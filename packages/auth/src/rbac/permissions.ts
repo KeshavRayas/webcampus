@@ -4,8 +4,8 @@ import { adminAc, defaultStatements } from "better-auth/plugins/admin/access";
 
 const statement = {
   ...defaultStatements,
-  attendance: ["create","read"],
-  marks: ["read"], 
+  attendance: ["create", "read"],
+  marks: ["read"],
   semester: ["create", "delete", "read"],
   courses: ["create", "read"],
   department: ["create", "read"],
@@ -39,7 +39,6 @@ export const roles = {
     courseAssignment: ["create"],
   }),
   coe: ac.newRole({
-    
     freeze: ["read", "lock"],
     attendance: ["read"],
     marks: ["read"],
@@ -51,6 +50,9 @@ export const roles = {
     sectionAssignment: ["create", "read", "update", "delete"],
     section: ["create", "read"],
     semester: ["read"],
+  }),
+  admission: ac.newRole({
+    user: [],
   }),
 } satisfies Record<Role, unknown>;
 

@@ -32,7 +32,30 @@ class Seeder {
       throw error;
     }
   }
+  public async ensureAdmissionUser(): Promise<void> {
+    const {
+      ADMISSION_USER_EMAIL,
+      ADMISSION_USER_PASSWORD,
+      ADMISSION_USER_NAME,
+      ADMISSION_USER_USERNAME,
+    } = backendEnv();
 
+    await this.signIn(); // sign in as admin
+
+    try {
+      await this.createUser({
+        name: ADMISSION_USER_NAME,
+        email: ADMISSION_USER_EMAIL,
+        username: ADMISSION_USER_USERNAME,
+        password: ADMISSION_USER_PASSWORD,
+        role: "admission",
+      });
+
+      logger.info("Admission user created from env.");
+    } catch {
+      logger.info("Admission user already exists. Skipping.");
+    }
+  }
   public async createUser(userData: CreateUserType): Promise<void> {
     try {
       const userService = new UserService({
@@ -78,6 +101,7 @@ async function main() {
   const seeder = new Seeder();
   try {
     await seeder.seedDepartmentUsers(10);
+    await seeder.ensureAdmissionUser();
   } catch (error) {
     logger.error(`Fatal error in seed script: ${(error as Error).message}`);
     process.exit(1);
