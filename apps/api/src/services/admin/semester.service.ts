@@ -13,9 +13,17 @@ export class SemesterService {
     data: CreateSemesterType
   ): Promise<BaseResponse<SemesterResponseType>> {
     try {
+      const name = `${data.type.toUpperCase()} ${data.year}`;
+      const currentDate = new Date();
+      const isCurrent =
+        currentDate >= new Date(data.startDate) &&
+        currentDate <= new Date(data.endDate);
+
       const semester = await db.semester.create({
         data: {
           ...data,
+          name,
+          isCurrent,
         },
       });
       const response: BaseResponse<SemesterResponseType> = {
@@ -39,6 +47,52 @@ export class SemesterService {
     }
   }
 
+  static async update(
+    id: string,
+    data: CreateSemesterType
+  ): Promise<BaseResponse<SemesterResponseType>> {
+    try {
+      const name = `${data.type.toUpperCase()} ${data.year}`;
+      const currentDate = new Date();
+      const isCurrent =
+        currentDate >= new Date(data.startDate) &&
+        currentDate <= new Date(data.endDate);
+
+      const semester = await db.semester.update({
+        where: { id },
+        data: {
+          type: data.type,
+          year: data.year,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          name,
+          isCurrent,
+        },
+      });
+      const response: BaseResponse<SemesterResponseType> = {
+        status: "success",
+        message: "Semester updated successfully",
+        data: semester,
+      };
+      logger.info(response);
+      return response;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2002") {
+          throw new Error(`Semester ${data.type} ${data.year} already exists`);
+        }
+        if (error.code === "P2025") {
+          throw new Error("Semester not found");
+        }
+      }
+      if (error instanceof Error) {
+        throw error;
+      }
+      logger.error({ error });
+      throw new Error("Failed to update semester");
+    }
+  }
+
   static async getAll(
     query: SemesterQueryType
   ): Promise<BaseResponse<SemesterResponseType[]>> {
@@ -51,10 +105,18 @@ export class SemesterService {
           createdAt: "desc",
         },
       });
+
+      const currentDate = new Date();
+      const semestersWithStatus = semesters.map((semester) => ({
+        ...semester,
+        isCurrent:
+          currentDate >= semester.startDate && currentDate <= semester.endDate,
+      }));
+
       const response: BaseResponse<SemesterResponseType[]> = {
         status: "success",
         message: "Semesters fetched successfully",
-        data: semesters,
+        data: semestersWithStatus,
       };
       logger.info(response);
       return response;

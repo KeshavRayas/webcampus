@@ -3,11 +3,23 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { SemesterResponseType } from "@webcampus/schemas/admin";
 import dayjs from "dayjs";
+import { AdminSemesterActions } from "./admin-semester-actions";
 
 export const AdminSemesterColumns: ColumnDef<SemesterResponseType>[] = [
   {
     accessorKey: "id",
     header: "ID",
+  },
+  {
+    id: "name",
+    header: "Name",
+    cell: ({ row }) => {
+      return (
+        <div>
+          {row.original.type.toUpperCase()} {row.original.year}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "endDate",
@@ -44,5 +56,9 @@ export const AdminSemesterColumns: ColumnDef<SemesterResponseType>[] = [
     cell: ({ row }) => {
       return <div>{row.original.userId}</div>;
     },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => <AdminSemesterActions semester={row.original} />,
   },
 ];

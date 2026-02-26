@@ -15,7 +15,7 @@
     "db:reset": "prisma migrate reset -f",
     "db:nuke": "docker compose down --volumes || docker-compose down --volumes",
     "db:up": "docker compose up -d || docker-compose up -d",
-    "db:setup": "run-s db:up db:generate db:migrate db:deploy",
+    "db:setup": "run-s db:up db:generate",
     "dx": "run-s db:setup",
     "format:write": "prettier --write \"**/*.{ts,tsx,mdx}\" --cache",
     "format:check": "prettier --check \"**/*.{ts,tsx,mdx}\" --cache",

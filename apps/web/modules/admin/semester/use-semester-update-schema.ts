@@ -1,6 +1,5 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
@@ -15,31 +14,39 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 
-export const useSemesterCreateSchema = (semesters?: SemesterResponseType[]) => {
+export const useSemesterUpdateSchema = (
+  semester: SemesterResponseType,
+  onSuccessCallback?: () => void
+) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const { data } = authClient.useSession();
   const queryClient = useQueryClient();
+
   const form = useForm<CreateSemesterType>({
     resolver: zodResolver(CreateSemesterSchema),
     defaultValues: {
-      type: "odd",
-      year: "",
-      startDate: new Date(),
-      endDate: new Date(),
-      userId: data?.user?.id || "",
+      type: semester.type,
+      year: semester.year,
+      startDate: new Date(semester.startDate),
+      endDate: new Date(semester.endDate),
+      userId: semester.userId || "",
     },
   });
 
+  // Update form values when semester prop changes
   useEffect(() => {
-    if (data?.user?.id) {
-      form.setValue("userId", data.user.id);
-    }
-  }, [data, form]);
+    form.reset({
+      type: semester.type,
+      year: semester.year,
+      startDate: new Date(semester.startDate),
+      endDate: new Date(semester.endDate),
+      userId: semester.userId || "",
+    });
+  }, [semester, form]);
 
-  const { mutate: createSemester } = useMutation({
+  const { mutate: updateSemester } = useMutation({
     mutationFn: async (data: CreateSemesterType) => {
-      return await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
+      return await axios.put(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester/${semester.id}`,
         data,
         {
           withCredentials: true,
@@ -49,30 +56,18 @@ export const useSemesterCreateSchema = (semesters?: SemesterResponseType[]) => {
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);
       queryClient.invalidateQueries({ queryKey: ["semesters"] });
+      onSuccessCallback?.();
     },
     onError: (error: AxiosError<ErrorResponse>) => {
-      toast.error(error.response?.data.error);
+      const errorMessage =
+        error.response?.data?.error || error.message || "An error occurred";
+      toast.error(errorMessage);
     },
   });
 
-  const onSubmit = (data: CreateSemesterType) => {
-    if (semesters) {
-      const hasOverlap = semesters.some((semester) => {
-        const startA = new Date(data.startDate).getTime();
-        const endA = new Date(data.endDate).getTime();
-        const startB = new Date(semester.startDate).getTime();
-        const endB = new Date(semester.endDate).getTime();
-
-        return startA <= endB && endA >= startB;
-      });
-
-      if (hasOverlap) {
-        toast.error("Semester dates overlap with an existing semester.");
-        return;
-      }
-    }
-    createSemester(data);
+  const onUpdate = (data: CreateSemesterType) => {
+    updateSemester(data);
   };
 
-  return { form, onSubmit };
+  return { form, onUpdate };
 };
