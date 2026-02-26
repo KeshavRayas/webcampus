@@ -20,6 +20,10 @@ const backendEnvSchema = commonEnvSchema.extend({
   ADMIN_USER_EMAIL: z.string(),
   ADMIN_USER_PASSWORD: z.string(),
   ADMIN_USER_USERNAME: z.string(),
+  ADMISSION_USER_NAME: z.string(),
+  ADMISSION_USER_EMAIL: z.string(),
+  ADMISSION_USER_PASSWORD: z.string(),
+  ADMISSION_USER_USERNAME: z.string(),
 });
 
 /**

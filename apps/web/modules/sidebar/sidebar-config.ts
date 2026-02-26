@@ -246,4 +246,16 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     },
     navSecondary,
   },
+  admission: {
+    navMain: {
+      items: [
+        {
+          name: "Registration",
+          url: "/admission/registration",
+          icon: BookCopy,
+        },
+      ],
+    },
+    navSecondary,
+  },
 } as const;
