@@ -31,8 +31,19 @@ export const DepartmentCoursesColumns: ColumnDef<CourseResponseDTO>[] = [
     header: "Credits",
   },
   {
-    accessorKey: "hasLab",
-    header: "Lab",
+    accessorKey: "semesterNumber",
+    header: "Sem No.",
+  },
+  {
+    accessorKey: "semesterId",
+    header: "Semester ID",
+  },
+  {
+    id: "semesterName",
+    header: "Semester Instance",
+    cell: ({ row }) => {
+      return <div>{row.original.semester?.name || "-"}</div>;
+    },
   },
   {
     id: "actions",

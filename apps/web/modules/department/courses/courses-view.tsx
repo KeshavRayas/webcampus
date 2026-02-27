@@ -1,14 +1,12 @@
 "use client";
 
-import { Checkbox } from "@webcampus/ui/components/checkbox";
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@webcampus/ui/components/form";
-import { Input } from "@webcampus/ui/components/input";
+import { authClient } from "@/lib/auth-client";
+import { useQuery } from "@tanstack/react-query";
+import { frontendEnv } from "@webcampus/common/env";
+import { SemesterResponseType } from "@webcampus/schemas/admin";
+import { CourseResponseDTO } from "@webcampus/schemas/department";
+import { BaseResponse } from "@webcampus/types/api";
+import { Label } from "@webcampus/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -16,145 +14,104 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
-import React from "react";
-import { DepartmentCoursesTable } from "./department-courses-table";
-import { useCreateCourseForm } from "./use-create-course-form";
+import axios from "axios";
+import React, { useState } from "react";
+import { SemesterCourseBlock } from "./semester-course-block";
 
-const COURSE_TYPES = [
-  { value: "core", label: "Core" },
-  { value: "elective", label: "Elective" },
-  { value: "lab", label: "Laboratory" },
-  { value: "seminar", label: "Seminar" },
-  { value: "project", label: "Project" },
-] as const;
+const ODD_SEMESTERS = [1, 3, 5, 7];
+const EVEN_SEMESTERS = [2, 4, 6, 8];
 
 export const CoursesView: React.FC = () => {
-  const { form, onSubmit } = useCreateCourseForm();
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const { data: session } = authClient.useSession();
+  const departmentName = session?.user?.name;
+
+  // Track the globally selected semester instance
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string>("");
+
+  // Fetch all available semester instances for the dropdown
+  const { data: semesters } = useQuery({
+    queryKey: ["semesters"],
+    queryFn: async () => {
+      const res = await axios.get<BaseResponse<SemesterResponseType[]>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
+        { withCredentials: true }
+      );
+      if (res.data.status === "success") {
+        return res.data.data;
+      }
+      return [];
+    },
+  });
+
+  // Fetch courses ONLY for the selected semester instance
+  const { data: courses, isLoading: coursesLoading } = useQuery({
+    queryKey: ["courses", departmentName, selectedSemesterId],
+    queryFn: async () => {
+      const res = await axios.get<BaseResponse<CourseResponseDTO[]>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/course/branch`,
+        {
+          params: { name: departmentName, semesterId: selectedSemesterId },
+          withCredentials: true,
+        }
+      );
+      if (res.data.status === "success") {
+        return res.data.data;
+      }
+      return [];
+    },
+    enabled: !!departmentName && !!selectedSemesterId,
+  });
+
+  const selectedSemester = semesters?.find((s) => s.id === selectedSemesterId);
+  const semesterNumbers =
+    selectedSemester?.type === "odd" ? ODD_SEMESTERS : EVEN_SEMESTERS;
 
   return (
-    <div>
-      <div className="flex justify-end">
-        <DialogForm
-          trigger="Create New Course"
-          title="Create New Course"
-          form={form}
-          onSubmit={onSubmit}
+    <div className="space-y-8">
+      {/* Global Semester Selector */}
+      <div className="w-full max-w-sm space-y-2">
+        <Label>Select Academic Semester Instance</Label>
+        <Select
+          value={selectedSemesterId}
+          onValueChange={setSelectedSemesterId}
         >
-          <FormField
-            control={form.control}
-            name="code"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Course Code *</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="e.g., CS101, MATH201"
-                    {...field}
-                    className="uppercase"
-                    onChange={(e) =>
-                      field.onChange(e.target.value.toUpperCase())
-                    }
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Course Name *</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="e.g., Introduction to Computer Science"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Course Type *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select course type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {COURSE_TYPES.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="credits"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Credits *</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="10"
-                      placeholder="e.g., 3"
-                      {...field}
-                      onChange={(e) =>
-                        field.onChange(parseInt(e.target.value) || 0)
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <FormField
-            control={form.control}
-            name="hasLab"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-y-0 space-x-3 rounded-md border p-4">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>Has Laboratory Component</FormLabel>
-                  <p className="text-muted-foreground text-sm">
-                    Check this if the course includes practical/lab sessions
-                  </p>
-                </div>
-              </FormItem>
-            )}
-          />
-        </DialogForm>
+          <SelectTrigger>
+            <SelectValue placeholder="Select a semester..." />
+          </SelectTrigger>
+          <SelectContent>
+            {semesters?.map((sem) => (
+              <SelectItem key={sem.id} value={sem.id}>
+                {sem.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <DepartmentCoursesTable />
+
+      {/* Render the 4 blocks if an instance is selected */}
+      {selectedSemester && (
+        <div className="space-y-6">
+          {coursesLoading ? (
+            <div>Loading courses...</div>
+          ) : (
+            semesterNumbers.map((num) => {
+              // Pre-filter courses for this specific numerical block
+              const blockCourses =
+                courses?.filter((c) => c.semesterNumber === num) || [];
+
+              return (
+                <SemesterCourseBlock
+                  key={num}
+                  semesterId={selectedSemester.id}
+                  semesterNumber={num}
+                  courses={blockCourses}
+                />
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 };

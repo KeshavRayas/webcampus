@@ -55,6 +55,7 @@ model Semester {
   createdBy User         @relation(fields: [userId], references: [id])
   userId    String
   Section   Section[]
+  Course    Course[]
 
   @@unique([type, year])
 }
@@ -238,6 +239,9 @@ model Course {
   department     Department           @relation(fields: [departmentName], references: [name])
   departmentName String
   hasLab         Boolean              @default(false)
+  semesterId     String
+  semester       Semester             @relation(fields: [semesterId], references: [id])
+  semesterNumber Int
   assignments    CourseAssignment[]
   registrations  CourseRegistration[]
   marks          Mark[]

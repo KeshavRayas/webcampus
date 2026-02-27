@@ -6,13 +6,18 @@ import { BaseResponse } from "@webcampus/types/api";
 export class CourseService {
   static async create(data: CreateCourseDTO): Promise<BaseResponse<Course>> {
     try {
-      const { departmentName, ...courseData } = data;
+      const { departmentName, semesterId, ...courseData } = data;
       const course = await db.course.create({
         data: {
           ...courseData,
           department: {
             connect: {
               name: departmentName,
+            },
+          },
+          semester: {
+            connect: {
+              id: semesterId,
             },
           },
         },
@@ -65,7 +70,10 @@ export class CourseService {
     }
   }
 
-  static async getByBranch(name: string): Promise<BaseResponse<Course[]>> {
+  static async getByBranch(
+    name: string,
+    semesterId?: string
+  ): Promise<BaseResponse<Course[]>> {
     try {
       const courses = await db.course.findMany({
         where: {
@@ -73,6 +81,14 @@ export class CourseService {
             name: {
               equals: name,
               mode: "insensitive",
+            },
+          },
+          ...(semesterId ? { semesterId } : {}),
+        },
+        include: {
+          semester: {
+            select: {
+              name: true,
             },
           },
         },
