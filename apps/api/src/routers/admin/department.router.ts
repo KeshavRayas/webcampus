@@ -30,4 +30,15 @@ router.get(
   DepartmentController.getDepartments
 );
 
+router.delete(
+  "/:id",
+  protect({
+    role: "admin",
+    permissions: {
+      department: ["delete"],
+    },
+  }),
+  DepartmentController.delete
+);
+
 export default router;
