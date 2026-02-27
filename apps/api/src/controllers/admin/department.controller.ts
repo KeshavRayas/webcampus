@@ -60,7 +60,7 @@ export class DepartmentController {
 
   static async delete(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const response = await DepartmentService.delete(id);
       if (response.status === "success") {
         sendResponse({
