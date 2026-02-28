@@ -1,24 +1,20 @@
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
-import {
-  CreateFacultyType,
-  FacultyResponseType,
-  UpdateFacultyType,
-} from "@webcampus/schemas/faculty";
+import { BaseFacultyType, UpdateFacultyType } from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
 
 export class Faculty {
-  static async create(
-    data: CreateFacultyType
-  ): Promise<BaseResponse<FacultyResponseType>> {
+  static async create(data: BaseFacultyType): Promise<BaseResponse<unknown>> {
     try {
       const faculty = await db.faculty.create({
         data: {
           userId: data.userId,
-          departmentName: data.departmentName,
+          departmentId: data.departmentId,
+          shortName: data.shortName,
+          designation: data.designation,
         },
       });
-      const response: BaseResponse<FacultyResponseType> = {
+      const response: BaseResponse<unknown> = {
         status: "success",
         message: "Faculty created successfully",
         data: faculty,
@@ -31,10 +27,10 @@ export class Faculty {
     }
   }
 
-  static async getAll(): Promise<BaseResponse<FacultyResponseType[]>> {
+  static async getAll(): Promise<BaseResponse<unknown[]>> {
     try {
       const faculties = await db.faculty.findMany();
-      const response: BaseResponse<FacultyResponseType[]> = {
+      const response: BaseResponse<unknown[]> = {
         status: "success",
         message: "Faculties retrieved successfully",
         data: faculties,
@@ -47,7 +43,7 @@ export class Faculty {
     }
   }
 
-  static async getById(id: string): Promise<BaseResponse<FacultyResponseType>> {
+  static async getById(id: string): Promise<BaseResponse<unknown>> {
     try {
       const faculty = await db.faculty.findUnique({
         where: { id },
@@ -57,7 +53,7 @@ export class Faculty {
         throw new Error("Faculty not found");
       }
 
-      const response: BaseResponse<FacultyResponseType> = {
+      const response: BaseResponse<unknown> = {
         status: "success",
         message: "Faculty retrieved successfully",
         data: faculty,
@@ -73,16 +69,18 @@ export class Faculty {
   static async update(
     id: string,
     data: UpdateFacultyType
-  ): Promise<BaseResponse<FacultyResponseType>> {
+  ): Promise<BaseResponse<unknown>> {
     try {
       const faculty = await db.faculty.update({
         where: { id },
         data: {
-          departmentName: data.departmentName,
+          ...(data.departmentId && { departmentId: data.departmentId }),
+          ...(data.designation && { designation: data.designation }),
+          ...(data.shortName && { shortName: data.shortName }),
         },
       });
 
-      const response: BaseResponse<FacultyResponseType> = {
+      const response: BaseResponse<unknown> = {
         status: "success",
         message: "Faculty updated successfully",
         data: faculty,

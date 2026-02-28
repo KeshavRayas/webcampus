@@ -14,6 +14,7 @@ const statement = {
   courseAssignment: ["create"],
   section: ["create", "read"],
   freeze: ["read", "lock"],
+  faculty: ["create", "read", "update", "delete"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -24,6 +25,7 @@ export const roles = {
     semester: ["create", "read", "delete", "update"],
     department: ["create", "read", "delete"],
     sectionAssignment: ["create", "read", "update", "delete"],
+    faculty: ["create", "read"],
   }),
   student: ac.newRole({
     user: [],

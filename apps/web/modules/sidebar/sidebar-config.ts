@@ -50,6 +50,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/admin/semester",
           icon: CalendarDays,
         },
+        {
+          name: "Faculty",
+          url: "/admin/faculty",
+          icon: Users,
+        },
       ],
     },
     navSecondary,
