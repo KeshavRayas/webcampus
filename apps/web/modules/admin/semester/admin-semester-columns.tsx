@@ -9,24 +9,20 @@ export const AdminSemesterColumns: ColumnDef<SemesterResponseType>[] = [
   {
     accessorKey: "id",
     header: "ID",
+    meta: { enableCopy: true },
   },
   {
     id: "name",
     header: "Name",
-    cell: ({ row }) => {
-      return (
-        <div>
-          {row.original.type.toUpperCase()} {row.original.year}
-        </div>
-      );
-    },
+    accessorFn: (row) => `${row.type.toUpperCase()} ${row.year}`,
+    meta: { enableCopy: true },
   },
   {
     accessorKey: "endDate",
     header: "End Date",
-    cell: ({ row }) => {
-      return <div>{dayjs(row.original.endDate).format("DD/MM/YYYY")}</div>;
-    },
+    cell: ({ row }) => dayjs(row.original.endDate).format("DD/MM/YYYY"),
+    accessorFn: (row) => dayjs(row.endDate).format("DD/MM/YYYY"),
+    meta: { enableCopy: true },
   },
   {
     accessorKey: "type",
@@ -35,9 +31,9 @@ export const AdminSemesterColumns: ColumnDef<SemesterResponseType>[] = [
   {
     accessorKey: "startDate",
     header: "Start Date",
-    cell: ({ row }) => {
-      return <div>{dayjs(row.original.startDate).format("DD/MM/YYYY")}</div>;
-    },
+    cell: ({ row }) => dayjs(row.original.startDate).format("DD/MM/YYYY"),
+    accessorFn: (row) => dayjs(row.startDate).format("DD/MM/YYYY"),
+    meta: { enableCopy: true },
   },
   {
     accessorKey: "year",
@@ -53,9 +49,7 @@ export const AdminSemesterColumns: ColumnDef<SemesterResponseType>[] = [
   {
     accessorKey: "userId",
     header: "User ID",
-    cell: ({ row }) => {
-      return <div>{row.original.userId}</div>;
-    },
+    meta: { enableCopy: true },
   },
   {
     id: "actions",

@@ -69,7 +69,7 @@ export function DataTable<TData, TValue>({
               >
                 {row.getVisibleCells().map((cell) => {
                   const copyButton =
-                    cell.column.columnDef.meta?.enableCopy !== false;
+                    cell.column.columnDef.meta?.enableCopy === true;
 
                   return (
                     <TableCell
