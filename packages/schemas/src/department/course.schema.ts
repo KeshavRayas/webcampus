@@ -26,6 +26,14 @@ const BaseCourseSchema = z.object({
   hasLab: z.boolean(),
 
   departmentName: z.string().min(1, "Department is required"),
+
+  semesterId: z.string().min(1, "Semester is required"),
+
+  semesterNumber: z
+    .number()
+    .int()
+    .min(1, "Semester number is required")
+    .max(8, "Semester number must be between 1 and 8"),
 });
 
 /**
@@ -43,7 +51,13 @@ export const UpdateCourseSchema = BaseCourseSchema.partial();
  * Response schema for a single course
  */
 export const CourseResponseSchema = BaseCourseSchema.extend({
-  id: z.uuid(),
+  id: z.string().uuid(),
+  // Add the joined semester relation
+  semester: z
+    .object({
+      name: z.string().nullable().optional(),
+    })
+    .optional(),
 });
 
 export type CreateCourseDTO = z.infer<typeof CreateCourseSchema>;

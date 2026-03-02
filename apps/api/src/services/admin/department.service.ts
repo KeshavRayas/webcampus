@@ -102,4 +102,33 @@ export class DepartmentService {
       throw new Error("Failed to get departments");
     }
   }
+
+  static async delete(userId: string): Promise<BaseResponse<null>> {
+    try {
+      // First delete the department associated with the user
+      await db.department.deleteMany({
+        where: {
+          userId: userId,
+        },
+      });
+
+      // Then delete the user
+      await db.user.delete({
+        where: {
+          id: userId,
+        },
+      });
+
+      const response: BaseResponse<null> = {
+        status: "success",
+        message: "Department deleted successfully",
+        data: null,
+      };
+      logger.info(response);
+      return response;
+    } catch (error) {
+      logger.error(`Failed to delete department`, error);
+      throw new Error("Failed to delete department");
+    }
+  }
 }

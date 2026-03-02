@@ -18,7 +18,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@webcampus/ui/components/form";
-import { Input } from "@webcampus/ui/components/input";
 import { Page, PageContent, PageHeader } from "@webcampus/ui/components/page";
 import {
   Popover,
@@ -41,7 +40,6 @@ import { AdminSemesterColumns } from "./admin-semester-columns";
 import { useSemesterCreateSchema } from "./use-semester-create-schema";
 
 export const AdminSemesterView = () => {
-  const { form, onSubmit } = useSemesterCreateSchema();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: semesters, isLoading } = useQuery({
     queryKey: ["semesters"],
@@ -60,12 +58,18 @@ export const AdminSemesterView = () => {
     },
   });
 
+  const { form, onSubmit } = useSemesterCreateSchema(semesters ?? undefined);
+
+  const watchedType = form.watch("type");
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 6 }, (_, i) =>
+    (currentYear + i).toString()
+  );
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
-  if (!semesters || semesters.length === 0) {
-    return <div>No semesters found</div>;
-  }
+
   return (
     <div>
       <Page>
@@ -102,6 +106,12 @@ export const AdminSemesterView = () => {
                         </SelectContent>
                       </Select>
                     </FormControl>
+                    {watchedType && (
+                      <p className="text-muted-foreground mt-1 text-sm">
+                        Applies to semesters:{" "}
+                        {watchedType === "odd" ? "1, 3, 5, 7" : "2, 4, 6, 8"}
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -114,11 +124,23 @@ export const AdminSemesterView = () => {
                   <FormItem className="flex-1">
                     <FormLabel>Year</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., 2024"
-                        type="number"
-                      />
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select Year" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="w-full">
+                          {years.map((year) => (
+                            <SelectItem key={year} value={year}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -158,6 +180,8 @@ export const AdminSemesterView = () => {
                           selected={field.value}
                           onSelect={field.onChange}
                           captionLayout="dropdown"
+                          fromYear={currentYear - 5}
+                          toYear={currentYear + 10}
                         />
                       </PopoverContent>
                     </Popover>
@@ -197,6 +221,8 @@ export const AdminSemesterView = () => {
                           selected={field.value}
                           onSelect={field.onChange}
                           captionLayout="dropdown"
+                          fromYear={currentYear - 5}
+                          toYear={currentYear + 10}
                         />
                       </PopoverContent>
                     </Popover>
@@ -208,7 +234,11 @@ export const AdminSemesterView = () => {
           </DialogForm>
         </PageHeader>
         <PageContent>
-          <DataTable columns={AdminSemesterColumns} data={semesters} />
+          {semesters && semesters.length > 0 ? (
+            <DataTable columns={AdminSemesterColumns} data={semesters} />
+          ) : (
+            <div>No semesters found</div>
+          )}
         </PageContent>
       </Page>
     </div>

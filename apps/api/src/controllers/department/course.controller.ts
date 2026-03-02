@@ -2,7 +2,7 @@ import { CourseService } from "@webcampus/api/src/services/department/course.ser
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
-import { StringParam, UUIDType } from "@webcampus/schemas/common";
+import { UUIDType } from "@webcampus/schemas/common";
 import { CreateCourseDTO } from "@webcampus/schemas/department";
 import { Request, Response } from "express";
 
@@ -60,8 +60,13 @@ export class CourseController {
 
   static async getByBranch(req: Request, res: Response): Promise<void> {
     try {
-      const request = req.query as StringParam;
-      const response = await CourseService.getByBranch(request.name);
+      const { name, semesterId } = req.query as {
+        name: string;
+        semesterId?: string;
+      };
+
+      const response = await CourseService.getByBranch(name, semesterId);
+
       if (response.status === "success") {
         sendResponse({
           res,

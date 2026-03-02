@@ -57,4 +57,29 @@ export class DepartmentController {
       });
     }
   }
+
+  static async delete(req: Request, res: Response): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const response = await DepartmentService.delete(id);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          statusCode: 200,
+          status: "success",
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Deleting Department", error);
+      sendResponse({
+        res,
+        status: "error",
+        message: ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 500,
+        error,
+      });
+    }
+  }
 }
