@@ -364,3 +364,27 @@ model Freeze {
   User               User?            @relation(fields: [userId], references: [id])
   userId             String?
 }
+
+model Admission {
+  id Int @id @default(autoincrement())
+  name        String
+  email       String @unique
+  phoneNumber String?
+  address String?
+  gender  String?
+  fatherName String?
+  motherName String?
+  fatherEmail String?
+  motherEmail String?
+  fatherNumber String?
+  motherNumber String?
+  class10thMarks Float?
+  class12thMarks Float?
+  class10thMarksPdf String?
+  class12thMarksPdf String?
+  class10thSchoolName String?
+  class12thSchoolName String?
+  modeOfAdmission String?
+  photo String?
+  createdAt DateTime @default(now())
+}

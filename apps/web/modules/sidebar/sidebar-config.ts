@@ -255,8 +255,13 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     navMain: {
       items: [
         {
-          name: "Registration",
-          url: "/admission/registration",
+          name: "Dashboard",
+          url: "/admission",
+          icon: LayoutDashboard,
+        },
+        {
+          name: "View Admissions",
+          url: "/admission/view-admissions",
           icon: BookCopy,
         },
       ],

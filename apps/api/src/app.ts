@@ -5,6 +5,7 @@ import { backendEnv } from "@webcampus/common/env";
 import cors from "cors";
 import express from "express";
 import adminRouter from "./routers/admin/admin.router";
+import admissionRouter from "./routers/admission/admission.router";
 import coeRouter from "./routers/coe/coe.router";
 import hodRouter from "./routers/hod/hod.router";
 
@@ -31,6 +32,8 @@ app.use("/hod", hodRouter);
 app.use("/department", DepartmentRouter);
 
 app.use("/coe", coeRouter);
+
+app.use("/admission", admissionRouter);
 
 app.get("/", (req, res) => {
   res.send({
