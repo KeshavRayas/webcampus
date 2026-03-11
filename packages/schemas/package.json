@@ -4,6 +4,7 @@
   "private": true,
   "exports": {
     "./admin": "./src/admin/index.ts",
+    "./admission": "./src/admission/index.ts",
     "./department": "./src/department/index.ts",
     "./faculty": "./src/faculty/index.ts",
     "./hod": "./src/hod/index.ts",

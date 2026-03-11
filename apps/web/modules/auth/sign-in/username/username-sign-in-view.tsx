@@ -15,8 +15,18 @@ import Link from "next/link";
 import React from "react";
 import { useUsernameSignInForm } from "./use-username-sign-in-form";
 
-export const UsernameSignIn = () => {
-  const { form, onSubmit } = useUsernameSignInForm();
+// 1. Add the role prop
+export const UsernameSignIn = ({ role }: { role: string }) => {
+  // 2. Pass the role to our updated hook
+  const { form, onSubmit } = useUsernameSignInForm(role);
+
+  // 3. Set up dynamic text based on the role
+  const isStudent = role === "student";
+  const title = isStudent ? "Student sign in" : "Applicant sign in";
+  const idLabel = isStudent ? "USN" : "Application ID";
+  const idPlaceholder = isStudent
+    ? "Enter your USN"
+    : "Enter your Application ID";
 
   return (
     <Form {...form}>
@@ -25,7 +35,7 @@ export const UsernameSignIn = () => {
         className="flex flex-col gap-6"
       >
         <div className="flex flex-col items-center gap-2 text-center">
-          <h1 className="text-2xl font-bold">Student sign in</h1>
+          <h1 className="text-2xl font-bold">{title}</h1>
           <p className="text-muted-foreground text-sm text-balance">
             Welcome back! Please sign in to continue.
           </p>
@@ -36,9 +46,9 @@ export const UsernameSignIn = () => {
             name="username"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>USN</FormLabel>
+                <FormLabel>{idLabel}</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Enter your usn" />
+                  <Input {...field} placeholder={idPlaceholder} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

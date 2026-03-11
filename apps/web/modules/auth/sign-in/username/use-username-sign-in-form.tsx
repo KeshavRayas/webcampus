@@ -7,13 +7,20 @@ import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import z from "zod";
 
-const signInSchema = z.object({
-  username: z.string().min(1, "USN is required"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
-
-export const useUsernameSignInForm = () => {
+export const useUsernameSignInForm = (role: string) => {
   const router = useRouter();
+
+  // Move the schema inside so it can use the dynamic role for error messages
+  const signInSchema = z.object({
+    username: z
+      .string()
+      .min(
+        1,
+        role === "student" ? "USN is required" : "Application ID is required"
+      ),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+  });
+
   const form = useForm({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -29,7 +36,8 @@ export const useUsernameSignInForm = () => {
       },
       onSuccess: () => {
         toast.success("Signed in successfully!");
-        router.push("/student");
+        // Dynamically route them to their respective dashboard!
+        router.push(`/${role}`);
       },
       onRetry: () => {
         toast.info("Retrying sign in...");
@@ -37,8 +45,5 @@ export const useUsernameSignInForm = () => {
     });
   };
 
-  return {
-    form,
-    onSubmit,
-  };
+  return { form, onSubmit };
 };

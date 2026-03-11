@@ -15,6 +15,7 @@ const statement = {
   section: ["create", "read"],
   freeze: ["read", "lock"],
   faculty: ["create", "read", "update", "delete"],
+  admission: ["create", "read", "update", "delete"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -26,6 +27,10 @@ export const roles = {
     department: ["create", "read", "delete"],
     sectionAssignment: ["create", "read", "update", "delete"],
     faculty: ["create", "read"],
+    admission: ["create", "read", "update", "delete"],
+  }),
+  applicant: ac.newRole({
+    admission: ["read", "update"],
   }),
   student: ac.newRole({
     user: [],
@@ -54,7 +59,9 @@ export const roles = {
     semester: ["read"],
   }),
   admission: ac.newRole({
-    user: [],
+    semester: ["read"], // Allows fetching the semester dropdown
+    admission: ["create", "read", "update", "delete"], // Allows managing admissions
+    user: ["set-role"], // Needed because creating an applicant creates a user
   }),
 } satisfies Record<Role, unknown>;
 

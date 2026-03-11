@@ -50,7 +50,7 @@ export class UserService {
    */
   async create(): Promise<BaseResponse<Partial<User>>> {
     try {
-      if (this.body.role === "student") {
+      if (this.body.role === "student" || this.body.role === "applicant") {
         return await this.createStudent();
       } else {
         return await this.createUserWithAdminAPI();

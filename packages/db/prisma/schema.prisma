@@ -56,6 +56,7 @@ model Semester {
   userId    String
   Section   Section[]
   Course    Course[]
+  Admission Admission[]
 
   @@unique([type, year])
 }
@@ -134,6 +135,13 @@ enum Designation {
   ASSISTANT_PROFESSOR
   PROFESSOR
   VISITING_PROFESSOR
+}
+
+enum AdmissionStatus {
+  PENDING    // Admin created the shell, student hasn't submitted yet
+  SUBMITTED  // Student filled the form and uploaded docs
+  APPROVED   // Admin verified the documents
+  REJECTED   // Admin rejected the application
 }
 
 model Department {
@@ -366,25 +374,37 @@ model Freeze {
 }
 
 model Admission {
-  id Int @id @default(autoincrement())
-  name        String
-  email       String @unique
-  phoneNumber String?
-  address String?
-  gender  String?
-  fatherName String?
-  motherName String?
-  fatherEmail String?
-  motherEmail String?
-  fatherNumber String?
-  motherNumber String?
-  class10thMarks Float?
-  class12thMarks Float?
-  class10thMarksPdf String?
-  class12thMarksPdf String?
+  id                  String          @id @default(uuid())
+  applicationId       String          @unique // Used as the student's initial username
+  modeOfAdmission     String
+  status              AdmissionStatus @default(PENDING)
+
+  semesterId          String
+  semester            Semester        @relation(fields: [semesterId], references: [id])
+
+  // --- Fields below are optional because they are filled later by the Applicant ---
+  name                String?
+  email               String?         @unique
+  phoneNumber         String?
+  address             String?
+  gender              String?
+  fatherName          String?
+  motherName          String?
+  fatherEmail         String?
+  motherEmail         String?
+  fatherNumber        String?
+  motherNumber        String?
+  class10thMarks      Float?
+  class12thMarks      Float?
+  class10thMarksPdf   String?
+  class12thMarksPdf   String?
+  casteCertificate    String?         // Added this from our previous check!
   class10thSchoolName String?
   class12thSchoolName String?
-  modeOfAdmission String?
-  photo String?
-  createdAt DateTime @default(now())
+  photo               String?
+
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([semesterId])
 }

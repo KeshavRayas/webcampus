@@ -268,4 +268,17 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     },
     navSecondary,
   },
+
+  applicant: {
+    navMain: {
+      items: [
+        {
+          name: "My Application",
+          url: "/applicant",
+          icon: BookOpenText,
+        },
+      ],
+    },
+    navSecondary,
+  },
 } as const;

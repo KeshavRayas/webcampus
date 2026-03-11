@@ -7,6 +7,7 @@ export const roles = [
   "department",
   "admission",
   "admin",
+  "applicant",
 ] as const;
 
 /** Type representing all allowed user roles in the system. */
