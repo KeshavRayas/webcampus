@@ -1,5 +1,9 @@
 import path from "path";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { v4 as uuidv4 } from "uuid";
 
 // Ensure your AWS variables are in your apps/api/.env file!
@@ -37,5 +41,27 @@ export const uploadToS3 = async (
   } catch (error) {
     console.error("S3 Upload Error:", error);
     return { success: false, url: null };
+  }
+};
+
+export const deleteFromS3 = async (
+  url: string
+): Promise<{ success: boolean }> => {
+  try {
+    // Extract the object key from the full S3 URL
+    // e.g. https://bucket.s3.region.amazonaws.com/photo_abc123.png → photo_abc123.png
+    const key = url.split(".amazonaws.com/")[1];
+    if (!key) return { success: false };
+
+    const command = new DeleteObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Key: key,
+    });
+
+    await s3Client.send(command);
+    return { success: true };
+  } catch (error) {
+    console.error("S3 Delete Error:", error);
+    return { success: false };
   }
 };

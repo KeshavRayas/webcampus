@@ -75,4 +75,11 @@ export const AdminAdmissionColumns: ColumnDef<AdmissionResponse>[] = [
     header: "Actions",
     cell: ({ row }) => <AdminAdmissionActions admission={row.original} />,
   },
+  {
+    id: "menu",
+    header: "",
+    cell: ({ row }) => (
+      <AdminAdmissionActions admission={row.original} menuOnly />
+    ),
+  },
 ];

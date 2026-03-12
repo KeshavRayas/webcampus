@@ -104,6 +104,41 @@ export class AdmissionService {
     return { status: "success", message: "Fetched", data: admission };
   }
 
+  static async deleteAdmission(id: string): Promise<BaseResponse<unknown>> {
+    try {
+      // 1. Fetch the admission record
+      const admission = await db.admission.findUnique({ where: { id } });
+      if (!admission) throw new Error("Admission not found");
+
+      // 2. Delete associated S3 files if they exist
+      const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+      const fileUrls = [
+        admission.photo,
+        admission.class10thMarksPdf,
+        admission.class12thMarksPdf,
+        admission.casteCertificate,
+      ].filter(
+        (url): url is string => typeof url === "string" && url.length > 0
+      );
+
+      await Promise.all(fileUrls.map((url) => deleteFromS3(url)));
+
+      // 3. Delete the database record
+      await db.admission.delete({ where: { id } });
+
+      return {
+        status: "success",
+        message: "Admission deleted successfully",
+        data: null,
+      };
+    } catch (error) {
+      logger.error("Failed to delete admission", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to delete admission"
+      );
+    }
+  }
+
   static async submitApplication(
     applicationId: string,
     data: Record<string, string>, // Text fields

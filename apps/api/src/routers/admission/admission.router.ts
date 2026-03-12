@@ -43,6 +43,18 @@ router.get(
   AdmissionController.getMe
 );
 
+// Endpoint for admin to delete an admission record (and its S3 files)
+router.delete(
+  "/:id",
+  protect({
+    role: "admin",
+    permissions: {
+      admission: ["delete"],
+    },
+  }),
+  AdmissionController.deleteAdmission
+);
+
 // Endpoint for applicant to submit their final form
 router.put(
   "/submit",

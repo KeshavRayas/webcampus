@@ -113,6 +113,32 @@ export class AdmissionController {
     }
   }
 
+  static async deleteAdmission(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const response = await AdmissionService.deleteAdmission(id as string);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error deleting admission", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
   static async submit(req: Request, res: Response): Promise<void> {
     try {
       // 1. FOOLPROOF WAY: Get session directly from Better Auth
