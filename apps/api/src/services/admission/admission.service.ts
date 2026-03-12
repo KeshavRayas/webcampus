@@ -11,31 +11,79 @@ export class AdmissionService {
     headers: IncomingHttpHeaders
   ): Promise<BaseResponse<unknown>> {
     try {
-      // 1. Create the applicant auth user
-      // We generate a dummy email and name since they haven't filled it out yet
-      const userService = new UserService({
-        request: {
-          email: `${data.applicationId.toLowerCase()}@applicant.local`,
-          name: `Applicant ${data.applicationId}`,
-          username: data.applicationId, // The student will log in using this!
-          password: "password", // Default password
-          role: "applicant", // Our newly created role
+      const applicationId = data.applicationId.trim();
+      const applicantEmail = `${applicationId.toLowerCase()}@applicant.local`;
+
+      // 1. Guard against duplicate admission shells first.
+      const existingAdmission = await db.admission.findFirst({
+        where: {
+          applicationId: {
+            equals: applicationId,
+            mode: "insensitive",
+          },
         },
-        headers,
       });
 
-      const authUser = await userService.create();
+      if (existingAdmission) {
+        throw new Error("An admission with this Application ID already exists");
+      }
 
-      if (authUser.status === "error" || !authUser.data?.id) {
+      // 2. Ensure an applicant auth user exists for this application ID.
+      // Reuse it if it already exists (for idempotent retries).
+      const existingApplicantUser = await db.user.findFirst({
+        where: {
+          OR: [
+            {
+              username: {
+                equals: applicationId,
+                mode: "insensitive",
+              },
+            },
+            { email: applicantEmail },
+          ],
+        },
+        select: {
+          id: true,
+          role: true,
+        },
+      });
+
+      let createdNewApplicantUser = false;
+
+      if (existingApplicantUser && existingApplicantUser.role !== "applicant") {
         throw new Error(
-          authUser.message || "Failed to create applicant user account"
+          "This Application ID is already linked to a non-applicant user"
         );
       }
 
-      // 2. Create the Admission Shell in the database
+      if (!existingApplicantUser) {
+        // We generate a dummy email and name since the applicant has not filled it out yet.
+        const userService = new UserService({
+          request: {
+            email: applicantEmail,
+            name: `Applicant ${applicationId}`,
+            username: applicationId,
+            password: "password",
+            role: "applicant",
+          },
+          headers,
+        });
+
+        const authUser = await userService.create();
+
+        if (authUser.status === "error" || !authUser.data?.id) {
+          throw new Error(
+            authUser.message || "Failed to create applicant user account"
+          );
+        }
+
+        createdNewApplicantUser = true;
+      }
+
+      // 3. Create the Admission Shell in the database.
       const admission = await db.admission.create({
         data: {
-          applicationId: data.applicationId,
+          applicationId,
           modeOfAdmission: data.modeOfAdmission,
           semesterId: data.semesterId,
           status: "PENDING", // Explicitly setting the initial status
@@ -47,7 +95,9 @@ export class AdmissionService {
 
       const response: BaseResponse<unknown> = {
         status: "success",
-        message: "Admission shell and applicant account created successfully",
+        message: createdNewApplicantUser
+          ? "Admission shell and applicant account created successfully"
+          : "Admission shell created successfully",
         data: admission,
       };
 
