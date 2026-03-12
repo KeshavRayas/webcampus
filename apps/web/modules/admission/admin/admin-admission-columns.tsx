@@ -34,7 +34,7 @@ export type AdmissionResponse = {
   photo?: string | null;
 };
 
-export const AdminAdmissionColumns: ColumnDef<AdmissionResponse>[] = [
+const baseColumns: ColumnDef<AdmissionResponse>[] = [
   {
     accessorKey: "applicationId",
     header: "Application ID",
@@ -70,11 +70,23 @@ export const AdminAdmissionColumns: ColumnDef<AdmissionResponse>[] = [
       <div>{dayjs(row.original.createdAt).format("MMM D, YYYY")}</div>
     ),
   },
-  {
-    id: "actions",
-    header: "Actions",
-    cell: ({ row }) => <AdminAdmissionActions admission={row.original} />,
-  },
+];
+
+export const getAdminAdmissionColumns = (
+  showViewDetails: boolean
+): ColumnDef<AdmissionResponse>[] => [
+  ...baseColumns,
+  ...(showViewDetails
+    ? [
+        {
+          id: "actions",
+          header: "Actions",
+          cell: ({ row }: { row: { original: AdmissionResponse } }) => (
+            <AdminAdmissionActions admission={row.original} />
+          ),
+        } satisfies ColumnDef<AdmissionResponse>,
+      ]
+    : []),
   {
     id: "menu",
     header: "",

@@ -1,5 +1,5 @@
 import { AdminAdmissionView } from "@/modules/admission/admin/admin-admission-view";
-import React from "react";
+import React, { Suspense } from "react";
 
 export default function ViewAdmissionsPage() {
   return (
@@ -9,12 +9,13 @@ export default function ViewAdmissionsPage() {
           Admissions Management
         </h1>
         <p className="text-muted-foreground text-sm">
-          Select a semester to view current applicants and create new admission
-          shells.
+          Filter admissions by application ID, status, mode, date range, and
+          semester.
         </p>
       </div>
-      {/* Mount our new, semester-aware view! */}
-      <AdminAdmissionView hideAddForm={true} />
+      <Suspense>
+        <AdminAdmissionView hideAddForm showFilters />
+      </Suspense>
     </div>
   );
 }

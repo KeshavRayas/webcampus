@@ -46,7 +46,7 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
     },
     onSuccess: () => {
       toast.success("Admission shell created! Applicant can now log in.");
-      queryClient.invalidateQueries({ queryKey: ["admissions", semesterId] });
+      queryClient.invalidateQueries({ queryKey: ["admissions"] });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(

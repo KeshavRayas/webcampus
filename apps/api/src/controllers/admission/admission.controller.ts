@@ -4,7 +4,10 @@ import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
-import { CreateAdmissionShellType } from "@webcampus/schemas/admission";
+import {
+  CreateAdmissionShellType,
+  GetAdmissionsQueryType,
+} from "@webcampus/schemas/admission";
 import { Request, Response } from "express";
 
 export class AdmissionController {
@@ -44,6 +47,33 @@ export class AdmissionController {
       const { semesterId } = req.params;
       const response = await AdmissionService.getAdmissionsBySemester(
         semesterId as string
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error fetching admissions", error);
+      sendResponse({
+        res,
+        status: "error",
+        message: ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 500,
+        error,
+      });
+    }
+  }
+
+  static async getAdmissions(req: Request, res: Response): Promise<void> {
+    try {
+      const response = await AdmissionService.getAdmissions(
+        req.query as GetAdmissionsQueryType
       );
 
       if (response.status === "success") {

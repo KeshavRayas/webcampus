@@ -1,11 +1,26 @@
 import { AdmissionController } from "@webcampus/api/src/controllers/admission/admission.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
-import { CreateAdmissionShellSchema } from "@webcampus/schemas/admission";
+import {
+  CreateAdmissionShellSchema,
+  GetAdmissionsQuerySchema,
+} from "@webcampus/schemas/admission";
 import { Router } from "express";
 import multer from "multer";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
+
+router.get(
+  "/",
+  validateRequest(GetAdmissionsQuerySchema, "query"),
+  protect({
+    role: "admin",
+    permissions: {
+      admission: ["read"],
+    },
+  }),
+  AdmissionController.getAdmissions
+);
 
 // Endpoint to create the Admission Shell
 router.post(

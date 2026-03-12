@@ -1,5 +1,5 @@
 import { AdminAdmissionView } from "@/modules/admission/admin/admin-admission-view";
-import React from "react";
+import React, { Suspense } from "react";
 
 export default function AdminAdmissionPage() {
   return (
@@ -10,7 +10,9 @@ export default function AdminAdmissionPage() {
           Create student admission shells and track application status.
         </p>
       </div>
-      <AdminAdmissionView />
+      <Suspense>
+        <AdminAdmissionView />
+      </Suspense>
     </div>
   );
 }

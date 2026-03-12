@@ -2,7 +2,10 @@ import { IncomingHttpHeaders } from "http";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
-import { CreateAdmissionShellType } from "@webcampus/schemas/admission";
+import {
+  CreateAdmissionShellType,
+  GetAdmissionsQueryType,
+} from "@webcampus/schemas/admission";
 import { BaseResponse } from "@webcampus/types/api";
 
 export class AdmissionService {
@@ -119,13 +122,48 @@ export class AdmissionService {
     }
   }
 
-  static async getAdmissionsBySemester(
-    semesterId: string
+  static async getAdmissions(
+    filters: GetAdmissionsQueryType
   ): Promise<BaseResponse<unknown>> {
     try {
+      const createdTo = filters.createdTo
+        ? new Date(filters.createdTo)
+        : undefined;
+
+      if (createdTo) {
+        createdTo.setHours(23, 59, 59, 999);
+      }
+
       const admissions = await db.admission.findMany({
-        where: { semesterId },
+        where: {
+          applicationId: filters.applicationId
+            ? {
+                contains: filters.applicationId,
+                mode: "insensitive",
+              }
+            : undefined,
+          status: filters.status,
+          modeOfAdmission: filters.mode
+            ? {
+                equals: filters.mode,
+                mode: "insensitive",
+              }
+            : undefined,
+          semesterId: filters.semester,
+          createdAt:
+            filters.createdFrom || createdTo
+              ? {
+                  gte: filters.createdFrom
+                    ? new Date(filters.createdFrom)
+                    : undefined,
+                  lte: createdTo,
+                }
+              : undefined,
+        },
         orderBy: { createdAt: "desc" },
+        include: {
+          semester: true,
+        },
       });
 
       return {
@@ -137,6 +175,12 @@ export class AdmissionService {
       logger.error("Failed to fetch admissions", error);
       throw error;
     }
+  }
+
+  static async getAdmissionsBySemester(
+    semesterId: string
+  ): Promise<BaseResponse<unknown>> {
+    return this.getAdmissions({ semester: semesterId });
   }
 
   static async getByApplicationId(
