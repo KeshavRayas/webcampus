@@ -100,7 +100,6 @@ class Seeder {
 async function main() {
   const seeder = new Seeder();
   try {
-    await seeder.seedDepartmentUsers(10);
     await seeder.ensureAdmissionUser();
   } catch (error) {
     logger.error(`Fatal error in seed script: ${(error as Error).message}`);

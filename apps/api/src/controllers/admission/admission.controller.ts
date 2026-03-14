@@ -99,7 +99,7 @@ export class AdmissionController {
 
   static async getMe(req: Request, res: Response): Promise<void> {
     try {
-      // 1. FOOLPROOF WAY: Get session directly from Better Auth
+      // Get session directly from Better Auth
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
@@ -107,7 +107,7 @@ export class AdmissionController {
 
       if (!userId) throw new Error("Unauthorized: User session not found");
 
-      // 2. Fetch the user from the DB to get their Application ID
+      // Fetch the user from the DB to get their Application ID
       const user = await db.user.findUnique({ where: { id: userId } });
       const applicationId = user?.username;
 
@@ -115,7 +115,7 @@ export class AdmissionController {
         throw new Error("Unauthorized: Applicant ID not found");
       }
 
-      // 3. Fetch their admission shell
+      // Fetch their admission shell
       const response = await AdmissionService.getByApplicationId(applicationId);
 
       if (response.status === "success") {
@@ -171,7 +171,7 @@ export class AdmissionController {
 
   static async submit(req: Request, res: Response): Promise<void> {
     try {
-      // 1. FOOLPROOF WAY: Get session directly from Better Auth
+      // Get session directly from Better Auth
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
@@ -185,7 +185,7 @@ export class AdmissionController {
       if (!applicationId)
         throw new Error("Unauthorized: Applicant ID not found");
 
-      // 2. Process the Multer files
+      // Process the Multer files
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
       const fileUrls: { [key: string]: string } = {};
 
@@ -209,6 +209,11 @@ export class AdmissionController {
         handleUpload("class12thMarksPdf", "12th_marks_"),
         handleUpload("casteCertificate", "caste_cert_"),
         handleUpload("photo", "photo_"),
+        handleUpload("disabilityCertificate", "disability_cert_"),
+        handleUpload("economicallyBackwardCertificate", "eco_backward_cert_"),
+        handleUpload("aadharCard", "aadhar_card_"),
+        handleUpload("transferCertificate", "tc_"),
+        handleUpload("studyCertificate", "study_cert_"),
       ]);
 
       // 3. Submit to the service

@@ -82,6 +82,11 @@ router.put(
     { name: "class12thMarksPdf", maxCount: 1 },
     { name: "casteCertificate", maxCount: 1 },
     { name: "photo", maxCount: 1 },
+    { name: "disabilityCertificate", maxCount: 1 },
+    { name: "economicallyBackwardCertificate", maxCount: 1 },
+    { name: "aadharCard", maxCount: 1 },
+    { name: "transferCertificate", maxCount: 1 },
+    { name: "studyCertificate", maxCount: 1 },
   ]),
   AdmissionController.submit
 );

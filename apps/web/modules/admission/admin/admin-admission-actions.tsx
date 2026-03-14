@@ -50,13 +50,32 @@ const DataField = ({
   value,
 }: {
   label: string;
-  value?: string | number | null;
-}) => (
-  <div className="space-y-1">
-    <p className="text-muted-foreground text-sm">{label}</p>
-    <p className="font-medium break-words">{value || "-"}</p>
-  </div>
-);
+  value?: string | number | boolean | Date | null;
+}) => {
+  let displayValue = "-";
+  if (value !== undefined && value !== null && value !== "") {
+    if (typeof value === "boolean") {
+      displayValue = value ? "Yes" : "No";
+    } else if (value instanceof Date) {
+      displayValue = value.toLocaleDateString();
+    } else if (
+      typeof value === "string" &&
+      !isNaN(Date.parse(value)) &&
+      value.includes("T")
+    ) {
+      displayValue = new Date(value).toLocaleDateString();
+    } else {
+      displayValue = String(value);
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <p className="text-muted-foreground text-sm">{label}</p>
+      <p className="font-medium break-words">{displayValue}</p>
+    </div>
+  );
+};
 
 export const AdminAdmissionActions = ({
   admission,
@@ -68,6 +87,39 @@ export const AdminAdmissionActions = ({
   const isPending = admission.status === "PENDING";
   const { onDelete } = useAdmissionDelete();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  // Compute Full Name
+  const fullName = [
+    admission.firstName,
+    admission.middleName,
+    admission.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  // Format Address block
+  const currentFullAddress = [
+    admission.currentAddress,
+    admission.currentArea,
+    admission.currentCity,
+    admission.currentDistrict,
+    admission.currentState,
+    admission.currentCountry,
+    admission.currentPincode,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const permanentFullAddress = [
+    admission.permanentAddress,
+    admission.permanentArea,
+    admission.permanentCity,
+    admission.permanentDistrict,
+    admission.permanentState,
+    admission.permanentCountry,
+    admission.permanentPincode,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   if (menuOnly) {
     return (
@@ -145,22 +197,20 @@ export const AdminAdmissionActions = ({
                 <Avatar className="h-28 w-28 border">
                   <AvatarImage
                     src={admission.photo || undefined}
-                    alt={admission.name || "Student photo"}
+                    alt={fullName || "Student photo"}
                   />
                   <AvatarFallback className="text-xl font-semibold">
-                    {getInitials(admission.name)}
+                    {getInitials(fullName)}
                   </AvatarFallback>
                 </Avatar>
 
                 <div className="w-full space-y-3 text-center">
-                  <p className="text-lg font-semibold">
-                    {admission.name || "-"}
-                  </p>
+                  <p className="text-lg font-semibold">{fullName || "-"}</p>
                   <p className="text-muted-foreground text-sm break-all">
-                    {admission.email || "-"}
+                    {admission.primaryEmail || "-"}
                   </p>
                   <p className="text-muted-foreground text-sm">
-                    {admission.phoneNumber || "-"}
+                    {admission.primaryPhoneNumber || "-"}
                   </p>
                 </div>
 
@@ -179,6 +229,9 @@ export const AdminAdmissionActions = ({
                       {admission.status}
                     </Badge>
                   </div>
+                  <DataField label="Temporary USN" value={admission.tempUsn} />
+                  <DataField label="USN" value={admission.usn} />
+                  <DataField label="Unique ID" value={admission.uniqueId} />
                 </div>
               </div>
 
@@ -193,82 +246,341 @@ export const AdminAdmissionActions = ({
                   <>
                     <section className="bg-card mb-6 rounded-xl border p-6">
                       <h4 className="mb-4 text-lg font-semibold">
+                        Admission Details
+                      </h4>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <DataField label="Branch" value={admission.branch} />
+                        <DataField label="Quota" value={admission.quota} />
+                        <DataField
+                          label="Entrance Exam Rank"
+                          value={admission.entranceExamRank}
+                        />
+                        <DataField
+                          label="Category Claimed"
+                          value={admission.categoryClaimed}
+                        />
+                        <DataField
+                          label="Category Allotted"
+                          value={admission.categoryAllotted}
+                        />
+                        <DataField
+                          label="Admission Order No."
+                          value={admission.originalAdmissionOrderNumber}
+                        />
+                        <DataField
+                          label="Admission Order Date"
+                          value={admission.originalAdmissionOrderDate}
+                        />
+                        <DataField
+                          label="Fee Payable"
+                          value={
+                            admission.feePayable
+                              ? `₹${admission.feePayable}`
+                              : null
+                          }
+                        />
+                        <DataField
+                          label="Fee Paid"
+                          value={
+                            admission.feePaid ? `₹${admission.feePaid}` : null
+                          }
+                        />
+                        <DataField
+                          label="Hostel Required"
+                          value={admission.hostel}
+                        />
+                        <DataField
+                          label="Hostel Room No."
+                          value={admission.hostelRoomNumber}
+                        />
+                      </div>
+                    </section>
+
+                    <section className="bg-card mb-6 rounded-xl border p-6">
+                      <h4 className="mb-4 border-b pb-2 text-lg font-semibold">
                         Personal Information
                       </h4>
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <DataField label="Name" value={admission.name} />
-                        <DataField label="Email" value={admission.email} />
+                      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <DataField label="Name" value={fullName} />
                         <DataField
-                          label="Phone"
-                          value={admission.phoneNumber}
+                          label="Name as per 10th"
+                          value={admission.nameAsPer10th}
+                        />
+                        <DataField
+                          label="Date of Birth"
+                          value={admission.dob}
                         />
                         <DataField label="Gender" value={admission.gender} />
-                        <div className="space-y-1 md:col-span-2">
+                        <DataField
+                          label="Blood Group"
+                          value={admission.bloodGroup}
+                        />
+                        <DataField
+                          label="Nationality"
+                          value={admission.nationality}
+                        />
+                        <DataField
+                          label="Mother Tongue"
+                          value={admission.motherTongue}
+                        />
+                        <DataField
+                          label="Religion"
+                          value={admission.religion}
+                        />
+                        <DataField label="Caste" value={admission.caste} />
+                        <DataField
+                          label="Sub-Caste"
+                          value={admission.subCaste}
+                        />
+                        <DataField
+                          label="Place of Birth"
+                          value={admission.placeOfBirth}
+                        />
+                        <DataField
+                          label="State of Birth"
+                          value={admission.stateOfBirth}
+                        />
+                        <DataField label="NRI" value={admission.nri} />
+                        <DataField
+                          label="Economically Backward"
+                          value={admission.economicallyBackward}
+                        />
+                        <DataField
+                          label="Disability"
+                          value={admission.disability}
+                        />
+                        {admission.disability && (
+                          <DataField
+                            label="Disability Type"
+                            value={admission.disabilityType}
+                          />
+                        )}
+                        <DataField
+                          label="Aadhar Number"
+                          value={admission.aadharNumber}
+                        />
+                      </div>
+                      <div className="mb-4 grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-3">
+                        <DataField
+                          label="Primary Email"
+                          value={admission.primaryEmail}
+                        />
+                        <DataField
+                          label="Secondary Email"
+                          value={admission.secondaryEmail}
+                        />
+                        <DataField
+                          label="Primary Phone"
+                          value={admission.primaryPhoneNumber}
+                        />
+                        <DataField
+                          label="Secondary Phone"
+                          value={admission.secondaryPhoneNumber}
+                        />
+                        <DataField
+                          label="Emergency Contact"
+                          value={admission.emergencyContactNumber}
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-2">
+                        <div className="space-y-1 md:col-span-1">
                           <p className="text-muted-foreground text-sm">
-                            Address
+                            Current Address
                           </p>
                           <p className="font-medium break-words">
-                            {admission.address || "-"}
+                            {currentFullAddress || "-"}
+                          </p>
+                        </div>
+                        <div className="space-y-1 md:col-span-1">
+                          <p className="text-muted-foreground text-sm">
+                            Permanent Address
+                          </p>
+                          <p className="font-medium break-words">
+                            {permanentFullAddress || "-"}
                           </p>
                         </div>
                       </div>
                     </section>
 
                     <section className="bg-card mb-6 rounded-xl border p-6">
-                      <h4 className="mb-4 text-lg font-semibold">
-                        Academic Information
+                      <h4 className="mb-4 border-b pb-2 text-lg font-semibold">
+                        Education Details
                       </h4>
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <h5 className="text-md text-primary mb-3 font-semibold">
+                        10th Grade
+                      </h5>
+                      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
                         <DataField
-                          label="10th Marks"
-                          value={
-                            typeof admission.class10thMarks === "number"
-                              ? `${admission.class10thMarks}%`
-                              : "-"
-                          }
-                        />
-                        <DataField
-                          label="10th School"
+                          label="School Name"
                           value={admission.class10thSchoolName}
                         />
                         <DataField
-                          label="12th Marks"
+                          label="School Type"
+                          value={admission.class10thSchoolType}
+                        />
+                        <DataField
+                          label="Medium of Teaching"
+                          value={admission.class10thMediumOfTeaching}
+                        />
+                        <DataField
+                          label="School City"
+                          value={admission.class10thSchoolCity}
+                        />
+                        <DataField
+                          label="School State"
+                          value={admission.class10thSchoolState}
+                        />
+                        <DataField
+                          label="Year of Passing"
+                          value={admission.class10thYearOfPassing}
+                        />
+                        <DataField
+                          label="Aggregate Score"
+                          value={admission.class10thAggregateScore}
+                        />
+                        <DataField
+                          label="Aggregate Total"
+                          value={admission.class10thAggregateTotal}
+                        />
+                        <DataField
+                          label="Percentage"
                           value={
-                            typeof admission.class12thMarks === "number"
-                              ? `${admission.class12thMarks}%`
+                            admission.class10thAggregateScore &&
+                            admission.class10thAggregateTotal
+                              ? `${((admission.class10thAggregateScore / admission.class10thAggregateTotal) * 100).toFixed(2)}%`
                               : "-"
                           }
                         />
+                      </div>
+
+                      <h5 className="text-md text-primary mb-3 border-t pt-4 font-semibold">
+                        12th Grade / PUC
+                      </h5>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <DataField
-                          label="12th School"
-                          value={admission.class12thSchoolName}
+                          label="Institute Name"
+                          value={admission.class12thInstituteName}
+                        />
+                        <DataField
+                          label="Institute Type"
+                          value={admission.class12thInstituteType}
+                        />
+                        <DataField
+                          label="Branch/Stream"
+                          value={admission.class12thBranch}
+                        />
+                        <DataField
+                          label="Medium of Teaching"
+                          value={admission.class12thMediumOfTeaching}
+                        />
+                        <DataField
+                          label="Institute City"
+                          value={admission.class12thInstituteCity}
+                        />
+                        <DataField
+                          label="Institute State"
+                          value={admission.class12thInstituteState}
+                        />
+                        <DataField
+                          label="Year of Passing"
+                          value={admission.class12thYearOfPassing}
+                        />
+                        <DataField
+                          label="Aggregate Score"
+                          value={admission.class12thAggregateScore}
+                        />
+                        <DataField
+                          label="Aggregate Total"
+                          value={admission.class12thAggregateTotal}
+                        />
+                        <DataField
+                          label="Percentage"
+                          value={
+                            admission.class12thAggregateScore &&
+                            admission.class12thAggregateTotal
+                              ? `${((admission.class12thAggregateScore / admission.class12thAggregateTotal) * 100).toFixed(2)}%`
+                              : "-"
+                          }
                         />
                       </div>
                     </section>
 
                     <section className="bg-card mb-6 rounded-xl border p-6">
-                      <h4 className="mb-4 text-lg font-semibold">
-                        Parent Information
+                      <h4 className="mb-4 border-b pb-2 text-lg font-semibold">
+                        Parent / Guardian Information
                       </h4>
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <DataField
-                          label="Father's Name"
-                          value={admission.fatherName}
-                        />
-                        <DataField
-                          label="Mother's Name"
-                          value={admission.motherName}
-                        />
-                        <DataField
-                          label="Father's Phone"
-                          value={admission.fatherNumber}
-                        />
+                      <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+                        <div className="space-y-4">
+                          <h5 className="text-md text-primary font-semibold">
+                            Father's Details
+                          </h5>
+                          <DataField
+                            label="Name"
+                            value={admission.fatherName}
+                          />
+                          <DataField
+                            label="Phone"
+                            value={admission.fatherNumber}
+                          />
+                          <DataField
+                            label="Email"
+                            value={admission.fatherEmail}
+                          />
+                          <DataField
+                            label="Occupation"
+                            value={admission.fatherOccupation}
+                          />
+                        </div>
+                        <div className="space-y-4">
+                          <h5 className="text-md text-primary font-semibold">
+                            Mother's Details
+                          </h5>
+                          <DataField
+                            label="Name"
+                            value={admission.motherName}
+                          />
+                          <DataField
+                            label="Phone"
+                            value={admission.motherNumber}
+                          />
+                          <DataField
+                            label="Email"
+                            value={admission.motherEmail}
+                          />
+                          <DataField
+                            label="Occupation"
+                            value={admission.motherOccupation}
+                          />
+                        </div>
+                        <div className="space-y-4">
+                          <h5 className="text-md text-primary font-semibold">
+                            Guardian's Details
+                          </h5>
+                          <DataField
+                            label="Name"
+                            value={admission.guardianName}
+                          />
+                          <DataField
+                            label="Phone"
+                            value={admission.guardianNumber}
+                          />
+                          <DataField
+                            label="Email"
+                            value={admission.guardianEmail}
+                          />
+                          <DataField
+                            label="Occupation"
+                            value={admission.guardianOccupation}
+                          />
+                        </div>
                       </div>
                     </section>
 
                     <section className="bg-card mb-6 rounded-xl border p-6">
-                      <h4 className="mb-4 text-lg font-semibold">Documents</h4>
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <h4 className="mb-4 border-b pb-2 text-lg font-semibold">
+                        Documents
+                      </h4>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div className="space-y-1">
                           <p className="text-muted-foreground text-sm">
                             Passport Photo
@@ -288,7 +600,24 @@ export const AdminAdmissionActions = ({
                         </div>
                         <div className="space-y-1">
                           <p className="text-muted-foreground text-sm">
-                            10th Marks Card PDF
+                            Aadhar Card
+                          </p>
+                          {admission.aadharCard ? (
+                            <a
+                              href={admission.aadharCard}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary font-medium hover:underline"
+                            >
+                              View file
+                            </a>
+                          ) : (
+                            <p className="font-medium">-</p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground text-sm">
+                            10th Marks Card
                           </p>
                           {admission.class10thMarksPdf ? (
                             <a
@@ -305,11 +634,96 @@ export const AdminAdmissionActions = ({
                         </div>
                         <div className="space-y-1">
                           <p className="text-muted-foreground text-sm">
-                            12th Marks Card PDF
+                            12th Marks Card
                           </p>
                           {admission.class12thMarksPdf ? (
                             <a
                               href={admission.class12thMarksPdf}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary font-medium hover:underline"
+                            >
+                              View file
+                            </a>
+                          ) : (
+                            <p className="font-medium">-</p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground text-sm">
+                            Caste Certificate
+                          </p>
+                          {admission.casteCertificate ? (
+                            <a
+                              href={admission.casteCertificate}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary font-medium hover:underline"
+                            >
+                              View file
+                            </a>
+                          ) : (
+                            <p className="font-medium">-</p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground text-sm">
+                            Disability Certificate
+                          </p>
+                          {admission.disabilityCertificate ? (
+                            <a
+                              href={admission.disabilityCertificate}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary font-medium hover:underline"
+                            >
+                              View file
+                            </a>
+                          ) : (
+                            <p className="font-medium">-</p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground text-sm">
+                            EWS Certificate
+                          </p>
+                          {admission.economicallyBackwardCertificate ? (
+                            <a
+                              href={admission.economicallyBackwardCertificate}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary font-medium hover:underline"
+                            >
+                              View file
+                            </a>
+                          ) : (
+                            <p className="font-medium">-</p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground text-sm">
+                            Transfer Certificate
+                          </p>
+                          {admission.transferCertificate ? (
+                            <a
+                              href={admission.transferCertificate}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary font-medium hover:underline"
+                            >
+                              View file
+                            </a>
+                          ) : (
+                            <p className="font-medium">-</p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-muted-foreground text-sm">
+                            Study Certificate
+                          </p>
+                          {admission.studyCertificate ? (
+                            <a
+                              href={admission.studyCertificate}
                               target="_blank"
                               rel="noreferrer"
                               className="text-primary font-medium hover:underline"
