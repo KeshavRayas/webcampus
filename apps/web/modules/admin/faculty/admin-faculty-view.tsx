@@ -36,28 +36,30 @@ export const AdminFacultyView = () => {
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("");
 
   // 1. Fetch Departments for the global dropdown
-  const { data: departments } = useQuery({
-    queryKey: ["department"],
+  const { data: departments = [] } = useQuery({
+    queryKey: ["admin-departments"],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<DepartmentResponseDTO[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/department`,
         { withCredentials: true }
       );
-      if (res.data.status === "success") return res.data.data;
-      return [];
+      if (res.data.status === "success" && Array.isArray(res.data.data))
+        return res.data.data;
+      return [] as DepartmentResponseDTO[];
     },
   });
 
   // 2. Fetch Faculty ONLY for the selected department
-  const { data: faculty, isLoading: facultyLoading } = useQuery({
+  const { data: faculty = [], isLoading: facultyLoading } = useQuery({
     queryKey: ["admin-faculty", selectedDepartmentId],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<AdminFacultyResponse[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/faculty/department/${selectedDepartmentId}`,
         { withCredentials: true }
       );
-      if (res.data.status === "success") return res.data.data;
-      return [];
+      if (res.data.status === "success" && Array.isArray(res.data.data))
+        return res.data.data;
+      return [] as AdminFacultyResponse[];
     },
     enabled: !!selectedDepartmentId,
   });

@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { dayjs } from "@webcampus/common/dayjs";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   SemesterResponseType,
   SemesterTypeSchema,
@@ -33,19 +33,17 @@ import {
 } from "@webcampus/ui/components/select";
 import { cn } from "@webcampus/ui/lib/utils";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
-import axios from "axios";
 import { CalendarIcon } from "lucide-react";
 import React from "react";
 import { AdminSemesterColumns } from "./admin-semester-columns";
 import { useSemesterCreateSchema } from "./use-semester-create-schema";
 
 export const AdminSemesterView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: semesters, isLoading } = useQuery({
     queryKey: ["semesters"],
     queryFn: async () => {
-      return await axios.get<BaseResponse<SemesterResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
+      return await apiClient.get<BaseResponse<SemesterResponseType[]>>(
+        `/admin/semester`,
         {
           withCredentials: true,
         }

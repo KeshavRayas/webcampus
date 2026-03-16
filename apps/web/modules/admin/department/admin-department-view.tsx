@@ -44,9 +44,7 @@ export const AdminDepartmentView = () => {
     );
   }
 
-  if (!response.data?.data.data) {
-    return <div>No departments found</div>;
-  }
+  const departments = response.data?.data?.data ?? [];
 
   return (
     <Page>
@@ -54,10 +52,7 @@ export const AdminDepartmentView = () => {
         <CreateDepartmentView />
       </PageHeader>
       <PageContent>
-        <DataTable
-          columns={adminDepartmentColumns}
-          data={response.data?.data.data}
-        />
+        <DataTable columns={adminDepartmentColumns} data={departments} />
       </PageContent>
     </Page>
   );
