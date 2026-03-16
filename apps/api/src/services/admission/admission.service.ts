@@ -17,7 +17,7 @@ export class AdmissionService {
       const applicationId = data.applicationId.trim();
       const applicantEmail = `${applicationId.toLowerCase()}@applicant.local`;
 
-      // 1. Guard against duplicate admission shells first.
+      // Guard against duplicate admission shells first.
       const existingAdmission = await db.admission.findFirst({
         where: {
           applicationId: {
@@ -31,7 +31,7 @@ export class AdmissionService {
         throw new Error("An admission with this Application ID already exists");
       }
 
-      // 2. Ensure an applicant auth user exists for this application ID.
+      // Ensure an applicant auth user exists for this application ID.
       // Reuse it if it already exists (for idempotent retries).
       const existingApplicantUser = await db.user.findFirst({
         where: {
@@ -66,7 +66,7 @@ export class AdmissionService {
             email: applicantEmail,
             name: `Applicant ${applicationId}`,
             username: applicationId,
-            password: "password",
+            password: "password", // Dummy password
             role: "applicant",
           },
           headers,
@@ -200,24 +200,29 @@ export class AdmissionService {
 
   static async deleteAdmission(id: string): Promise<BaseResponse<unknown>> {
     try {
-      // 1. Fetch the admission record
+      // Fetch the admission record
       const admission = await db.admission.findUnique({ where: { id } });
       if (!admission) throw new Error("Admission not found");
 
-      // 2. Delete associated S3 files if they exist
+      // Delete associated S3 files if they exist
       const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
       const fileUrls = [
         admission.photo,
         admission.class10thMarksPdf,
         admission.class12thMarksPdf,
         admission.casteCertificate,
+        admission.disabilityCertificate,
+        admission.economicallyBackwardCertificate,
+        admission.aadharCard,
+        admission.transferCertificate,
+        admission.studyCertificate,
       ].filter(
         (url): url is string => typeof url === "string" && url.length > 0
       );
 
       await Promise.all(fileUrls.map((url) => deleteFromS3(url)));
 
-      // 3. Delete the database record
+      // Delete the database record
       await db.admission.delete({ where: { id } });
 
       return {
@@ -233,13 +238,49 @@ export class AdmissionService {
     }
   }
 
+  static async generateTempUsn(
+    semesterId: string,
+    branchCode: string
+  ): Promise<string> {
+    try {
+      const semester = await db.semester.findUnique({
+        where: { id: semesterId },
+      });
+      if (!semester) throw new Error("Semester not found");
+
+      const yearPrefix = semester.year.toString().slice(-2);
+      const formattedBranch = branchCode.toUpperCase().substring(0, 2);
+      const prefix = `1BM${yearPrefix}${formattedBranch}`;
+
+      const lastAdmission = await db.admission.findFirst({
+        where: { tempUsn: { startsWith: prefix } },
+        orderBy: { tempUsn: "desc" },
+      });
+
+      if (!lastAdmission || !lastAdmission.tempUsn) return `${prefix}001`;
+
+      const lastNumberStr = lastAdmission.tempUsn.slice(-3);
+      const lastNumber = parseInt(lastNumberStr, 10);
+
+      if (isNaN(lastNumber)) return `${prefix}001`;
+
+      let nextNumber = lastNumber + 1;
+      if (nextNumber > 399 && nextNumber < 600) nextNumber = 600;
+
+      return `${prefix}${nextNumber.toString().padStart(3, "0")}`;
+    } catch (error) {
+      logger.error("Failed to generate Temp USN", error);
+      throw new Error("Failed to generate Temp USN");
+    }
+  }
+
   static async submitApplication(
     applicationId: string,
     data: Record<string, string>, // Text fields
     fileUrls: { [key: string]: string } // S3 URLs
   ): Promise<BaseResponse<unknown>> {
     try {
-      // 1. Find the existing shell case-insensitively
+      // Find the existing shell case-insensitively
       const existingAdmission = await db.admission.findFirst({
         where: {
           applicationId: {
@@ -253,30 +294,126 @@ export class AdmissionService {
         throw new Error("Admission shell not found.");
       }
 
-      // 2. Update the record using its exact unique database ID
+      const branchCode = data.branch || "XX";
+      const tempUsn = await AdmissionService.generateTempUsn(
+        existingAdmission.semesterId,
+        branchCode
+      );
+
+      // Update the record using its exact unique database ID
       const updatedAdmission = await db.admission.update({
-        where: { id: existingAdmission.id }, // <--- Update by ID instead of applicationId
+        where: { id: existingAdmission.id }, // Update by ID instead of applicationId
         data: {
           status: "SUBMITTED",
-          name: data.name,
-          email: data.email,
-          phoneNumber: data.phoneNumber,
-          address: data.address,
+
+          // Admission Details
+          firstName: data.firstName,
+          middleName: data.middleName,
+          lastName: data.lastName,
+          branch: data.branch,
+          categoryClaimed: data.categoryClaimed,
+          categoryAllotted: data.categoryAllotted,
+          quota: data.quota,
+          entranceExamRank: data.entranceExamRank,
+          originalAdmissionOrderNumber: data.originalAdmissionOrderNumber,
+          originalAdmissionOrderDate: data.originalAdmissionOrderDate
+            ? new Date(data.originalAdmissionOrderDate)
+            : null,
+          feePayable: data.feePayable ? parseFloat(data.feePayable) : null,
+          feePaid: data.feePaid ? parseFloat(data.feePaid) : null,
+          hostel: data.hostel === "true",
+          hostelRoomNumber: data.hostelRoomNumber ?? null,
+
+          tempUsn: tempUsn,
+
+          // Personal Information
+          nameAsPer10th: data.nameAsPer10th,
+          dob: data.dob ? new Date(data.dob) : null,
+          bloodGroup: data.bloodGroup,
           gender: data.gender,
-          fatherName: data.fatherName,
-          motherName: data.motherName,
-          fatherEmail: data.fatherEmail,
-          motherEmail: data.motherEmail,
-          fatherNumber: data.fatherNumber,
-          motherNumber: data.motherNumber,
-          class10thMarks: data.class10thMarks
-            ? parseFloat(data.class10thMarks)
-            : null,
-          class12thMarks: data.class12thMarks
-            ? parseFloat(data.class12thMarks)
-            : null,
+          primaryPhoneNumber: data.primaryPhoneNumber,
+          secondaryPhoneNumber: data.secondaryPhoneNumber,
+          emergencyContactNumber: data.emergencyContactNumber,
+          primaryEmail: data.primaryEmail,
+          secondaryEmail: data.secondaryEmail,
+
+          currentAddress: data.currentAddress,
+          currentCity: data.currentCity,
+          currentArea: data.currentArea,
+          currentDistrict: data.currentDistrict,
+          currentState: data.currentState,
+          currentCountry: data.currentCountry,
+          currentPincode: data.currentPincode,
+
+          permanentAddress: data.permanentAddress,
+          permanentCity: data.permanentCity,
+          permanentArea: data.permanentArea,
+          permanentDistrict: data.permanentDistrict,
+          permanentState: data.permanentState,
+          permanentCountry: data.permanentCountry,
+          permanentPincode: data.permanentPincode,
+
+          placeOfBirth: data.placeOfBirth,
+          stateOfBirth: data.stateOfBirth,
+          religion: data.religion,
+          caste: data.caste,
+          subCaste: data.subCaste ?? null,
+          motherTongue: data.motherTongue,
+          nri: data.nri === "true",
+          nationality: data.nationality,
+          disability: data.disability === "true",
+          disabilityType: data.disabilityType ?? null,
+          economicallyBackward: data.economicallyBackward === "true",
+          aadharNumber: data.aadharNumber,
+
+          // Education Details
           class10thSchoolName: data.class10thSchoolName,
-          class12thSchoolName: data.class12thSchoolName,
+          class10thSchoolType: data.class10thSchoolType,
+          class10thSchoolCity: data.class10thSchoolCity,
+          class10thSchoolState: data.class10thSchoolState,
+          class10thSchoolCode: data.class10thSchoolCode,
+          class10thYearOfPassing: data.class10thYearOfPassing,
+          class10thAggregateScore: data.class10thAggregateScore
+            ? parseFloat(data.class10thAggregateScore)
+            : null,
+          class10thAggregateTotal: data.class10thAggregateTotal
+            ? parseFloat(data.class10thAggregateTotal)
+            : null,
+          class10thMediumOfTeaching: data.class10thMediumOfTeaching,
+
+          class12thInstituteName: data.class12thInstituteName,
+          class12thInstituteType: data.class12thInstituteType,
+          class12thInstituteCity: data.class12thInstituteCity,
+          class12thInstituteState: data.class12thInstituteState,
+          class12thInstituteCode: data.class12thInstituteCode,
+          class12thYearOfPassing: data.class12thYearOfPassing,
+          class12thBranch: data.class12thBranch,
+          class12thAggregateScore: data.class12thAggregateScore
+            ? parseFloat(data.class12thAggregateScore)
+            : null,
+          class12thAggregateTotal: data.class12thAggregateTotal
+            ? parseFloat(data.class12thAggregateTotal)
+            : null,
+          class12thMediumOfTeaching: data.class12thMediumOfTeaching,
+
+          // Parent Details
+          fatherName: data.fatherName,
+          fatherEmail: data.fatherEmail,
+          fatherNumber: data.fatherNumber,
+          fatherPermanentAddress: data.fatherPermanentAddress,
+          fatherOccupation: data.fatherOccupation ?? null,
+
+          motherName: data.motherName,
+          motherEmail: data.motherEmail,
+          motherNumber: data.motherNumber,
+          motherPermanentAddress: data.motherPermanentAddress,
+          motherOccupation: data.motherOccupation ?? null,
+
+          guardianName: data.guardianName ?? null,
+          guardianEmail: data.guardianEmail ?? null,
+          guardianNumber: data.guardianNumber ?? null,
+          guardianPermanentAddress: data.guardianPermanentAddress ?? null,
+          guardianOccupation: data.guardianOccupation ?? null,
 
           // Inject the S3 URLs if they were successfully uploaded
           ...(fileUrls.class10thMarksPdf && {
@@ -288,7 +425,25 @@ export class AdmissionService {
           ...(fileUrls.casteCertificate && {
             casteCertificate: fileUrls.casteCertificate,
           }),
-          ...(fileUrls.photo && { photo: fileUrls.photo }),
+          ...(fileUrls.photo && {
+            photo: fileUrls.photo,
+          }),
+          ...(fileUrls.disabilityCertificate && {
+            disabilityCertificate: fileUrls.disabilityCertificate,
+          }),
+          ...(fileUrls.economicallyBackwardCertificate && {
+            economicallyBackwardCertificate:
+              fileUrls.economicallyBackwardCertificate,
+          }),
+          ...(fileUrls.aadharCard && {
+            aadharCard: fileUrls.aadharCard,
+          }),
+          ...(fileUrls.transferCertificate && {
+            transferCertificate: fileUrls.transferCertificate,
+          }),
+          ...(fileUrls.studyCertificate && {
+            studyCertificate: fileUrls.studyCertificate,
+          }),
         },
       });
 

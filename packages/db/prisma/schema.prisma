@@ -374,37 +374,130 @@ model Freeze {
 }
 
 model Admission {
-  id                  String          @id @default(uuid())
-  applicationId       String          @unique // Used as the student's initial username
-  modeOfAdmission     String
-  status              AdmissionStatus @default(PENDING)
+  id              String          @id @default(uuid())
+  applicationId   String          @unique
+  modeOfAdmission String
+  status          AdmissionStatus @default(PENDING)
 
-  semesterId          String
-  semester            Semester        @relation(fields: [semesterId], references: [id])
+  semesterId      String
+  semester        Semester        @relation(fields: [semesterId], references: [id])
 
-  // --- Fields below are optional because they are filled later by the Applicant ---
-  name                String?
-  email               String?         @unique
-  phoneNumber         String?
-  address             String?
-  gender              String?
-  fatherName          String?
-  motherName          String?
-  fatherEmail         String?
-  motherEmail         String?
-  fatherNumber        String?
-  motherNumber        String?
-  class10thMarks      Float?
-  class12thMarks      Float?
-  class10thMarksPdf   String?
-  class12thMarksPdf   String?
-  casteCertificate    String?         // Added this from our previous check!
-  class10thSchoolName String?
-  class12thSchoolName String?
-  photo               String?
+  firstName                    String?
+  middleName                   String?
+  lastName                     String?
+  branch                       String?
+  categoryClaimed              String?
+  categoryAllotted             String?
+  quota                        String?
+  entranceExamRank             String?
+  originalAdmissionOrderNumber String?
+  originalAdmissionOrderDate   DateTime?
+  feePayable                   Float?
+  feePaid                      Float?
+  hostel                       Boolean?
+  hostelRoomNumber             String?
+  admissionType                String?
+  admissionDate                DateTime?
 
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  // These are hidden from the applicant form, generated/assigned later
+  tempUsn                      String?   @unique
+  usn                          String?   @unique
+  uniqueId                     String?   @unique
+
+  nameAsPer10th          String?
+  dob                    DateTime?
+  bloodGroup             String?
+  gender                 String?
+  primaryPhoneNumber     String?
+  secondaryPhoneNumber   String?
+  emergencyContactNumber String?
+  primaryEmail           String?   @unique
+  secondaryEmail         String?
+
+  // Current Address
+  currentAddress         String?
+  currentCity            String?
+  currentArea            String?
+  currentDistrict        String?
+  currentState           String?
+  currentCountry         String?
+  currentPincode         String?
+
+  // Permanent Address
+  permanentAddress       String?
+  permanentCity          String?
+  permanentArea          String?
+  permanentDistrict      String?
+  permanentState         String?
+  permanentCountry       String?
+  permanentPincode       String?
+
+  placeOfBirth           String?
+  stateOfBirth           String?
+  religion               String?
+  caste                  String?
+  subCaste               String?
+  motherTongue           String?
+  nri                    Boolean?
+  nationality            String?
+  disability             Boolean?
+  disabilityType         String?
+  economicallyBackward   Boolean?
+  aadharNumber           String?   @unique
+
+  // 10th Grade
+  class10thSchoolName       String?
+  class10thSchoolType       String?
+  class10thSchoolCity       String?
+  class10thSchoolState      String?
+  class10thSchoolCode       String?
+  class10thYearOfPassing    String?
+  class10thAggregateScore   Float?
+  class10thAggregateTotal   Float?
+  class10thMediumOfTeaching String?
+
+  // 12th Grade
+  class12thInstituteName    String?
+  class12thInstituteType    String?
+  class12thInstituteCity    String?
+  class12thInstituteState   String?
+  class12thInstituteCode    String?
+  class12thYearOfPassing    String?
+  class12thBranch           String?
+  class12thAggregateScore   Float?
+  class12thAggregateTotal   Float?
+  class12thMediumOfTeaching String?
+
+  fatherName               String?
+  fatherEmail              String?
+  fatherNumber             String?
+  fatherPermanentAddress   String?
+  fatherOccupation         String?
+
+  motherName               String?
+  motherEmail              String?
+  motherNumber             String?
+  motherPermanentAddress   String?
+  motherOccupation         String?
+
+  guardianName             String?
+  guardianEmail            String?
+  guardianNumber           String?
+  guardianPermanentAddress String?
+  guardianOccupation       String?
+
+  photo                           String?
+  casteCertificate                String?
+  disabilityCertificate           String?
+  economicallyBackwardCertificate String?
+  aadharCard                      String?
+  class10thMarksPdf               String?
+  class12thMarksPdf               String?
+  transferCertificate             String?
+  studyCertificate                String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([semesterId])
 }
