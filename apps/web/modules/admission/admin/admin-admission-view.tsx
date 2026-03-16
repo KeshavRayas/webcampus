@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { SemesterResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
-import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -86,7 +85,6 @@ export const AdminAdmissionView = ({
   hideAddForm?: boolean;
   showFilters?: boolean;
 }) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -108,8 +106,8 @@ export const AdminAdmissionView = ({
   const { data: semesters } = useQuery({
     queryKey: ["semesters"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<SemesterResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
+      const res = await apiClient.get<BaseResponse<SemesterResponseType[]>>(
+        `/admin/semester`,
         { withCredentials: true }
       );
       if (res.data.status === "success") return res.data.data;
@@ -126,8 +124,8 @@ export const AdminAdmissionView = ({
     queryKey: ["admissions", appliedFilters],
     queryFn: async () => {
       const query = createFilterQueryString(appliedFilters);
-      const res = await axios.get<BaseResponse<AdmissionResponse[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admission${query ? `?${query}` : ""}`,
+      const res = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
+        `/admission${query ? `?${query}` : ""}`,
         { withCredentials: true }
       );
       if (res.data.status === "success") return res.data.data;
