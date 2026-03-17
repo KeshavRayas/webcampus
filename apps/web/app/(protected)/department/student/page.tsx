@@ -1,7 +1,12 @@
-import React from "react";
+import { DepartmentStudentView } from "@/modules/department/student/department-student-view";
+import React, { Suspense } from "react";
 
 const Page = () => {
-  return <div>Page</div>;
+  return (
+    <Suspense>
+      <DepartmentStudentView />
+    </Suspense>
+  );
 };
 
 export default Page;

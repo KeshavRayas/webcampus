@@ -16,6 +16,7 @@ const statement = {
   freeze: ["read", "lock"],
   faculty: ["create", "read", "update", "delete"],
   admission: ["create", "read", "update", "delete"],
+  student: ["read"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -55,6 +56,7 @@ export const roles = {
     courses: ["create", "read"],
     hod: ["create", "read", "remove"],
     faculty: ["read"],
+    student: ["read"],
     sectionAssignment: ["create", "read", "update", "delete"],
     section: ["create", "read"],
     semester: ["read"],
