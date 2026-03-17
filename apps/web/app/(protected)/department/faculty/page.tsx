@@ -1,8 +1,12 @@
 import { DepartmentFacultyView } from "@/modules/department/faculty/department-faculty-view";
-import React from "react";
+import React, { Suspense } from "react";
 
 const Page = () => {
-  return <DepartmentFacultyView />;
+  return (
+    <Suspense>
+      <DepartmentFacultyView />
+    </Suspense>
+  );
 };
 
 export default Page;

@@ -1,11 +1,20 @@
 "use client";
 
 import { apiClient } from "@/lib/api-client";
+import {
+  createFilterQueryString,
+  getFiltersFromSearchParams,
+} from "@/lib/filter-search-params";
 import { useQuery } from "@tanstack/react-query";
 import { SemesterResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
+import {
+  FilterActions,
+  FilterBuilder,
+  type FilterFieldConfig,
+} from "@webcampus/ui/components/filter-builder";
 import {
   FormControl,
   FormField,
@@ -55,29 +64,6 @@ const EMPTY_FILTERS: AdmissionFilters = {
   createdTo: "",
 };
 
-const getFiltersFromSearchParams = (
-  searchParams: ReturnType<typeof useSearchParams>
-): AdmissionFilters => ({
-  applicationId: searchParams.get("applicationId") ?? "",
-  status: searchParams.get("status") ?? "",
-  mode: searchParams.get("mode") ?? "",
-  semester: searchParams.get("semester") ?? "",
-  createdFrom: searchParams.get("createdFrom") ?? "",
-  createdTo: searchParams.get("createdTo") ?? "",
-});
-
-const createFilterQueryString = (filters: AdmissionFilters) => {
-  const params = new URLSearchParams();
-
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value) {
-      params.set(key, value);
-    }
-  });
-
-  return params.toString();
-};
-
 export const AdminAdmissionView = ({
   hideAddForm = false,
   showFilters = false,
@@ -89,15 +75,19 @@ export const AdminAdmissionView = ({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [draftFilters, setDraftFilters] = useState<AdmissionFilters>(() =>
-    showFilters ? getFiltersFromSearchParams(searchParams) : EMPTY_FILTERS
+    showFilters
+      ? getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
+      : EMPTY_FILTERS
   );
   const [appliedFilters, setAppliedFilters] = useState<AdmissionFilters>(() =>
-    showFilters ? getFiltersFromSearchParams(searchParams) : EMPTY_FILTERS
+    showFilters
+      ? getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
+      : EMPTY_FILTERS
   );
 
   useEffect(() => {
     if (!showFilters) return;
-    const nextFilters = getFiltersFromSearchParams(searchParams);
+    const nextFilters = getFiltersFromSearchParams(searchParams, EMPTY_FILTERS);
     setDraftFilters(nextFilters);
     setAppliedFilters(nextFilters);
   }, [searchParams, showFilters]);
@@ -142,6 +132,61 @@ export const AdminAdmissionView = ({
     }));
   };
 
+  const admissionFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
+    {
+      key: "applicationId",
+      label: "Application ID",
+      type: "text",
+      placeholder: "Search application ID",
+      inputId: "admission-application-id",
+    },
+    {
+      key: "status",
+      label: "Status",
+      type: "select",
+      placeholder: "All statuses",
+      allOptionLabel: "All statuses",
+      options: ADMISSION_STATUSES.map((status) => ({
+        label: status,
+        value: status,
+      })),
+    },
+    {
+      key: "mode",
+      label: "Mode",
+      type: "select",
+      placeholder: "All modes",
+      allOptionLabel: "All modes",
+      options: ADMISSION_MODES.map((mode) => ({
+        label: mode,
+        value: mode,
+      })),
+    },
+    {
+      key: "createdFrom",
+      label: "Created From",
+      type: "date",
+      inputId: "admission-created-from",
+    },
+    {
+      key: "createdTo",
+      label: "Created To",
+      type: "date",
+      inputId: "admission-created-to",
+    },
+    {
+      key: "semester",
+      label: "Semester",
+      type: "select",
+      placeholder: "All semesters",
+      allOptionLabel: "All semesters",
+      options: (semesters || []).map((semester) => ({
+        label: semester.name,
+        value: semester.id,
+      })),
+    },
+  ];
+
   const applyFilters = () => {
     if (
       draftFilters.createdFrom &&
@@ -174,131 +219,15 @@ export const AdminAdmissionView = ({
       <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
         {showFilters ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-6 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="admission-application-id">Application ID</Label>
-                <Input
-                  id="admission-application-id"
-                  placeholder="Search application ID"
-                  value={draftFilters.applicationId}
-                  onChange={(event) =>
-                    updateDraftFilter("applicationId", event.target.value)
-                  }
-                />
-              </div>
+            <FilterBuilder
+              fields={admissionFilterFields}
+              draftFilters={draftFilters}
+              onDraftChange={updateDraftFilter}
+              allValue={ALL_FILTERS_VALUE}
+              className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-6"
+            />
 
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select
-                  value={draftFilters.status || ALL_FILTERS_VALUE}
-                  onValueChange={(value) =>
-                    updateDraftFilter(
-                      "status",
-                      value === ALL_FILTERS_VALUE ? "" : value
-                    )
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_FILTERS_VALUE}>
-                      All statuses
-                    </SelectItem>
-                    {ADMISSION_STATUSES.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Mode</Label>
-                <Select
-                  value={draftFilters.mode || ALL_FILTERS_VALUE}
-                  onValueChange={(value) =>
-                    updateDraftFilter(
-                      "mode",
-                      value === ALL_FILTERS_VALUE ? "" : value
-                    )
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All modes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_FILTERS_VALUE}>All modes</SelectItem>
-                    {ADMISSION_MODES.map((mode) => (
-                      <SelectItem key={mode} value={mode}>
-                        {mode}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="admission-created-from">Created From</Label>
-                <Input
-                  id="admission-created-from"
-                  type="date"
-                  value={draftFilters.createdFrom}
-                  onChange={(event) =>
-                    updateDraftFilter("createdFrom", event.target.value)
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="admission-created-to">Created To</Label>
-                <Input
-                  id="admission-created-to"
-                  type="date"
-                  value={draftFilters.createdTo}
-                  onChange={(event) =>
-                    updateDraftFilter("createdTo", event.target.value)
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Semester</Label>
-                <Select
-                  value={draftFilters.semester || ALL_FILTERS_VALUE}
-                  onValueChange={(value) =>
-                    updateDraftFilter(
-                      "semester",
-                      value === ALL_FILTERS_VALUE ? "" : value
-                    )
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All semesters" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL_FILTERS_VALUE}>
-                      All semesters
-                    </SelectItem>
-                    {semesters?.map((semester) => (
-                      <SelectItem key={semester.id} value={semester.id}>
-                        {semester.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button onClick={applyFilters} type="button">
-                Apply Filters
-              </Button>
-              <Button onClick={resetFilters} type="button" variant="outline">
-                Reset Filters
-              </Button>
-            </div>
+            <FilterActions onApply={applyFilters} onReset={resetFilters} />
           </div>
         ) : (
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">

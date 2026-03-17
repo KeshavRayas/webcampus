@@ -54,6 +54,7 @@ export const roles = {
     ...adminAc.statements,
     courses: ["create", "read"],
     hod: ["create", "read", "remove"],
+    faculty: ["read"],
     sectionAssignment: ["create", "read", "update", "delete"],
     section: ["create", "read"],
     semester: ["read"],
