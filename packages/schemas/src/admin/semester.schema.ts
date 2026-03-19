@@ -5,6 +5,7 @@ export const SemesterTypeSchema = z.enum(["even", "odd"]);
 export const BaseSemesterSchema = z.object({
   type: SemesterTypeSchema,
   year: z.string().min(4, { error: "Year is required" }),
+  semesterNumber: z.number().int().min(1).max(8),
 
   /**
    * Just a temporary fix to get the date from the form.
@@ -17,6 +18,31 @@ export const BaseSemesterSchema = z.object({
    */
   endDate: z.coerce.date() as z.ZodDate,
   userId: z.string(),
+}).superRefine((data, ctx) => {
+  if (data.startDate >= data.endDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["endDate"],
+      message: "End date must be after start date",
+    });
+  }
+
+  const isOddSemester = data.semesterNumber % 2 === 1;
+  if (data.type === "odd" && !isOddSemester) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["semesterNumber"],
+      message: "Odd type allows only 1, 3, 5, or 7",
+    });
+  }
+
+  if (data.type === "even" && isOddSemester) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["semesterNumber"],
+      message: "Even type allows only 2, 4, 6, or 8",
+    });
+  }
 });
 
 export const CreateSemesterSchema = BaseSemesterSchema;

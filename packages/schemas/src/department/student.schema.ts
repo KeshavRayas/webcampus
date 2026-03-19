@@ -18,25 +18,24 @@ export const AdmissionStatusEnum = z.enum([
 ]);
 
 export const DepartmentStudentQuerySchema = z.object({
-  tempUsn: optionalQueryString(z.string()),
+  usn: optionalQueryString(z.string()),
   name: optionalQueryString(z.string()),
-  status: optionalQueryString(AdmissionStatusEnum),
-  modeOfAdmission: optionalQueryString(z.string()),
-  gender: optionalQueryString(z.string()),
+  departmentName: optionalQueryString(z.string()),
+  currentSemester: optionalQueryString(
+    z.coerce.number().int().min(1).max(8)
+  ),
+  academicYear: optionalQueryString(z.string()),
 });
 
 export const DepartmentStudentResponseSchema = z.object({
   id: z.string(),
-  applicationId: z.string(),
-  tempUsn: z.string().nullable(),
-  firstName: z.string().nullable(),
-  lastName: z.string().nullable(),
-  branch: z.string().nullable(),
-  status: AdmissionStatusEnum,
-  modeOfAdmission: z.string(),
-  gender: z.string().nullable(),
-  primaryEmail: z.string().nullable(),
-  createdAt: z.date(),
+  userId: z.string(),
+  usn: z.string(),
+  name: z.string().nullable(),
+  email: z.string().nullable(),
+  departmentName: z.string(),
+  currentSemester: z.number().int(),
+  academicYear: z.string(),
 });
 
 export type DepartmentStudentQueryType = z.infer<

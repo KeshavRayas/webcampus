@@ -33,19 +33,16 @@ export const DepartmentSectionView = () => {
   const { data: semesters, isLoading: isLoadingSemesters } = useQuery({
     queryKey: ["semesters"],
     queryFn: async () => {
-      return await axios.get<BaseResponse<SemesterResponseType[]>>(
+      const res = await axios.get<BaseResponse<SemesterResponseType[]>>(
         `${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
         {
           withCredentials: true,
         }
       );
-    },
-    select: (data) => {
-      console.log(data);
-
-      if (data.data.status === "success") {
-        return data.data.data;
+      if (res.data.status === "success") {
+        return res.data.data;
       }
+      return [] as SemesterResponseType[];
     },
   });
   const { data, isLoading } = useQuery({

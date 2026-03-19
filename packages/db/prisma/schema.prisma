@@ -46,6 +46,7 @@ model Semester {
   id        String       @id @default(uuid())
   type      SemesterType
   year      String
+  semesterNumber Int
   name      String?
   startDate DateTime
   endDate   DateTime
@@ -58,7 +59,7 @@ model Semester {
   Course    Course[]
   Admission Admission[]
 
-  @@unique([type, year])
+  @@unique([type, year, semesterNumber])
 }
 
 enum SemesterType {

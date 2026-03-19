@@ -9,10 +9,30 @@ import { UUIDType } from "@webcampus/schemas/common";
 import { BaseResponse } from "@webcampus/types/api";
 
 export class SemesterService {
+  private static validateSemesterConstraints(data: CreateSemesterType): void {
+    const startDate = new Date(data.startDate);
+    const endDate = new Date(data.endDate);
+
+    if (startDate >= endDate) {
+      throw new Error("End date must be after start date");
+    }
+
+    const isOddSemester = data.semesterNumber % 2 === 1;
+    if (data.type === "odd" && !isOddSemester) {
+      throw new Error("Odd type allows only 1, 3, 5, or 7");
+    }
+
+    if (data.type === "even" && isOddSemester) {
+      throw new Error("Even type allows only 2, 4, 6, or 8");
+    }
+  }
+
   static async create(
     data: CreateSemesterType
   ): Promise<BaseResponse<SemesterResponseType>> {
     try {
+      SemesterService.validateSemesterConstraints(data);
+
       const name = `${data.type.toUpperCase()} ${data.year}`;
       const currentDate = new Date();
       const isCurrent =
@@ -36,7 +56,9 @@ export class SemesterService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2002") {
-          throw new Error(`Semester ${data.type} ${data.year} already exists`);
+          throw new Error(
+            `Semester ${data.type} ${data.year} ${data.semesterNumber} already exists`
+          );
         }
       }
       if (error instanceof Error) {
@@ -52,6 +74,8 @@ export class SemesterService {
     data: CreateSemesterType
   ): Promise<BaseResponse<SemesterResponseType>> {
     try {
+      SemesterService.validateSemesterConstraints(data);
+
       const name = `${data.type.toUpperCase()} ${data.year}`;
       const currentDate = new Date();
       const isCurrent =
@@ -79,7 +103,9 @@ export class SemesterService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2002") {
-          throw new Error(`Semester ${data.type} ${data.year} already exists`);
+          throw new Error(
+            `Semester ${data.type} ${data.year} ${data.semesterNumber} already exists`
+          );
         }
         if (error.code === "P2025") {
           throw new Error("Semester not found");

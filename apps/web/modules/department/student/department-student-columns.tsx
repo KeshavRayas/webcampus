@@ -3,55 +3,37 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { DepartmentStudentResponseType } from "@webcampus/schemas/department";
 
-const formatStatus = (status: string) => {
-  return status.charAt(0) + status.slice(1).toLowerCase();
-};
-
 export const departmentStudentColumns: ColumnDef<DepartmentStudentResponseType>[] =
   [
     {
-      accessorKey: "applicationId",
-      header: "Application ID",
+      accessorKey: "usn",
+      header: "USN",
     },
     {
-      accessorKey: "tempUsn",
-      header: "Temp USN",
-      cell: ({ row }) => row.original.tempUsn ?? "—",
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row }) => row.original.name ?? "—",
     },
     {
-      id: "fullName",
-      header: "Full Name",
-      cell: ({ row }) => {
-        const { firstName, lastName } = row.original;
-        const name = [firstName, lastName].filter(Boolean).join(" ");
-        return name || "—";
-      },
+      accessorKey: "email",
+      header: "Email",
+      cell: ({ row }) => row.original.email ?? "—",
     },
     {
-      accessorKey: "branch",
-      header: "Branch",
-      cell: ({ row }) => row.original.branch ?? "—",
+      accessorKey: "departmentName",
+      header: "Department",
     },
     {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => formatStatus(row.original.status),
-      meta: {
-        enableCopy: false,
-      },
+      accessorKey: "currentSemester",
+      header: "Current Semester",
     },
     {
-      accessorKey: "modeOfAdmission",
-      header: "Mode of Admission",
+      accessorKey: "academicYear",
+      header: "Academic Year",
     },
     {
-      accessorKey: "gender",
-      header: "Gender",
-      cell: ({ row }) => row.original.gender ?? "—",
-    },
-    {
-      accessorKey: "primaryEmail",
-      header: "Primary Email",
-      cell: ({ row }) => row.original.primaryEmail ?? "—",
+      accessorKey: "userId",
+      header: "User ID",
+      meta: { enableCopy: true },
     },
   ];

@@ -3,12 +3,190 @@ import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
+  AdmissionActionParamType,
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
+  PortStudentsType,
 } from "@webcampus/schemas/admission";
 import { BaseResponse } from "@webcampus/types/api";
 
 export class AdmissionService {
+  private static normalizeApplicationId(value: string): string {
+    return value.trim().toLowerCase();
+  }
+
+  private static applicantEmailFromApplicationId(applicationId: string): string {
+    return `${AdmissionService.normalizeApplicationId(applicationId)}@applicant.local`;
+  }
+
+  private static async resolveApplicantUsersForPort(
+    applicationIds: string[],
+    headers: IncomingHttpHeaders
+  ): Promise<{ userIdByApplicationId: Map<string, string>; autoCreatedUsers: number }> {
+    const normalizedApplicationIds = Array.from(
+      new Set(
+        applicationIds
+          .map((applicationId) => AdmissionService.normalizeApplicationId(applicationId))
+          .filter((applicationId) => applicationId.length > 0)
+      )
+    );
+
+    const userIdByApplicationId = new Map<string, string>();
+    if (normalizedApplicationIds.length === 0) {
+      return { userIdByApplicationId, autoCreatedUsers: 0 };
+    }
+
+    const existingUsers = await db.user.findMany({
+      where: {
+        OR: [
+          ...normalizedApplicationIds.map((applicationId) => ({
+            username: {
+              equals: applicationId,
+              mode: "insensitive" as const,
+            },
+          })),
+          {
+            email: {
+              in: normalizedApplicationIds.map((applicationId) =>
+                AdmissionService.applicantEmailFromApplicationId(applicationId)
+              ),
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+      },
+    });
+
+    for (const user of existingUsers) {
+      const normalizedUsername = user.username
+        ? AdmissionService.normalizeApplicationId(user.username)
+        : null;
+      if (
+        normalizedUsername &&
+        normalizedApplicationIds.includes(normalizedUsername)
+      ) {
+        userIdByApplicationId.set(normalizedUsername, user.id);
+        continue;
+      }
+
+      const normalizedEmail = user.email.trim().toLowerCase();
+      if (!normalizedEmail.endsWith("@applicant.local")) {
+        continue;
+      }
+
+      const emailApplicationId = normalizedEmail.replace("@applicant.local", "");
+      if (normalizedApplicationIds.includes(emailApplicationId)) {
+        userIdByApplicationId.set(emailApplicationId, user.id);
+      }
+    }
+
+    const missingApplicationIds = normalizedApplicationIds.filter(
+      (applicationId) => !userIdByApplicationId.has(applicationId)
+    );
+
+    let autoCreatedUsers = 0;
+
+    for (const applicationId of missingApplicationIds) {
+      const userService = new UserService({
+        request: {
+          email: AdmissionService.applicantEmailFromApplicationId(applicationId),
+          name: `Applicant ${applicationId.toUpperCase()}`,
+          username: applicationId.toUpperCase(),
+          password: "password",
+          role: "applicant",
+        },
+        headers,
+      });
+
+      try {
+        const createResponse = await userService.create();
+        if (createResponse.status === "success" && createResponse.data?.id) {
+          userIdByApplicationId.set(applicationId, createResponse.data.id);
+          autoCreatedUsers += 1;
+          continue;
+        }
+      } catch {
+        // If create fails due to race/uniqueness, try a fresh lookup before failing.
+      }
+
+      const fallbackUser = await db.user.findFirst({
+        where: {
+          OR: [
+            {
+              username: {
+                equals: applicationId,
+                mode: "insensitive",
+              },
+            },
+            {
+              email: AdmissionService.applicantEmailFromApplicationId(applicationId),
+            },
+          ],
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (fallbackUser?.id) {
+        userIdByApplicationId.set(applicationId, fallbackUser.id);
+        continue;
+      }
+    }
+
+    const unresolvedApplicationIds = normalizedApplicationIds.filter(
+      (applicationId) => !userIdByApplicationId.has(applicationId)
+    );
+
+    if (unresolvedApplicationIds.length > 0) {
+      throw new Error(
+        `Unable to resolve applicant user(s) for application ID(s): ${unresolvedApplicationIds
+          .map((applicationId) => applicationId.toUpperCase())
+          .join(", ")}`
+      );
+    }
+
+    return {
+      userIdByApplicationId,
+      autoCreatedUsers,
+    };
+  }
+
+  private static async updateAdmissionStatus(
+    id: string,
+    status: "APPROVED" | "REJECTED"
+  ): Promise<BaseResponse<unknown>> {
+    const admission = await db.admission.findUnique({
+      where: { id },
+    });
+
+    if (!admission) {
+      throw new Error("Admission not found");
+    }
+
+    if (admission.status !== "SUBMITTED") {
+      throw new Error(
+        `Only SUBMITTED applications can be marked ${status}. Current status is ${admission.status}`
+      );
+    }
+
+    const updatedAdmission = await db.admission.update({
+      where: { id },
+      data: { status },
+      include: { semester: true },
+    });
+
+    return {
+      status: "success",
+      message: `Admission ${status.toLowerCase()} successfully`,
+      data: updatedAdmission,
+    };
+  }
+
   static async createShell(
     data: CreateAdmissionShellType,
     headers: IncomingHttpHeaders
@@ -238,12 +416,13 @@ export class AdmissionService {
     }
   }
 
-  static async generateTempUsn(
+  private static async generateTempUsnWithClient(
+    client: Pick<Prisma.TransactionClient, "semester" | "admission">,
     semesterId: string,
     branchCode: string
   ): Promise<string> {
     try {
-      const semester = await db.semester.findUnique({
+      const semester = await client.semester.findUnique({
         where: { id: semesterId },
       });
       if (!semester) throw new Error("Semester not found");
@@ -252,7 +431,7 @@ export class AdmissionService {
       const formattedBranch = branchCode.toUpperCase().substring(0, 2);
       const prefix = `1BM${yearPrefix}${formattedBranch}`;
 
-      const lastAdmission = await db.admission.findFirst({
+      const lastAdmission = await client.admission.findFirst({
         where: { tempUsn: { startsWith: prefix } },
         orderBy: { tempUsn: "desc" },
       });
@@ -272,6 +451,17 @@ export class AdmissionService {
       logger.error("Failed to generate Temp USN", error);
       throw new Error("Failed to generate Temp USN");
     }
+  }
+
+  static async generateTempUsn(
+    semesterId: string,
+    branchCode: string
+  ): Promise<string> {
+    return AdmissionService.generateTempUsnWithClient(
+      db,
+      semesterId,
+      branchCode
+    );
   }
 
   static async submitApplication(
@@ -455,6 +645,220 @@ export class AdmissionService {
     } catch (error) {
       logger.error("Failed to submit application", error);
       throw new Error("Failed to submit application");
+    }
+  }
+
+  static async approveAdmission(
+    params: AdmissionActionParamType
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      return await AdmissionService.updateAdmissionStatus(params.id, "APPROVED");
+    } catch (error) {
+      logger.error("Failed to approve admission", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to approve admission"
+      );
+    }
+  }
+
+  static async rejectAdmission(
+    params: AdmissionActionParamType
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      return await AdmissionService.updateAdmissionStatus(params.id, "REJECTED");
+    } catch (error) {
+      logger.error("Failed to reject admission", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to reject admission"
+      );
+    }
+  }
+
+  static async portStudents(
+    payload: PortStudentsType,
+    headers: IncomingHttpHeaders
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const [semester, unresolvedCount, approvedAdmissions] = await Promise.all([
+        db.semester.findUnique({
+          where: { id: payload.semesterId },
+          select: {
+            id: true,
+            year: true,
+            semesterNumber: true,
+          },
+        }),
+        db.admission.count({
+          where: {
+            semesterId: payload.semesterId,
+            status: {
+              in: ["PENDING", "SUBMITTED"],
+            },
+          },
+        }),
+        db.admission.findMany({
+          where: {
+            semesterId: payload.semesterId,
+            status: "APPROVED",
+          },
+          select: {
+            id: true,
+            applicationId: true,
+            branch: true,
+            tempUsn: true,
+            usn: true,
+          },
+        }),
+      ]);
+
+      if (!semester) {
+        throw new Error("Semester not found");
+      }
+
+      if (unresolvedCount > 0) {
+        throw new Error(
+          `Cannot port students. ${unresolvedCount} application(s) are still pending review.`
+        );
+      }
+
+      const approvedUnportedAdmissions = approvedAdmissions.filter(
+        (admission) => !admission.usn
+      );
+
+      const allApprovedApplicationIds = approvedAdmissions.map(
+        (admission) => admission.applicationId
+      );
+
+      const { userIdByApplicationId, autoCreatedUsers } =
+        await AdmissionService.resolveApplicantUsersForPort(
+          allApprovedApplicationIds,
+          headers
+        );
+
+      const result = await db.$transaction(async (tx) => {
+        let newlyPorted = 0;
+        let alreadyPorted = 0;
+
+        for (const admission of approvedUnportedAdmissions) {
+          const userId = userIdByApplicationId.get(
+            AdmissionService.normalizeApplicationId(admission.applicationId)
+          );
+          if (!userId) {
+            throw new Error(
+              `Applicant user not found for application ID ${admission.applicationId}`
+            );
+          }
+
+          if (!admission.branch) {
+            throw new Error(
+              `Branch is missing for application ID ${admission.applicationId}`
+            );
+          }
+
+          let finalUsn = admission.tempUsn?.trim();
+          if (!finalUsn) {
+            // Legacy/generated admissions may skip submit flow; backfill temp USN here.
+            finalUsn = await AdmissionService.generateTempUsnWithClient(
+              tx,
+              payload.semesterId,
+              admission.branch
+            );
+          }
+
+          const existingStudent = await tx.student.findFirst({
+            where: {
+              OR: [{ userId }, { usn: finalUsn }],
+            },
+            select: {
+              id: true,
+              usn: true,
+            },
+          });
+
+          if (existingStudent) {
+            await tx.admission.update({
+              where: { id: admission.id },
+              data: {
+                usn: existingStudent.usn,
+              },
+            });
+
+            await tx.user.update({
+              where: { id: userId },
+              data: { role: "student" },
+            });
+
+            alreadyPorted += 1;
+            continue;
+          }
+
+          await tx.student.create({
+            data: {
+              userId,
+              usn: finalUsn,
+              departmentName: admission.branch,
+              currentSemester: semester.semesterNumber,
+              academicYear: semester.year,
+            },
+          });
+
+          await tx.admission.update({
+            where: { id: admission.id },
+            data: {
+              tempUsn: finalUsn,
+              usn: finalUsn,
+            },
+          });
+
+          await tx.user.update({
+            where: { id: userId },
+            data: { role: "student" },
+          });
+
+          newlyPorted += 1;
+        }
+
+        return {
+          newlyPorted,
+          alreadyPorted,
+        };
+      });
+
+      return {
+        status: "success",
+        message: "Students ported successfully",
+        data: {
+          semesterId: payload.semesterId,
+          semesterNumber: semester.semesterNumber,
+          totalApproved: approvedAdmissions.length,
+          newlyPorted: result.newlyPorted,
+          alreadyPorted: result.alreadyPorted,
+          autoCreatedApplicants: autoCreatedUsers,
+          rejectedCount: await db.admission.count({
+            where: {
+              semesterId: payload.semesterId,
+              status: "REJECTED",
+            },
+          }),
+        },
+      };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2002") {
+          throw new Error("Port operation encountered duplicate student data");
+        }
+
+        if (error.code === "P2003") {
+          throw new Error(
+            "Port operation failed due to missing department mapping for one or more branches"
+          );
+        }
+      }
+
+      logger.error("Failed to port students", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to port students"
+      );
     }
   }
 }

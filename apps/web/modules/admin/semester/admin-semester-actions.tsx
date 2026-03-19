@@ -51,6 +51,9 @@ import { toast } from "react-toastify";
 import { useSemesterDelete } from "./use-semester-delete";
 import { useSemesterUpdateSchema } from "./use-semester-update-schema";
 
+const ODD_SEMESTER_NUMBERS = [1, 3, 5, 7];
+const EVEN_SEMESTER_NUMBERS = [2, 4, 6, 8];
+
 export const AdminSemesterActions = ({
   semester,
 }: {
@@ -64,6 +67,8 @@ export const AdminSemesterActions = ({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   const watchedType = form.watch("type");
+  const semesterNumberOptions =
+    watchedType === "odd" ? ODD_SEMESTER_NUMBERS : EVEN_SEMESTER_NUMBERS;
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 6 }, (_, i) =>
     (currentYear + i).toString()
@@ -123,7 +128,16 @@ export const AdminSemesterActions = ({
                       <FormLabel>Type</FormLabel>
                       <FormControl>
                         <Select
-                          onValueChange={field.onChange}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            form.setValue(
+                              "semesterNumber",
+                              value === "odd" ? 1 : 2,
+                              {
+                                shouldValidate: true,
+                              }
+                            );
+                          }}
                           value={field.value}
                         >
                           <FormControl>
@@ -172,6 +186,41 @@ export const AdminSemesterActions = ({
                             {years.map((year) => (
                               <SelectItem key={year} value={year}>
                                 {year}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="semesterNumber"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Semester Number</FormLabel>
+                      <FormControl>
+                        <Select
+                          onValueChange={(value) =>
+                            field.onChange(Number.parseInt(value, 10))
+                          }
+                          value={String(field.value)}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select Semester Number" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="w-full">
+                            {semesterNumberOptions.map((semesterNumber) => (
+                              <SelectItem
+                                key={semesterNumber}
+                                value={String(semesterNumber)}
+                              >
+                                {semesterNumber}
                               </SelectItem>
                             ))}
                           </SelectContent>

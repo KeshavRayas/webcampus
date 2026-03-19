@@ -1,8 +1,10 @@
 import { AdmissionController } from "@webcampus/api/src/controllers/admission/admission.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
+  AdmissionActionParamSchema,
   CreateAdmissionShellSchema,
   GetAdmissionsQuerySchema,
+  PortStudentsSchema,
 } from "@webcampus/schemas/admission";
 import { Router } from "express";
 import multer from "multer";
@@ -14,7 +16,7 @@ router.get(
   "/",
   validateRequest(GetAdmissionsQuerySchema, "query"),
   protect({
-    role: "admin",
+    role: ["admin", "admission"],
     permissions: {
       admission: ["read"],
     },
@@ -27,7 +29,7 @@ router.post(
   "/shell",
   validateRequest(CreateAdmissionShellSchema),
   protect({
-    role: "admin",
+    role: ["admin", "admission"],
     permissions: {
       admission: ["create"],
       user: ["set-role"], // Needed to create the applicant user
@@ -40,7 +42,7 @@ router.post(
 router.get(
   "/semester/:semesterId",
   protect({
-    role: "admin",
+    role: ["admin", "admission"],
     permissions: {
       admission: ["read"],
     },
@@ -62,12 +64,48 @@ router.get(
 router.delete(
   "/:id",
   protect({
-    role: "admin",
+    role: ["admin", "admission"],
     permissions: {
       admission: ["delete"],
     },
   }),
   AdmissionController.deleteAdmission
+);
+
+router.patch(
+  "/:id/approve",
+  validateRequest(AdmissionActionParamSchema, "params"),
+  protect({
+    role: ["admin", "admission"],
+    permissions: {
+      admission: ["update"],
+    },
+  }),
+  AdmissionController.approve
+);
+
+router.patch(
+  "/:id/reject",
+  validateRequest(AdmissionActionParamSchema, "params"),
+  protect({
+    role: ["admin", "admission"],
+    permissions: {
+      admission: ["update"],
+    },
+  }),
+  AdmissionController.reject
+);
+
+router.post(
+  "/port",
+  validateRequest(PortStudentsSchema),
+  protect({
+    role: ["admin", "admission"],
+    permissions: {
+      admission: ["update"],
+    },
+  }),
+  AdmissionController.portStudents
 );
 
 // Endpoint for applicant to submit their final form

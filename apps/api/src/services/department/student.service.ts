@@ -38,74 +38,87 @@ export class DepartmentStudentService {
         throw new Error("Department not found for this user");
       }
 
-      const admissionRecords = await db.admission.findMany({
+      const normalizedDepartmentName = department.name.trim().toLowerCase();
+      const isFirstYearDepartmentAdmin =
+        normalizedDepartmentName === "first year";
+
+      const studentRecords = await db.student.findMany({
         where: {
-          branch: {
-            equals: department.name,
-            mode: "insensitive",
-          },
-          ...(query.tempUsn
+          ...(isFirstYearDepartmentAdmin
             ? {
-                tempUsn: {
-                  contains: query.tempUsn,
+                currentSemester: {
+                  in: [1, 2],
+                },
+              }
+            : {
+                departmentName: {
+                  equals: department.name,
+                  mode: "insensitive",
+                },
+              }),
+          ...(query.usn
+            ? {
+                usn: {
+                  contains: query.usn,
+                  mode: "insensitive",
+                },
+              }
+            : {}),
+          ...(query.currentSemester
+            ? {
+                currentSemester: query.currentSemester,
+              }
+            : {}),
+          ...(query.academicYear
+            ? {
+                academicYear: {
+                  contains: query.academicYear,
+                  mode: "insensitive",
+                },
+              }
+            : {}),
+          ...(query.departmentName
+            ? {
+                departmentName: {
+                  equals: query.departmentName,
                   mode: "insensitive",
                 },
               }
             : {}),
           ...(query.name
             ? {
-                OR: [
-                  {
-                    firstName: {
-                      contains: query.name,
-                      mode: "insensitive",
-                    },
+                user: {
+                  name: {
+                    contains: query.name,
+                    mode: "insensitive",
                   },
-                  {
-                    lastName: {
-                      contains: query.name,
-                      mode: "insensitive",
-                    },
-                  },
-                ],
-              }
-            : {}),
-          ...(query.status ? { status: query.status } : {}),
-          ...(query.modeOfAdmission
-            ? {
-                modeOfAdmission: {
-                  contains: query.modeOfAdmission,
-                  mode: "insensitive",
-                },
-              }
-            : {}),
-          ...(query.gender
-            ? {
-                gender: {
-                  contains: query.gender,
-                  mode: "insensitive",
                 },
               }
             : {}),
         },
+        include: {
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+        },
         orderBy: {
-          createdAt: "desc",
+          usn: "asc",
         },
       });
 
-      const students: DepartmentStudentResponseType[] = admissionRecords.map(
+      const students: DepartmentStudentResponseType[] = studentRecords.map(
         (record) => ({
           id: record.id,
-          applicationId: record.applicationId,
-          tempUsn: record.tempUsn ?? null,
-          firstName: record.firstName ?? null,
-          lastName: record.lastName ?? null,
-          branch: record.branch ?? null,
-          status: record.status,
-          modeOfAdmission: record.modeOfAdmission,
-          gender: record.gender ?? null,
-          primaryEmail: record.primaryEmail ?? null,
-          createdAt: record.createdAt,
+          userId: record.userId,
+          usn: record.usn,
+          name: record.user.name ?? null,
+          email: record.user.email ?? null,
+          departmentName: record.departmentName,
+          currentSemester: record.currentSemester,
+          academicYear: record.academicYear,
         })
       );
 

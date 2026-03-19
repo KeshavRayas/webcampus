@@ -26,6 +26,7 @@ export const useSemesterUpdateSchema = (
     defaultValues: {
       type: semester.type,
       year: semester.year,
+      semesterNumber: semester.semesterNumber,
       startDate: new Date(semester.startDate),
       endDate: new Date(semester.endDate),
       userId: semester.userId || "",
@@ -37,6 +38,7 @@ export const useSemesterUpdateSchema = (
     form.reset({
       type: semester.type,
       year: semester.year,
+      semesterNumber: semester.semesterNumber,
       startDate: new Date(semester.startDate),
       endDate: new Date(semester.endDate),
       userId: semester.userId || "",

@@ -6,12 +6,20 @@ export const CreateAdmissionShellSchema = z.object({
   semesterId: z.string().uuid("Invalid Semester ID"),
 });
 
-const AdmissionStatusSchema = z.enum([
+export const AdmissionStatusSchema = z.enum([
   "PENDING",
   "SUBMITTED",
   "APPROVED",
   "REJECTED",
 ]);
+
+export const AdmissionActionParamSchema = z.object({
+  id: z.string().uuid("Invalid admission ID"),
+});
+
+export const PortStudentsSchema = z.object({
+  semesterId: z.string().uuid("Invalid semester ID"),
+});
 
 const optionalQueryString = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((value) => {
@@ -52,3 +60,5 @@ export type CreateAdmissionShellType = z.infer<
   typeof CreateAdmissionShellSchema
 >;
 export type GetAdmissionsQueryType = z.infer<typeof GetAdmissionsQuerySchema>;
+export type AdmissionActionParamType = z.infer<typeof AdmissionActionParamSchema>;
+export type PortStudentsType = z.infer<typeof PortStudentsSchema>;

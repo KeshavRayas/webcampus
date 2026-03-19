@@ -17,24 +17,26 @@ import { toast } from "react-toastify";
 
 export const useSemesterCreateSchema = (semesters?: SemesterResponseType[]) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const { data } = authClient.useSession();
+  const { data: session } = authClient.useSession();
   const queryClient = useQueryClient();
+  const currentYear = new Date().getFullYear().toString();
   const form = useForm<CreateSemesterType>({
     resolver: zodResolver(CreateSemesterSchema),
     defaultValues: {
       type: "odd",
-      year: "",
+      year: currentYear,
+      semesterNumber: 1,
       startDate: new Date(),
       endDate: new Date(),
-      userId: data?.user?.id || "",
+      userId: session?.user?.id || "",
     },
   });
 
   useEffect(() => {
-    if (data?.user?.id) {
-      form.setValue("userId", data.user.id);
+    if (session?.user?.id) {
+      form.setValue("userId", session.user.id);
     }
-  }, [data, form]);
+  }, [session, form]);
 
   const { mutate: createSemester } = useMutation({
     mutationFn: async (data: CreateSemesterType) => {
@@ -49,9 +51,21 @@ export const useSemesterCreateSchema = (semesters?: SemesterResponseType[]) => {
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);
       queryClient.invalidateQueries({ queryKey: ["semesters"] });
+      form.reset({
+        type: "odd",
+        year: currentYear,
+        semesterNumber: 1,
+        startDate: new Date(),
+        endDate: new Date(),
+        userId: session?.user?.id || "",
+      });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
-      toast.error(error.response?.data.error);
+      toast.error(
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Failed to create semester"
+      );
     },
   });
 

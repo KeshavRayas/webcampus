@@ -40,6 +40,10 @@ export const AdminSemesterColumns: ColumnDef<SemesterResponseType>[] = [
     header: "Year",
   },
   {
+    accessorKey: "semesterNumber",
+    header: "Semester #",
+  },
+  {
     accessorKey: "isCurrent",
     header: "Is Current",
     cell: ({ row }) => {

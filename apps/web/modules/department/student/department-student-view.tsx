@@ -7,10 +7,7 @@ import {
 } from "@/lib/filter-search-params";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import {
-  AdmissionStatusEnum,
-  DepartmentStudentResponseType,
-} from "@webcampus/schemas/department";
+import { DepartmentStudentResponseType } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import {
@@ -27,31 +24,27 @@ import React, { useEffect, useState } from "react";
 import { departmentStudentColumns } from "./department-student-columns";
 
 type StudentFilters = {
-  tempUsn: string;
+  usn: string;
   name: string;
-  status: string;
-  modeOfAdmission: string;
-  gender: string;
+  departmentName: string;
+  currentSemester: string;
+  academicYear: string;
 };
 
 const EMPTY_FILTERS: StudentFilters = {
-  tempUsn: "",
+  usn: "",
   name: "",
-  status: "",
-  modeOfAdmission: "",
-  gender: "",
-};
-
-const formatStatus = (status: string) => {
-  return status.charAt(0) + status.slice(1).toLowerCase();
+  departmentName: "",
+  currentSemester: "",
+  academicYear: "",
 };
 
 const studentFilterFields: FilterFieldConfig<StudentFilters>[] = [
   {
-    key: "tempUsn",
+    key: "usn",
     label: "USN",
     type: "text",
-    inputId: "department-student-tempusn",
+    inputId: "department-student-usn",
     placeholder: "Search by USN",
     className: "xl:col-span-2",
   },
@@ -63,40 +56,35 @@ const studentFilterFields: FilterFieldConfig<StudentFilters>[] = [
     placeholder: "Search by student name",
   },
   {
-    key: "status",
-    label: "Status",
-    type: "select",
-    allOptionLabel: "All statuses",
-    placeholder: "All statuses",
-    options: AdmissionStatusEnum.options.map((s) => ({
-      label: formatStatus(s),
-      value: s,
-    })),
+    key: "departmentName",
+    label: "Department",
+    type: "text",
+    inputId: "department-student-department-name",
+    placeholder: "Search by department",
   },
   {
-    key: "modeOfAdmission",
-    label: "Mode of Admission",
+    key: "currentSemester",
+    label: "Current Semester",
     type: "select",
-    allOptionLabel: "All modes",
-    placeholder: "All modes",
+    allOptionLabel: "All semesters",
+    placeholder: "All semesters",
     options: [
-      { label: "KCET", value: "KCET" },
-      { label: "COMEDK", value: "COMEDK" },
-      { label: "Management", value: "Management" },
-      { label: "SNQ Quota", value: "SNQ Quota" },
-      { label: "Other", value: "Other" },
+      { label: "1", value: "1" },
+      { label: "2", value: "2" },
+      { label: "3", value: "3" },
+      { label: "4", value: "4" },
+      { label: "5", value: "5" },
+      { label: "6", value: "6" },
+      { label: "7", value: "7" },
+      { label: "8", value: "8" },
     ],
   },
   {
-    key: "gender",
-    label: "Gender",
-    type: "select",
-    allOptionLabel: "All genders",
-    placeholder: "All genders",
-    options: [
-      { label: "Male", value: "Male" },
-      { label: "Female", value: "Female" },
-    ],
+    key: "academicYear",
+    label: "Academic Year",
+    type: "text",
+    inputId: "department-student-academic-year",
+    placeholder: "Search by academic year",
   },
 ];
 
@@ -144,13 +132,17 @@ export const DepartmentStudentView = () => {
     queryKey: ["department-students", appliedFilters],
     queryFn: async () => {
       const apiFilters = {
-        ...(appliedFilters.tempUsn ? { tempUsn: appliedFilters.tempUsn } : {}),
+        ...(appliedFilters.usn ? { usn: appliedFilters.usn } : {}),
         ...(appliedFilters.name ? { name: appliedFilters.name } : {}),
-        ...(appliedFilters.status ? { status: appliedFilters.status } : {}),
-        ...(appliedFilters.modeOfAdmission
-          ? { modeOfAdmission: appliedFilters.modeOfAdmission }
+        ...(appliedFilters.departmentName
+          ? { departmentName: appliedFilters.departmentName }
           : {}),
-        ...(appliedFilters.gender ? { gender: appliedFilters.gender } : {}),
+        ...(appliedFilters.currentSemester
+          ? { currentSemester: Number.parseInt(appliedFilters.currentSemester, 10) }
+          : {}),
+        ...(appliedFilters.academicYear
+          ? { academicYear: appliedFilters.academicYear }
+          : {}),
       };
 
       const res = await axios.get<

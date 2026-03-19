@@ -5,8 +5,10 @@ import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import {
+  AdmissionActionParamType,
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
+  PortStudentsType,
 } from "@webcampus/schemas/admission";
 import { Request, Response } from "express";
 
@@ -243,6 +245,91 @@ export class AdmissionController {
           error instanceof Error && error.message.includes("Unauthorized")
             ? 401
             : 400,
+        error,
+      });
+    }
+  }
+
+  static async approve(req: Request, res: Response): Promise<void> {
+    try {
+      const response = await AdmissionService.approveAdmission(
+        req.params as AdmissionActionParamType
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error approving admission", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
+  static async reject(req: Request, res: Response): Promise<void> {
+    try {
+      const response = await AdmissionService.rejectAdmission(
+        req.params as AdmissionActionParamType
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error rejecting admission", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
+  static async portStudents(req: Request, res: Response): Promise<void> {
+    try {
+      const response = await AdmissionService.portStudents(
+        req.body as PortStudentsType,
+        req.headers
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error porting students", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
         error,
       });
     }

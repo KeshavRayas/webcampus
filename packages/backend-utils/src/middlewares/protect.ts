@@ -7,7 +7,7 @@ import { ERRORS } from "../errors";
 import { sendResponse } from "../helpers";
 
 interface ProtectParams {
-  role?: Role;
+  role?: Role | Role[];
   permissions: Partial<Permissions>;
 }
 
@@ -55,10 +55,39 @@ export const protect =
           error: ERRORS.UNAUTHORIZED,
         });
       }
+
+      const sessionRole = session.user.role as Role | undefined;
+
+      if (!sessionRole) {
+        logger.error(ERRORS.UNAUTHENTICATED);
+        return sendResponse({
+          status: "error",
+          res,
+          statusCode: 401,
+          message: ERRORS.UNAUTHORIZED,
+          error: ERRORS.UNAUTHORIZED,
+        });
+      }
+
+      if (role) {
+        const allowedRoles = Array.isArray(role) ? role : [role];
+        if (!allowedRoles.includes(sessionRole)) {
+          logger.error(ERRORS.FORBIDDEN);
+          sendResponse({
+            status: "error",
+            res,
+            statusCode: 403,
+            message: ERRORS.FORBIDDEN,
+            error: ERRORS.FORBIDDEN,
+          });
+          return;
+        }
+      }
+
       const { success, error } = await auth.api.userHasPermission({
         headers: fromNodeHeaders(req.headers),
         body: {
-          role,
+          role: sessionRole,
           permissions,
         },
       });

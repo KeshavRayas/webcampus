@@ -27,6 +27,7 @@ import { Eye, MoreHorizontal } from "lucide-react";
 import React, { useState } from "react";
 import { AdmissionResponse } from "./admin-admission-columns";
 import { useAdmissionDelete } from "./use-admission-delete";
+import { useAdmissionReview } from "./use-admission-review";
 
 const getStatusVariant = (status: AdmissionResponse["status"]) => {
   if (status === "APPROVED") return "default" as const;
@@ -85,7 +86,9 @@ export const AdminAdmissionActions = ({
   menuOnly?: boolean;
 }) => {
   const isPending = admission.status === "PENDING";
+  const isSubmitted = admission.status === "SUBMITTED";
   const { onDelete } = useAdmissionDelete();
+  const { onApprove, onReject, isApproving, isRejecting } = useAdmissionReview();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   // Compute Full Name
@@ -232,6 +235,26 @@ export const AdminAdmissionActions = ({
                   <DataField label="Temporary USN" value={admission.tempUsn} />
                   <DataField label="USN" value={admission.usn} />
                   <DataField label="Unique ID" value={admission.uniqueId} />
+
+                  {isSubmitted && (
+                    <div className="flex flex-col gap-2 border-t pt-3">
+                      <Button
+                        size="sm"
+                        onClick={() => onApprove(admission.id)}
+                        disabled={isApproving || isRejecting}
+                      >
+                        {isApproving ? "Approving..." : "Approve"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => onReject(admission.id)}
+                        disabled={isApproving || isRejecting}
+                      >
+                        {isRejecting ? "Rejecting..." : "Reject"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
 
