@@ -56,9 +56,14 @@ export const GetAdmissionsQuerySchema = z
     }
   );
 
+export const SubmitApplicationSchema = z.object({
+  departmentId: z.string().uuid("Invalid department ID"),
+});
 export type CreateAdmissionShellType = z.infer<
   typeof CreateAdmissionShellSchema
 >;
 export type GetAdmissionsQueryType = z.infer<typeof GetAdmissionsQuerySchema>;
-export type AdmissionActionParamType = z.infer<typeof AdmissionActionParamSchema>;
+export type AdmissionActionParamType = z.infer<
+  typeof AdmissionActionParamSchema
+>;
 export type PortStudentsType = z.infer<typeof PortStudentsSchema>;

@@ -146,16 +146,19 @@ enum AdmissionStatus {
 }
 
 model Department {
-  id        String    @id @default(uuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  name      String    @unique
-  hodId     String?   @unique
-  hod       Hod?      @relation(fields: [hodId], references: [id])
-  sections  Section[]
-  students  Student[]
-  faculties Faculty[]
-  Course    Course[]
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  name         String    @unique
+  code         String    @unique
+  abbreviation String
+  hodId        String?   @unique
+  hod          Hod?      @relation(fields: [hodId], references: [id])
+  sections     Section[]
+  students     Student[]
+  faculties    Faculty[]
+  Course       Course[]
+  Admissions   Admission[]
 
   @@index([name])
 }
@@ -382,6 +385,9 @@ model Admission {
 
   semesterId      String
   semester        Semester        @relation(fields: [semesterId], references: [id])
+
+  departmentId                 String?
+  department                   Department? @relation(fields: [departmentId], references: [id])
 
   firstName                    String?
   middleName                   String?

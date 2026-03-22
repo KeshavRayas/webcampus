@@ -1,3 +1,4 @@
+import { DepartmentController } from "@webcampus/api/src/controllers/admin/department.controller";
 import { AdmissionController } from "@webcampus/api/src/controllers/admission/admission.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
@@ -58,6 +59,15 @@ router.get(
     permissions: { admission: ["read"] },
   }),
   AdmissionController.getMe
+);
+
+router.get(
+  "/departments",
+  protect({
+    role: "applicant", // Allow applicants to access this
+    permissions: { department: ["read"] },
+  }),
+  DepartmentController.getPublicDepartments
 );
 
 // Endpoint for admin to delete an admission record (and its S3 files)

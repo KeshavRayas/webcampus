@@ -50,6 +50,8 @@ export class DepartmentService {
       const department = await db.department.create({
         data: {
           name: request.name,
+          code: request.code,
+          abbreviation: request.abbreviation,
           user: {
             connect: {
               id: user.data?.id,
@@ -86,19 +88,68 @@ export class DepartmentService {
    * @returns A promise that resolves to a BaseResponse object containing an array of department information.
    */
   static async getDepartments(): Promise<
-    BaseResponse<DepartmentResponseDTO[]>
+    BaseResponse<
+      (DepartmentResponseDTO & { email?: string; emailVerified?: boolean })[]
+    >
   > {
     try {
-      const departments = await db.department.findMany({});
-      const response: BaseResponse<DepartmentResponseDTO[]> = {
-        status: "success",
+      const departments = await db.department.findMany({
+        include: {
+          user: {
+            select: {
+              email: true,
+              emailVerified: true,
+            },
+          },
+        },
+      });
+      const formattedDepartments: (DepartmentResponseDTO & {
+        email?: string;
+        emailVerified?: boolean;
+      })[] = departments.map((dept) => {
+        const { user, ...departmentData } = dept;
+        return {
+          ...departmentData,
+          email: user?.email,
+          emailVerified: user?.emailVerified,
+        };
+      });
+
+      const response = {
+        status: "success" as const,
         message: "Departments fetched successfully",
-        data: departments,
+        data: formattedDepartments,
       };
       logger.info(response);
       return response;
     } catch (error) {
       logger.error(`Failed to get departments`, error);
+      throw new Error("Failed to get departments");
+    }
+  }
+
+  // department.service.ts
+  static async getDepartmentsPublic(): Promise<
+    BaseResponse<
+      { id: string; name: string; code: string; abbreviation: string }[]
+    >
+  > {
+    try {
+      const departments = await db.department.findMany({
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          abbreviation: true,
+        },
+      });
+      return {
+        status: "success",
+        message: "Departments fetched successfully",
+        data: departments,
+      };
+    } catch (error) {
+      logger.error("Failed to get departments", error);
       throw new Error("Failed to get departments");
     }
   }

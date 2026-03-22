@@ -32,6 +32,7 @@ export const roles = {
   }),
   applicant: ac.newRole({
     admission: ["read", "update"],
+    department: ["read"],
   }),
   student: ac.newRole({
     user: [],

@@ -22,6 +22,8 @@ export const useCreateDepartmentForm = () => {
     ),
     defaultValues: {
       name: "",
+      code: "",
+      abbreviation: "",
       email: "",
       password: "password",
       username: "",

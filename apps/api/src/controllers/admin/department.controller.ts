@@ -32,6 +32,32 @@ export class DepartmentController {
     }
   }
 
+  static async getPublicDepartments(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const response = await DepartmentService.getDepartmentsPublic();
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      sendResponse({
+        res,
+        status: "error",
+        message: ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 500,
+        error,
+      });
+    }
+  }
+
   static async create(req: Request, res: Response): Promise<void> {
     try {
       const request: CreateDepartmentDTO &

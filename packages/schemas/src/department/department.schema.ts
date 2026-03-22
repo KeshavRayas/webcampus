@@ -6,6 +6,10 @@ import { z } from "zod";
  */
 export const BaseDepartmentSchema = z.object({
   name: z.string().min(1, { message: "Department name cannot be empty" }),
+  code: z.string().min(1, { message: "Department code cannot be empty" }),
+  abbreviation: z
+    .string()
+    .min(1, { message: "Department abbreviation cannot be empty" }),
 });
 
 /**

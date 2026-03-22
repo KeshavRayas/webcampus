@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
+import { DepartmentResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { Checkbox } from "@webcampus/ui/components/checkbox";
@@ -23,14 +24,6 @@ type ApplicantAdmissionData = {
   modeOfAdmission: string;
   status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
 };
-
-const branches = [
-  { value: "CS", label: "Computer Science and Engineering" },
-  { value: "IS", label: "Information Science and Engineering" },
-  { value: "EC", label: "Electronics & Communication Engineering" },
-  { value: "ME", label: "Mechanical Engineering" },
-  { value: "CV", label: "Civil Engineering" },
-];
 
 export const ApplicantAdmissionView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
@@ -54,6 +47,21 @@ export const ApplicantAdmissionView = () => {
       return null;
     },
     retry: false,
+  });
+
+  const { data: departments } = useQuery({
+    queryKey: ["departments"],
+    queryFn: async () => {
+      // Fetching from the department endpoint, NOT /admin/user
+      const res = await axios.get<BaseResponse<DepartmentResponseDTO[]>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/admission/departments`, // Ensure this matches your router path
+        {
+          withCredentials: true,
+        }
+      );
+      if (res.data.status === "success") return res.data.data;
+      return [];
+    },
   });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -200,15 +208,15 @@ export const ApplicantAdmissionView = () => {
             </div>
 
             <div className="space-y-2 md:col-span-3">
-              <Label htmlFor="branch">Branch *</Label>
-              <Select name="branch" required>
-                <SelectTrigger id="branch">
+              <Label htmlFor="departmentId">Branch *</Label>
+              <Select name="departmentId" required>
+                <SelectTrigger id="departmentId">
                   <SelectValue placeholder="Select branch" />
                 </SelectTrigger>
                 <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.value} value={branch.value}>
-                      {branch.label}
+                  {departments?.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

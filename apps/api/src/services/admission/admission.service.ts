@@ -15,18 +15,25 @@ export class AdmissionService {
     return value.trim().toLowerCase();
   }
 
-  private static applicantEmailFromApplicationId(applicationId: string): string {
+  private static applicantEmailFromApplicationId(
+    applicationId: string
+  ): string {
     return `${AdmissionService.normalizeApplicationId(applicationId)}@applicant.local`;
   }
 
   private static async resolveApplicantUsersForPort(
     applicationIds: string[],
     headers: IncomingHttpHeaders
-  ): Promise<{ userIdByApplicationId: Map<string, string>; autoCreatedUsers: number }> {
+  ): Promise<{
+    userIdByApplicationId: Map<string, string>;
+    autoCreatedUsers: number;
+  }> {
     const normalizedApplicationIds = Array.from(
       new Set(
         applicationIds
-          .map((applicationId) => AdmissionService.normalizeApplicationId(applicationId))
+          .map((applicationId) =>
+            AdmissionService.normalizeApplicationId(applicationId)
+          )
           .filter((applicationId) => applicationId.length > 0)
       )
     );
@@ -78,7 +85,10 @@ export class AdmissionService {
         continue;
       }
 
-      const emailApplicationId = normalizedEmail.replace("@applicant.local", "");
+      const emailApplicationId = normalizedEmail.replace(
+        "@applicant.local",
+        ""
+      );
       if (normalizedApplicationIds.includes(emailApplicationId)) {
         userIdByApplicationId.set(emailApplicationId, user.id);
       }
@@ -93,7 +103,8 @@ export class AdmissionService {
     for (const applicationId of missingApplicationIds) {
       const userService = new UserService({
         request: {
-          email: AdmissionService.applicantEmailFromApplicationId(applicationId),
+          email:
+            AdmissionService.applicantEmailFromApplicationId(applicationId),
           name: `Applicant ${applicationId.toUpperCase()}`,
           username: applicationId.toUpperCase(),
           password: "password",
@@ -123,7 +134,8 @@ export class AdmissionService {
               },
             },
             {
-              email: AdmissionService.applicantEmailFromApplicationId(applicationId),
+              email:
+                AdmissionService.applicantEmailFromApplicationId(applicationId),
             },
           ],
         },
@@ -400,8 +412,31 @@ export class AdmissionService {
 
       await Promise.all(fileUrls.map((url) => deleteFromS3(url)));
 
+      const applicationId = admission.applicationId;
+      const applicantEmail = `${applicationId.toLowerCase()}@applicant.local`;
+
       // Delete the database record
-      await db.admission.delete({ where: { id } });
+      const applicantUser = await db.user.findFirst({
+        where: {
+          OR: [
+            { username: { equals: applicationId, mode: "insensitive" } },
+            { email: applicantEmail },
+          ],
+          role: "applicant", // Safety check: Ensure we only delete if they are still an 'applicant'
+        },
+        select: { id: true },
+      });
+
+      // --- NEW LOGIC: Delete both inside a transaction ---
+      await db.$transaction(async (tx) => {
+        // 1. Delete the admission record
+        await tx.admission.delete({ where: { id } });
+
+        // 2. Delete the user account (if found)
+        if (applicantUser) {
+          await tx.user.delete({ where: { id: applicantUser.id } });
+        }
+      });
 
       return {
         status: "success",
@@ -429,7 +464,7 @@ export class AdmissionService {
 
       const yearPrefix = semester.year.toString().slice(-2);
       const formattedBranch = branchCode.toUpperCase().substring(0, 2);
-      const prefix = `1BM${yearPrefix}${formattedBranch}`;
+      const prefix = `1BM${yearPrefix}TMP${formattedBranch}`;
 
       const lastAdmission = await client.admission.findFirst({
         where: { tempUsn: { startsWith: prefix } },
@@ -484,10 +519,19 @@ export class AdmissionService {
         throw new Error("Admission shell not found.");
       }
 
-      const branchCode = data.branch || "XX";
+      if (!data.departmentId)
+        throw new Error("Department selection is required.");
+
+      const department = await db.department.findUnique({
+        where: { id: data.departmentId },
+      });
+
+      if (!department) throw new Error("Selected department does not exist.");
+
+      // Use the official department code for USN generation (e.g., "CS")
       const tempUsn = await AdmissionService.generateTempUsn(
         existingAdmission.semesterId,
-        branchCode
+        department.code
       );
 
       // Update the record using its exact unique database ID
@@ -500,7 +544,8 @@ export class AdmissionService {
           firstName: data.firstName,
           middleName: data.middleName,
           lastName: data.lastName,
-          branch: data.branch,
+          departmentId: department.id,
+          branch: department.name,
           categoryClaimed: data.categoryClaimed,
           categoryAllotted: data.categoryAllotted,
           quota: data.quota,
@@ -652,7 +697,10 @@ export class AdmissionService {
     params: AdmissionActionParamType
   ): Promise<BaseResponse<unknown>> {
     try {
-      return await AdmissionService.updateAdmissionStatus(params.id, "APPROVED");
+      return await AdmissionService.updateAdmissionStatus(
+        params.id,
+        "APPROVED"
+      );
     } catch (error) {
       logger.error("Failed to approve admission", error);
       throw new Error(
@@ -665,7 +713,10 @@ export class AdmissionService {
     params: AdmissionActionParamType
   ): Promise<BaseResponse<unknown>> {
     try {
-      return await AdmissionService.updateAdmissionStatus(params.id, "REJECTED");
+      return await AdmissionService.updateAdmissionStatus(
+        params.id,
+        "REJECTED"
+      );
     } catch (error) {
       logger.error("Failed to reject admission", error);
       throw new Error(
@@ -679,37 +730,39 @@ export class AdmissionService {
     headers: IncomingHttpHeaders
   ): Promise<BaseResponse<unknown>> {
     try {
-      const [semester, unresolvedCount, approvedAdmissions] = await Promise.all([
-        db.semester.findUnique({
-          where: { id: payload.semesterId },
-          select: {
-            id: true,
-            year: true,
-            semesterNumber: true,
-          },
-        }),
-        db.admission.count({
-          where: {
-            semesterId: payload.semesterId,
-            status: {
-              in: ["PENDING", "SUBMITTED"],
+      const [semester, unresolvedCount, approvedAdmissions] = await Promise.all(
+        [
+          db.semester.findUnique({
+            where: { id: payload.semesterId },
+            select: {
+              id: true,
+              year: true,
+              semesterNumber: true,
             },
-          },
-        }),
-        db.admission.findMany({
-          where: {
-            semesterId: payload.semesterId,
-            status: "APPROVED",
-          },
-          select: {
-            id: true,
-            applicationId: true,
-            branch: true,
-            tempUsn: true,
-            usn: true,
-          },
-        }),
-      ]);
+          }),
+          db.admission.count({
+            where: {
+              semesterId: payload.semesterId,
+              status: {
+                in: ["PENDING", "SUBMITTED"],
+              },
+            },
+          }),
+          db.admission.findMany({
+            where: {
+              semesterId: payload.semesterId,
+              status: "APPROVED",
+            },
+            select: {
+              id: true,
+              applicationId: true,
+              departmentId: true,
+              tempUsn: true,
+              usn: true,
+            },
+          }),
+        ]
+      );
 
       if (!semester) {
         throw new Error("Semester not found");
@@ -749,9 +802,20 @@ export class AdmissionService {
             );
           }
 
-          if (!admission.branch) {
+          if (!admission.departmentId) {
             throw new Error(
               `Branch is missing for application ID ${admission.applicationId}`
+            );
+          }
+
+          const department = await tx.department.findUnique({
+            where: { id: admission.departmentId },
+            select: { name: true, code: true },
+          });
+
+          if (!department) {
+            throw new Error(
+              `Department not found for application ID ${admission.applicationId}`
             );
           }
 
@@ -761,7 +825,7 @@ export class AdmissionService {
             finalUsn = await AdmissionService.generateTempUsnWithClient(
               tx,
               payload.semesterId,
-              admission.branch
+              department.code
             );
           }
 
@@ -796,7 +860,7 @@ export class AdmissionService {
             data: {
               userId,
               usn: finalUsn,
-              departmentName: admission.branch,
+              departmentName: department.name,
               currentSemester: semester.semesterNumber,
               academicYear: semester.year,
             },

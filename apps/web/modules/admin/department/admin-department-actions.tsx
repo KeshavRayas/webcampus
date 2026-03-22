@@ -1,6 +1,5 @@
 "use client";
 
-import { UserResponseType } from "@webcampus/schemas/admin";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -19,12 +18,13 @@ import {
 } from "@webcampus/ui/components/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
+import { DepartmentTableItem } from "./admin-department-columns";
 import { useDepartmentDelete } from "./use-department-delete";
 
 export const AdminDepartmentActions = ({
   department,
 }: {
-  department: UserResponseType;
+  department: DepartmentTableItem;
 }) => {
   const { onDelete } = useDepartmentDelete();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);

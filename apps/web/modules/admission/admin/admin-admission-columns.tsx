@@ -12,6 +12,8 @@ export type AdmissionResponse = {
   status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
   createdAt: string;
 
+  departmentId?: string | null;
+
   // Added all the fields from the database
   firstName?: string | null;
   middleName?: string | null;

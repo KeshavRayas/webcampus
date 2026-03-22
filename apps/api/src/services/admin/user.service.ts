@@ -8,6 +8,7 @@ import {
   UsersQueryDTO,
 } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
+import { type Role } from "@webcampus/types/rbac";
 
 /**
  * Custom User Service for Better Auth Integration
@@ -117,7 +118,7 @@ export class UserService {
       const { user } = await auth.api.setRole({
         body: {
           userId: this.userId,
-          role: this.body.role,
+          role: this.body.role as Role,
         },
         headers: fromNodeHeaders(this.headers),
       });
@@ -141,7 +142,7 @@ export class UserService {
           email: this.body.email,
           password: this.body.password,
           name: this.body.name,
-          role: this.body.role,
+          role: this.body.role as Role,
         },
       });
       logger.info("User Created using Admin API ", { user });

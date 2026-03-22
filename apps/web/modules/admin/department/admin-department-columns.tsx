@@ -1,10 +1,15 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { UserResponseType } from "@webcampus/schemas/admin";
+import { DepartmentResponseDTO } from "@webcampus/schemas/department";
 import { AdminDepartmentActions } from "./admin-department-actions";
 
-export const adminDepartmentColumns: ColumnDef<UserResponseType>[] = [
+export type DepartmentTableItem = DepartmentResponseDTO & {
+  email?: string;
+  emailVerified?: boolean;
+};
+
+export const adminDepartmentColumns: ColumnDef<DepartmentTableItem>[] = [
   {
     accessorKey: "id",
     header: "ID",
@@ -12,6 +17,14 @@ export const adminDepartmentColumns: ColumnDef<UserResponseType>[] = [
   {
     accessorKey: "name",
     header: "Name",
+  },
+  {
+    accessorKey: "code",
+    header: "Department Code",
+  },
+  {
+    accessorKey: "abbreviation",
+    header: "Abbreviation",
   },
   {
     accessorKey: "email",

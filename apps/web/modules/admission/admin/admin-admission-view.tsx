@@ -162,7 +162,8 @@ export const AdminAdmissionView = ({
     });
 
   const unresolvedAdmissionsCount = (semesterAdmissions || []).filter(
-    (admission) => admission.status === "PENDING" || admission.status === "SUBMITTED"
+    (admission) =>
+      admission.status === "PENDING" || admission.status === "SUBMITTED"
   ).length;
 
   const approvedAdmissions = (semesterAdmissions || []).filter(
@@ -416,7 +417,9 @@ export const AdminAdmissionView = ({
                 }
                 setIsPortPreviewOpen(true);
               }}
-              disabled={!selectedSemesterId || isFetchingSemesterAdmissions || isPorting}
+              disabled={
+                !selectedSemesterId || isFetchingSemesterAdmissions || isPorting
+              }
             >
               {isPorting ? "Porting..." : "Preview Port"}
             </Button>
@@ -429,7 +432,9 @@ export const AdminAdmissionView = ({
               <DialogHeader>
                 <DialogTitle>Preview Student Port</DialogTitle>
                 <DialogDescription>
-                  Review admissions for {selectedSemester?.name || "the selected semester"} before final port.
+                  Review admissions for{" "}
+                  {selectedSemester?.name || "the selected semester"} before
+                  final port.
                 </DialogDescription>
               </DialogHeader>
 
@@ -437,38 +442,65 @@ export const AdminAdmissionView = ({
                 <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                   <div className="bg-muted/30 rounded-md border p-3">
                     <p className="text-muted-foreground">Pending/Submitted</p>
-                    <p className="text-lg font-semibold">{unresolvedAdmissionsCount}</p>
+                    <p className="text-lg font-semibold">
+                      {unresolvedAdmissionsCount}
+                    </p>
                   </div>
                   <div className="bg-muted/30 rounded-md border p-3">
                     <p className="text-muted-foreground">Will be ported</p>
-                    <p className="text-lg font-semibold">{admissionsToPort.length}</p>
+                    <p className="text-lg font-semibold">
+                      {admissionsToPort.length}
+                    </p>
                   </div>
                   <div className="bg-muted/30 rounded-md border p-3">
                     <p className="text-muted-foreground">Already ported</p>
-                    <p className="text-lg font-semibold">{alreadyPortedAdmissions.length}</p>
+                    <p className="text-lg font-semibold">
+                      {alreadyPortedAdmissions.length}
+                    </p>
                   </div>
                 </div>
 
                 {admissionsToPort.length > 0 ? (
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Admissions that will be ported</p>
+                    <p className="text-sm font-medium">
+                      Admissions that will be ported
+                    </p>
                     <div className="max-h-56 overflow-auto rounded-md border">
                       <table className="w-full text-sm">
                         <thead className="bg-muted/50 sticky top-0">
                           <tr>
-                            <th className="px-3 py-2 text-left font-medium">Application ID</th>
-                            <th className="px-3 py-2 text-left font-medium">Student Name</th>
-                            <th className="px-3 py-2 text-left font-medium">Status</th>
+                            <th className="px-3 py-2 text-left font-medium">
+                              Application ID
+                            </th>
+                            <th className="px-3 py-2 text-left font-medium">
+                              Student Name
+                            </th>
+                            <th className="px-3 py-2 text-left font-medium">
+                              Status
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {admissionsToPort.map((admission) => (
-                            <tr key={admission.id} className="border-t">
-                              <td className="px-3 py-2">{admission.applicationId}</td>
-                              <td className="px-3 py-2">{admission.studentName || "-"}</td>
-                              <td className="px-3 py-2">{admission.status}</td>
-                            </tr>
-                          ))}
+                          {admissionsToPort.map((admission) => {
+                            const fullName = [
+                              admission.firstName,
+                              admission.middleName,
+                              admission.lastName,
+                            ]
+                              .filter(Boolean)
+                              .join(" ");
+                            return (
+                              <tr key={admission.id} className="border-t">
+                                <td className="px-3 py-2">
+                                  {admission.applicationId}
+                                </td>
+                                <td className="px-3 py-2">{fullName || "-"}</td>
+                                <td className="px-3 py-2">
+                                  {admission.status}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -481,7 +513,8 @@ export const AdminAdmissionView = ({
 
                 {unresolvedAdmissionsCount > 0 && (
                   <p className="text-sm font-medium text-amber-700">
-                    Port is disabled until all admissions are reviewed (no pending or submitted records).
+                    Port is disabled until all admissions are reviewed (no
+                    pending or submitted records).
                   </p>
                 )}
               </div>
@@ -498,10 +531,14 @@ export const AdminAdmissionView = ({
                   type="button"
                   onClick={handleConfirmPort}
                   disabled={
-                    isPorting || unresolvedAdmissionsCount > 0 || admissionsToPort.length === 0
+                    isPorting ||
+                    unresolvedAdmissionsCount > 0 ||
+                    admissionsToPort.length === 0
                   }
                 >
-                  {isPorting ? "Porting..." : `Confirm Port (${admissionsToPort.length})`}
+                  {isPorting
+                    ? "Porting..."
+                    : `Confirm Port (${admissionsToPort.length})`}
                 </Button>
               </DialogFooter>
             </DialogContent>

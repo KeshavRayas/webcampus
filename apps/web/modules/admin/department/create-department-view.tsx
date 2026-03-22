@@ -52,6 +52,34 @@ export const CreateDepartmentView = () => {
 
       <FormField
         control={form.control}
+        name="code"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Code</FormLabel>
+            <FormControl>
+              <Input {...field} type="text" placeholder="e.g. CS" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="abbreviation"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Abbreviation</FormLabel>
+            <FormControl>
+              <Input {...field} type="text" placeholder="e.g. CSE" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
         name="email"
         render={({ field }) => (
           <FormItem>

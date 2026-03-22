@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { UserResponseType } from "@webcampus/schemas/admin";
+import { DepartmentResponseDTO } from "@webcampus/schemas/department";
 import { SuccessResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import { Page, PageContent, PageHeader } from "@webcampus/ui/components/page";
@@ -17,12 +17,10 @@ export const AdminDepartmentView = () => {
   const response = useQuery({
     queryKey: ["department"],
     queryFn: async () => {
-      return await axios.get<SuccessResponse<UserResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/user`,
+      return await axios.get<SuccessResponse<DepartmentResponseDTO[]>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/department`,
         {
-          params: {
-            role: "department",
-          },
+          withCredentials: true,
         }
       );
     },
