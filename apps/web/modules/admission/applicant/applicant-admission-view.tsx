@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { DepartmentResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { Checkbox } from "@webcampus/ui/components/checkbox";
@@ -23,6 +22,10 @@ type ApplicantAdmissionData = {
   applicationId: string;
   modeOfAdmission: string;
   status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  department?: { name: string };
+  categoryClaimed?: string;
+  categoryAllotted?: string;
+  quota?: string;
 };
 
 export const ApplicantAdmissionView = () => {
@@ -47,21 +50,6 @@ export const ApplicantAdmissionView = () => {
       return null;
     },
     retry: false,
-  });
-
-  const { data: departments } = useQuery({
-    queryKey: ["departments"],
-    queryFn: async () => {
-      // Fetching from the department endpoint, NOT /admin/user
-      const res = await axios.get<BaseResponse<DepartmentResponseDTO[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admission/departments`, // Ensure this matches your router path
-        {
-          withCredentials: true,
-        }
-      );
-      if (res.data.status === "success") return res.data.data;
-      return [];
-    },
   });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -208,33 +196,30 @@ export const ApplicantAdmissionView = () => {
             </div>
 
             <div className="space-y-2 md:col-span-3">
-              <Label htmlFor="departmentId">Branch *</Label>
-              <Select name="departmentId" required>
-                <SelectTrigger id="departmentId">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments?.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Branch</Label>
+              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
+                {admission.department?.name || "Assigned Branch"}
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="categoryClaimed">Category Claimed *</Label>
-              <Input id="categoryClaimed" name="categoryClaimed" required />
+              <Label>Category Claimed</Label>
+              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
+                {admission.categoryClaimed || "Not Set"}
+              </div>
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="categoryAllotted">Category Allotted *</Label>
-              <Input id="categoryAllotted" name="categoryAllotted" required />
+              <Label>Category Allotted</Label>
+              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
+                {admission.categoryAllotted || "Not Set"}
+              </div>
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="quota">Quota *</Label>
-              <Input id="quota" name="quota" required />
+              <Label>Quota</Label>
+              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
+                {admission.quota || "Not Set"}
+              </div>
             </div>
 
             <div className="space-y-2 md:col-span-4">

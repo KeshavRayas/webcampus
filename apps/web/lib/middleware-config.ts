@@ -1,13 +1,23 @@
 import { Role, roles } from "@webcampus/types/rbac";
 import { normalize } from "@webcampus/ui/lib/utils";
 
-export const AUTH_ROUTES = roles.map((role) => `/${role}/sign-in`);
-export const DASHBOARD_REDIRECTS: Record<Role, string> = Object.fromEntries(
-  roles.map((role) => [role, `/${role}`])
-) as Record<Role, string>;
+export const AUTH_ROUTES = [
+  ...roles.map((role) => `/${role}/sign-in`),
+  "/admission/sign-in",
+];
+export const DASHBOARD_REDIRECTS: Record<Role, string> = {
+  ...Object.fromEntries(roles.map((role) => [role, `/${role}`])),
+  admission_admin: "/admission",
+  admission_reviewer: "/admission",
+} as Record<Role, string>;
 
-export const getRoleFromPathname = (pathname: string): Role | null => {
+export const getRoleFromPathname = (
+  pathname: string
+): Role | null | "admission" => {
   const clean = normalize(pathname);
+  if (clean === "/admission" || clean.startsWith("/admission/")) {
+    return "admission";
+  }
   return (
     roles.find(
       (role) => clean === `/${role}` || clean.startsWith(`/${role}/`)

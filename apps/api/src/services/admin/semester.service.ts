@@ -1,188 +1,191 @@
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
-  CreateSemesterType,
-  SemesterQueryType,
-  SemesterResponseType,
+  AcademicTermQueryType,
+  AcademicTermResponseType,
+  CreateAcademicTermType,
+  CreateSemesterConfigType,
+  SemesterConfigResponseType,
 } from "@webcampus/schemas/admin";
 import { UUIDType } from "@webcampus/schemas/common";
 import { BaseResponse } from "@webcampus/types/api";
 
 export class SemesterService {
-  private static validateSemesterConstraints(data: CreateSemesterType): void {
-    const startDate = new Date(data.startDate);
-    const endDate = new Date(data.endDate);
-
-    if (startDate >= endDate) {
-      throw new Error("End date must be after start date");
-    }
-
-    const isOddSemester = data.semesterNumber % 2 === 1;
-    if (data.type === "odd" && !isOddSemester) {
-      throw new Error("Odd type allows only 1, 3, 5, or 7");
-    }
-
-    if (data.type === "even" && isOddSemester) {
-      throw new Error("Even type allows only 2, 4, 6, or 8");
-    }
-  }
-
-  static async create(
-    data: CreateSemesterType
-  ): Promise<BaseResponse<SemesterResponseType>> {
+  static async createAcademicTerm(
+    data: CreateAcademicTermType
+  ): Promise<BaseResponse<AcademicTermResponseType>> {
     try {
-      SemesterService.validateSemesterConstraints(data);
-
-      const name = `${data.type.toUpperCase()} ${data.year}`;
-      const currentDate = new Date();
-      const isCurrent =
-        currentDate >= new Date(data.startDate) &&
-        currentDate <= new Date(data.endDate);
-
-      const semester = await db.semester.create({
-        data: {
-          ...data,
-          name,
-          isCurrent,
-        },
+      const term = await db.academicTerm.create({
+        data,
       });
-      const response: BaseResponse<SemesterResponseType> = {
+      const response: BaseResponse<AcademicTermResponseType> = {
         status: "success",
-        message: "Semester created successfully",
-        data: semester,
+        message: "Academic Term created successfully",
+        data: term,
       };
       logger.info(response);
       return response;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2002") {
-          throw new Error(
-            `Semester ${data.type} ${data.year} ${data.semesterNumber} already exists`
-          );
-        }
-      }
-      if (error instanceof Error) {
-        throw error;
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new Error(
+          `Academic Term ${data.type} ${data.year} already exists`
+        );
       }
       logger.error({ error });
-      throw new Error("Failed to create semester");
+      throw new Error("Failed to create academic term");
     }
   }
 
-  static async update(
+  static async updateAcademicTerm(
     id: string,
-    data: CreateSemesterType
-  ): Promise<BaseResponse<SemesterResponseType>> {
+    data: CreateAcademicTermType
+  ): Promise<BaseResponse<AcademicTermResponseType>> {
     try {
-      SemesterService.validateSemesterConstraints(data);
-
-      const name = `${data.type.toUpperCase()} ${data.year}`;
-      const currentDate = new Date();
-      const isCurrent =
-        currentDate >= new Date(data.startDate) &&
-        currentDate <= new Date(data.endDate);
-
-      const semester = await db.semester.update({
+      const term = await db.academicTerm.update({
         where: { id },
-        data: {
-          type: data.type,
-          year: data.year,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          name,
-          isCurrent,
-        },
+        data,
       });
-      const response: BaseResponse<SemesterResponseType> = {
+      const response: BaseResponse<AcademicTermResponseType> = {
         status: "success",
-        message: "Semester updated successfully",
-        data: semester,
+        message: "Academic Term updated successfully",
+        data: term,
       };
       logger.info(response);
       return response;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2002") {
-          throw new Error(
-            `Semester ${data.type} ${data.year} ${data.semesterNumber} already exists`
-          );
-        }
-        if (error.code === "P2025") {
-          throw new Error("Semester not found");
-        }
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new Error(
+          `Academic Term ${data.type} ${data.year} already exists`
+        );
       }
-      if (error instanceof Error) {
-        throw error;
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new Error("Academic Term not found");
       }
       logger.error({ error });
-      throw new Error("Failed to update semester");
+      throw new Error("Failed to update academic term");
     }
   }
 
-  static async getAll(
-    query: SemesterQueryType
-  ): Promise<BaseResponse<SemesterResponseType[]>> {
+  static async getAllAcademicTerms(
+    query: AcademicTermQueryType
+  ): Promise<BaseResponse<AcademicTermResponseType[]>> {
     try {
-      const semesters = await db.semester.findMany({
-        where: {
-          ...query,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
+      const terms = await db.academicTerm.findMany({
+        where: query,
+        orderBy: { year: "desc" },
+        include: { Semester: true },
       });
-
-      const currentDate = new Date();
-      const semestersWithStatus = semesters.map((semester) => ({
-        ...semester,
-        isCurrent:
-          currentDate >= semester.startDate && currentDate <= semester.endDate,
-      }));
-
-      const response: BaseResponse<SemesterResponseType[]> = {
+      const response: BaseResponse<AcademicTermResponseType[]> = {
         status: "success",
-        message: "Semesters fetched successfully",
-        data: semestersWithStatus,
+        message: "Academic Terms fetched successfully",
+        data: terms,
       };
       logger.info(response);
       return response;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2025") {
-          throw new Error("Semester not found");
-        }
-      }
-      if (error instanceof Error) {
-        throw error;
-      }
       logger.error({ error });
-      throw new Error("Failed to fetch semesters");
+      throw new Error("Failed to fetch academic terms");
     }
   }
 
-  static async delete({ id }: UUIDType): Promise<BaseResponse<null>> {
+  static async deleteAcademicTerm({
+    id,
+  }: UUIDType): Promise<BaseResponse<null>> {
     try {
-      await db.semester.delete({
+      await db.academicTerm.delete({
         where: { id },
       });
       const response: BaseResponse<null> = {
         status: "success",
-        message: "Semester deleted successfully",
+        message: "Academic Term deleted successfully",
         data: null,
       };
       logger.info(response);
       return response;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2025") {
-          throw new Error("Semester not found");
-        }
-      }
-      if (error instanceof Error) {
-        throw error;
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new Error("Academic Term not found");
       }
       logger.error({ error });
-      throw new Error("Failed to delete semester");
+      throw new Error("Failed to delete academic term");
+    }
+  }
+
+  static async bulkUpsertSemesters(
+    academicTermId: string,
+    semesters: CreateSemesterConfigType[]
+  ): Promise<BaseResponse<SemesterConfigResponseType[]>> {
+    try {
+      const upsertedSemesters = await db.$transaction(
+        semesters.map((semester) => {
+          return db.semester.upsert({
+            where: {
+              academicTermId_programType_semesterNumber: {
+                academicTermId: semester.academicTermId,
+                programType: semester.programType,
+                semesterNumber: semester.semesterNumber,
+              },
+            },
+            update: {
+              startDate: semester.startDate,
+              endDate: semester.endDate,
+              userId: semester.userId,
+            },
+            create: {
+              academicTermId: semester.academicTermId,
+              programType: semester.programType,
+              semesterNumber: semester.semesterNumber,
+              startDate: semester.startDate,
+              endDate: semester.endDate,
+              userId: semester.userId,
+            },
+          });
+        })
+      );
+
+      const response: BaseResponse<SemesterConfigResponseType[]> = {
+        status: "success",
+        message: "Semesters upserted successfully",
+        data: upsertedSemesters as unknown as SemesterConfigResponseType[],
+      };
+      logger.info(response);
+      return response;
+    } catch (error) {
+      logger.error({ error });
+      throw new Error("Failed to bulk upsert semesters");
+    }
+  }
+
+  static async getSemestersByTerm(
+    academicTermId: string
+  ): Promise<BaseResponse<SemesterConfigResponseType[]>> {
+    try {
+      const semesters = await db.semester.findMany({
+        where: { academicTermId },
+        orderBy: [{ programType: "asc" }, { semesterNumber: "asc" }],
+      });
+      const response: BaseResponse<SemesterConfigResponseType[]> = {
+        status: "success",
+        message: "Semesters fetched successfully",
+        data: semesters as unknown as SemesterConfigResponseType[],
+      };
+      logger.info(response);
+      return response;
+    } catch (error) {
+      logger.error({ error });
+      throw new Error("Failed to fetch semesters");
     }
   }
 }

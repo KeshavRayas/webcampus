@@ -47,3 +47,5 @@ playwright/.cache/
 playwright/.auth
 
 .tsup
+
+.agents

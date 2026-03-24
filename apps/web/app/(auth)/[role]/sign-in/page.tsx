@@ -11,7 +11,7 @@ const SignInPage = async ({
   params: Promise<{ role: string }>;
 }) => {
   const roleSchema = z.object({
-    role: z.enum(roles),
+    role: z.enum([...roles, "admission"] as const),
   });
   const { data, success } = await roleSchema.safeParseAsync(await params);
 

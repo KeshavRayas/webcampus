@@ -13,12 +13,12 @@ export type AdmissionResponse = {
   createdAt: string;
 
   departmentId?: string | null;
+  department?: { name: string } | null;
 
   // Added all the fields from the database
   firstName?: string | null;
   middleName?: string | null;
   lastName?: string | null;
-  branch?: string | null;
   categoryClaimed?: string | null;
   categoryAllotted?: string | null;
   quota?: string | null;
@@ -159,7 +159,9 @@ const baseColumns: ColumnDef<AdmissionResponse>[] = [
     accessorKey: "createdAt",
     header: "Created On",
     cell: ({ row }) => (
-      <div>{dayjs(row.original.createdAt).format("MMM D, YYYY")}</div>
+      <div suppressHydrationWarning>
+        {dayjs(row.original.createdAt).format("MMM D, YYYY")}
+      </div>
     ),
   },
 ];

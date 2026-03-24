@@ -17,7 +17,7 @@ router.get(
   "/",
   validateRequest(GetAdmissionsQuerySchema, "query"),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission_admin", "admission_reviewer"],
     permissions: {
       admission: ["read"],
     },
@@ -30,7 +30,7 @@ router.post(
   "/shell",
   validateRequest(CreateAdmissionShellSchema),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission_admin"],
     permissions: {
       admission: ["create"],
       user: ["set-role"], // Needed to create the applicant user
@@ -43,7 +43,7 @@ router.post(
 router.get(
   "/semester/:semesterId",
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission_admin", "admission_reviewer"],
     permissions: {
       admission: ["read"],
     },
@@ -64,7 +64,7 @@ router.get(
 router.get(
   "/departments",
   protect({
-    role: "applicant", // Allow applicants to access this
+    role: ["applicant", "admin", "admission_admin", "admission_reviewer"],
     permissions: { department: ["read"] },
   }),
   DepartmentController.getPublicDepartments
@@ -74,7 +74,7 @@ router.get(
 router.delete(
   "/:id",
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission_admin", "admission_reviewer"],
     permissions: {
       admission: ["delete"],
     },
@@ -86,7 +86,7 @@ router.patch(
   "/:id/approve",
   validateRequest(AdmissionActionParamSchema, "params"),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission_reviewer"],
     permissions: {
       admission: ["update"],
     },
@@ -98,7 +98,7 @@ router.patch(
   "/:id/reject",
   validateRequest(AdmissionActionParamSchema, "params"),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission_reviewer"],
     permissions: {
       admission: ["update"],
     },
@@ -110,9 +110,9 @@ router.post(
   "/port",
   validateRequest(PortStudentsSchema),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission_reviewer"],
     permissions: {
-      admission: ["update"],
+      admission: ["port"],
     },
   }),
   AdmissionController.portStudents

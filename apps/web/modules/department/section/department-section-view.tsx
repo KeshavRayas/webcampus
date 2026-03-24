@@ -3,7 +3,7 @@
 import { authClient } from "@/lib/auth-client";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { SemesterResponseType } from "@webcampus/schemas/admin";
+import { AcademicTermResponseType } from "@webcampus/schemas/admin";
 import { SectionResponseType } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
@@ -24,27 +24,33 @@ import {
 } from "@webcampus/ui/components/select";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
 import axios from "axios";
+import React, { useState } from "react";
 import { DepartmentSectionColumns } from "./department-section-columns";
 import { useCreateSectionForm } from "./use-create-section-form";
 
 export const DepartmentSectionView = () => {
   const { data: session } = authClient.useSession();
   const { form, onSubmit } = useCreateSectionForm();
-  const { data: semesters, isLoading: isLoadingSemesters } = useQuery({
-    queryKey: ["semesters"],
+
+  // Local state for cascading term selection inside the dialog
+  const [dialogTermId, setDialogTermId] = useState<string>("");
+
+  const { data: terms, isLoading: isLoadingTerms } = useQuery({
+    queryKey: ["academic-terms"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<SemesterResponseType[]>>(
+      const res = await axios.get<BaseResponse<AcademicTermResponseType[]>>(
         `${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
-        {
-          withCredentials: true,
-        }
+        { withCredentials: true }
       );
-      if (res.data.status === "success") {
-        return res.data.data;
-      }
-      return [] as SemesterResponseType[];
+      if (res.data.status === "success") return res.data.data;
+      return [] as AcademicTermResponseType[];
     },
   });
+
+  const termOptions = Array.isArray(terms) ? terms : [];
+  const selectedTerm = termOptions.find((t) => t.id === dialogTermId);
+  const nestedSemesters = selectedTerm?.Semester || [];
+
   const { data, isLoading } = useQuery({
     queryKey: ["sections"],
     queryFn: async () => {
@@ -90,6 +96,32 @@ export const DepartmentSectionView = () => {
               </FormItem>
             )}
           />
+
+          {/* Cascading Term → Semester selection */}
+          <div className="space-y-2">
+            <FormLabel>Academic Term</FormLabel>
+            <Select
+              value={dialogTermId}
+              onValueChange={(value) => {
+                setDialogTermId(value);
+                form.setValue("semesterId", ""); // Reset semester on term change
+              }}
+              disabled={isLoadingTerms}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select term..." />
+              </SelectTrigger>
+              <SelectContent>
+                {termOptions.map((term) => (
+                  <SelectItem key={term.id} value={term.id}>
+                    {term.type.charAt(0).toUpperCase() + term.type.slice(1)}{" "}
+                    {term.year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <FormField
             control={form.control}
             name="semesterId"
@@ -98,20 +130,19 @@ export const DepartmentSectionView = () => {
                 <FormLabel>Semester</FormLabel>
                 <Select
                   onValueChange={field.onChange}
-                  defaultValue={field.value}
-                  disabled={isLoadingSemesters}
+                  value={field.value}
+                  disabled={!dialogTermId}
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select semester" />
+                      <SelectValue placeholder="Select semester..." />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {semesters?.map((semester) => (
+                    {nestedSemesters.map((semester) => (
                       <SelectItem key={semester.id} value={semester.id}>
-                        {semester.year} -{" "}
-                        {semester.type.charAt(0).toUpperCase() +
-                          semester.type.slice(1)}
+                        {semester.programType} - Semester{" "}
+                        {semester.semesterNumber}
                       </SelectItem>
                     ))}
                   </SelectContent>

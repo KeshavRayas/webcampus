@@ -39,9 +39,22 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (session && roleFromPath && session.user.role !== roleFromPath) {
-    url.pathname = "/403";
-    return NextResponse.redirect(url);
+  if (session && roleFromPath) {
+    if (
+      roleFromPath === "admission" &&
+      !["admission_admin", "admission_reviewer"].includes(
+        session.user?.role as string
+      )
+    ) {
+      url.pathname = "/403";
+      return NextResponse.redirect(url);
+    } else if (
+      roleFromPath !== "admission" &&
+      session.user?.role !== roleFromPath
+    ) {
+      url.pathname = "/403";
+      return NextResponse.redirect(url);
+    }
   }
 
   return NextResponse.next();

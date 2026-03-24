@@ -12,11 +12,11 @@ import {
 import { BaseResponse } from "@webcampus/types/api";
 
 export class HODService {
-  static async checkIfHODExists(departmentName: string): Promise<boolean> {
+  static async checkIfHODExists(userId: string): Promise<boolean> {
     try {
       const hod = await db.hod.findUnique({
         where: {
-          departmentName: departmentName,
+          userId: userId,
         },
       });
       return !!hod;
@@ -25,13 +25,11 @@ export class HODService {
       throw new Error(MESSAGES.HOD.FAILED_TO_CHECK_IF_HOD_EXISTS);
     }
   }
-  static async get(
-    departmentName: string
-  ): Promise<BaseResponse<HODResponseDTO>> {
+  static async get(userId: string): Promise<BaseResponse<HODResponseDTO>> {
     try {
       const hod = await db.hod.findUnique({
         where: {
-          departmentName: departmentName,
+          userId: userId,
         },
       });
       if (!hod) {
@@ -57,7 +55,7 @@ export class HODService {
     headers: IncomingHttpHeaders
   ): Promise<BaseResponse<HODResponseDTO>> {
     try {
-      const hodExists = await HODService.checkIfHODExists(data.departmentName);
+      const hodExists = await HODService.checkIfHODExists(data.userId);
       if (hodExists) {
         throw new Error(MESSAGES.HOD.CHECK_IF_HOD_EXISTS);
       }
@@ -75,12 +73,8 @@ export class HODService {
       logger.info("Role changed to HOD", { userId: data.userId });
       const hod = await db.hod.create({
         data: {
-          ...data,
-          department: {
-            connect: {
-              name: data.departmentName,
-            },
-          },
+          userId: data.userId,
+          departmentName: data.departmentName,
         },
       });
       const response: BaseResponse<HODResponseDTO> = {
@@ -120,7 +114,7 @@ export class HODService {
       logger.info("Role changed to faculty", { userId: data.userId });
       const hod = await db.hod.delete({
         where: {
-          departmentName: data.departmentName,
+          userId: data.userId,
         },
       });
       const response: BaseResponse<HODResponseDTO> = {

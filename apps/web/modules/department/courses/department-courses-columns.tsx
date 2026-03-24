@@ -42,7 +42,14 @@ export const DepartmentCoursesColumns: ColumnDef<CourseResponseDTO>[] = [
     id: "semesterName",
     header: "Semester Instance",
     cell: ({ row }) => {
-      return <div>{row.original.semester?.name || "-"}</div>;
+      const sem = row.original.semester;
+      if (!sem?.academicTerm) return <div>-</div>;
+      const termLabel = `${sem.academicTerm.type.charAt(0).toUpperCase() + sem.academicTerm.type.slice(1)} ${sem.academicTerm.year}`;
+      return (
+        <div>
+          {termLabel} · {sem.programType} Sem {sem.semesterNumber}
+        </div>
+      );
     },
   },
   {

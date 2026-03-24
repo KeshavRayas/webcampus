@@ -55,6 +55,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/admin/faculty",
           icon: Users,
         },
+        {
+          name: "Admission Users",
+          url: "/admin/admission-users",
+          icon: UserSearch,
+        },
       ],
     },
     navSecondary,
@@ -251,7 +256,24 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     },
     navSecondary,
   },
-  admission: {
+  admission_admin: {
+    navMain: {
+      items: [
+        {
+          name: "Dashboard",
+          url: "/admission",
+          icon: LayoutDashboard,
+        },
+        {
+          name: "View Admissions",
+          url: "/admission/view-admissions",
+          icon: BookCopy,
+        },
+      ],
+    },
+    navSecondary,
+  },
+  admission_reviewer: {
     navMain: {
       items: [
         {

@@ -1,32 +1,36 @@
 import { SemesterController } from "@webcampus/api/src/controllers/admin/semester.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
-import { CreateSemesterSchema } from "@webcampus/schemas/admin";
+import {
+  CreateAcademicTermSchema,
+  CreateSemesterConfigSchema,
+} from "@webcampus/schemas/admin";
 import { Router } from "express";
+import { z } from "zod";
 
 const router = Router();
 
 router.post(
   "/",
-  validateRequest(CreateSemesterSchema),
+  validateRequest(CreateAcademicTermSchema),
   protect({
     role: "admin",
     permissions: {
       semester: ["create"],
     },
   }),
-  SemesterController.create
+  SemesterController.createAcademicTerm
 );
 
 router.put(
   "/:id",
-  validateRequest(CreateSemesterSchema),
+  validateRequest(CreateAcademicTermSchema),
   protect({
     role: "admin",
     permissions: {
       semester: ["update"],
     },
   }),
-  SemesterController.update
+  SemesterController.updateAcademicTerm
 );
 
 router.delete(
@@ -35,7 +39,7 @@ router.delete(
     role: "admin",
     permissions: { semester: ["delete"] },
   }),
-  SemesterController.delete
+  SemesterController.deleteAcademicTerm
 );
 
 router.get(
@@ -43,7 +47,25 @@ router.get(
   protect({
     permissions: { semester: ["read"] },
   }),
-  SemesterController.getAll
+  SemesterController.getAllAcademicTerms
+);
+
+router.put(
+  "/:id/semesters",
+  validateRequest(z.array(CreateSemesterConfigSchema)),
+  protect({
+    role: "admin",
+    permissions: { semester: ["update"] },
+  }),
+  SemesterController.bulkUpsertSemesters
+);
+
+router.get(
+  "/:id/semesters",
+  protect({
+    permissions: { semester: ["read"] },
+  }),
+  SemesterController.getSemestersByTerm
 );
 
 export default router;

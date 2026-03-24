@@ -15,7 +15,7 @@ const statement = {
   section: ["create", "read"],
   freeze: ["read", "lock"],
   faculty: ["create", "read", "update", "delete"],
-  admission: ["create", "read", "update", "delete"],
+  admission: ["create", "read", "update", "delete", "port"],
   student: ["read"],
 } as const;
 
@@ -27,8 +27,8 @@ export const roles = {
     semester: ["create", "read", "delete", "update"],
     department: ["create", "read", "delete"],
     sectionAssignment: ["create", "read", "update", "delete"],
-    faculty: ["create", "read"],
-    admission: ["create", "read", "update", "delete"],
+    faculty: ["create", "read", "delete"],
+    admission: ["create", "read", "update", "delete", "port"],
   }),
   applicant: ac.newRole({
     admission: ["read", "update"],
@@ -62,10 +62,16 @@ export const roles = {
     section: ["create", "read"],
     semester: ["read"],
   }),
-  admission: ac.newRole({
-    semester: ["read"], // Allows fetching the semester dropdown
-    admission: ["create", "read", "update", "delete"], // Allows managing admissions
-    user: ["set-role"], // Needed because creating an applicant creates a user
+  admission_admin: ac.newRole({
+    semester: ["read"],
+    admission: ["create", "read", "delete"],
+    user: ["set-role"],
+    department: ["read"],
+  }),
+  admission_reviewer: ac.newRole({
+    semester: ["read"],
+    admission: ["read", "update", "port", "delete"],
+    department: ["read"],
   }),
 } satisfies Record<Role, unknown>;
 

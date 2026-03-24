@@ -1,8 +1,9 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import { Badge } from "@webcampus/ui/components/badge";
+import { AdminFacultyActions } from "./admin-faculty-actions";
 
-// Define a local type for the joined response from our new backend endpoint
 export type AdminFacultyResponse = {
   id: string;
   userId: string;
@@ -13,13 +14,23 @@ export type AdminFacultyResponse = {
     name: string;
     email: string;
   };
+  hod?: { id: string } | null;
 };
 
 export const AdminFacultyColumns: ColumnDef<AdminFacultyResponse>[] = [
   {
     accessorKey: "user.name",
     header: "Name",
-    cell: ({ row }) => <div>{row.original.user?.name}</div>,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        {row.original.user?.name}
+        {row.original.hod && (
+          <Badge variant="secondary" className="h-5 py-0 text-xs">
+            HOD
+          </Badge>
+        )}
+      </div>
+    ),
   },
   {
     accessorKey: "user.email",
@@ -34,12 +45,15 @@ export const AdminFacultyColumns: ColumnDef<AdminFacultyResponse>[] = [
     accessorKey: "designation",
     header: "Designation",
     cell: ({ row }) => {
-      // Format "ASSISTANT_PROFESSOR" to "Assistant Professor"
       const formatted = row.original.designation
         .split("_")
         .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
         .join(" ");
       return <div>{formatted}</div>;
     },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => <AdminFacultyActions faculty={row.original} />,
   },
 ];

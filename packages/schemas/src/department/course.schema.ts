@@ -55,7 +55,14 @@ export const CourseResponseSchema = BaseCourseSchema.extend({
   // Add the joined semester relation
   semester: z
     .object({
-      name: z.string().nullable().optional(),
+      programType: z.string(),
+      semesterNumber: z.number(),
+      academicTerm: z
+        .object({
+          type: z.string(),
+          year: z.string(),
+        })
+        .optional(),
     })
     .optional(),
 });

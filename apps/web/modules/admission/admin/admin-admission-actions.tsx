@@ -1,5 +1,6 @@
 "use client";
 
+import { authClient } from "@/lib/auth-client";
 import {
   Avatar,
   AvatarFallback,
@@ -73,7 +74,9 @@ const DataField = ({
   return (
     <div className="space-y-1">
       <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="font-medium break-words">{displayValue}</p>
+      <p className="font-medium break-words" suppressHydrationWarning>
+        {displayValue}
+      </p>
     </div>
   );
 };
@@ -85,10 +88,19 @@ export const AdminAdmissionActions = ({
   admission: AdmissionResponse;
   menuOnly?: boolean;
 }) => {
+  const { data: session } = authClient.useSession();
+  const role = session?.user?.role;
+  const canReview = role === "admin" || role === "admission_reviewer";
+  const canDelete =
+    role === "admin" ||
+    role === "admission_admin" ||
+    role === "admission_reviewer";
+
   const isPending = admission.status === "PENDING";
   const isSubmitted = admission.status === "SUBMITTED";
   const { onDelete } = useAdmissionDelete();
-  const { onApprove, onReject, isApproving, isRejecting } = useAdmissionReview();
+  const { onApprove, onReject, isApproving, isRejecting } =
+    useAdmissionReview();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
   // Compute Full Name
@@ -136,12 +148,14 @@ export const AdminAdmissionActions = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => setIsDeleteOpen(true)}
-              className="text-red-600 focus:text-red-600"
-            >
-              Delete
-            </DropdownMenuItem>
+            {canDelete && (
+              <DropdownMenuItem
+                onClick={() => setIsDeleteOpen(true)}
+                className="text-red-600 focus:text-red-600"
+              >
+                Delete
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -236,7 +250,7 @@ export const AdminAdmissionActions = ({
                   <DataField label="USN" value={admission.usn} />
                   <DataField label="Unique ID" value={admission.uniqueId} />
 
-                  {isSubmitted && (
+                  {isSubmitted && canReview && (
                     <div className="flex flex-col gap-2 border-t pt-3">
                       <Button
                         size="sm"
@@ -272,7 +286,10 @@ export const AdminAdmissionActions = ({
                         Admission Details
                       </h4>
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <DataField label="Branch" value={admission.branch} />
+                        <DataField
+                          label="Branch"
+                          value={admission.department?.name}
+                        />
                         <DataField label="Quota" value={admission.quota} />
                         <DataField
                           label="Entrance Exam Rank"

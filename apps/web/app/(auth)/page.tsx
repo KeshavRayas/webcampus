@@ -14,11 +14,16 @@ const HomePage = () => {
         </p>
       </div>
       <div className="flex flex-col gap-2.5">
-        {roles.map((role) => (
-          <Button key={role} size={"lg"} variant={"outline"} asChild>
-            <Link href={`/${role}/sign-in`}>{capitalize(role)} Sign In</Link>
-          </Button>
-        ))}
+        {roles
+          .filter((r) => r !== "admission_admin" && r !== "admission_reviewer")
+          .map((role) => (
+            <Button key={role} size={"lg"} variant={"outline"} asChild>
+              <Link href={`/${role}/sign-in`}>{capitalize(role)} Sign In</Link>
+            </Button>
+          ))}
+        <Button size={"lg"} variant={"outline"} asChild>
+          <Link href="/admission/sign-in">Admission Sign In</Link>
+        </Button>
       </div>
     </div>
   );

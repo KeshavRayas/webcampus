@@ -279,6 +279,10 @@ export class AdmissionService {
           applicationId,
           modeOfAdmission: data.modeOfAdmission,
           semesterId: data.semesterId,
+          departmentId: data.departmentId,
+          categoryClaimed: data.categoryClaimed,
+          categoryAllotted: data.categoryAllotted,
+          quota: data.quota,
           status: "PENDING", // Explicitly setting the initial status
         },
         include: {
@@ -353,6 +357,7 @@ export class AdmissionService {
         orderBy: { createdAt: "desc" },
         include: {
           semester: true,
+          department: true,
         },
       });
 
@@ -383,7 +388,7 @@ export class AdmissionService {
           mode: "insensitive",
         },
       },
-      include: { semester: true },
+      include: { semester: true, department: true },
     });
     return { status: "success", message: "Fetched", data: admission };
   }
@@ -459,10 +464,11 @@ export class AdmissionService {
     try {
       const semester = await client.semester.findUnique({
         where: { id: semesterId },
+        include: { academicTerm: true },
       });
       if (!semester) throw new Error("Semester not found");
 
-      const yearPrefix = semester.year.toString().slice(-2);
+      const yearPrefix = semester.academicTerm.year.toString().slice(-2);
       const formattedBranch = branchCode.toUpperCase().substring(0, 2);
       const prefix = `1BM${yearPrefix}TMP${formattedBranch}`;
 
@@ -519,14 +525,12 @@ export class AdmissionService {
         throw new Error("Admission shell not found.");
       }
 
-      if (!data.departmentId)
-        throw new Error("Department selection is required.");
-
+      // Department is already strictly locked to the shell
       const department = await db.department.findUnique({
-        where: { id: data.departmentId },
+        where: { id: existingAdmission.departmentId },
       });
 
-      if (!department) throw new Error("Selected department does not exist.");
+      if (!department) throw new Error("Assigned department does not exist.");
 
       // Use the official department code for USN generation (e.g., "CS")
       const tempUsn = await AdmissionService.generateTempUsn(
@@ -544,11 +548,7 @@ export class AdmissionService {
           firstName: data.firstName,
           middleName: data.middleName,
           lastName: data.lastName,
-          departmentId: department.id,
-          branch: department.name,
-          categoryClaimed: data.categoryClaimed,
-          categoryAllotted: data.categoryAllotted,
-          quota: data.quota,
+          // Quota, Category, and Department are preserved securely from initial shell creation
           entranceExamRank: data.entranceExamRank,
           originalAdmissionOrderNumber: data.originalAdmissionOrderNumber,
           originalAdmissionOrderDate: data.originalAdmissionOrderDate
@@ -736,7 +736,7 @@ export class AdmissionService {
             where: { id: payload.semesterId },
             select: {
               id: true,
-              year: true,
+              academicTerm: { select: { year: true } },
               semesterNumber: true,
             },
           }),
@@ -862,7 +862,7 @@ export class AdmissionService {
               usn: finalUsn,
               departmentName: department.name,
               currentSemester: semester.semesterNumber,
-              academicYear: semester.year,
+              academicYear: semester.academicTerm.year,
             },
           });
 

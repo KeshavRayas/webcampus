@@ -64,4 +64,115 @@ export class AdminFacultyController {
       });
     }
   }
+
+  static async update(req: Request, res: Response): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const request = req.body;
+      const response = await AdminFacultyService.update(id, request);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          message: response.message,
+          data: response.data,
+          statusCode: 200,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Updating Faculty", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
+  static async delete(req: Request, res: Response): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const response = await AdminFacultyService.delete(id);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          message: response.message,
+          data: response.data,
+          statusCode: 200,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Deleting Faculty", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
+  static async createHodAccount(req: Request, res: Response): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const request = req.body;
+      const response = await AdminFacultyService.createHodAccount(
+        id,
+        request.departmentId,
+        { ...request, headers: req.headers }
+      );
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          message: response.message,
+          data: response.data,
+          statusCode: 201,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Creating HOD Account", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
+  static async reassignHodAccount(req: Request, res: Response): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const { hodId } = req.body;
+      const response = await AdminFacultyService.reassignHodAccount(hodId, id);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          message: response.message,
+          data: response.data,
+          statusCode: 200,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Reassigning HOD Account", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
 }

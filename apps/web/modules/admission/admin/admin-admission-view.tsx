@@ -1,12 +1,13 @@
 "use client";
 
 import { apiClient } from "@/lib/api-client";
+import { authClient } from "@/lib/auth-client";
 import {
   createFilterQueryString,
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useQuery } from "@tanstack/react-query";
-import { SemesterResponseType } from "@webcampus/schemas/admin";
+import { AcademicTermResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
@@ -59,6 +60,7 @@ type AdmissionFilters = {
   applicationId: string;
   status: string;
   mode: string;
+  academicTerm: string;
   semester: string;
   createdFrom: string;
   createdTo: string;
@@ -68,6 +70,7 @@ const EMPTY_FILTERS: AdmissionFilters = {
   applicationId: "",
   status: "",
   mode: "",
+  academicTerm: "",
   semester: "",
   createdFrom: "",
   createdTo: "",
@@ -80,6 +83,16 @@ export const AdminAdmissionView = ({
   hideAddForm?: boolean;
   showFilters?: boolean;
 }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+
+  const { data: session } = authClient.useSession();
+  const role = session?.user?.role;
+  const canCreate =
+    isMounted && (role === "admin" || role === "admission_admin");
+  const canPort =
+    isMounted && (role === "admin" || role === "admission_reviewer");
+
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -102,11 +115,24 @@ export const AdminAdmissionView = ({
     setAppliedFilters(nextFilters);
   }, [searchParams, showFilters]);
 
-  // 1. Fetch Semesters
-  const { data: semesters } = useQuery({
-    queryKey: ["semesters"],
+  const { data: departments } = useQuery({
+    queryKey: ["departments"],
     queryFn: async () => {
-      const res = await apiClient.get<BaseResponse<SemesterResponseType[]>>(
+      const res = await apiClient.get<
+        BaseResponse<{ id: string; name: string }[]>
+      >(`/admission/departments`, { withCredentials: true });
+      if (res.data.status === "success" && Array.isArray(res.data.data)) {
+        return res.data.data;
+      }
+      return [];
+    },
+  });
+
+  // 1. Fetch Academic Terms
+  const { data: terms } = useQuery({
+    queryKey: ["academic-terms"],
+    queryFn: async () => {
+      const res = await apiClient.get<BaseResponse<AcademicTermResponseType[]>>(
         `/admin/semester`,
         { withCredentials: true }
       );
@@ -114,7 +140,7 @@ export const AdminAdmissionView = ({
       return [];
     },
   });
-  const semesterOptions = Array.isArray(semesters) ? semesters : [];
+  const termOptions = Array.isArray(terms) ? terms : [];
 
   // 2. Fetch Admissions for the selected filters
   const {
@@ -137,7 +163,11 @@ export const AdminAdmissionView = ({
   const { form, onSubmit } = useCreateAdmissionShellForm(draftFilters.semester);
   const { onPortStudents, isPorting } = usePortStudents();
   const selectedSemesterId = showFilters ? draftFilters.semester : "";
-  const selectedSemester = semesterOptions.find(
+  const selectedTerm = termOptions.find(
+    (t) => t.id === draftFilters.academicTerm
+  );
+  const nestedSemesters = selectedTerm?.Semester || [];
+  const selectedSemester = nestedSemesters.find(
     (semester) => semester.id === selectedSemesterId
   );
 
@@ -244,13 +274,24 @@ export const AdminAdmissionView = ({
       inputId: "admission-created-to",
     },
     {
+      key: "academicTerm",
+      label: "Academic Term",
+      type: "select",
+      placeholder: "All terms",
+      allOptionLabel: "All terms",
+      options: termOptions.map((term) => ({
+        label: `${term.type} ${term.year}`,
+        value: term.id,
+      })),
+    },
+    {
       key: "semester",
       label: "Semester",
       type: "select",
       placeholder: "All semesters",
       allOptionLabel: "All semesters",
-      options: semesterOptions.map((semester) => ({
-        label: semester.name,
+      options: nestedSemesters.map((semester) => ({
+        label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
     },
@@ -301,13 +342,45 @@ export const AdminAdmissionView = ({
         ) : (
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="w-60 space-y-2">
+              <Label>Academic Term</Label>
+              <Select
+                value={draftFilters.academicTerm || ALL_FILTERS_VALUE}
+                onValueChange={(value) => {
+                  const academicTerm = value === ALL_FILTERS_VALUE ? "" : value;
+                  setDraftFilters((prev) => ({
+                    ...prev,
+                    academicTerm,
+                    semester: "",
+                  }));
+                  setAppliedFilters({
+                    ...EMPTY_FILTERS,
+                    academicTerm,
+                    semester: "",
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select term" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_FILTERS_VALUE}>All terms</SelectItem>
+                  {termOptions.map((term) => (
+                    <SelectItem key={term.id} value={term.id}>
+                      {term.type} {term.year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-60 space-y-2">
               <Label>Admission Semester</Label>
               <Select
                 value={draftFilters.semester || ALL_FILTERS_VALUE}
+                disabled={!draftFilters.academicTerm}
                 onValueChange={(value) => {
                   const semester = value === ALL_FILTERS_VALUE ? "" : value;
                   setDraftFilters((prev) => ({ ...prev, semester }));
-                  setAppliedFilters({ ...EMPTY_FILTERS, semester });
+                  setAppliedFilters((prev) => ({ ...prev, semester }));
                 }}
               >
                 <SelectTrigger>
@@ -317,15 +390,16 @@ export const AdminAdmissionView = ({
                   <SelectItem value={ALL_FILTERS_VALUE}>
                     All semesters
                   </SelectItem>
-                  {semesterOptions.map((semester) => (
+                  {nestedSemesters.map((semester) => (
                     <SelectItem key={semester.id} value={semester.id}>
-                      {semester.name}
+                      {semester.programType} - Semester{" "}
+                      {semester.semesterNumber}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {!hideAddForm && (
+            {!hideAddForm && canCreate && (
               <DialogForm
                 trigger={
                   <Button disabled={!draftFilters.semester}>
@@ -377,17 +451,134 @@ export const AdminAdmissionView = ({
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="departmentId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department / Branch *</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select branch" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {departments?.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="categoryClaimed"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category Claimed *</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {["GENERAL", "OBC", "SC", "ST"].map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              {cat}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="categoryAllotted"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category Allotted *</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {["GENERAL", "OBC", "SC", "ST"].map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              {cat}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="quota"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quota *</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select quota" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {["MERIT", "MANAGEMENT", "SPORTS", "NRI", "SNQ"].map(
+                            (q) => (
+                              <SelectItem key={q} value={q}>
+                                {q}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </DialogForm>
             )}
           </div>
         )}
 
-        {!showFilters && !hideAddForm && !draftFilters.semester && (
-          <p className="text-muted-foreground text-sm">
-            Select an admission semester above before creating a new admission
-            shell.
-          </p>
-        )}
+        {!showFilters &&
+          !hideAddForm &&
+          canCreate &&
+          !draftFilters.semester && (
+            <p className="text-muted-foreground text-sm">
+              Select an admission semester above before creating a new admission
+              shell.
+            </p>
+          )}
 
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -398,7 +589,10 @@ export const AdminAdmissionView = ({
                 : "Showing admissions for the selected semester."}
             </p>
             {showFilters && selectedSemesterId && (
-              <p className="text-muted-foreground mt-1 text-sm">
+              <p
+                className="text-muted-foreground mt-1 text-sm"
+                suppressHydrationWarning
+              >
                 {isFetchingSemesterAdmissions
                   ? "Checking port readiness..."
                   : unresolvedAdmissionsCount > 0
@@ -408,7 +602,7 @@ export const AdminAdmissionView = ({
             )}
           </div>
 
-          {showFilters && (
+          {showFilters && canPort && (
             <Button
               onClick={() => {
                 if (!selectedSemesterId) {
@@ -433,8 +627,10 @@ export const AdminAdmissionView = ({
                 <DialogTitle>Preview Student Port</DialogTitle>
                 <DialogDescription>
                   Review admissions for{" "}
-                  {selectedSemester?.name || "the selected semester"} before
-                  final port.
+                  {selectedSemester
+                    ? `${selectedSemester.programType} - Semester ${selectedSemester.semesterNumber}`
+                    : "the selected semester"}{" "}
+                  before final port.
                 </DialogDescription>
               </DialogHeader>
 

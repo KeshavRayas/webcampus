@@ -87,8 +87,8 @@ export class CourseService {
         },
         include: {
           semester: {
-            select: {
-              name: true,
+            include: {
+              academicTerm: true,
             },
           },
         },

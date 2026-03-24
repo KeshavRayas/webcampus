@@ -42,29 +42,44 @@ model User {
   @@map("user")
 }
 
-model Semester {
+model AcademicTerm {
   id        String       @id @default(uuid())
   type      SemesterType
   year      String
+  isCurrent Boolean      @default(false)
+
+  Semester  Semester[]
+
+  @@unique([type, year])
+}
+
+model Semester {
+  id             String       @id @default(uuid())
+  academicTermId String
+  academicTerm   AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+  programType    ProgramType
   semesterNumber Int
-  name      String?
-  startDate DateTime
-  endDate   DateTime
-  isCurrent Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  createdBy User         @relation(fields: [userId], references: [id])
-  userId    String
+  startDate      DateTime
+  endDate        DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  createdBy      User         @relation(fields: [userId], references: [id])
+  userId         String
   Section   Section[]
   Course    Course[]
   Admission Admission[]
 
-  @@unique([type, year, semesterNumber])
+  @@unique([academicTermId, programType, semesterNumber])
 }
 
 enum SemesterType {
   even
   odd
+}
+
+enum ProgramType {
+  UG
+  PG
 }
 
 model Session {
@@ -145,6 +160,21 @@ enum AdmissionStatus {
   REJECTED   // Admin rejected the application
 }
 
+enum Category {
+  GENERAL
+  OBC
+  SC
+  ST
+}
+
+enum Quota {
+  MERIT
+  MANAGEMENT
+  SPORTS
+  NRI
+  SNQ
+}
+
 model Department {
   id           String    @id @default(uuid())
   userId       String
@@ -152,8 +182,7 @@ model Department {
   name         String    @unique
   code         String    @unique
   abbreviation String
-  hodId        String?   @unique
-  hod          Hod?      @relation(fields: [hodId], references: [id])
+  hods         Hod[]
   sections     Section[]
   students     Student[]
   faculties    Faculty[]
@@ -167,8 +196,10 @@ model Hod {
   id             String      @id @default(uuid())
   user           User        @relation(fields: [userId], references: [id])
   userId         String      @unique
-  department     Department?
-  departmentName String?     @unique
+  departmentName String?
+  department     Department? @relation(fields: [departmentName], references: [name])
+  facultyId      String?     @unique
+  faculty        Faculty?    @relation(fields: [facultyId], references: [id])
 }
 
 model Section {
@@ -241,6 +272,7 @@ model Faculty {
   shortName      String             // Added shortName
   designation    Designation        // Added designation
   teaches        CourseAssignment[]
+  hod            Hod?
 
   @@index([departmentId])
 }
@@ -386,16 +418,15 @@ model Admission {
   semesterId      String
   semester        Semester        @relation(fields: [semesterId], references: [id])
 
-  departmentId                 String?
-  department                   Department? @relation(fields: [departmentId], references: [id])
+  departmentId                 String
+  department                   Department @relation(fields: [departmentId], references: [id])
 
   firstName                    String?
   middleName                   String?
   lastName                     String?
-  branch                       String?
-  categoryClaimed              String?
-  categoryAllotted             String?
-  quota                        String?
+  categoryClaimed              Category
+  categoryAllotted             Category
+  quota                        Quota
   entranceExamRank             String?
   originalAdmissionOrderNumber String?
   originalAdmissionOrderDate   DateTime?

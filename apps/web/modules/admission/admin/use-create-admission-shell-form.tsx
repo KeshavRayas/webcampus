@@ -23,16 +23,27 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
       applicationId: "",
       modeOfAdmission: "KCET", // Default value
       semesterId: semesterId,
+      departmentId: "",
+      categoryClaimed: "GENERAL",
+      categoryAllotted: "GENERAL",
+      quota: "MERIT",
     },
   });
 
   const { isSubmitSuccessful } = form.formState;
 
-  // Keep the semesterId locked into the hidden field
   useEffect(() => {
     form.setValue("semesterId", semesterId, { shouldValidate: true });
     if (isSubmitSuccessful) {
-      form.reset({ applicationId: "", modeOfAdmission: "KCET", semesterId });
+      form.reset({
+        applicationId: "",
+        modeOfAdmission: "KCET",
+        semesterId,
+        departmentId: "",
+        categoryClaimed: "GENERAL",
+        categoryAllotted: "GENERAL",
+        quota: "MERIT",
+      });
     }
   }, [semesterId, form, isSubmitSuccessful]);
 
