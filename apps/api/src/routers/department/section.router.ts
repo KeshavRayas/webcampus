@@ -2,6 +2,7 @@ import { SectionController } from "@webcampus/api/src/controllers/department/sec
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   CreateSectionSchema,
+  GenerateSectionsSchema,
   SectionQuerySchema,
 } from "@webcampus/schemas/department";
 import { Router } from "express";
@@ -20,6 +21,18 @@ router.post(
   SectionController.create
 );
 
+router.post(
+  "/generate",
+  validateRequest(GenerateSectionsSchema),
+  protect({
+    role: "department",
+    permissions: {
+      section: ["create"],
+    },
+  }),
+  SectionController.generateSections
+);
+
 router.get(
   "/",
   validateRequest(SectionQuerySchema, "query"),
@@ -30,6 +43,50 @@ router.get(
     },
   }),
   SectionController.getAll
+);
+
+router.get(
+  "/unassigned-count",
+  protect({
+    role: "department",
+    permissions: {
+      section: ["read"],
+    },
+  }),
+  SectionController.getUnassignedCount
+);
+
+router.get(
+  "/with-students",
+  protect({
+    role: "department",
+    permissions: {
+      section: ["read"],
+    },
+  }),
+  SectionController.getSectionsWithStudents
+);
+
+router.get(
+  "/unassigned-students",
+  protect({
+    role: "department",
+    permissions: {
+      section: ["read"],
+    },
+  }),
+  SectionController.getUnassignedStudents
+);
+
+router.post(
+  "/assign-students",
+  protect({
+    role: "department",
+    permissions: {
+      section: ["create"],
+    },
+  }),
+  SectionController.assignStudentsToSection
 );
 
 router.get("/:id", SectionController.getById);
