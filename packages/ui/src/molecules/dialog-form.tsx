@@ -23,6 +23,8 @@ interface DialogFormProps<T extends FieldValues> {
   children: React.ReactNode;
   form: UseFormReturn<T>;
   onSubmit: (data: T) => void;
+  /** Optional className to override DialogContent width (e.g. "sm:max-w-3xl") */
+  contentClassName?: string;
 }
 
 export const DialogForm = <T extends FieldValues>({
@@ -32,6 +34,7 @@ export const DialogForm = <T extends FieldValues>({
   children,
   form,
   onSubmit,
+  contentClassName,
 }: DialogFormProps<T>) => {
   const [open, setOpen] = React.useState(false);
   const isMobile = useIsMobile();
@@ -56,7 +59,7 @@ export const DialogForm = <T extends FieldValues>({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{renderTrigger()}</DialogTrigger>
-      <DialogContent>
+      <DialogContent className={contentClassName}>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit)}

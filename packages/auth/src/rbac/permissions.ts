@@ -7,7 +7,7 @@ const statement = {
   attendance: ["create", "read"],
   marks: ["read"],
   semester: ["create", "delete", "read", "update"],
-  courses: ["create", "read"],
+  courses: ["create", "read", "update", "delete"],
   department: ["create", "read", "delete"],
   hod: ["create", "read", "remove"],
   sectionAssignment: ["create", "read", "update", "delete"],
@@ -54,7 +54,7 @@ export const roles = {
   }),
   department: ac.newRole({
     ...adminAc.statements,
-    courses: ["create", "read"],
+    courses: ["create", "read", "update", "delete"],
     hod: ["create", "read", "remove"],
     faculty: ["read"],
     student: ["read"],

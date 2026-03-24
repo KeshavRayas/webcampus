@@ -82,6 +82,20 @@ enum ProgramType {
   PG
 }
 
+enum CourseMode {
+  INTEGRATED
+  NON_INTEGRATED
+  FINAL_SUMMARY
+  NCMC
+}
+
+enum CourseType {
+  PC
+  PE
+  OE
+  NCMC
+}
+
 model Session {
   id        String   @id
   expiresAt DateTime
@@ -287,14 +301,46 @@ model Course {
   id             String               @id @default(uuid())
   code           String               @unique
   name           String
-  type           String
-  credits        Int
+  courseMode     CourseMode
+  courseType     CourseType
   department     Department           @relation(fields: [departmentName], references: [name])
   departmentName String
-  hasLab         Boolean              @default(false)
   semesterId     String
   semester       Semester             @relation(fields: [semesterId], references: [id])
   semesterNumber Int
+
+  // Credit fields (L-T-P-S)
+  lectureCredits          Int     @default(0)
+  tutorialCredits         Int     @default(0)
+  practicalCredits        Int     @default(0)
+  skillCredits            Int     @default(0)
+  totalCredits            Int
+
+  // Derived field
+  hasLaboratoryComponent  Boolean @default(false)
+
+  // SEE Assessment
+  seeMaxMarks             Int     @default(0)
+  seeMinMarks             Int     @default(0)
+  seeWeightage            Int     @default(0)
+
+  // CIE Assessment
+  maxNoOfCies             Int     @default(0)
+  minNoOfCies             Int     @default(0)
+  cieMaxMarks             Int     @default(0)
+  cieMinMarks             Int     @default(0)
+  cieWeightage            Int     @default(0)
+
+  // Other Assessment
+  noOfAssignments         Int     @default(0)
+  assignmentMaxMarks      Int     @default(0)
+  labMaxMarks             Int     @default(0)
+  labMinMarks             Int     @default(0)
+  labWeightage            Int     @default(0)
+  cumulativeMaxMarks      Int     @default(0)
+  cumulativeMinMarks      Int     @default(0)
+
+  // Relations
   assignments    CourseAssignment[]
   registrations  CourseRegistration[]
   marks          Mark[]

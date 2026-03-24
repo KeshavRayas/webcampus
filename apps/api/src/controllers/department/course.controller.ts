@@ -3,7 +3,11 @@ import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { UUIDType } from "@webcampus/schemas/common";
-import { CreateCourseDTO } from "@webcampus/schemas/department";
+import {
+  CreateCourseDTO,
+  DeleteCourseDTO,
+  UpdateCourseDTO,
+} from "@webcampus/schemas/department";
 import { Request, Response } from "express";
 
 export class CourseController {
@@ -28,6 +32,60 @@ export class CourseController {
         status: "error",
         message: ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 500,
+        error,
+      });
+    }
+  }
+
+  static async update(req: Request, res: Response): Promise<void> {
+    try {
+      const request: UpdateCourseDTO = req.body;
+      logger.debug("Updating Course", request);
+      const response = await CourseService.update(request);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Updating Course", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: error instanceof Error ? 400 : 500,
+        error,
+      });
+    }
+  }
+
+  static async delete(req: Request, res: Response): Promise<void> {
+    try {
+      const request: DeleteCourseDTO = req.body;
+      logger.debug("Deleting Course", request);
+      const response = await CourseService.delete(request.id);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Deleting Course", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: error instanceof Error ? 400 : 500,
         error,
       });
     }

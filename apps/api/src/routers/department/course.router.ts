@@ -1,7 +1,11 @@
 import { CourseController } from "@webcampus/api/src/controllers/department/course.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import { StringParamSchema } from "@webcampus/schemas/common";
-import { CreateCourseSchema } from "@webcampus/schemas/department";
+import {
+  CreateCourseSchema,
+  DeleteCourseSchema,
+  UpdateCourseSchema,
+} from "@webcampus/schemas/department";
 import { Router } from "express";
 
 const router = Router();
@@ -16,6 +20,30 @@ router.post(
     },
   }),
   CourseController.create
+);
+
+router.put(
+  "/",
+  validateRequest(UpdateCourseSchema),
+  protect({
+    role: "department",
+    permissions: {
+      courses: ["update"],
+    },
+  }),
+  CourseController.update
+);
+
+router.delete(
+  "/",
+  validateRequest(DeleteCourseSchema),
+  protect({
+    role: "department",
+    permissions: {
+      courses: ["delete"],
+    },
+  }),
+  CourseController.delete
 );
 
 router.get(

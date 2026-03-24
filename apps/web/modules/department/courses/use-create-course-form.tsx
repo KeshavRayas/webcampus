@@ -27,12 +27,38 @@ export const useCreateCourseForm = (
     defaultValues: {
       code: "",
       name: "",
-      type: "",
-      credits: 1,
-      hasLab: false,
+      courseMode: undefined,
+      courseType: undefined,
       departmentName: "",
       semesterId: semesterId,
       semesterNumber: semesterNumber,
+
+      // Credit fields (L-T-P-S)
+      lectureCredits: 0,
+      tutorialCredits: 0,
+      practicalCredits: 0,
+      skillCredits: 0,
+
+      // SEE Assessment
+      seeMaxMarks: 0,
+      seeMinMarks: 0,
+      seeWeightage: 0,
+
+      // CIE Assessment
+      maxNoOfCies: 0,
+      minNoOfCies: 0,
+      cieMaxMarks: 0,
+      cieMinMarks: 0,
+      cieWeightage: 0,
+
+      // Other Assessment
+      noOfAssignments: 0,
+      assignmentMaxMarks: 0,
+      labMaxMarks: 0,
+      labMinMarks: 0,
+      labWeightage: 0,
+      cumulativeMaxMarks: 0,
+      cumulativeMinMarks: 0,
     },
   });
 
