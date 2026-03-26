@@ -1,10 +1,19 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { AcademicTermResponseType } from "@webcampus/schemas/admin";
-import { BaseResponse } from "@webcampus/types/api";
+import { BaseResponse, SuccessResponse } from "@webcampus/types/api";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@webcampus/ui/components/alert-dialog";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -14,13 +23,6 @@ import {
   CardTitle,
 } from "@webcampus/ui/components/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@webcampus/ui/components/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -28,10 +30,13 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
-import axios from "axios";
-import { Plus, Users } from "lucide-react";
-import React, { useState } from "react";
+import axios, { AxiosError, AxiosResponse } from "axios";
+import { Plus, Trash2, Users } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { AssignStudentDialog } from "./assign-student-dialog";
+
+type SectionCycle = "PHYSICS" | "CHEMISTRY";
 
 interface StudentSection {
   id: string;
@@ -48,6 +53,7 @@ interface StudentSection {
 interface SectionWithStudents {
   id: string;
   name: string;
+  cycle: "PHYSICS" | "CHEMISTRY" | "NONE";
   semesterId: string;
   studentSections: StudentSection[];
   _count: {
@@ -55,13 +61,25 @@ interface SectionWithStudents {
   };
 }
 
-export const SectionCardsView = () => {
+interface SectionCardsViewProps {
+  semesterId: string;
+  academicYear: string;
+  isUgFirstYearReadOnly: boolean;
+  isBasicSciences: boolean;
+  selectedCycle: SectionCycle;
+}
+
+export const SectionCardsView = ({
+  semesterId,
+  academicYear,
+  isUgFirstYearReadOnly,
+  isBasicSciences,
+  selectedCycle,
+}: SectionCardsViewProps) => {
+  const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const departmentName = session?.user?.name ?? "";
-
-  const [termId, setTermId] = useState<string>("");
-  const [semesterId, setSemesterId] = useState<string>("");
 
   // Assign dialog state
   const [assignOpen, setAssignOpen] = useState(false);
@@ -69,24 +87,10 @@ export const SectionCardsView = () => {
     sectionId: string;
     sectionName: string;
   }>({ sectionId: "", sectionName: "" });
-
-  // Fetch academic terms
-  const { data: terms } = useQuery({
-    queryKey: ["academic-terms"],
-    queryFn: async () => {
-      const res = await axios.get<BaseResponse<AcademicTermResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
-        { withCredentials: true }
-      );
-      if (res.data.status === "success") return res.data.data;
-      return [] as AcademicTermResponseType[];
-    },
-  });
-
-  const termOptions = Array.isArray(terms) ? terms : [];
-  const selectedTerm = termOptions.find((t) => t.id === termId);
-  const nestedSemesters = selectedTerm?.Semester || [];
-  const academicYear = selectedTerm?.year ?? "";
+  const [deleteTarget, setDeleteTarget] = useState<{
+    sectionId: string;
+    sectionName: string;
+  } | null>(null);
 
   // Fetch sections with students
   const { data: sections, isLoading } = useQuery({
@@ -105,62 +109,46 @@ export const SectionCardsView = () => {
     enabled: !!semesterId && !!departmentName,
   });
 
+  const deleteSectionMutation = useMutation({
+    mutationFn: async (sectionId: string) => {
+      return await axios.delete(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/section/${sectionId}`,
+        { withCredentials: true }
+      );
+    },
+    onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
+      toast.success(data.data.message);
+      queryClient.invalidateQueries({ queryKey: ["sections-with-students"] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-count"] });
+      setDeleteTarget(null);
+    },
+    onError: (error: AxiosError<{ error?: string }>) => {
+      toast.error(error.response?.data?.error || "Failed to delete section");
+    },
+  });
+
+  const visibleSections = useMemo(() => {
+    if (!sections) {
+      return [] as SectionWithStudents[];
+    }
+
+    if (!isBasicSciences) {
+      return sections;
+    }
+
+    return sections.filter((section) => section.cycle === selectedCycle);
+  }, [isBasicSciences, sections, selectedCycle]);
+
   return (
     <div className="space-y-4">
-      {/* Term → Semester selection */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Academic Term</label>
-          <Select
-            value={termId}
-            onValueChange={(value) => {
-              setTermId(value);
-              setSemesterId("");
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select term..." />
-            </SelectTrigger>
-            <SelectContent>
-              {termOptions.map((term) => (
-                <SelectItem key={term.id} value={term.id}>
-                  {term.type.charAt(0).toUpperCase() + term.type.slice(1)}{" "}
-                  {term.year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Semester</label>
-          <Select
-            value={semesterId}
-            onValueChange={setSemesterId}
-            disabled={!termId}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select semester..." />
-            </SelectTrigger>
-            <SelectContent>
-              {nestedSemesters.map((semester) => (
-                <SelectItem key={semester.id} value={semester.id}>
-                  {semester.programType} - Semester {semester.semesterNumber}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
       {/* Section Cards Grid */}
       {isLoading && semesterId && (
         <p className="text-muted-foreground text-sm">Loading sections...</p>
       )}
 
-      {sections && sections.length > 0 && (
+      {visibleSections.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {sections.map((section) => (
+          {visibleSections.map((section) => (
             <Card key={section.id}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-lg font-semibold">
@@ -171,21 +159,39 @@ export const SectionCardsView = () => {
                     <Users className="h-3 w-3" />
                     {section._count.studentSections}
                   </Badge>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => {
-                      setAssignTarget({
-                        sectionId: section.id,
-                        sectionName: section.name,
-                      });
-                      setAssignOpen(true);
-                    }}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span className="sr-only">Add student</span>
-                  </Button>
+                  {!isUgFirstYearReadOnly && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          setAssignTarget({
+                            sectionId: section.id,
+                            sectionName: section.name,
+                          });
+                          setAssignOpen(true);
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span className="sr-only">Add student</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() =>
+                          setDeleteTarget({
+                            sectionId: section.id,
+                            sectionName: section.name,
+                          })
+                        }
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="sr-only">Delete section</span>
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -231,12 +237,13 @@ export const SectionCardsView = () => {
         </div>
       )}
 
-      {sections && sections.length === 0 && semesterId && (
+      {sections && visibleSections.length === 0 && semesterId && (
         <div className="text-muted-foreground flex flex-col items-center justify-center py-12 text-center">
           <Users className="mb-2 h-8 w-8 opacity-40" />
           <p className="text-sm">
-            No sections found for this semester. Use the Generate button to
-            create sections.
+            {isBasicSciences
+              ? `No ${selectedCycle.toLowerCase()} cycle sections found for this semester.`
+              : "No sections found for this semester. Use the Generate button to create sections."}
           </p>
         </div>
       )}
@@ -251,6 +258,40 @@ export const SectionCardsView = () => {
         departmentName={departmentName}
         academicYear={academicYear}
       />
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Section</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`Are you sure you want to delete Section ${deleteTarget?.sectionName ?? ""}? Deleting this section will unassign all students currently in it.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                if (!deleteTarget?.sectionId) {
+                  return;
+                }
+                deleteSectionMutation.mutate(deleteTarget.sectionId);
+              }}
+              disabled={deleteSectionMutation.isPending}
+            >
+              {deleteSectionMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

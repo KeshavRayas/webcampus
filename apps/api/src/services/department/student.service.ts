@@ -31,6 +31,7 @@ export class DepartmentStudentService {
         select: {
           id: true,
           name: true,
+          type: true,
         },
       });
 
@@ -38,13 +39,11 @@ export class DepartmentStudentService {
         throw new Error("Department not found for this user");
       }
 
-      const normalizedDepartmentName = department.name.trim().toLowerCase();
-      const isFirstYearDepartmentAdmin =
-        normalizedDepartmentName === "first year";
+      const isBasicSciences = department.type === "BASIC_SCIENCES";
 
       const studentRecords = await db.student.findMany({
         where: {
-          ...(isFirstYearDepartmentAdmin
+          ...(isBasicSciences
             ? {
                 currentSemester: {
                   in: [1, 2],
@@ -66,7 +65,7 @@ export class DepartmentStudentService {
             : {}),
           ...(query.currentSemester
             ? {
-                currentSemester: query.currentSemester,
+                currentSemester: Number(query.currentSemester),
               }
             : {}),
           ...(query.academicYear

@@ -23,13 +23,14 @@ const computeDerivedFields = (data: CreateCourseDTO) => {
 export class CourseService {
   static async create(data: CreateCourseDTO): Promise<BaseResponse<Course>> {
     try {
-      const { departmentName, semesterId, ...courseData } = data;
+      const { departmentName, semesterId, cycle, ...courseData } = data;
       const derived = computeDerivedFields(data);
 
       const course = await db.course.create({
         data: {
           ...courseData,
           ...derived,
+          cycle: cycle ?? "NONE",
           department: {
             connect: {
               name: departmentName,
@@ -66,7 +67,7 @@ export class CourseService {
 
   static async update(data: UpdateCourseDTO): Promise<BaseResponse<Course>> {
     try {
-      const { id, departmentName, semesterId, ...updateFields } = data;
+      const { id, departmentName, semesterId, cycle, ...updateFields } = data;
 
       // Fetch existing course to merge with partial update for derived computation
       const existing = await db.course.findUnique({ where: { id } });
@@ -79,6 +80,7 @@ export class CourseService {
         name: updateFields.name ?? existing.name,
         courseMode: updateFields.courseMode ?? existing.courseMode,
         courseType: updateFields.courseType ?? existing.courseType,
+        cycle: cycle ?? existing.cycle,
         departmentName: departmentName ?? existing.departmentName,
         semesterId: semesterId ?? existing.semesterId,
         semesterNumber: updateFields.semesterNumber ?? existing.semesterNumber,
@@ -116,6 +118,7 @@ export class CourseService {
         data: {
           ...updateFields,
           ...derived,
+          ...(cycle ? { cycle } : {}),
           ...(departmentName
             ? { department: { connect: { name: departmentName } } }
             : {}),

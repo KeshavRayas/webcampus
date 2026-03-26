@@ -10,6 +10,7 @@ export const BaseDepartmentSchema = z.object({
   abbreviation: z
     .string()
     .min(1, { message: "Department abbreviation cannot be empty" }),
+  type: z.enum(["DEGREE_GRANTING", "BASIC_SCIENCES", "SERVICE"]).optional(),
 });
 
 /**

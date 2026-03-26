@@ -30,49 +30,78 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@webcampus/ui/components/select";
 import axios, { AxiosError, AxiosResponse } from "axios";
 import { Wand2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import {
+  useForm,
+  useWatch,
+  type FieldValues,
+  type UseFormReturn,
+} from "react-hook-form";
 import { toast } from "react-toastify";
+import { useCreateCycleSectionsForm } from "./use-create-section-form";
 
-export const GenerateSectionsDialog = () => {
+type SectionCycle = "PHYSICS" | "CHEMISTRY";
+
+interface UnassignedDepartmentCount {
+  departmentId: string;
+  departmentName: string;
+  abbreviation: string;
+  unassignedCount: number;
+}
+
+interface DetailedPreviewSection {
+  sectionName: string;
+  studentUsns: string[];
+}
+
+interface GenerateSectionsDialogProps {
+  termId: string;
+  semesterId: string;
+  semesterNumber: number;
+  cycle?: SectionCycle;
+}
+
+export const GenerateSectionsDialog = ({
+  termId,
+  semesterId,
+  semesterNumber,
+  cycle = "PHYSICS",
+}: GenerateSectionsDialogProps) => {
   const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const departmentName = session?.user?.name ?? "";
 
   const [open, setOpen] = useState(false);
-  const [dialogTermId, setDialogTermId] = useState<string>("");
+  const searchParams = useSearchParams();
 
-  const form = useForm<GenerateSectionsDTO>({
-    resolver: zodResolver(GenerateSectionsSchema),
-    defaultValues: {
-      semesterId: "",
-      departmentName,
-      studentsPerSection: 60,
-      academicYear: "",
+  const cycleFromParams = useMemo(() => {
+    const paramCycle = searchParams.get("cycle");
+    return paramCycle === "PHYSICS" || paramCycle === "CHEMISTRY"
+      ? paramCycle
+      : undefined;
+  }, [searchParams]);
+
+  const selectedCycle: SectionCycle = cycleFromParams ?? cycle;
+
+  const { data: deptInfo } = useQuery({
+    queryKey: ["department-info"],
+    queryFn: async () => {
+      const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
+        {
+          withCredentials: true,
+        }
+      );
+      if (res.data.status === "success") return res.data.data;
+      return { type: "DEGREE_GRANTING", name: "" };
     },
+    enabled: !!session?.user?.id,
   });
 
-  // Sync departmentName from session whenever it loads/changes
-  useEffect(() => {
-    if (departmentName) {
-      form.setValue("departmentName", departmentName);
-    }
-  }, [departmentName, form]);
-
-  const selectedSemesterId = form.watch("semesterId");
-  const studentsPerSection = form.watch("studentsPerSection");
-
-  // Fetch academic terms for cascading dropdown
   const { data: terms, isLoading: isLoadingTerms } = useQuery({
     queryKey: ["academic-terms"],
     queryFn: async () => {
@@ -86,47 +115,195 @@ export const GenerateSectionsDialog = () => {
   });
 
   const termOptions = Array.isArray(terms) ? terms : [];
-  const selectedTerm = termOptions.find((t) => t.id === dialogTermId);
-  const nestedSemesters = selectedTerm?.Semester || [];
+  const selectedTerm = termOptions.find((t) => t.id === termId);
+  const selectedSemester = selectedTerm?.Semester?.find(
+    (s) => s.id === semesterId
+  );
 
-  // Fetch unassigned student count when semester is selected
+  const isBasicSciences = deptInfo?.type === "BASIC_SCIENCES";
+  const isCycleMode =
+    isBasicSciences && (semesterNumber === 1 || semesterNumber === 2);
+
+  const isUgFirstYearReadOnly =
+    deptInfo?.type !== "BASIC_SCIENCES" &&
+    selectedSemester?.programType === "UG" &&
+    (semesterNumber === 1 || semesterNumber === 2);
+
+  const standardForm = useForm<GenerateSectionsDTO>({
+    resolver: zodResolver(GenerateSectionsSchema),
+    defaultValues: {
+      semesterId: "",
+      departmentName,
+      studentsPerSection: 60,
+      academicYear: "",
+    },
+  });
+
+  useEffect(() => {
+    if (!departmentName) {
+      return;
+    }
+    standardForm.setValue("departmentName", departmentName);
+  }, [departmentName, standardForm]);
+
+  useEffect(() => {
+    standardForm.setValue("semesterId", semesterId);
+    standardForm.setValue("academicYear", selectedTerm?.year ?? "");
+  }, [semesterId, selectedTerm?.year, standardForm]);
+
+  const cycleSectionForm = useCreateCycleSectionsForm({
+    termId,
+    semesterId,
+    semesterNumber,
+    cycle: selectedCycle,
+    academicYear: selectedTerm?.year ?? "",
+  });
+
+  const { data: unassignedCounts } = useQuery({
+    queryKey: ["unassigned-counts", termId, semesterNumber],
+    queryFn: async () => {
+      const res = await axios.get<BaseResponse<UnassignedDepartmentCount[]>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/section/unassigned-counts`,
+        {
+          params: { termId, semesterNumber },
+          withCredentials: true,
+        }
+      );
+      if (res.data.status === "success") return res.data.data;
+      return [] as UnassignedDepartmentCount[];
+    },
+    enabled: isCycleMode && !!termId && !!semesterNumber,
+  });
+
+  useEffect(() => {
+    if (!isCycleMode || !unassignedCounts) {
+      return;
+    }
+    cycleSectionForm.syncAllocations(unassignedCounts);
+  }, [isCycleMode, unassignedCounts]);
+
   const { data: unassignedData } = useQuery({
-    queryKey: ["unassigned-count", selectedSemesterId, departmentName],
+    queryKey: ["unassigned-count", semesterId, departmentName],
     queryFn: async () => {
       const res = await axios.get<
         BaseResponse<{ count: number; semesterNumber: number }>
       >(`${NEXT_PUBLIC_API_BASE_URL}/department/section/unassigned-count`, {
-        params: { semesterId: selectedSemesterId, departmentName },
+        params: { semesterId, departmentName },
         withCredentials: true,
       });
       if (res.data.status === "success") return res.data.data;
       return { count: 0, semesterNumber: 0 };
     },
-    enabled: !!selectedSemesterId && !!departmentName,
+    enabled: !isCycleMode && !!semesterId && !!departmentName,
   });
 
+  const standardStudentsPerSection = standardForm.watch("studentsPerSection");
   const unassignedCount = unassignedData?.count ?? 0;
-  const semesterNumber = unassignedData?.semesterNumber ?? 0;
+  const previewSemesterNumber =
+    unassignedData?.semesterNumber ?? semesterNumber;
 
-  // Live preview computation
-  const preview = useMemo(() => {
-    if (!studentsPerSection || studentsPerSection <= 0 || unassignedCount === 0)
-      return [];
+  const standardPreview = useMemo(() => {
+    if (
+      !standardStudentsPerSection ||
+      standardStudentsPerSection <= 0 ||
+      unassignedCount === 0
+    ) {
+      return [] as { name: string; count: number }[];
+    }
 
-    const numSections = Math.ceil(unassignedCount / studentsPerSection);
+    const numSections = Math.ceil(unassignedCount / standardStudentsPerSection);
     const sections: { name: string; count: number }[] = [];
-
     for (let i = 0; i < numSections; i++) {
-      const remaining = unassignedCount - i * studentsPerSection;
+      const remaining = unassignedCount - i * standardStudentsPerSection;
       sections.push({
-        name: `${semesterNumber}${String.fromCharCode(65 + i)}`,
-        count: Math.min(studentsPerSection, remaining),
+        name: `${previewSemesterNumber}${String.fromCharCode(65 + i)}`,
+        count: Math.min(standardStudentsPerSection, remaining),
       });
     }
     return sections;
-  }, [studentsPerSection, unassignedCount, semesterNumber]);
+  }, [previewSemesterNumber, standardStudentsPerSection, unassignedCount]);
 
-  const generateMutation = useMutation({
+  const allocationValues = useWatch({
+    control: cycleSectionForm.form.control,
+    name: "allocations",
+  });
+  const cycleStudentsPerSection = useWatch({
+    control: cycleSectionForm.form.control,
+    name: "studentsPerSection",
+  });
+
+  const totalSelectedStudents = useMemo(() => {
+    if (!Array.isArray(allocationValues)) {
+      return 0;
+    }
+    return allocationValues.reduce((sum, allocation) => {
+      if (!allocation || !allocation.selected || allocation.count <= 0) {
+        return sum;
+      }
+      return sum + (allocation.count || 0);
+    }, 0);
+  }, [allocationValues]);
+
+  const cycleSectionsPreview = useMemo(() => {
+    if (!cycleStudentsPerSection || cycleStudentsPerSection <= 0) {
+      return 0;
+    }
+    if (!totalSelectedStudents || totalSelectedStudents <= 0) {
+      return 0;
+    }
+    return Math.ceil(totalSelectedStudents / cycleStudentsPerSection);
+  }, [cycleStudentsPerSection, totalSelectedStudents]);
+
+  const selectedAllocations = useMemo(
+    () =>
+      (allocationValues ?? [])
+        .filter((allocation) => allocation?.selected && allocation.count > 0)
+        .map((allocation) => ({
+          departmentId: allocation.departmentId,
+          count: allocation.count,
+          selected: true,
+        })),
+    [allocationValues]
+  );
+
+  const {
+    data: detailedPreviewSections,
+    isFetching: isFetchingDetailedPreview,
+  } = useQuery({
+    queryKey: [
+      "detailed-generation-preview",
+      semesterId,
+      selectedCycle,
+      cycleStudentsPerSection,
+      selectedAllocations,
+    ],
+    queryFn: async () => {
+      const res = await axios.post<BaseResponse<DetailedPreviewSection[]>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/section/preview-sections`,
+        {
+          semesterId,
+          cycle: selectedCycle,
+          studentsPerSection: cycleStudentsPerSection,
+          allocations: selectedAllocations,
+        },
+        { withCredentials: true }
+      );
+
+      if (res.data.status === "success") {
+        return res.data.data;
+      }
+
+      return [] as DetailedPreviewSection[];
+    },
+    enabled:
+      open &&
+      isCycleMode &&
+      !!semesterId &&
+      cycleStudentsPerSection > 0 &&
+      selectedAllocations.length > 0,
+  });
+
+  const standardMutation = useMutation({
     mutationFn: async (values: GenerateSectionsDTO) => {
       return await axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/department/section/generate`,
@@ -140,13 +317,34 @@ export const GenerateSectionsDialog = () => {
       queryClient.invalidateQueries({ queryKey: ["sections-with-students"] });
       queryClient.invalidateQueries({ queryKey: ["unassigned-count"] });
       setOpen(false);
-      form.reset();
-      setDialogTermId("");
+      standardForm.reset({
+        semesterId,
+        departmentName,
+        studentsPerSection: 60,
+        academicYear: selectedTerm?.year ?? "",
+      });
     },
     onError: (error: AxiosError<{ error?: string }>) => {
       toast.error(error.response?.data?.error || "Failed to generate sections");
     },
   });
+
+  useEffect(() => {
+    if (!cycleSectionForm.generateCycleMutation.isSuccess) {
+      return;
+    }
+
+    setOpen(false);
+    cycleSectionForm.generateCycleMutation.reset();
+  }, [cycleSectionForm.generateCycleMutation]);
+
+  const isPending =
+    standardMutation.isPending ||
+    cycleSectionForm.generateCycleMutation.isPending;
+
+  const handleStandardSubmit = (values: GenerateSectionsDTO) => {
+    standardMutation.mutate({ ...values, departmentName });
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -156,135 +354,255 @@ export const GenerateSectionsDialog = () => {
           Generate Sections
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <Form {...form}>
+      <DialogContent className={isCycleMode ? "sm:max-w-3xl" : "sm:max-w-lg"}>
+        <Form
+          {...((isCycleMode
+            ? cycleSectionForm.form
+            : standardForm) as unknown as UseFormReturn<FieldValues>)}
+        >
           <form
-            onSubmit={form.handleSubmit((values) =>
-              generateMutation.mutate({
-                ...values,
-                departmentName,
-              })
-            )}
+            onSubmit={
+              isCycleMode
+                ? (event) => {
+                    event.preventDefault();
+                    cycleSectionForm.onSubmit();
+                  }
+                : standardForm.handleSubmit(handleStandardSubmit)
+            }
             className="space-y-4"
           >
             <DialogHeader>
               <DialogTitle>Generate Sections</DialogTitle>
             </DialogHeader>
 
-            {/* Term Selection */}
-            <div className="space-y-2">
-              <FormLabel>Academic Term</FormLabel>
-              <Select
-                value={dialogTermId}
-                onValueChange={(value) => {
-                  setDialogTermId(value);
-                  form.setValue("semesterId", "");
-                  // Auto-set academic year from term
-                  const term = termOptions.find((t) => t.id === value);
-                  if (term) {
-                    form.setValue("academicYear", term.year);
-                  }
-                }}
-                disabled={isLoadingTerms}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select term..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {termOptions.map((term) => (
-                    <SelectItem key={term.id} value={term.id}>
-                      {term.type.charAt(0).toUpperCase() + term.type.slice(1)}{" "}
-                      {term.year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="bg-muted rounded-md p-3 text-sm">
+              <p>
+                Academic Term: <strong>{selectedTerm?.year ?? "--"}</strong>
+              </p>
+              <p>
+                Semester:{" "}
+                <strong>
+                  {selectedSemester?.programType ?? "--"} - {semesterNumber}
+                </strong>
+              </p>
+              {isCycleMode ? (
+                <p>
+                  Cycle: <strong>{selectedCycle}</strong>
+                </p>
+              ) : null}
             </div>
 
-            {/* Semester Selection */}
-            <FormField
-              control={form.control}
-              name="semesterId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Semester</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={!dialogTermId}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select semester..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {nestedSemesters.map((semester) => (
-                        <SelectItem key={semester.id} value={semester.id}>
-                          {semester.programType} - Semester{" "}
-                          {semester.semesterNumber}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Unassigned count display */}
-            {selectedSemesterId && (
-              <div className="bg-muted rounded-md p-3">
-                <p className="text-sm">
-                  Unassigned students:{" "}
-                  <Badge variant="secondary" className="ml-1">
-                    {unassignedCount}
-                  </Badge>
-                </p>
+            {isUgFirstYearReadOnly ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <strong>403 Unauthorized:</strong> First-year sections are
+                managed by the Basic Sciences department.
               </div>
-            )}
+            ) : null}
 
-            {/* Students per section input */}
-            <FormField
-              control={form.control}
-              name="studentsPerSection"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Students per Section</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="200"
-                      {...field}
-                      onChange={(e) =>
-                        field.onChange(parseInt(e.target.value) || 0)
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {isCycleMode ? (
+              <>
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                    Department Allocation
+                  </p>
+                  <div className="space-y-2">
+                    {(unassignedCounts ?? []).map((department, index) => {
+                      const row = allocationValues?.[index];
+                      const isDisabled = department.unassignedCount === 0;
 
-            {/* Live Preview */}
-            {preview.length > 0 && (
-              <div className="bg-muted space-y-1 rounded-md p-3">
-                <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
-                  Preview ({preview.length} sections)
-                </p>
-                {preview.map((section) => (
-                  <div
-                    key={section.name}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span className="font-mono font-medium">
-                      Section {section.name}
-                    </span>
-                    <Badge variant="outline">{section.count} students</Badge>
+                      return (
+                        <div
+                          key={department.departmentId}
+                          className="bg-muted grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md p-3"
+                        >
+                          <Button
+                            type="button"
+                            variant={row?.selected ? "default" : "outline"}
+                            className={
+                              row?.selected
+                                ? "bg-green-600 text-white hover:bg-green-600/90"
+                                : undefined
+                            }
+                            disabled={isDisabled}
+                            onClick={() => {
+                              cycleSectionForm.form.setValue(
+                                `allocations.${index}.selected`,
+                                !row?.selected
+                              );
+                            }}
+                          >
+                            {department.abbreviation}
+                          </Button>
+
+                          <div className="text-sm">
+                            <p className="font-medium">
+                              {department.departmentName}
+                            </p>
+                            <p className="text-muted-foreground text-xs">
+                              Unassigned: {department.unassignedCount}
+                            </p>
+                          </div>
+
+                          <Input
+                            type="number"
+                            min={0}
+                            max={department.unassignedCount}
+                            value={row?.count ?? 0}
+                            className="w-24"
+                            onChange={(event) => {
+                              const raw = parseInt(event.target.value, 10);
+                              const safeValue = Number.isNaN(raw)
+                                ? 0
+                                : Math.max(
+                                    0,
+                                    Math.min(raw, department.unassignedCount)
+                                  );
+                              cycleSectionForm.form.setValue(
+                                `allocations.${index}.count`,
+                                safeValue
+                              );
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
+                </div>
+
+                <FormField
+                  control={cycleSectionForm.form.control}
+                  name="studentsPerSection"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Students Per Section</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="200"
+                          value={field.value}
+                          onChange={(event) => {
+                            field.onChange(
+                              parseInt(event.target.value, 10) || 0
+                            );
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="bg-muted rounded-md p-3 text-sm">
+                  <p>
+                    Preview: <strong>{totalSelectedStudents}</strong> /{" "}
+                    <strong>{cycleStudentsPerSection || 0}</strong> ={" "}
+                    <strong>{cycleSectionsPreview}</strong> section(s)
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                    Detailed Preview
+                  </p>
+
+                  {isFetchingDetailedPreview ? (
+                    <div className="bg-muted rounded-md p-3 text-sm">
+                      Loading section preview...
+                    </div>
+                  ) : detailedPreviewSections &&
+                    detailedPreviewSections.length > 0 ? (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {detailedPreviewSections.map((section) => (
+                        <div
+                          key={section.sectionName}
+                          className="bg-muted rounded-md p-3"
+                        >
+                          <p className="mb-2 text-sm font-semibold">
+                            Section {section.sectionName}
+                          </p>
+                          <div className="max-h-40 space-y-1 overflow-y-auto rounded border p-2">
+                            {section.studentUsns.length > 0 ? (
+                              section.studentUsns.map((usn) => (
+                                <p
+                                  key={`${section.sectionName}-${usn}`}
+                                  className="font-mono text-xs"
+                                >
+                                  {usn}
+                                </p>
+                              ))
+                            ) : (
+                              <p className="text-muted-foreground text-xs">
+                                No students in this section
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-muted rounded-md p-3 text-sm">
+                      Select departments and set counts to preview sections.
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <FormField
+                  control={standardForm.control}
+                  name="studentsPerSection"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Students per Section</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="200"
+                          {...field}
+                          onChange={(event) => {
+                            field.onChange(
+                              parseInt(event.target.value, 10) || 0
+                            );
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="bg-muted rounded-md p-3">
+                  <p className="text-sm">
+                    Unassigned students:{" "}
+                    <Badge variant="secondary" className="ml-1">
+                      {unassignedCount}
+                    </Badge>
+                  </p>
+                </div>
+
+                {standardPreview.length > 0 ? (
+                  <div className="bg-muted space-y-1 rounded-md p-3">
+                    <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
+                      Preview ({standardPreview.length} sections)
+                    </p>
+                    {standardPreview.map((section) => (
+                      <div
+                        key={section.name}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="font-mono font-medium">
+                          Section {section.name}
+                        </span>
+                        <Badge variant="outline">
+                          {section.count} students
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </>
             )}
 
             <DialogFooter>
@@ -293,18 +611,27 @@ export const GenerateSectionsDialog = () => {
                   Cancel
                 </Button>
               </DialogClose>
-              <Button
-                type="submit"
-                disabled={
-                  generateMutation.isPending ||
-                  unassignedCount === 0 ||
-                  !selectedSemesterId
-                }
-              >
-                {generateMutation.isPending
-                  ? "Generating..."
-                  : `Generate ${preview.length} Sections`}
-              </Button>
+              {isUgFirstYearReadOnly ? (
+                <Button type="button" disabled>
+                  Restricted (Managed by Basic Sciences)
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={
+                    isPending ||
+                    !semesterId ||
+                    isLoadingTerms ||
+                    (isCycleMode && totalSelectedStudents === 0)
+                  }
+                >
+                  {isPending
+                    ? "Generating..."
+                    : isCycleMode
+                      ? `Generate ${cycleSectionsPreview} Sections`
+                      : `Generate ${standardPreview.length} Sections`}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </Form>

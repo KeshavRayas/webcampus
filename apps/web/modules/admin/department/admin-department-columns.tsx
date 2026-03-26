@@ -11,10 +11,6 @@ export type DepartmentTableItem = DepartmentResponseDTO & {
 
 export const adminDepartmentColumns: ColumnDef<DepartmentTableItem>[] = [
   {
-    accessorKey: "id",
-    header: "ID",
-  },
-  {
     accessorKey: "name",
     header: "Name",
   },

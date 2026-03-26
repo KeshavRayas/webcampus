@@ -1,5 +1,8 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { frontendEnv } from "@webcampus/common/env";
+import { AdminStudentResponseType } from "@webcampus/schemas/admin";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -16,20 +19,36 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@webcampus/ui/components/dropdown-menu";
+import axios, { AxiosError } from "axios";
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
-import { DepartmentTableItem } from "./admin-department-columns";
-import { EditDepartmentDialog } from "./edit-department-dialog";
-import { useDepartmentDelete } from "./use-department-delete";
+import { toast } from "react-toastify";
 
-export const AdminDepartmentActions = ({
-  department,
+export const AdminStudentActions = ({
+  student,
 }: {
-  department: DepartmentTableItem;
+  student: AdminStudentResponseType;
 }) => {
-  const { onDelete } = useDepartmentDelete();
+  const queryClient = useQueryClient();
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      return await axios.delete(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/student/${student.id}`,
+        { withCredentials: true }
+      );
+    },
+    onSuccess: () => {
+      toast.success(`Student ${student.usn} deleted successfully`);
+      queryClient.invalidateQueries({ queryKey: ["admin-students"] });
+      setIsDeleteOpen(false);
+    },
+    onError: (error: AxiosError<{ error?: string }>) => {
+      toast.error(error.response?.data?.error || "Failed to delete student");
+    },
+  });
 
   return (
     <>
@@ -42,14 +61,11 @@ export const AdminDepartmentActions = ({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
-            Edit
-          </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => setIsDeleteOpen(true)}
             className="text-red-600 focus:text-red-600"
           >
-            Delete
+            Delete Student
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -57,10 +73,13 @@ export const AdminDepartmentActions = ({
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Department</DialogTitle>
+            <DialogTitle>Delete Student</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this department? This action
-              cannot be undone.
+              Are you sure you want to permanently delete{" "}
+              <strong>{student.usn}</strong> ({student.name ?? "Unnamed"})? This
+              will remove the student profile, their user account, all section
+              assignments, course registrations, and marks. This action cannot
+              be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -69,22 +88,14 @@ export const AdminDepartmentActions = ({
             </Button>
             <Button
               variant="destructive"
-              onClick={() => {
-                onDelete(department.id);
-                setIsDeleteOpen(false);
-              }}
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
             >
-              Delete
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <EditDepartmentDialog
-        open={isEditOpen}
-        onOpenChange={setIsEditOpen}
-        department={department}
-      />
     </>
   );
 };

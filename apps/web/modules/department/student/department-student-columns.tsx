@@ -27,13 +27,4 @@ export const departmentStudentColumns: ColumnDef<DepartmentStudentResponseType>[
       accessorKey: "currentSemester",
       header: "Current Semester",
     },
-    {
-      accessorKey: "academicYear",
-      header: "Academic Year",
-    },
-    {
-      accessorKey: "userId",
-      header: "User ID",
-      meta: { enableCopy: true },
-    },
   ];

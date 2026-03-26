@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="$PROJECT_DIR$/apps/web/app/(protected)/admin/students/page.tsx">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/apps/web/app/(protected)/admin/students/page.tsx" />
+              <option name="originalContent" value="import { AdminStudentsView } from &quot;@/modules/admin/students/admin-students-view&quot;;&#10;import React from &quot;react&quot;;&#10;&#10;const Page = () =&gt; {&#10;  return &lt;AdminStudentsView /&gt;;&#10;};&#10;&#10;export default Page;&#10;" />
+              <option name="updatedContent" value="import { AdminStudentsView } from &quot;@/modules/admin/students/admin-students-view&quot;;&#10;import React, { Suspense } from &quot;react&quot;;&#10;&#10;const Page = () =&gt; {&#10;  return (&#10;    &lt;Suspense fallback={&lt;div className=&quot;p-4 text-sm&quot;&gt;Loading students...&lt;/div&gt;}&gt;&#10;      &lt;AdminStudentsView /&gt;&#10;    &lt;/Suspense&gt;&#10;  );&#10;};&#10;&#10;export default Page;&#10;" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

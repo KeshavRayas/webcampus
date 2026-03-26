@@ -50,6 +50,25 @@ export const DepartmentFacultyView = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data: session } = authClient.useSession();
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+
+  // Fetch department type for conditional filter rendering
+  const { data: deptInfo } = useQuery({
+    queryKey: ["department-info"],
+    queryFn: async () => {
+      const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
+        {
+          withCredentials: true,
+        }
+      );
+      if (res.data.status === "success") return res.data.data;
+      return { type: "DEGREE_GRANTING", name: "" };
+    },
+    enabled: !!session?.user?.id,
+  });
+
+  const isDegreeGranting = deptInfo?.type === "DEGREE_GRANTING";
   const [draftFilters, setDraftFilters] = useState<FacultyFilters>(() =>
     getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
   );
@@ -125,7 +144,7 @@ export const DepartmentFacultyView = () => {
     return options;
   }, [response.data, draftFilters.department]);
 
-  const facultyFilterFields: FilterFieldConfig<FacultyFilters>[] = [
+  const allFilterFields: FilterFieldConfig<FacultyFilters>[] = [
     {
       key: "name",
       label: "Faculty Name",
@@ -165,7 +184,31 @@ export const DepartmentFacultyView = () => {
     },
   ];
 
-  const isDepartmentAdmin = session?.user?.role === "department";
+  // DEGREE_GRANTING sees only their own faculty — hide redundant dept filter
+  const facultyFilterFields = isDegreeGranting
+    ? allFilterFields.filter((f) => f.key !== "department")
+    : allFilterFields;
+
+  // Guard: show skeleton until session is loaded to prevent hydration mismatch
+  if (!session) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <Skeleton className="h-10 w-full xl:col-span-2" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const isDepartmentAdmin = session.user?.role === "department";
 
   if (!isDepartmentAdmin) {
     return (
@@ -184,7 +227,6 @@ export const DepartmentFacultyView = () => {
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
-
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, index) => (
             <Skeleton key={index} className="h-12 w-full" />

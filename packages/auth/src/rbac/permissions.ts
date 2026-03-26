@@ -8,15 +8,15 @@ const statement = {
   marks: ["read"],
   semester: ["create", "delete", "read", "update"],
   courses: ["create", "read", "update", "delete"],
-  department: ["create", "read", "delete"],
+  department: ["create", "read", "update", "delete"],
   hod: ["create", "read", "remove"],
   sectionAssignment: ["create", "read", "update", "delete"],
   courseAssignment: ["create"],
-  section: ["create", "read"],
+  section: ["create", "read", "delete"],
   freeze: ["read", "lock"],
   faculty: ["create", "read", "update", "delete"],
   admission: ["create", "read", "update", "delete", "port"],
-  student: ["read"],
+  student: ["read", "delete"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -25,10 +25,11 @@ export const roles = {
   admin: ac.newRole({
     ...adminAc.statements,
     semester: ["create", "read", "delete", "update"],
-    department: ["create", "read", "delete"],
+    department: ["create", "read", "update", "delete"],
     sectionAssignment: ["create", "read", "update", "delete"],
     faculty: ["create", "read", "delete"],
     admission: ["create", "read", "update", "delete", "port"],
+    student: ["read", "delete"],
   }),
   applicant: ac.newRole({
     admission: ["read", "update"],
@@ -59,7 +60,7 @@ export const roles = {
     faculty: ["read"],
     student: ["read"],
     sectionAssignment: ["create", "read", "update", "delete"],
-    section: ["create", "read"],
+    section: ["create", "read", "delete"],
     semester: ["read"],
   }),
   admission_admin: ac.newRole({

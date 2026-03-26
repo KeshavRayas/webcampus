@@ -4,7 +4,10 @@ import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { CreateUserType } from "@webcampus/schemas/admin";
-import { CreateDepartmentDTO } from "@webcampus/schemas/department";
+import {
+  CreateDepartmentDTO,
+  UpdateDepartmentDTO,
+} from "@webcampus/schemas/department";
 import { Request, Response } from "express";
 
 export class DepartmentController {
@@ -103,6 +106,33 @@ export class DepartmentController {
         res,
         status: "error",
         message: ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 500,
+        error,
+      });
+    }
+  }
+
+  static async update(req: Request, res: Response): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const request: UpdateDepartmentDTO = req.body;
+      const response = await DepartmentService.update(id, request);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          statusCode: 200,
+          status: "success",
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Updating Department", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 500,
         error,
       });

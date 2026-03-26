@@ -68,6 +68,7 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
       name: course.name,
       courseMode: course.courseMode,
       courseType: course.courseType,
+      cycle: course.cycle ?? "NONE",
       departmentName: session?.user?.name ?? "",
       semesterId: course.semesterId,
       semesterNumber: course.semesterNumber,

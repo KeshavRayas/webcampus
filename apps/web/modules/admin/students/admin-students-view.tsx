@@ -1,13 +1,12 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
 import {
   createFilterQueryString,
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { DepartmentStudentResponseType } from "@webcampus/schemas/department";
+import { AdminStudentResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import {
@@ -21,98 +20,29 @@ import { Skeleton } from "@webcampus/ui/components/skeleton";
 import axios from "axios";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
-import { departmentStudentColumns } from "./department-student-columns";
+import { adminStudentColumns } from "./admin-students-columns";
 
 type StudentFilters = {
   usn: string;
   name: string;
+  email: string;
   departmentName: string;
   currentSemester: string;
-  academicYear: string;
 };
 
 const EMPTY_FILTERS: StudentFilters = {
   usn: "",
   name: "",
+  email: "",
   departmentName: "",
   currentSemester: "",
-  academicYear: "",
 };
 
-export const DepartmentStudentView = () => {
+export const AdminStudentsView = () => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { data: session } = authClient.useSession();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
-  // Fetch department type for conditional filter rendering
-  const { data: deptInfo } = useQuery({
-    queryKey: ["department-info"],
-    queryFn: async () => {
-      const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
-        {
-          withCredentials: true,
-        }
-      );
-      if (res.data.status === "success") return res.data.data;
-      return { type: "DEGREE_GRANTING", name: "" };
-    },
-    enabled: !!session?.user?.id,
-  });
-
-  const isDegreeGranting = deptInfo?.type === "DEGREE_GRANTING";
-
-  // Build filter fields dynamically based on department type
-  const studentFilterFields = useMemo(() => {
-    const allFields: FilterFieldConfig<StudentFilters>[] = [
-      {
-        key: "usn",
-        label: "USN",
-        type: "text",
-        inputId: "department-student-usn",
-        placeholder: "Search by USN",
-        className: "xl:col-span-2",
-      },
-      {
-        key: "name",
-        label: "Student Name",
-        type: "text",
-        inputId: "department-student-name",
-        placeholder: "Search by student name",
-      },
-      {
-        key: "departmentName",
-        label: "Department",
-        type: "text",
-        inputId: "department-student-department-name",
-        placeholder: "Search by department",
-      },
-      {
-        key: "currentSemester",
-        label: "Current Semester",
-        type: "select",
-        allOptionLabel: "All semesters",
-        placeholder: "All semesters",
-        options: [
-          { label: "1", value: "1" },
-          { label: "2", value: "2" },
-          { label: "3", value: "3" },
-          { label: "4", value: "4" },
-          { label: "5", value: "5" },
-          { label: "6", value: "6" },
-          { label: "7", value: "7" },
-          { label: "8", value: "8" },
-        ],
-      },
-    ];
-
-    // DEGREE_GRANTING sees only their own students — hide redundant dept filter
-    return isDegreeGranting
-      ? allFields.filter((f) => f.key !== "departmentName")
-      : allFields;
-  }, [isDegreeGranting]);
 
   const [draftFilters, setDraftFilters] = useState<StudentFilters>(() =>
     getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
@@ -149,63 +79,112 @@ export const DepartmentStudentView = () => {
   };
 
   const response = useQuery({
-    queryKey: ["department-students", appliedFilters],
+    queryKey: ["admin-students", appliedFilters],
     queryFn: async () => {
       const apiFilters = {
         ...(appliedFilters.usn ? { usn: appliedFilters.usn } : {}),
         ...(appliedFilters.name ? { name: appliedFilters.name } : {}),
+        ...(appliedFilters.email ? { email: appliedFilters.email } : {}),
         ...(appliedFilters.departmentName
           ? { departmentName: appliedFilters.departmentName }
           : {}),
         ...(appliedFilters.currentSemester
-          ? {
-              currentSemester: Number.parseInt(
-                appliedFilters.currentSemester,
-                10
-              ),
-            }
-          : {}),
-        ...(appliedFilters.academicYear
-          ? { academicYear: appliedFilters.academicYear }
+          ? { currentSemester: appliedFilters.currentSemester }
           : {}),
       };
 
-      const res = await axios.get<
-        BaseResponse<DepartmentStudentResponseType[]>
-      >(`${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/department/student`, {
-        params: apiFilters,
-        withCredentials: true,
-      });
+      const res = await axios.get<BaseResponse<AdminStudentResponseType[]>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/student`,
+        {
+          params: apiFilters,
+          withCredentials: true,
+        }
+      );
 
       if (res.data.status === "success" && Array.isArray(res.data.data)) {
         return res.data.data;
       }
 
-      return [] as DepartmentStudentResponseType[];
+      return [] as AdminStudentResponseType[];
     },
   });
 
-  const isDepartmentAdmin = session?.user?.role === "department";
-
-  if (!isDepartmentAdmin) {
-    return (
-      <div className="text-muted-foreground rounded-lg border p-4 text-sm">
-        Students are available in read-only mode for department admins.
-      </div>
+  // Extract unique department names for the dropdown filter
+  const departmentOptions = useMemo(() => {
+    const options = Array.from(
+      new Set((response.data || []).map((s) => s.departmentName))
     );
-  }
+    if (
+      draftFilters.departmentName &&
+      !options.includes(draftFilters.departmentName)
+    ) {
+      return [draftFilters.departmentName, ...options];
+    }
+    return options;
+  }, [response.data, draftFilters.departmentName]);
+
+  const studentFilterFields: FilterFieldConfig<StudentFilters>[] = [
+    {
+      key: "usn",
+      label: "USN",
+      type: "text",
+      inputId: "admin-student-usn",
+      placeholder: "Search by USN",
+    },
+    {
+      key: "name",
+      label: "Name",
+      type: "text",
+      inputId: "admin-student-name",
+      placeholder: "Search by name",
+    },
+    {
+      key: "email",
+      label: "Email",
+      type: "text",
+      inputId: "admin-student-email",
+      placeholder: "Search by email",
+    },
+    {
+      key: "departmentName",
+      label: "Department",
+      type: "select",
+      allOptionLabel: "All departments",
+      placeholder: "All departments",
+      options: departmentOptions.map((dept) => ({
+        label: dept,
+        value: dept,
+      })),
+    },
+    {
+      key: "currentSemester",
+      label: "Semester",
+      type: "select",
+      allOptionLabel: "All semesters",
+      placeholder: "All semesters",
+      options: [
+        { label: "1", value: "1" },
+        { label: "2", value: "2" },
+        { label: "3", value: "3" },
+        { label: "4", value: "4" },
+        { label: "5", value: "5" },
+        { label: "6", value: "6" },
+        { label: "7", value: "7" },
+        { label: "8", value: "8" },
+      ],
+    },
+  ];
 
   if (response.isLoading) {
     return (
       <div className="space-y-6">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Skeleton className="h-10 w-full xl:col-span-2" />
+          <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
-
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, index) => (
             <Skeleton key={index} className="h-12 w-full" />
@@ -222,7 +201,7 @@ export const DepartmentStudentView = () => {
       <div className="space-y-2">
         <h3 className="text-xl font-semibold tracking-tight">Students</h3>
         <p className="text-muted-foreground text-sm">
-          Students are read-only. Use filters to refine results.
+          Manage all students across all departments.
         </p>
       </div>
 
@@ -234,7 +213,6 @@ export const DepartmentStudentView = () => {
           allValue={DEFAULT_FILTER_ALL_VALUE}
           className="md:grid-cols-2 xl:grid-cols-5"
         />
-
         <FilterActions onApply={applyFilters} onReset={resetFilters} />
       </FilterPanel>
 
@@ -247,7 +225,7 @@ export const DepartmentStudentView = () => {
           No students found for the selected filters.
         </div>
       ) : (
-        <DataTable columns={departmentStudentColumns} data={students} />
+        <DataTable columns={adminStudentColumns} data={students} />
       )}
     </div>
   );

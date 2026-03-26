@@ -31,6 +31,7 @@ export class DepartmentFacultyService {
         select: {
           id: true,
           name: true,
+          type: true,
         },
       });
 
@@ -40,7 +41,9 @@ export class DepartmentFacultyService {
 
       const facultyRecords = await db.faculty.findMany({
         where: {
-          departmentId: department.id,
+          ...(department.type !== "BASIC_SCIENCES"
+            ? { departmentId: department.id }
+            : {}),
           designation: query.designation,
           department: query.department
             ? {

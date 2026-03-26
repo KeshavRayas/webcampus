@@ -60,6 +60,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/admin/admission-users",
           icon: UserSearch,
         },
+        {
+          name: "Students",
+          url: "/admin/students",
+          icon: GraduationCap,
+        },
       ],
     },
     navSecondary,

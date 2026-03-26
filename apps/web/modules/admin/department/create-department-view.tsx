@@ -8,6 +8,13 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@webcampus/ui/components/select";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
 import React from "react";
 import { useCreateDepartmentForm } from "./use-create-department-form";
@@ -73,6 +80,29 @@ export const CreateDepartmentView = () => {
             <FormControl>
               <Input {...field} type="text" placeholder="e.g. CSE" />
             </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="type"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Department Type</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value}>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type..." />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="DEGREE_GRANTING">Degree Granting</SelectItem>
+                <SelectItem value="BASIC_SCIENCES">Basic Sciences</SelectItem>
+                <SelectItem value="SERVICE">Service</SelectItem>
+              </SelectContent>
+            </Select>
             <FormMessage />
           </FormItem>
         )}

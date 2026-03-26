@@ -16,7 +16,8 @@ import { toast } from "react-toastify";
 
 export const useCreateCourseForm = (
   semesterId: string,
-  semesterNumber: number
+  semesterNumber: number,
+  defaultCycle: "PHYSICS" | "CHEMISTRY" | "NONE"
 ) => {
   const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
@@ -29,6 +30,7 @@ export const useCreateCourseForm = (
       name: "",
       courseMode: undefined,
       courseType: undefined,
+      cycle: "NONE",
       departmentName: "",
       semesterId: semesterId,
       semesterNumber: semesterNumber,
@@ -72,7 +74,15 @@ export const useCreateCourseForm = (
     }
     form.setValue("semesterId", semesterId, { shouldValidate: true });
     form.setValue("semesterNumber", semesterNumber, { shouldValidate: true });
-  }, [session, form, isSubmitSuccessful, semesterId, semesterNumber]);
+    form.setValue("cycle", defaultCycle, { shouldValidate: true });
+  }, [
+    session,
+    form,
+    isSubmitSuccessful,
+    semesterId,
+    semesterNumber,
+    defaultCycle,
+  ]);
 
   const { mutate } = useMutation({
     mutationFn: async (values: CreateCourseDTO) => {
@@ -92,7 +102,10 @@ export const useCreateCourseForm = (
   });
 
   const onSubmit = (values: CreateCourseDTO) => {
-    mutate(values);
+    mutate({
+      ...values,
+      cycle: defaultCycle,
+    });
   };
 
   return { form, onSubmit };

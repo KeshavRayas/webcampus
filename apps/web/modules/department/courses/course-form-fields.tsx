@@ -89,174 +89,184 @@ interface CourseFormFieldsProps {
  * Shared form field layout for Create and Edit course forms.
  * Renders the 3-section grid: Basic Info, Credits (L-T-P-S), Assessment Rubric.
  */
-export const CourseFormFields = ({ form }: CourseFormFieldsProps) => (
-  <>
-    {/* ── Section 1: Basic Info ── */}
-    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-      <FormField
-        control={form.control}
-        name="code"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Course Code *</FormLabel>
-            <FormControl>
-              <Input
-                placeholder="e.g., CS101"
-                {...field}
-                className="uppercase"
-                onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="name"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Course Name *</FormLabel>
-            <FormControl>
-              <Input placeholder="Course Name" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="courseMode"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Course Mode *</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
+export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
+  return (
+    <>
+      {/* ── Section 1: Basic Info ── */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <FormField
+          control={form.control}
+          name="code"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Course Code *</FormLabel>
               <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select mode" />
-                </SelectTrigger>
+                <Input
+                  placeholder="e.g., CS101"
+                  {...field}
+                  className="uppercase"
+                  onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                />
               </FormControl>
-              <SelectContent>
-                {COURSE_MODE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="courseType"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Course Type *</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {COURSE_TYPE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    </div>
-
-    {/* ── Section 2: Credits (L-T-P-S) ── */}
-    <FormSection title="Credits (L-T-P-S)">
-      <div className="grid grid-cols-4 gap-3">
-        <NumberField form={form} name="lectureCredits" label="Lecture (L)" />
-        <NumberField form={form} name="tutorialCredits" label="Tutorial (T)" />
-        <NumberField
-          form={form}
-          name="practicalCredits"
-          label="Practical (P)"
+              <FormMessage />
+            </FormItem>
+          )}
         />
-        <NumberField form={form} name="skillCredits" label="Skill (S)" />
+
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Course Name *</FormLabel>
+              <FormControl>
+                <Input placeholder="Course Name" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="courseMode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Course Mode *</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select mode" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {COURSE_MODE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="courseType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Course Type *</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {COURSE_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
       </div>
-    </FormSection>
 
-    {/* ── Section 3: Assessment Rubric ── */}
-    <FormSection title="Assessment Rubric">
-      <div className="space-y-3">
-        {/* SEE row */}
-        <div>
-          <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
-            SEE (Semester End Exam)
-          </p>
-          <div className="grid grid-cols-3 gap-3">
-            <NumberField form={form} name="seeMaxMarks" label="Max Marks" />
-            <NumberField form={form} name="seeMinMarks" label="Min Marks" />
-            <NumberField form={form} name="seeWeightage" label="Weightage" />
+      {/* ── Section 2: Credits (L-T-P-S) ── */}
+      <FormSection title="Credits (L-T-P-S)">
+        <div className="grid grid-cols-4 gap-3">
+          <NumberField form={form} name="lectureCredits" label="Lecture (L)" />
+          <NumberField
+            form={form}
+            name="tutorialCredits"
+            label="Tutorial (T)"
+          />
+          <NumberField
+            form={form}
+            name="practicalCredits"
+            label="Practical (P)"
+          />
+          <NumberField form={form} name="skillCredits" label="Skill (S)" />
+        </div>
+      </FormSection>
+
+      {/* ── Section 3: Assessment Rubric ── */}
+      <FormSection title="Assessment Rubric">
+        <div className="space-y-3">
+          {/* SEE row */}
+          <div>
+            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
+              SEE (Semester End Exam)
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              <NumberField form={form} name="seeMaxMarks" label="Max Marks" />
+              <NumberField form={form} name="seeMinMarks" label="Min Marks" />
+              <NumberField form={form} name="seeWeightage" label="Weightage" />
+            </div>
+          </div>
+
+          {/* CIE row */}
+          <div>
+            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
+              CIE (Continuous Internal)
+            </p>
+            <div className="grid grid-cols-5 gap-3">
+              <NumberField form={form} name="maxNoOfCies" label="Max CIEs" />
+              <NumberField form={form} name="minNoOfCies" label="Min CIEs" />
+              <NumberField form={form} name="cieMaxMarks" label="Max Marks" />
+              <NumberField form={form} name="cieMinMarks" label="Min Marks" />
+              <NumberField form={form} name="cieWeightage" label="Weightage" />
+            </div>
+          </div>
+
+          {/* Lab & Assignments row */}
+          <div>
+            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
+              Lab &amp; Assignments
+            </p>
+            <div className="grid grid-cols-5 gap-3">
+              <NumberField form={form} name="labMaxMarks" label="Lab Max" />
+              <NumberField form={form} name="labMinMarks" label="Lab Min" />
+              <NumberField form={form} name="labWeightage" label="Lab Wt." />
+              <NumberField
+                form={form}
+                name="noOfAssignments"
+                label="# Assign."
+              />
+              <NumberField
+                form={form}
+                name="assignmentMaxMarks"
+                label="Assign. Max"
+              />
+            </div>
+          </div>
+
+          {/* Cumulative row */}
+          <div>
+            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
+              Cumulative
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <NumberField
+                form={form}
+                name="cumulativeMaxMarks"
+                label="Max Marks"
+              />
+              <NumberField
+                form={form}
+                name="cumulativeMinMarks"
+                label="Min Marks"
+              />
+            </div>
           </div>
         </div>
-
-        {/* CIE row */}
-        <div>
-          <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
-            CIE (Continuous Internal)
-          </p>
-          <div className="grid grid-cols-5 gap-3">
-            <NumberField form={form} name="maxNoOfCies" label="Max CIEs" />
-            <NumberField form={form} name="minNoOfCies" label="Min CIEs" />
-            <NumberField form={form} name="cieMaxMarks" label="Max Marks" />
-            <NumberField form={form} name="cieMinMarks" label="Min Marks" />
-            <NumberField form={form} name="cieWeightage" label="Weightage" />
-          </div>
-        </div>
-
-        {/* Lab & Assignments row */}
-        <div>
-          <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
-            Lab &amp; Assignments
-          </p>
-          <div className="grid grid-cols-5 gap-3">
-            <NumberField form={form} name="labMaxMarks" label="Lab Max" />
-            <NumberField form={form} name="labMinMarks" label="Lab Min" />
-            <NumberField form={form} name="labWeightage" label="Lab Wt." />
-            <NumberField form={form} name="noOfAssignments" label="# Assign." />
-            <NumberField
-              form={form}
-              name="assignmentMaxMarks"
-              label="Assign. Max"
-            />
-          </div>
-        </div>
-
-        {/* Cumulative row */}
-        <div>
-          <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
-            Cumulative
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <NumberField
-              form={form}
-              name="cumulativeMaxMarks"
-              label="Max Marks"
-            />
-            <NumberField
-              form={form}
-              name="cumulativeMinMarks"
-              label="Min Marks"
-            />
-          </div>
-        </div>
-      </div>
-    </FormSection>
-  </>
-);
+      </FormSection>
+    </>
+  );
+};

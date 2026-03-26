@@ -189,6 +189,18 @@ enum Quota {
   SNQ
 }
 
+enum DepartmentType {
+  DEGREE_GRANTING
+  BASIC_SCIENCES
+  SERVICE
+}
+
+enum Cycle {
+  PHYSICS
+  CHEMISTRY
+  NONE
+}
+
 model Department {
   id           String    @id @default(uuid())
   userId       String
@@ -196,6 +208,7 @@ model Department {
   name         String    @unique
   code         String    @unique
   abbreviation String
+  type         DepartmentType @default(DEGREE_GRANTING)
   hods         Hod[]
   sections     Section[]
   students     Student[]
@@ -226,6 +239,7 @@ model Section {
   courses         CourseAssignment[]
   studentSections StudentSection[]
   batches         Batch[]
+  cycle           Cycle              @default(NONE)
 
   @@unique([name, departmentName, semesterId])
   @@index([departmentName, semesterId])
@@ -303,6 +317,7 @@ model Course {
   name           String
   courseMode     CourseMode
   courseType     CourseType
+  cycle          Cycle                @default(NONE)
   department     Department           @relation(fields: [departmentName], references: [name])
   departmentName String
   semesterId     String

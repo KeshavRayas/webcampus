@@ -16,6 +16,11 @@ const COURSE_MODES = [
 const COURSE_TYPES = ["PC", "PE", "OE", "NCMC"] as const;
 
 /**
+ * Enum values matching Prisma Cycle
+ */
+const COURSE_CYCLES = ["PHYSICS", "CHEMISTRY", "NONE"] as const;
+
+/**
  * Base course schema with all user-provided fields.
  * Excludes backend-computed fields: totalCredits, hasLaboratoryComponent
  */
@@ -38,6 +43,8 @@ const BaseCourseSchema = z.object({
   courseType: z.enum(COURSE_TYPES, {
     message: "Course type is required",
   }),
+
+  cycle: z.enum(COURSE_CYCLES).optional(),
 
   departmentName: z.string().min(1, "Department is required"),
 

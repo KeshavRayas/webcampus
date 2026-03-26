@@ -1,6 +1,7 @@
 import AdmissionUserRouter from "@webcampus/api/src/routers/admin/admission-user.router";
 import DepartmentRouter from "@webcampus/api/src/routers/admin/department.router";
 import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
+import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
 import UserRouter from "@webcampus/api/src/routers/admin/user.router";
 import { Router } from "express";
 import facultyRouter from "./faculty.router";
@@ -15,5 +16,7 @@ router.use("/department", DepartmentRouter);
 router.use("/semester", SemesterRouter);
 
 router.use("/faculty", facultyRouter);
+
+router.use("/student", StudentRouter);
 
 export default router;

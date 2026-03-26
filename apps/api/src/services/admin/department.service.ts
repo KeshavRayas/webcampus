@@ -6,6 +6,7 @@ import { CreateUserType } from "@webcampus/schemas/admin";
 import {
   CreateDepartmentDTO,
   DepartmentResponseDTO,
+  UpdateDepartmentDTO,
 } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 
@@ -154,20 +155,26 @@ export class DepartmentService {
     }
   }
 
-  static async delete(userId: string): Promise<BaseResponse<null>> {
+  static async delete(departmentId: string): Promise<BaseResponse<null>> {
     try {
-      // First delete the department associated with the user
-      await db.department.deleteMany({
-        where: {
-          userId: userId,
-        },
+      // Look up the department to get the associated userId
+      const department = await db.department.findUnique({
+        where: { id: departmentId },
+        select: { userId: true },
       });
 
-      // Then delete the user
-      await db.user.delete({
-        where: {
-          id: userId,
-        },
+      if (!department) {
+        throw new Error("Department not found");
+      }
+
+      // Delete the department first
+      await db.department.delete({
+        where: { id: departmentId },
+      });
+
+      // Then safely delete the associated user (if it still exists)
+      await db.user.deleteMany({
+        where: { id: department.userId },
       });
 
       const response: BaseResponse<null> = {
@@ -178,8 +185,40 @@ export class DepartmentService {
       logger.info(response);
       return response;
     } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
       logger.error(`Failed to delete department`, error);
       throw new Error("Failed to delete department");
+    }
+  }
+
+  static async update(
+    id: string,
+    data: UpdateDepartmentDTO
+  ): Promise<BaseResponse<DepartmentResponseDTO>> {
+    try {
+      const department = await db.department.update({
+        where: { id },
+        data,
+      });
+
+      return {
+        status: "success",
+        message: "Department updated successfully",
+        data: department,
+      };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2025") {
+          throw new Error("Department not found");
+        }
+        if (error.code === "P2002") {
+          throw new Error("Department already exists");
+        }
+      }
+      logger.error(`Failed to update department`, error);
+      throw new Error("Failed to update department");
     }
   }
 }
