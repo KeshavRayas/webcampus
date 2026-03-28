@@ -1,26 +1,47 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
+import {
+  createFilterQueryString,
+  getFiltersFromSearchParams,
+} from "@/lib/filter-search-params";
+import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { AcademicTermResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
-import { Label } from "@webcampus/ui/components/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@webcampus/ui/components/select";
+  DEFAULT_FILTER_ALL_VALUE,
+  FilterActions,
+  FilterBuilder,
+  FilterPanel,
+  type FilterFieldConfig,
+} from "@webcampus/ui/components/filter-builder";
+import {
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 import axios from "axios";
 import React, { useEffect, useMemo } from "react";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { GenerateSectionsDialog } from "./generate-sections-dialog";
 import { SectionCardsView } from "./section-cards-view";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 const BASIC_SCIENCES_CYCLE_OPTIONS = ["PHYSICS", "CHEMISTRY"] as const;
 type SectionCycle = (typeof BASIC_SCIENCES_CYCLE_OPTIONS)[number];
+
+type SectionFilters = {
+  termId: string;
+  semesterId: string;
+  cycle: string;
+};
+
+const EMPTY_FILTERS: SectionFilters = {
+  termId: "",
+  semesterId: "",
+  cycle: "",
+};
 
 const isRestrictedFirstYearUgSemester = (semester: {
   semesterNumber: number;
@@ -32,18 +53,29 @@ const isRestrictedFirstYearUgSemester = (semester: {
 export const DepartmentSectionView = () => {
   const { data: session } = authClient.useSession();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [termId, setTermId] = React.useState("");
-  const [semesterId, setSemesterId] = React.useState("");
+  const [draftFilters, setDraftFilters] = React.useState<SectionFilters>(() =>
+    getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
+  );
+  const [appliedFilters, setAppliedFilters] = React.useState<SectionFilters>(
+    () => getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
+  );
+
   const [semesterNumber, setSemesterNumber] = React.useState<number | null>(
     null
   );
   const [semesterProgramType, setSemesterProgramType] = React.useState<
     string | null
   >(null);
-  const [selectedCycle, setSelectedCycle] = React.useState<SectionCycle>(
-    BASIC_SCIENCES_CYCLE_OPTIONS[0]
-  );
+
+  useEffect(() => {
+    const nextFilters = getFiltersFromSearchParams(searchParams, EMPTY_FILTERS);
+    setDraftFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+  }, [searchParams]);
 
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
@@ -59,23 +91,27 @@ export const DepartmentSectionView = () => {
     enabled: !!session?.user?.id,
   });
 
-  const { data: terms } = useQuery({
-    queryKey: ["academic-terms"],
-    queryFn: async () => {
-      const res = await axios.get<BaseResponse<AcademicTermResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
-        { withCredentials: true }
-      );
-      if (res.data.status === "success") return res.data.data;
-      return [] as AcademicTermResponseType[];
-    },
-  });
+  const { data: terms = [] } = useAcademicTerms();
 
   const isBasicSciences = deptInfo?.type === "BASIC_SCIENCES";
-  const termOptions = Array.isArray(terms) ? terms : [];
-  const selectedTerm = termOptions.find((term) => term.id === termId);
-  const nestedSemesters = selectedTerm?.Semester ?? [];
-  const academicYear = selectedTerm?.year ?? "";
+  const selectedDraftTerm = terms.find(
+    (term) => term.id === draftFilters.termId
+  );
+  const nestedSemesters = selectedDraftTerm?.Semester ?? [];
+
+  // Sync filters when data changes (auto-clear if value no longer exists)
+  useCascadingFilterSync(draftFilters, setDraftFilters, {
+    academicTerms: terms,
+    semesters: nestedSemesters,
+  });
+
+  const selectedAppliedTerm = terms.find(
+    (term) => term.id === appliedFilters.termId
+  );
+  const selectedAppliedSemester = (selectedAppliedTerm?.Semester || []).find(
+    (semester) => semester.id === appliedFilters.semesterId
+  );
+  const academicYear = selectedAppliedTerm?.year ?? "";
 
   const semesterOptions = useMemo(() => {
     if (isBasicSciences) {
@@ -92,7 +128,7 @@ export const DepartmentSectionView = () => {
   }, [isBasicSciences, nestedSemesters]);
 
   const selectedSemesterFromAll = nestedSemesters.find(
-    (semester) => semester.id === semesterId
+    (semester) => semester.id === appliedFilters.semesterId
   );
   const isRestrictedForNonBasic =
     !isBasicSciences &&
@@ -100,35 +136,48 @@ export const DepartmentSectionView = () => {
     isRestrictedFirstYearUgSemester(selectedSemesterFromAll);
 
   useEffect(() => {
-    if (isBasicSciences) {
+    if (isBasicSciences && !draftFilters.cycle) {
+      setDraftFilters((current) => ({
+        ...current,
+        cycle: BASIC_SCIENCES_CYCLE_OPTIONS[0],
+      }));
       return;
     }
 
-    setSelectedCycle(BASIC_SCIENCES_CYCLE_OPTIONS[0]);
-  }, [isBasicSciences]);
+    if (!isBasicSciences && draftFilters.cycle) {
+      setDraftFilters((current) => ({
+        ...current,
+        cycle: "",
+      }));
+    }
+  }, [draftFilters.cycle, isBasicSciences]);
 
   useEffect(() => {
-    if (termId || termOptions.length === 0) {
+    if (draftFilters.termId || terms.length === 0) {
       return;
     }
 
     const currentTerm =
-      termOptions.find((term) => term.isCurrent) ?? termOptions[0];
+      terms.find((term) => term.isCurrent) ?? terms[0];
     if (currentTerm) {
-      setTermId(currentTerm.id);
+      setDraftFilters((current) => ({
+        ...current,
+        termId: currentTerm.id,
+      }));
     }
-  }, [termId, termOptions]);
+  }, [draftFilters.termId, terms]);
 
   useEffect(() => {
-    if (!semesterId) {
+    if (!appliedFilters.semesterId) {
       setSemesterNumber(null);
       setSemesterProgramType(null);
       return;
     }
 
-    const sem = semesterOptions.find((semester) => semester.id === semesterId);
+    const sem = (selectedAppliedTerm?.Semester || []).find(
+      (semester) => semester.id === appliedFilters.semesterId
+    );
     if (!sem) {
-      setSemesterId("");
       setSemesterNumber(null);
       setSemesterProgramType(null);
       return;
@@ -136,97 +185,149 @@ export const DepartmentSectionView = () => {
 
     setSemesterNumber(sem.semesterNumber);
     setSemesterProgramType(sem.programType);
-  }, [semesterId, semesterOptions]);
+  }, [appliedFilters.semesterId, selectedAppliedTerm]);
 
   useEffect(() => {
-    if (!termId || semesterId) {
+    if (!draftFilters.termId || draftFilters.semesterId) {
       return;
     }
 
     if (semesterOptions.length > 0) {
-      setSemesterId(semesterOptions[0]!.id);
+      setDraftFilters((current) => ({
+        ...current,
+        semesterId: semesterOptions[0]!.id,
+      }));
     }
-  }, [semesterId, semesterOptions, termId]);
+  }, [draftFilters.semesterId, draftFilters.termId, semesterOptions]);
 
-  const hasSelectedTermAndSem = Boolean(termId && semesterId);
+  useEffect(() => {
+    if (appliedFilters.termId && appliedFilters.semesterId) {
+      return;
+    }
+
+    if (!draftFilters.termId || !draftFilters.semesterId) {
+      return;
+    }
+
+    setAppliedFilters({
+      ...draftFilters,
+      cycle: isBasicSciences
+        ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
+        : "",
+    });
+  }, [
+    appliedFilters.semesterId,
+    appliedFilters.termId,
+    draftFilters,
+    isBasicSciences,
+  ]);
+
+  const updateDraftFilter = (key: keyof SectionFilters, value: string) => {
+    setDraftFilters((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
+
+  const applyFilters = () => {
+    const nextFilters = {
+      ...draftFilters,
+      cycle: isBasicSciences
+        ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
+        : "",
+    };
+
+    setAppliedFilters(nextFilters);
+    const query = createFilterQueryString(nextFilters);
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, {
+      scroll: false,
+    });
+  };
+
+  const resetFilters = () => {
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+    router.replace(pathname, { scroll: false });
+  };
+
+  const sectionFilterFields: FilterFieldConfig<SectionFilters>[] = [
+    {
+      key: "termId",
+      label: "Academic Term",
+      type: "select",
+      allOptionLabel: "All terms",
+      placeholder: "Select term...",
+      options: terms.map((term) => ({
+        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+        value: term.id,
+      })),
+    },
+    {
+      key: "semesterId",
+      label: "Semester",
+      type: "select",
+      allOptionLabel: "All semesters",
+      placeholder: draftFilters.termId
+        ? "Select semester..."
+        : "Select term first",
+      options: semesterOptions.map((semester) => ({
+        label: `${semester.programType} - Semester ${semester.semesterNumber}`,
+        value: semester.id,
+      })),
+    },
+    ...(isBasicSciences
+      ? [
+          {
+            key: "cycle",
+            label: "Cycle",
+            type: "select",
+            allOptionLabel: "All cycles",
+            placeholder: "Select cycle...",
+            options: BASIC_SCIENCES_CYCLE_OPTIONS.map((cycle) => ({
+              label: cycle,
+              value: cycle,
+            })),
+          } as FilterFieldConfig<SectionFilters>,
+        ]
+      : []),
+  ];
+
+  const hasSelectedTermAndSem = Boolean(
+    appliedFilters.termId && appliedFilters.semesterId
+  );
   const isUgFirstYearReadOnly =
     deptInfo?.type !== "BASIC_SCIENCES" &&
     semesterProgramType === "UG" &&
     (semesterNumber === 1 || semesterNumber === 2);
 
+  const appliedCycle =
+    isBasicSciences && appliedFilters.cycle
+      ? (appliedFilters.cycle as SectionCycle)
+      : BASIC_SCIENCES_CYCLE_OPTIONS[0];
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="space-y-1.5">
-          <Label>Academic Term</Label>
-          <Select
-            value={termId}
-            onValueChange={(value) => {
-              setTermId(value);
-              setSemesterId("");
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select term..." />
-            </SelectTrigger>
-            <SelectContent>
-              {termOptions.map((term) => (
-                <SelectItem key={term.id} value={term.id}>
-                  {term.type.charAt(0).toUpperCase() + term.type.slice(1)}{" "}
-                  {term.year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <FilterPanel>
+        <FilterBuilder
+          fields={sectionFilterFields}
+          draftFilters={draftFilters}
+          onDraftChange={(key, value) => {
+            if (key === "termId") {
+              setDraftFilters((current) => ({
+                ...current,
+                termId: value,
+                semesterId: "",
+              }));
+              return;
+            }
 
-        <div className="space-y-1.5">
-          <Label>Semester</Label>
-          <Select
-            value={semesterId}
-            onValueChange={setSemesterId}
-            disabled={!termId || semesterOptions.length === 0}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select semester..." />
-            </SelectTrigger>
-            <SelectContent>
-              {semesterOptions.length > 0 ? (
-                semesterOptions.map((semester) => (
-                  <SelectItem key={semester.id} value={semester.id}>
-                    {semester.programType} - Semester {semester.semesterNumber}
-                  </SelectItem>
-                ))
-              ) : (
-                <div className="text-muted-foreground px-2 py-1.5 text-sm">
-                  No semesters available for this term
-                </div>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {isBasicSciences ? (
-          <div className="space-y-1.5">
-            <Label>Cycle</Label>
-            <Select
-              value={selectedCycle}
-              onValueChange={(value) => setSelectedCycle(value as SectionCycle)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select cycle..." />
-              </SelectTrigger>
-              <SelectContent>
-                {BASIC_SCIENCES_CYCLE_OPTIONS.map((cycle) => (
-                  <SelectItem key={cycle} value={cycle}>
-                    {cycle}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-      </div>
+            updateDraftFilter(key, value);
+          }}
+          allValue={DEFAULT_FILTER_ALL_VALUE}
+          className="md:grid-cols-2 xl:grid-cols-3"
+        />
+        <FilterActions onApply={applyFilters} onReset={resetFilters} />
+      </FilterPanel>
 
       {isRestrictedForNonBasic ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -239,21 +340,21 @@ export const DepartmentSectionView = () => {
           <div className="flex items-center justify-end gap-2">
             {hasSelectedTermAndSem && !isUgFirstYearReadOnly ? (
               <GenerateSectionsDialog
-                termId={termId}
-                semesterId={semesterId}
+                termId={appliedFilters.termId}
+                semesterId={appliedFilters.semesterId}
                 semesterNumber={semesterNumber ?? 0}
-                cycle={selectedCycle}
+                cycle={appliedCycle}
               />
             ) : null}
           </div>
 
           {/* Section cards with student details */}
           <SectionCardsView
-            semesterId={semesterId}
+            semesterId={appliedFilters.semesterId}
             academicYear={academicYear}
             isUgFirstYearReadOnly={isUgFirstYearReadOnly}
             isBasicSciences={isBasicSciences}
-            selectedCycle={selectedCycle}
+            selectedCycle={appliedCycle}
           />
         </>
       )}

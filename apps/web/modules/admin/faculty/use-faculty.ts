@@ -12,22 +12,36 @@ export const useUpdateFaculty = (departmentId: string) => {
     mutationFn: async ({
       id,
       data,
+      imageFile,
     }: {
       id: string;
       data: Record<string, unknown>;
+      imageFile?: File | null;
     }) => {
+      const formData = new FormData();
+      Object.entries(data).forEach(([key, value]) => {
+        formData.append(key, String(value));
+      });
+
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
+
       const res = await axios.put(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/faculty/${id}`,
-        data,
-        { withCredentials: true }
+        formData,
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
       return res.data;
     },
     onSuccess: (res) => {
       toast.success(res.message);
-      queryClient.invalidateQueries({
-        queryKey: ["admin-faculty", departmentId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["admin-faculty"] });
     },
     onError: (err: AxiosError<ErrorResponse>) => {
       toast.error(err.response?.data?.message || err.message);
@@ -47,9 +61,7 @@ export const useDeleteFaculty = (departmentId: string) => {
     },
     onSuccess: (res) => {
       toast.success(res.message);
-      queryClient.invalidateQueries({
-        queryKey: ["admin-faculty", departmentId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["admin-faculty"] });
     },
     onError: (err: AxiosError<ErrorResponse>) => {
       toast.error(err.response?.data?.message || err.message);
@@ -76,9 +88,7 @@ export const useCreateHodAccount = (departmentId: string) => {
     },
     onSuccess: (res) => {
       toast.success(res.message);
-      queryClient.invalidateQueries({
-        queryKey: ["admin-faculty", departmentId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["admin-faculty"] });
     },
     onError: (err: AxiosError<ErrorResponse>) => {
       toast.error(err.response?.data?.message || err.message);
@@ -99,9 +109,7 @@ export const useReassignHodAccount = (departmentId: string) => {
     },
     onSuccess: (res) => {
       toast.success(res.message);
-      queryClient.invalidateQueries({
-        queryKey: ["admin-faculty", departmentId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["admin-faculty"] });
     },
     onError: (err: AxiosError<ErrorResponse>) => {
       toast.error(err.response?.data?.message || err.message);

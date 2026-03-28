@@ -63,9 +63,18 @@ export class DepartmentController {
 
   static async create(req: Request, res: Response): Promise<void> {
     try {
+      const logoFile = req.file;
+      if (!logoFile) {
+        throw new Error("Department logo is required");
+      }
+
       const request: CreateDepartmentDTO &
         CreateUserType & { headers: IncomingHttpHeaders } = req.body;
-      const response = await DepartmentService.create(request);
+      const response = await DepartmentService.create({
+        ...request,
+        headers: req.headers,
+        logoFile,
+      });
       if (response.status === "success") {
         sendResponse({
           res,
@@ -116,7 +125,7 @@ export class DepartmentController {
     try {
       const id = req.params.id as string;
       const request: UpdateDepartmentDTO = req.body;
-      const response = await DepartmentService.update(id, request);
+      const response = await DepartmentService.update(id, request, req.file);
       if (response.status === "success") {
         sendResponse({
           res,

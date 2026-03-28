@@ -27,7 +27,7 @@ export const roles = {
     semester: ["create", "read", "delete", "update"],
     department: ["create", "read", "update", "delete"],
     sectionAssignment: ["create", "read", "update", "delete"],
-    faculty: ["create", "read", "delete"],
+    faculty: ["create", "read", "update", "delete"],
     admission: ["create", "read", "update", "delete", "port"],
     student: ["read", "delete"],
   }),

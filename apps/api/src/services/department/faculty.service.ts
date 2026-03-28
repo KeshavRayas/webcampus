@@ -76,6 +76,11 @@ export class DepartmentFacultyService {
               createdAt: true,
             },
           },
+          hod: {
+            select: {
+              id: true,
+            },
+          },
           department: {
             select: {
               name: true,
@@ -91,6 +96,7 @@ export class DepartmentFacultyService {
           email: record.user.email,
           department: record.department.name,
           designation: record.designation,
+          isHod: Boolean(record.hod),
           createdAt: record.user.createdAt,
         }))
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

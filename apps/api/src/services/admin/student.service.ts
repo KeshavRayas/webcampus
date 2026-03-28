@@ -1,5 +1,6 @@
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
+import { UserService } from "./user.service";
 import {
   AdminStudentResponseType,
   GetAdminStudentsQueryType,
@@ -7,6 +8,85 @@ import {
 import { BaseResponse } from "@webcampus/types/api";
 
 export class AdminStudentService {
+  static async getById(studentId: string): Promise<BaseResponse<unknown>> {
+    try {
+      await UserService.backfillMissingProfileFields();
+
+      const student = await db.student.findUnique({
+        where: { id: studentId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              username: true,
+              displayUsername: true,
+              image: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+
+      if (!student) {
+        throw new Error("Student not found");
+      }
+
+      const admission = await db.admission.findFirst({
+        where: { usn: student.usn },
+        select: {
+          applicationId: true,
+          modeOfAdmission: true,
+          status: true,
+          firstName: true,
+          middleName: true,
+          lastName: true,
+          primaryPhoneNumber: true,
+          secondaryPhoneNumber: true,
+          primaryEmail: true,
+          photo: true,
+          categoryClaimed: true,
+          categoryAllotted: true,
+          quota: true,
+          currentAddress: true,
+          currentArea: true,
+          currentCity: true,
+          currentDistrict: true,
+          currentState: true,
+          currentCountry: true,
+          currentPincode: true,
+          permanentAddress: true,
+          permanentArea: true,
+          permanentCity: true,
+          permanentDistrict: true,
+          permanentState: true,
+          permanentCountry: true,
+          permanentPincode: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      return {
+        status: "success",
+        message: "Student details fetched successfully",
+        data: {
+          id: student.id,
+          usn: student.usn,
+          departmentName: student.departmentName,
+          currentSemester: student.currentSemester,
+          academicYear: student.academicYear,
+          user: student.user,
+          admission,
+        },
+      };
+    } catch (error) {
+      logger.error("Failed to fetch admin student details", error);
+      throw error;
+    }
+  }
+
   /**
    * Fetches all students globally (no department scoping).
    * Used by system admins to view the entire college roster.
@@ -15,6 +95,8 @@ export class AdminStudentService {
     query: GetAdminStudentsQueryType
   ): Promise<BaseResponse<AdminStudentResponseType[]>> {
     try {
+      await UserService.backfillMissingProfileFields();
+
       const where: Prisma.StudentWhereInput = {};
 
       if (query.usn) {
@@ -24,6 +106,13 @@ export class AdminStudentService {
       if (query.departmentName) {
         where.departmentName = {
           equals: query.departmentName,
+          mode: "insensitive",
+        };
+      }
+
+      if (query.academicYear) {
+        where.academicYear = {
+          equals: query.academicYear,
           mode: "insensitive",
         };
       }

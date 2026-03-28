@@ -31,7 +31,10 @@ export class DepartmentService {
    */
   static async create(
     request: CreateDepartmentDTO &
-      CreateUserType & { headers: IncomingHttpHeaders }
+      CreateUserType & {
+        headers: IncomingHttpHeaders;
+        logoFile: Express.Multer.File;
+      }
   ): Promise<BaseResponse<DepartmentResponseDTO>> {
     try {
       const userService = new UserService({
@@ -48,14 +51,44 @@ export class DepartmentService {
       if (user.status === "error") {
         throw new Error(user.message);
       }
+
+      if (!user.data?.id) {
+        throw new Error("Failed to create department user");
+      }
+
+      const { generateFileName, uploadToS3 } = await import(
+        "@webcampus/api/src/utils/s3"
+      );
+      const logoFileName = generateFileName(
+        request.logoFile.originalname,
+        "department_logo_"
+      );
+      const uploadResult = await uploadToS3(
+        request.logoFile.buffer,
+        logoFileName,
+        request.logoFile.mimetype
+      );
+
+      if (!uploadResult.success || !uploadResult.url) {
+        throw new Error("Failed to upload department logo");
+      }
+
+      await db.user.update({
+        where: { id: user.data.id },
+        data: {
+          image: uploadResult.url,
+        },
+      });
+
       const department = await db.department.create({
         data: {
           name: request.name,
           code: request.code,
           abbreviation: request.abbreviation,
+          type: request.type,
           user: {
             connect: {
-              id: user.data?.id,
+              id: user.data.id,
             },
           },
         },
@@ -90,16 +123,25 @@ export class DepartmentService {
    */
   static async getDepartments(): Promise<
     BaseResponse<
-      (DepartmentResponseDTO & { email?: string; emailVerified?: boolean })[]
+      (DepartmentResponseDTO & {
+        email?: string;
+        emailVerified?: boolean;
+        username?: string | null;
+        displayUsername?: string | null;
+      })[]
     >
   > {
     try {
+      await UserService.backfillMissingProfileFields();
+
       const departments = await db.department.findMany({
         include: {
           user: {
             select: {
               email: true,
               emailVerified: true,
+              username: true,
+              displayUsername: true,
             },
           },
         },
@@ -107,12 +149,16 @@ export class DepartmentService {
       const formattedDepartments: (DepartmentResponseDTO & {
         email?: string;
         emailVerified?: boolean;
+        username?: string | null;
+        displayUsername?: string | null;
       })[] = departments.map((dept) => {
         const { user, ...departmentData } = dept;
         return {
           ...departmentData,
           email: user?.email,
           emailVerified: user?.emailVerified,
+          username: user?.username,
+          displayUsername: user?.displayUsername,
         };
       });
 
@@ -137,6 +183,11 @@ export class DepartmentService {
   > {
     try {
       const departments = await db.department.findMany({
+        where: {
+          type: {
+            not: "BASIC_SCIENCES",
+          },
+        },
         select: {
           id: true,
           name: true,
@@ -195,12 +246,78 @@ export class DepartmentService {
 
   static async update(
     id: string,
-    data: UpdateDepartmentDTO
+    data: UpdateDepartmentDTO,
+    logoFile?: Express.Multer.File
   ): Promise<BaseResponse<DepartmentResponseDTO>> {
     try {
+      const existingDepartment = await db.department.findUnique({
+        where: { id },
+        include: {
+          user: {
+            select: {
+              id: true,
+              image: true,
+            },
+          },
+        },
+      });
+
+      if (!existingDepartment) {
+        throw new Error("Department not found");
+      }
+
+      if (logoFile) {
+        const { deleteFromS3, generateFileName, uploadToS3 } = await import(
+          "@webcampus/api/src/utils/s3"
+        );
+        const nextLogoName = generateFileName(
+          logoFile.originalname,
+          "department_logo_"
+        );
+        const uploadResult = await uploadToS3(
+          logoFile.buffer,
+          nextLogoName,
+          logoFile.mimetype
+        );
+
+        if (!uploadResult.success || !uploadResult.url) {
+          throw new Error("Failed to upload department logo");
+        }
+
+        if (existingDepartment.user.image) {
+          await deleteFromS3(existingDepartment.user.image);
+        }
+
+        await db.user.update({
+          where: { id: existingDepartment.user.id },
+          data: {
+            image: uploadResult.url,
+          },
+        });
+      }
+
+        const nextUserData: { username?: string; displayUsername?: string } = {};
+        if (data.username !== undefined) {
+          nextUserData.username = data.username;
+        }
+        if (data.displayUsername !== undefined) {
+          nextUserData.displayUsername = data.displayUsername;
+        }
+
+        if (Object.keys(nextUserData).length > 0) {
+          await db.user.update({
+            where: { id: existingDepartment.user.id },
+            data: nextUserData,
+          });
+        }
+
+        const departmentData = { ...data } as Record<string, unknown>;
+        delete departmentData.username;
+        delete departmentData.displayUsername;
+
       const department = await db.department.update({
         where: { id },
-        data,
+          data: departmentData,
       });
 
       return {

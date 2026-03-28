@@ -6,11 +6,14 @@ import {
   UpdateDepartmentSchema,
 } from "@webcampus/schemas/department";
 import { Router } from "express";
+import multer from "multer";
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.post(
   "/",
+  upload.single("logo"),
   validateRequest(CreateDepartmentSchema.extend(createUserSchema.shape)),
   protect({
     role: "admin",
@@ -46,6 +49,7 @@ router.delete(
 
 router.patch(
   "/:id",
+  upload.single("logo"),
   validateRequest(UpdateDepartmentSchema),
   protect({
     role: "admin",

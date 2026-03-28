@@ -94,6 +94,31 @@ export class DepartmentStudentService {
                 },
               }
             : {}),
+          ...(query.section
+            ? {
+                studentSections: {
+                  some: {
+                    section: {
+                      name: {
+                        contains: query.section,
+                        mode: "insensitive",
+                      },
+                    },
+                    ...(query.currentSemester
+                      ? { semester: Number(query.currentSemester) }
+                      : {}),
+                    ...(query.academicYear
+                      ? {
+                          academicYear: {
+                            equals: query.academicYear,
+                            mode: "insensitive",
+                          },
+                        }
+                      : {}),
+                  },
+                },
+              }
+            : {}),
         },
         include: {
           user: {
@@ -108,6 +133,56 @@ export class DepartmentStudentService {
         },
       });
 
+      const studentIds = studentRecords.map((record) => record.id);
+      const sectionAssignments =
+        studentIds.length > 0
+          ? await db.studentSection.findMany({
+              where: {
+                studentId: {
+                  in: studentIds,
+                },
+                ...(query.currentSemester
+                  ? { semester: Number(query.currentSemester) }
+                  : {}),
+                ...(query.academicYear
+                  ? {
+                      academicYear: {
+                        equals: query.academicYear,
+                        mode: "insensitive",
+                      },
+                    }
+                  : {}),
+                ...(query.section
+                  ? {
+                      section: {
+                        name: {
+                          contains: query.section,
+                          mode: "insensitive",
+                        },
+                      },
+                    }
+                  : {}),
+              },
+              select: {
+                studentId: true,
+                semester: true,
+                academicYear: true,
+                section: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            })
+          : [];
+
+      const sectionByStudentId = new Map<string, string>();
+      for (const assignment of sectionAssignments) {
+        if (!sectionByStudentId.has(assignment.studentId)) {
+          sectionByStudentId.set(assignment.studentId, assignment.section.name);
+        }
+      }
+
       const students: DepartmentStudentResponseType[] = studentRecords.map(
         (record) => ({
           id: record.id,
@@ -118,6 +193,7 @@ export class DepartmentStudentService {
           departmentName: record.departmentName,
           currentSemester: record.currentSemester,
           academicYear: record.academicYear,
+          section: sectionByStudentId.get(record.id) ?? null,
         })
       );
 

@@ -20,7 +20,7 @@ import React from "react";
 import { useCreateDepartmentForm } from "./use-create-department-form";
 
 export const CreateDepartmentView = () => {
-  const { form, onSubmit } = useCreateDepartmentForm();
+  const { form, onSubmit, setLogoFile } = useCreateDepartmentForm();
 
   return (
     <DialogForm
@@ -135,6 +135,21 @@ export const CreateDepartmentView = () => {
           </FormItem>
         )}
       />
+
+      <FormItem>
+        <FormLabel>Department Logo *</FormLabel>
+        <FormControl>
+          <Input
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              const file = event.target.files?.[0] || null;
+              setLogoFile(file);
+            }}
+          />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
     </DialogForm>
   );
 };

@@ -23,7 +23,13 @@ export const CreateDepartmentSchema = BaseDepartmentSchema;
  * Update Department Schema
  * @description This schema is used to validate the update department data
  */
-export const UpdateDepartmentSchema = BaseDepartmentSchema.partial();
+export const UpdateDepartmentSchema = BaseDepartmentSchema.partial().extend({
+  username: z.string().min(1, "Username is required").optional(),
+  displayUsername: z
+    .string()
+    .min(1, "Display username is required")
+    .optional(),
+});
 
 /**
  * Department Response Schema

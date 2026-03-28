@@ -30,6 +30,8 @@ export const useSemestersByTerm = (termId: string) => {
       return [];
     },
     enabled: !!termId,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -48,6 +50,8 @@ export const useBulkUpsertSemesters = (termId: string) => {
     onSuccess: (res) => {
       toast.success(res.data.message);
       queryClient.invalidateQueries({ queryKey: ["semesters", termId] });
+      // Also invalidate academic-terms since semester data is nested there
+      queryClient.invalidateQueries({ queryKey: ["academic-terms"] });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(error.response?.data?.message || "Failed to save semesters");

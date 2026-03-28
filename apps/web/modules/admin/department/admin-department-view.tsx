@@ -2,14 +2,13 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { DepartmentResponseDTO } from "@webcampus/schemas/department";
 import { SuccessResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import { Page, PageContent, PageHeader } from "@webcampus/ui/components/page";
 import { Skeleton } from "@webcampus/ui/components/skeleton";
 import axios from "axios";
 import React from "react";
-import { adminDepartmentColumns } from "./admin-department-columns";
+import { DepartmentTableItem, adminDepartmentColumns } from "./admin-department-columns";
 import { CreateDepartmentView } from "./create-department-view";
 
 export const AdminDepartmentView = () => {
@@ -17,7 +16,7 @@ export const AdminDepartmentView = () => {
   const response = useQuery({
     queryKey: ["department"],
     queryFn: async () => {
-      return await axios.get<SuccessResponse<DepartmentResponseDTO[]>>(
+      return await axios.get<SuccessResponse<DepartmentTableItem[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/department`,
         {
           withCredentials: true,

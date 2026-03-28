@@ -84,18 +84,147 @@ const BaseCourseSchema = z.object({
   cumulativeMinMarks: z.number().int().min(0),
 });
 
+const MODE_LOCKED_VALUES = {
+  INTEGRATED: {
+    tutorialCredits: 0,
+    skillCredits: 0,
+    maxNoOfCies: 3,
+    minNoOfCies: 2,
+    cieMaxMarks: 40,
+    cieMinMarks: 0,
+    cieWeightage: 50,
+    assignmentMaxMarks: 5,
+    labMaxMarks: 25,
+    labMinMarks: 10,
+    labWeightage: 0,
+    cumulativeMaxMarks: 100,
+    cumulativeMinMarks: 40,
+  },
+  NON_INTEGRATED: {
+    tutorialCredits: 0,
+    practicalCredits: 0,
+    skillCredits: 0,
+    maxNoOfCies: 3,
+    minNoOfCies: 2,
+    cieMaxMarks: 40,
+    cieMinMarks: 0,
+    cieWeightage: 100,
+    assignmentMaxMarks: 10,
+    labMaxMarks: 0,
+    labMinMarks: 0,
+    labWeightage: 0,
+    cumulativeMaxMarks: 100,
+    cumulativeMinMarks: 40,
+  },
+  FINAL_SUMMARY: {
+    tutorialCredits: 0,
+    practicalCredits: 0,
+    skillCredits: 0,
+    maxNoOfCies: 3,
+    minNoOfCies: 2,
+    cieMaxMarks: 50,
+    cieMinMarks: 20,
+    cieWeightage: 100,
+    noOfAssignments: 0,
+    assignmentMaxMarks: 0,
+    labMaxMarks: 0,
+    labMinMarks: 0,
+    labWeightage: 0,
+    cumulativeMaxMarks: 100,
+    cumulativeMinMarks: 40,
+  },
+  NCMC: {
+    tutorialCredits: 0,
+    practicalCredits: 0,
+    skillCredits: 0,
+    seeMaxMarks: 0,
+    seeMinMarks: 0,
+    seeWeightage: 0,
+    maxNoOfCies: 0,
+    minNoOfCies: 0,
+    cieMaxMarks: 0,
+    cieMinMarks: 0,
+    cieWeightage: 0,
+    noOfAssignments: 0,
+    assignmentMaxMarks: 0,
+    labMaxMarks: 0,
+    labMinMarks: 0,
+    labWeightage: 0,
+    cumulativeMaxMarks: 100,
+    cumulativeMinMarks: 40,
+  },
+} as const;
+
+type ModeName = keyof typeof MODE_LOCKED_VALUES;
+type ModeLockedField = keyof (typeof MODE_LOCKED_VALUES)[ModeName];
+
+const addLockedFieldIssue = (
+  ctx: z.RefinementCtx,
+  field: ModeLockedField,
+  expected: number,
+  mode: ModeName
+) => {
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: [field],
+    message: `${field} must be ${expected} for ${mode} mode`,
+  });
+};
+
+const validateModeLockedValues = (
+  value: Record<string, unknown>,
+  mode: ModeName,
+  ctx: z.RefinementCtx,
+  strictMissing = false
+) => {
+  const lockedValues = MODE_LOCKED_VALUES[mode];
+  (Object.entries(lockedValues) as Array<[ModeLockedField, number]>).forEach(
+    ([field, expected]) => {
+      const provided = value[field as string];
+
+      if (provided === undefined) {
+        if (strictMissing) {
+          addLockedFieldIssue(ctx, field, expected, mode);
+        }
+        return;
+      }
+
+      if (typeof provided !== "number" || provided !== expected) {
+        addLockedFieldIssue(ctx, field, expected, mode);
+      }
+    }
+  );
+};
+
 /**
  * Schema for creating a new course
  */
-export const CreateCourseSchema = BaseCourseSchema;
+export const CreateCourseSchema = BaseCourseSchema.superRefine((value, ctx) => {
+  validateModeLockedValues(
+    value as unknown as Record<string, unknown>,
+    value.courseMode,
+    ctx,
+    true
+  );
+});
 
 /**
  * Schema for updating an existing course.
  * Requires `id`; all other fields are optional for partial updates.
  */
-export const UpdateCourseSchema = BaseCourseSchema.partial().extend({
-  id: z.string().uuid("Course ID is required for updates"),
-});
+export const UpdateCourseSchema = BaseCourseSchema.partial()
+  .extend({
+    id: z.string().uuid("Course ID is required for updates"),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.courseMode) return;
+    validateModeLockedValues(
+      value as unknown as Record<string, unknown>,
+      value.courseMode,
+      ctx,
+      false
+    );
+  });
 
 /**
  * Schema for deleting a course

@@ -1,7 +1,21 @@
 "use client";
 
+import {
+  createFilterQueryString,
+  getFiltersFromSearchParams,
+} from "@/lib/filter-search-params";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SemesterTypeSchema } from "@webcampus/schemas/admin";
+import {
+  SemesterLifecycleStatusSchema,
+  SemesterTypeSchema,
+} from "@webcampus/schemas/admin";
+import {
+  DEFAULT_FILTER_ALL_VALUE,
+  FilterActions,
+  FilterBuilder,
+  FilterPanel,
+  type FilterFieldConfig,
+} from "@webcampus/ui/components/filter-builder";
 import {
   FormControl,
   FormField,
@@ -18,11 +32,33 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminTermCard } from "./admin-term-card";
 import { useAcademicTerms, useCreateAcademicTerm } from "./use-academic-term";
+
+type SemesterFilters = {
+  status: string;
+  type: string;
+  year: string;
+  isCurrent: string;
+};
+
+const DEFAULT_SEMESTER_FILTERS: SemesterFilters = {
+  status: "ACTIVE",
+  type: "",
+  year: "",
+  isCurrent: "",
+};
+
+const normalizeFilters = (filters: SemesterFilters): SemesterFilters => ({
+  status: filters.status || "ACTIVE",
+  type: filters.type || "",
+  year: filters.year || "",
+  isCurrent: filters.isCurrent || "",
+});
 
 const createSchema = z.object({
   type: SemesterTypeSchema,
@@ -30,7 +66,46 @@ const createSchema = z.object({
 });
 
 export const AdminSemesterView = () => {
-  const { data: terms, isLoading } = useAcademicTerms();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [draftFilters, setDraftFilters] = React.useState<SemesterFilters>(() =>
+    normalizeFilters(
+      getFiltersFromSearchParams(searchParams, DEFAULT_SEMESTER_FILTERS)
+    )
+  );
+  const [appliedFilters, setAppliedFilters] = React.useState<SemesterFilters>(
+    () =>
+      normalizeFilters(
+        getFiltersFromSearchParams(searchParams, DEFAULT_SEMESTER_FILTERS)
+      )
+  );
+
+  React.useEffect(() => {
+    const nextFilters = normalizeFilters(
+      getFiltersFromSearchParams(searchParams, DEFAULT_SEMESTER_FILTERS)
+    );
+    setDraftFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+  }, [searchParams]);
+
+  const { data: terms, isLoading } = useAcademicTerms({
+    status: SemesterLifecycleStatusSchema.safeParse(appliedFilters.status)
+      .success
+      ? (appliedFilters.status as z.infer<typeof SemesterLifecycleStatusSchema>)
+      : "ACTIVE",
+    type: SemesterTypeSchema.safeParse(appliedFilters.type).success
+      ? (appliedFilters.type as z.infer<typeof SemesterTypeSchema>)
+      : undefined,
+    year: appliedFilters.year || undefined,
+    isCurrent:
+      appliedFilters.isCurrent === "true"
+        ? true
+        : appliedFilters.isCurrent === "false"
+          ? false
+          : undefined,
+  });
   const { mutate: createTerm } = useCreateAcademicTerm();
 
   const currentYear = new Date().getFullYear();
@@ -48,6 +123,78 @@ export const AdminSemesterView = () => {
 
   const onSubmit = (data: z.infer<typeof createSchema>) => {
     createTerm(data);
+  };
+
+  const updateDraftFilter = (key: keyof SemesterFilters, value: string) => {
+    setDraftFilters((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
+
+  const semesterFilterFields: FilterFieldConfig<SemesterFilters>[] = [
+    {
+      key: "status",
+      label: "Semester Status",
+      type: "select",
+      placeholder: "Filter by status",
+      options: SemesterLifecycleStatusSchema.options.map((status) => ({
+        label: status,
+        value: status,
+      })),
+    },
+    {
+      key: "type",
+      label: "Term Type",
+      type: "select",
+      placeholder: "All term types",
+      allOptionLabel: "All term types",
+      options: SemesterTypeSchema.options.map((type) => ({
+        label: type.charAt(0).toUpperCase() + type.slice(1),
+        value: type,
+      })),
+    },
+    {
+      key: "year",
+      label: "Year",
+      type: "select",
+      placeholder: "All years",
+      allOptionLabel: "All years",
+      options: years.map((year) => ({
+        label: year,
+        value: year,
+      })),
+    },
+    {
+      key: "isCurrent",
+      label: "Current",
+      type: "select",
+      placeholder: "All",
+      allOptionLabel: "All",
+      options: [
+        { label: "Current", value: "true" },
+        { label: "Not Current", value: "false" },
+      ],
+    },
+  ];
+
+  const applyFilters = () => {
+    const nextFilters = normalizeFilters(draftFilters);
+    setAppliedFilters(nextFilters);
+    const query = createFilterQueryString(nextFilters);
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, {
+      scroll: false,
+    });
+  };
+
+  const resetFilters = () => {
+    const nextFilters = DEFAULT_SEMESTER_FILTERS;
+    setDraftFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+    const query = createFilterQueryString(nextFilters);
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, {
+      scroll: false,
+    });
   };
 
   if (isLoading) {
@@ -128,6 +275,17 @@ export const AdminSemesterView = () => {
           </DialogForm>
         </PageHeader>
         <PageContent>
+          <FilterPanel>
+            <FilterBuilder
+              fields={semesterFilterFields}
+              draftFilters={draftFilters}
+              onDraftChange={updateDraftFilter}
+              allValue={DEFAULT_FILTER_ALL_VALUE}
+              className="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
+            />
+            <FilterActions onApply={applyFilters} onReset={resetFilters} />
+          </FilterPanel>
+
           {terms && terms.length > 0 ? (
             <div className="space-y-4">
               {terms.map((term) => (

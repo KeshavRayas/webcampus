@@ -24,6 +24,7 @@ export const DepartmentFacultyResponseSchema = z.object({
   email: z.email(),
   department: z.string(),
   designation: DesignationEnum,
+  isHod: z.boolean(),
   createdAt: z.date(),
 });
 

@@ -247,7 +247,7 @@ export const AdminAdmissionActions = ({
                     </Badge>
                   </div>
                   <DataField label="Temporary USN" value={admission.tempUsn} />
-                  <DataField label="USN" value={admission.usn} />
+                  <DataField label="USN" value={admission.student?.usn} />
                   <DataField label="Unique ID" value={admission.uniqueId} />
 
                   {isSubmitted && canReview && (

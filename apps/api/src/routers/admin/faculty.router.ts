@@ -6,11 +6,25 @@ import {
   UpdateFacultySchema,
 } from "@webcampus/schemas/faculty";
 import { Router } from "express";
+import multer from "multer";
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.get(
+  "/",
+  protect({
+    role: "admin",
+    permissions: {
+      faculty: ["read"],
+    },
+  }),
+  AdminFacultyController.getAll
+);
 
 router.post(
   "/",
+  upload.single("image"),
   validateRequest(CreateFacultySchema.extend(createUserSchema.shape)),
   protect({
     role: "admin",
@@ -35,6 +49,7 @@ router.get(
 
 router.put(
   "/:id",
+  upload.single("image"),
   validateRequest(UpdateFacultySchema),
   protect({
     role: "admin",

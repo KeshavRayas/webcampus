@@ -41,6 +41,8 @@ export class AdminAdmissionUserService {
 
   static async getAll(): Promise<BaseResponse<unknown>> {
     try {
+      await UserService.backfillMissingProfileFields();
+
       const users = await db.user.findMany({
         where: {
           role: {
@@ -52,6 +54,7 @@ export class AdminAdmissionUserService {
           name: true,
           email: true,
           username: true,
+          displayUsername: true,
           role: true,
           createdAt: true,
         },

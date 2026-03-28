@@ -7,7 +7,7 @@ import { createUserSchema } from "@webcampus/schemas/admin";
 import { CreateFacultySchema } from "@webcampus/schemas/faculty";
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
 import axios, { AxiosError, AxiosResponse } from "axios";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -19,6 +19,7 @@ type FormType = z.infer<typeof FormSchema>;
 export const useCreateAdminFacultyForm = (departmentId: string) => {
   const queryClient = useQueryClient();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const form = useForm<FormType>({
     resolver: zodResolver(FormSchema),
@@ -30,6 +31,10 @@ export const useCreateAdminFacultyForm = (departmentId: string) => {
       role: "faculty", // Force the role
       departmentId: departmentId,
       designation: "ASSISTANT_PROFESSOR",
+      employeeId: "",
+      staffType: "REGULAR",
+      dob: new Date(),
+      dateOfJoining: new Date(),
     },
   });
 
@@ -42,10 +47,24 @@ export const useCreateAdminFacultyForm = (departmentId: string) => {
 
   const { mutate } = useMutation({
     mutationFn: async (values: FormType) => {
+      const formData = new FormData();
+      Object.entries(values).forEach(([key, value]) => {
+        formData.append(key, String(value));
+      });
+
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
+
       return await axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/faculty`,
-        values,
-        { withCredentials: true }
+        formData,
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
@@ -53,6 +72,7 @@ export const useCreateAdminFacultyForm = (departmentId: string) => {
       queryClient.invalidateQueries({
         queryKey: ["admin-faculty", departmentId],
       });
+      setImageFile(null);
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(error.response?.data?.error || "Failed to create faculty");
@@ -60,8 +80,13 @@ export const useCreateAdminFacultyForm = (departmentId: string) => {
   });
 
   const onSubmit = (values: FormType) => {
+    if (!imageFile) {
+      toast.error("Faculty image is required");
+      return;
+    }
+
     mutate(values);
   };
 
-  return { form, onSubmit };
+  return { form, onSubmit, imageFile, setImageFile };
 };

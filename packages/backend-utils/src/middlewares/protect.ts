@@ -84,6 +84,17 @@ export const protect =
         }
       }
 
+      const hasPermissionRequirements = Object.values(permissions).some(
+        (actions) => Array.isArray(actions) && actions.length > 0
+      );
+
+      // Support role-only guards: when no permissions are required,
+      // a valid session + allowed role is sufficient.
+      if (!hasPermissionRequirements) {
+        next();
+        return;
+      }
+
       const { success, error } = await auth.api.userHasPermission({
         headers: fromNodeHeaders(req.headers),
         body: {

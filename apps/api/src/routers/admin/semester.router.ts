@@ -1,6 +1,7 @@
 import { SemesterController } from "@webcampus/api/src/controllers/admin/semester.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
+  AcademicTermQuerySchema,
   CreateAcademicTermSchema,
   CreateSemesterConfigSchema,
 } from "@webcampus/schemas/admin";
@@ -44,6 +45,7 @@ router.delete(
 
 router.get(
   "/",
+  validateRequest(AcademicTermQuerySchema, "query"),
   protect({
     permissions: { semester: ["read"] },
   }),

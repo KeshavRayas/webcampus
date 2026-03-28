@@ -30,7 +30,14 @@ export const useUsernameSignInForm = (role: string) => {
   });
 
   const onSubmit = async (data: z.infer<typeof signInSchema>) => {
-    await authClient.signIn.username(data, {
+    // Normalize username input (trim and lowercase) for consistency with auth backend storage.
+    // Better Auth username plugin normalizes to lowercase, so input variants work.
+    const normalizedData = {
+      ...data,
+      username: data.username.trim().toLowerCase(),
+    };
+
+    await authClient.signIn.username(normalizedData, {
       onError: (error) => {
         toast.error(error.error.message);
       },

@@ -6,8 +6,9 @@ import {
   createFilterQueryString,
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
+import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
+import { useAdmissionDepartments, useDepartments } from "@/lib/use-departments";
 import { useQuery } from "@tanstack/react-query";
-import { AcademicTermResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
@@ -45,6 +46,8 @@ import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
+import { useSemestersByTerm } from "@/modules/admin/semester/use-semester-config";
 import {
   AdmissionResponse,
   getAdminAdmissionColumns,
@@ -115,32 +118,21 @@ export const AdminAdmissionView = ({
     setAppliedFilters(nextFilters);
   }, [searchParams, showFilters]);
 
-  const { data: departments } = useQuery({
-    queryKey: ["departments"],
-    queryFn: async () => {
-      const res = await apiClient.get<
-        BaseResponse<{ id: string; name: string }[]>
-      >(`/admission/departments`, { withCredentials: true });
-      if (res.data.status === "success" && Array.isArray(res.data.data)) {
-        return res.data.data;
-      }
-      return [];
-    },
-  });
+  // Use standardized hooks for fresh data
+  const { data: terms = [] } = useAcademicTerms();
+  const { data: departments = [] } = useDepartments();
+  const { data: admissionDepartments = [] } = useAdmissionDepartments();
 
-  // 1. Fetch Academic Terms
-  const { data: terms } = useQuery({
-    queryKey: ["academic-terms"],
-    queryFn: async () => {
-      const res = await apiClient.get<BaseResponse<AcademicTermResponseType[]>>(
-        `/admin/semester`,
-        { withCredentials: true }
-      );
-      if (res.data.status === "success") return res.data.data;
-      return [];
-    },
+  // Sync filters when data changes (auto-clear if value no longer exists)
+  const selectedTerm = terms.find(
+    (t) => t.id === draftFilters.academicTerm
+  );
+  const nestedSemesters = selectedTerm?.Semester || [];
+  useCascadingFilterSync(draftFilters, setDraftFilters, {
+    academicTerms: terms,
+    semesters: nestedSemesters,
+    departments,
   });
-  const termOptions = Array.isArray(terms) ? terms : [];
 
   // 2. Fetch Admissions for the selected filters
   const {
@@ -163,10 +155,6 @@ export const AdminAdmissionView = ({
   const { form, onSubmit } = useCreateAdmissionShellForm(draftFilters.semester);
   const { onPortStudents, isPorting } = usePortStudents();
   const selectedSemesterId = showFilters ? draftFilters.semester : "";
-  const selectedTerm = termOptions.find(
-    (t) => t.id === draftFilters.academicTerm
-  );
-  const nestedSemesters = selectedTerm?.Semester || [];
   const selectedSemester = nestedSemesters.find(
     (semester) => semester.id === selectedSemesterId
   );
@@ -201,11 +189,11 @@ export const AdminAdmissionView = ({
   );
 
   const admissionsToPort = approvedAdmissions.filter(
-    (admission) => !admission.usn
+    (admission) => !admission.student?.usn
   );
 
   const alreadyPortedAdmissions = approvedAdmissions.filter(
-    (admission) => !!admission.usn
+    (admission) => !!admission.student?.usn
   );
 
   const handleConfirmPort = () => {
@@ -225,6 +213,15 @@ export const AdminAdmissionView = ({
   };
 
   const updateDraftFilter = (key: keyof AdmissionFilters, value: string) => {
+    if (key === "academicTerm") {
+      setDraftFilters((current) => ({
+        ...current,
+        academicTerm: value,
+        semester: "",
+      }));
+      return;
+    }
+
     setDraftFilters((current) => ({
       ...current,
       [key]: value,
@@ -232,6 +229,30 @@ export const AdminAdmissionView = ({
   };
 
   const admissionFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
+    {
+      key: "academicTerm",
+      label: "Academic Term",
+      type: "select",
+      placeholder: "All terms",
+      allOptionLabel: "All terms",
+      options: terms.map((term) => ({
+        label: `${term.type} ${term.year}`,
+        value: term.id,
+      })),
+    },
+    {
+      key: "semester",
+      label: "Semester",
+      type: "select",
+      placeholder: draftFilters.academicTerm
+        ? "All semesters"
+        : "Select term first",
+      allOptionLabel: "All semesters",
+      options: nestedSemesters.map((semester) => ({
+        label: `${semester.programType} - Semester ${semester.semesterNumber}`,
+        value: semester.id,
+      })),
+    },
     {
       key: "applicationId",
       label: "Application ID",
@@ -266,34 +287,14 @@ export const AdminAdmissionView = ({
       label: "Created From",
       type: "date",
       inputId: "admission-created-from",
+      className: "xl:col-start-1",
     },
     {
       key: "createdTo",
       label: "Created To",
       type: "date",
       inputId: "admission-created-to",
-    },
-    {
-      key: "academicTerm",
-      label: "Academic Term",
-      type: "select",
-      placeholder: "All terms",
-      allOptionLabel: "All terms",
-      options: termOptions.map((term) => ({
-        label: `${term.type} ${term.year}`,
-        value: term.id,
-      })),
-    },
-    {
-      key: "semester",
-      label: "Semester",
-      type: "select",
-      placeholder: "All semesters",
-      allOptionLabel: "All semesters",
-      options: nestedSemesters.map((semester) => ({
-        label: `${semester.programType} - Semester ${semester.semesterNumber}`,
-        value: semester.id,
-      })),
+      className: "xl:col-start-2",
     },
   ];
 
@@ -364,7 +365,7 @@ export const AdminAdmissionView = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL_FILTERS_VALUE}>All terms</SelectItem>
-                  {termOptions.map((term) => (
+                  {terms.map((term) => (
                     <SelectItem key={term.id} value={term.id}>
                       {term.type} {term.year}
                     </SelectItem>
@@ -468,7 +469,7 @@ export const AdminAdmissionView = ({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {departments?.map((dept) => (
+                          {admissionDepartments?.map((dept) => (
                             <SelectItem key={dept.id} value={dept.id}>
                               {dept.name}
                             </SelectItem>

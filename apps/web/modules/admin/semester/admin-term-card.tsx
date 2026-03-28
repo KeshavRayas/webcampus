@@ -30,8 +30,16 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { mutate: deleteTerm, isPending: isDeleting } = useDeleteAcademicTerm();
   const { mutate: updateTerm, isPending: isUpdating } = useUpdateAcademicTerm();
+  const lifecycleStatus = term.status ?? (term.isCurrent ? "ACTIVE" : "INACTIVE");
+  const disableManualInactive =
+    (lifecycleStatus === "ACTIVE" || lifecycleStatus === "ARCHIVED") &&
+    term.isCurrent;
 
   const toggleIsCurrent = () => {
+    if (disableManualInactive) {
+      return;
+    }
+
     updateTerm({
       id: term.id,
       data: { type: term.type, year: term.year, isCurrent: !term.isCurrent },
@@ -75,7 +83,14 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
     <>
       <Card
         className="mb-4 border-l-4 shadow-sm"
-        style={{ borderLeftColor: term.isCurrent ? "#4ade80" : "#e2e8f0" }}
+        style={{
+          borderLeftColor:
+            lifecycleStatus === "ACTIVE"
+              ? "#4ade80"
+              : lifecycleStatus === "ARCHIVED"
+                ? "#94a3b8"
+                : "#e2e8f0",
+        }}
       >
         <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b pb-3">
           <div>
@@ -83,11 +98,17 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
               <CardTitle className="text-xl">
                 {term.type.toUpperCase()} {term.year}
               </CardTitle>
-              {term.isCurrent && (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium tracking-wide text-green-800">
-                  ACTIVE
-                </span>
-              )}
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium tracking-wide ${
+                  lifecycleStatus === "ACTIVE"
+                    ? "bg-green-100 text-green-800"
+                    : lifecycleStatus === "ARCHIVED"
+                      ? "bg-slate-100 text-slate-700"
+                      : "bg-amber-100 text-amber-800"
+                }`}
+              >
+                {lifecycleStatus}
+              </span>
             </div>
             <CardDescription className="mt-1">
               {activeSummaryString}
@@ -98,7 +119,7 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
               variant={term.isCurrent ? "secondary" : "default"}
               size="sm"
               onClick={toggleIsCurrent}
-              disabled={isUpdating}
+              disabled={isUpdating || disableManualInactive}
             >
               <Power className="mr-1 hidden h-4 w-4 md:mr-2 md:inline-block" />
               <span className="hidden md:inline-block">

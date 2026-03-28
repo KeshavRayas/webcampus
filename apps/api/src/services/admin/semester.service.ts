@@ -5,12 +5,36 @@ import {
   AcademicTermResponseType,
   CreateAcademicTermType,
   CreateSemesterConfigType,
+  SemesterLifecycleStatusType,
   SemesterConfigResponseType,
 } from "@webcampus/schemas/admin";
 import { UUIDType } from "@webcampus/schemas/common";
 import { BaseResponse } from "@webcampus/types/api";
 
 export class SemesterService {
+  private static getSemesterStatus(
+    startDate: Date,
+    endDate: Date,
+    now: Date
+  ): SemesterLifecycleStatusType {
+    if (startDate <= now && endDate >= now) return "ACTIVE";
+    if (endDate < now) return "ARCHIVED";
+    return "INACTIVE";
+  }
+
+  private static getTermStatus(
+    semesterStatuses: SemesterLifecycleStatusType[]
+  ): SemesterLifecycleStatusType {
+    if (semesterStatuses.includes("ACTIVE")) return "ACTIVE";
+    if (
+      semesterStatuses.length > 0 &&
+      semesterStatuses.every((status) => status === "ARCHIVED")
+    ) {
+      return "ARCHIVED";
+    }
+    return "INACTIVE";
+  }
+
   static async createAcademicTerm(
     data: CreateAcademicTermType
   ): Promise<BaseResponse<AcademicTermResponseType>> {
@@ -44,6 +68,34 @@ export class SemesterService {
     data: CreateAcademicTermType
   ): Promise<BaseResponse<AcademicTermResponseType>> {
     try {
+      if (data.isCurrent === false) {
+        const now = new Date();
+        const existingTerm = await db.academicTerm.findUnique({
+          where: { id },
+          select: {
+            Semester: {
+              select: {
+                startDate: true,
+              },
+            },
+          },
+        });
+
+        if (!existingTerm) {
+          throw new Error("Academic Term not found");
+        }
+
+        const hasStartedSemester = existingTerm.Semester.some(
+          (semester) => semester.startDate <= now
+        );
+
+        if (hasStartedSemester) {
+          throw new Error(
+            "Academic Term cannot be set inactive after a semester has started"
+          );
+        }
+      }
+
       const term = await db.academicTerm.update({
         where: { id },
         data,
@@ -79,15 +131,47 @@ export class SemesterService {
     query: AcademicTermQueryType
   ): Promise<BaseResponse<AcademicTermResponseType[]>> {
     try {
+      const { status, ...whereQuery } = query;
+      const now = new Date();
+
       const terms = await db.academicTerm.findMany({
-        where: query,
+        where: whereQuery,
         orderBy: { year: "desc" },
         include: { Semester: true },
       });
+
+      const termsWithStatus = terms
+        .map((term) => {
+          const semestersWithStatus = term.Semester.map((semester) => {
+            const semesterStatus = SemesterService.getSemesterStatus(
+              semester.startDate,
+              semester.endDate,
+              now
+            );
+
+            return {
+              ...semester,
+              status: semesterStatus,
+            };
+          });
+
+          const termStatus = SemesterService.getTermStatus(
+            semestersWithStatus.map((semester) => semester.status)
+          );
+
+          return {
+            ...term,
+            isCurrent: termStatus === "ACTIVE",
+            status: termStatus,
+            Semester: semestersWithStatus,
+          };
+        })
+        .filter((term) => (status ? term.status === status : true));
+
       const response: BaseResponse<AcademicTermResponseType[]> = {
         status: "success",
         message: "Academic Terms fetched successfully",
-        data: terms,
+        data: termsWithStatus,
       };
       logger.info(response);
       return response;

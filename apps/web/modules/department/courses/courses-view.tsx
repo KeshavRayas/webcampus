@@ -1,27 +1,43 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
+import {
+  createFilterQueryString,
+  getFiltersFromSearchParams,
+} from "@/lib/filter-search-params";
+import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { AcademicTermResponseType } from "@webcampus/schemas/admin";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
-import { Label } from "@webcampus/ui/components/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@webcampus/ui/components/select";
+  DEFAULT_FILTER_ALL_VALUE,
+  FilterActions,
+  FilterBuilder,
+  FilterPanel,
+  type FilterFieldConfig,
+} from "@webcampus/ui/components/filter-builder";
 import axios from "axios";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { SemesterCourseBlock } from "./semester-course-block";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 const BASIC_SCIENCES_CYCLE_OPTIONS = ["PHYSICS", "CHEMISTRY"] as const;
 type CourseCycle = "PHYSICS" | "CHEMISTRY" | "NONE";
+
+type CoursesFilters = {
+  termId: string;
+  semesterId: string;
+  cycle: string;
+};
+
+const EMPTY_FILTERS: CoursesFilters = {
+  termId: "",
+  semesterId: "",
+  cycle: "",
+};
 
 export const CoursesView: React.FC = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
@@ -50,38 +66,47 @@ export const CoursesView: React.FC = () => {
   const departmentType = deptInfo?.type ?? "DEGREE_GRANTING";
   const isBasicSciences = departmentType === "BASIC_SCIENCES";
 
-  // Cascading state
-  const [selectedTermId, setSelectedTermId] = useState<string>("");
-  const [selectedSemesterId, setSelectedSemesterId] = useState<string>("");
-  const [selectedCycle, setSelectedCycle] = useState<CourseCycle>("PHYSICS");
+  const [draftFilters, setDraftFilters] = useState<CoursesFilters>(() =>
+    getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
+  );
+  const [appliedFilters, setAppliedFilters] = useState<CoursesFilters>(() =>
+    getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
+  );
 
   useEffect(() => {
-    if (isBasicSciences && selectedCycle === "NONE") {
-      setSelectedCycle(BASIC_SCIENCES_CYCLE_OPTIONS[0]);
+    const nextFilters = getFiltersFromSearchParams(searchParams, EMPTY_FILTERS);
+    setDraftFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (isBasicSciences && !draftFilters.cycle) {
+      setDraftFilters((current) => ({
+        ...current,
+        cycle: BASIC_SCIENCES_CYCLE_OPTIONS[0],
+      }));
       return;
     }
 
-    if (!isBasicSciences && selectedCycle !== "NONE") {
-      setSelectedCycle("NONE");
+    if (!isBasicSciences && draftFilters.cycle) {
+      setDraftFilters((current) => ({
+        ...current,
+        cycle: "",
+      }));
     }
-  }, [isBasicSciences, selectedCycle]);
+  }, [draftFilters.cycle, isBasicSciences]);
 
   // Fetch all available academic terms (with nested semesters)
-  const { data: terms } = useQuery({
-    queryKey: ["academic-terms"],
-    queryFn: async () => {
-      const res = await axios.get<BaseResponse<AcademicTermResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
-        { withCredentials: true }
-      );
-      if (res.data.status === "success") return res.data.data;
-      return [];
-    },
-  });
+  const { data: terms = [] } = useAcademicTerms();
 
-  const termOptions = Array.isArray(terms) ? terms : [];
-  const selectedTerm = termOptions.find((t) => t.id === selectedTermId);
-  const allSemestersForTerm = selectedTerm?.Semester ?? [];
+  const selectedDraftTerm = terms.find((t) => t.id === draftFilters.termId);
+  const allSemestersForSelectedDraftTerm = selectedDraftTerm?.Semester ?? [];
+
+  // Sync filters when data changes (auto-clear if value no longer exists)
+  useCascadingFilterSync(draftFilters, setDraftFilters, {
+    academicTerms: terms,
+    semesters: allSemestersForSelectedDraftTerm,
+  });
 
   const semesterOptions = useMemo(() => {
     const isFirstYearUgSemester = (semester: {
@@ -92,52 +117,85 @@ export const CoursesView: React.FC = () => {
       FIRST_YEAR_UG_SEMESTERS.has(semester.semesterNumber);
 
     if (!isBasicSciences) {
-      return allSemestersForTerm.filter(
+      return allSemestersForSelectedDraftTerm.filter(
         (semester) => !isFirstYearUgSemester(semester)
       );
     }
 
-    return allSemestersForTerm.filter((semester) =>
+    return allSemestersForSelectedDraftTerm.filter((semester) =>
       isFirstYearUgSemester(semester)
     );
-  }, [allSemestersForTerm, isBasicSciences]);
+  }, [allSemestersForSelectedDraftTerm, isBasicSciences]);
 
-  const selectedSemester = semesterOptions.find(
-    (s) => s.id === selectedSemesterId
+  const selectedAppliedTerm = terms.find(
+    (term) => term.id === appliedFilters.termId
+  );
+  const selectedAppliedSemester = (selectedAppliedTerm?.Semester || []).find(
+    (semester) => semester.id === appliedFilters.semesterId
   );
 
+  const updateDraftFilter = (key: keyof CoursesFilters, value: string) => {
+    setDraftFilters((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
+
+  const applyFilters = () => {
+    const nextFilters = {
+      ...draftFilters,
+      cycle: isBasicSciences
+        ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
+        : "",
+    };
+
+    setAppliedFilters(nextFilters);
+    const query = createFilterQueryString(nextFilters);
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, {
+      scroll: false,
+    });
+  };
+
+  const resetFilters = () => {
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+    router.replace(pathname, { scroll: false });
+  };
+
   useEffect(() => {
-    if (!selectedSemesterId) {
+    if (!draftFilters.semesterId) {
       return;
     }
 
     const isSelectedSemesterAllowed = semesterOptions.some(
-      (semester) => semester.id === selectedSemesterId
+      (semester) => semester.id === draftFilters.semesterId
     );
 
     if (!isSelectedSemesterAllowed) {
-      setSelectedSemesterId("");
+      setDraftFilters((current) => ({
+        ...current,
+        semesterId: "",
+      }));
     }
-  }, [selectedSemesterId, semesterOptions]);
+  }, [draftFilters.semesterId, semesterOptions]);
 
   useEffect(() => {
-    if (selectedTermId || termOptions.length === 0) {
+    if (draftFilters.termId || terms.length === 0) {
       return;
     }
 
     const currentTerm =
-      termOptions.find((term) => term.isCurrent) ?? termOptions[0];
+      terms.find((term) => term.isCurrent) ?? terms[0];
     if (currentTerm) {
-      setSelectedTermId(currentTerm.id);
+      setDraftFilters((current) => ({
+        ...current,
+        termId: currentTerm.id,
+      }));
     }
-  }, [selectedTermId, termOptions]);
+  }, [draftFilters.termId, terms]);
 
   useEffect(() => {
-    if (!selectedTermId) {
-      return;
-    }
-
-    if (selectedSemesterId) {
+    if (!draftFilters.termId || draftFilters.semesterId) {
       return;
     }
 
@@ -150,7 +208,10 @@ export const CoursesView: React.FC = () => {
       );
 
       if (isRequestedSemesterAllowed) {
-        setSelectedSemesterId(requestedSemesterParam);
+        setDraftFilters((current) => ({
+          ...current,
+          semesterId: requestedSemesterParam,
+        }));
       } else {
         const nextParams = new URLSearchParams(searchParams.toString());
         nextParams.delete("semesterId");
@@ -164,130 +225,155 @@ export const CoursesView: React.FC = () => {
     }
 
     if (semesterOptions.length > 0) {
-      setSelectedSemesterId(semesterOptions[0]!.id);
+      setDraftFilters((current) => ({
+        ...current,
+        semesterId: semesterOptions[0]!.id,
+      }));
     }
   }, [
+    draftFilters.semesterId,
+    draftFilters.termId,
     pathname,
     router,
     searchParams,
-    selectedSemesterId,
-    selectedTermId,
     semesterOptions,
   ]);
 
+  useEffect(() => {
+    if (appliedFilters.termId && appliedFilters.semesterId) {
+      return;
+    }
+
+    if (!draftFilters.termId || !draftFilters.semesterId) {
+      return;
+    }
+
+    const initializedFilters = {
+      ...draftFilters,
+      cycle: isBasicSciences
+        ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
+        : "",
+    };
+
+    setAppliedFilters(initializedFilters);
+  }, [
+    appliedFilters.semesterId,
+    appliedFilters.termId,
+    draftFilters,
+    isBasicSciences,
+  ]);
+
+  const courseFilterFields: FilterFieldConfig<CoursesFilters>[] = [
+    {
+      key: "termId",
+      label: "Academic Term",
+      type: "select",
+      placeholder: "Select term...",
+      allOptionLabel: "All terms",
+      options: terms.map((term) => ({
+        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+        value: term.id,
+      })),
+    },
+    {
+      key: "semesterId",
+      label: "Semester",
+      type: "select",
+      placeholder: draftFilters.termId
+        ? "Select semester..."
+        : "Select term first",
+      allOptionLabel: "All semesters",
+      options: semesterOptions.map((semester) => ({
+        label: `${semester.programType} - Semester ${semester.semesterNumber}`,
+        value: semester.id,
+      })),
+    },
+    ...(isBasicSciences
+      ? [
+          {
+            key: "cycle",
+            label: "Cycle",
+            type: "select",
+            placeholder: "Select cycle...",
+            allOptionLabel: "All cycles",
+            options: BASIC_SCIENCES_CYCLE_OPTIONS.map((cycle) => ({
+              label: cycle,
+              value: cycle,
+            })),
+          } as FilterFieldConfig<CoursesFilters>,
+        ]
+      : []),
+  ];
+
   // Fetch courses ONLY for the selected semester instance
   const { data: courses, isLoading: coursesLoading } = useQuery({
-    queryKey: ["courses", departmentName, selectedSemesterId],
+    queryKey: ["courses", departmentName, appliedFilters.semesterId],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<CourseResponseDTO[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/course/branch`,
         {
-          params: { name: departmentName, semesterId: selectedSemesterId },
+          params: { name: departmentName, semesterId: appliedFilters.semesterId },
           withCredentials: true,
         }
       );
       if (res.data.status === "success") return res.data.data;
       return [];
     },
-    enabled: !!departmentName && !!selectedSemesterId,
+    enabled: !!departmentName && !!appliedFilters.semesterId,
   });
+
+  const appliedCycle =
+    isBasicSciences && appliedFilters.cycle
+      ? (appliedFilters.cycle as CourseCycle)
+      : "NONE";
 
   const filteredCourses = useMemo(() => {
     const courseList = courses ?? [];
-    return courseList.filter(
-      (course) => (course.cycle ?? "NONE") === selectedCycle
-    );
-  }, [courses, selectedCycle]);
+    if (!isBasicSciences || !appliedFilters.cycle) {
+      return courseList;
+    }
+
+    return courseList.filter((course) => (course.cycle ?? "NONE") === appliedCycle);
+  }, [appliedCycle, appliedFilters.cycle, courses, isBasicSciences]);
 
   return (
     <div className="space-y-8">
-      {/* Cascading Semester Selector */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-        <div className="w-60 space-y-2">
-          <Label>Academic Term</Label>
-          <Select
-            value={selectedTermId}
-            onValueChange={(value) => {
-              setSelectedTermId(value);
-              setSelectedSemesterId(""); // Reset child
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select term..." />
-            </SelectTrigger>
-            <SelectContent>
-              {termOptions.map((term) => (
-                <SelectItem key={term.id} value={term.id}>
-                  {term.type.charAt(0).toUpperCase() + term.type.slice(1)}{" "}
-                  {term.year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <FilterPanel>
+        <FilterBuilder
+          fields={courseFilterFields}
+          draftFilters={draftFilters}
+          onDraftChange={(key, value) => {
+            if (key === "termId") {
+              setDraftFilters((current) => ({
+                ...current,
+                termId: value,
+                semesterId: "",
+              }));
+              return;
+            }
 
-        <div className="w-60 space-y-2">
-          <Label>Semester</Label>
-          <Select
-            value={selectedSemesterId}
-            onValueChange={setSelectedSemesterId}
-            disabled={!selectedTermId || semesterOptions.length === 0}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select semester..." />
-            </SelectTrigger>
-            <SelectContent>
-              {semesterOptions.length > 0 ? (
-                semesterOptions.map((semester) => (
-                  <SelectItem key={semester.id} value={semester.id}>
-                    {semester.programType} - Semester {semester.semesterNumber}
-                  </SelectItem>
-                ))
-              ) : (
-                <div className="text-muted-foreground px-2 py-1.5 text-sm">
-                  No semesters available for this term
-                </div>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {isBasicSciences ? (
-          <div className="w-60 space-y-2">
-            <Label>Cycle</Label>
-            <Select
-              value={selectedCycle}
-              onValueChange={(value) => setSelectedCycle(value as CourseCycle)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select cycle..." />
-              </SelectTrigger>
-              <SelectContent>
-                {BASIC_SCIENCES_CYCLE_OPTIONS.map((cycle) => (
-                  <SelectItem key={cycle} value={cycle}>
-                    {cycle}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-      </div>
+            updateDraftFilter(key, value);
+          }}
+          allValue={DEFAULT_FILTER_ALL_VALUE}
+          className="md:grid-cols-2 xl:grid-cols-3"
+        />
+        <FilterActions onApply={applyFilters} onReset={resetFilters} />
+      </FilterPanel>
 
       {/* Render the semester blocks if an instance is selected */}
-      {selectedSemester && (
+      {selectedAppliedSemester && (
         <div className="space-y-6">
           {coursesLoading ? (
             <div>Loading courses...</div>
           ) : (
             <SemesterCourseBlock
-              key={selectedSemester.id}
-              semesterId={selectedSemester.id}
-              semesterNumber={selectedSemester.semesterNumber}
+              key={selectedAppliedSemester.id}
+              semesterId={selectedAppliedSemester.id}
+              semesterNumber={selectedAppliedSemester.semesterNumber}
               courses={filteredCourses}
               departmentType={departmentType}
-              programType={selectedSemester.programType}
-              selectedCycle={selectedCycle}
+              programType={selectedAppliedSemester.programType}
+              selectedCycle={appliedCycle}
               isBasicSciences={isBasicSciences}
             />
           )}

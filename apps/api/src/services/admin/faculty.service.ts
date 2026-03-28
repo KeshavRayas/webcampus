@@ -1,9 +1,10 @@
 import { IncomingHttpHeaders } from "http";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
+import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import { CreateUserType } from "@webcampus/schemas/admin";
-import { CreateFacultyType } from "@webcampus/schemas/faculty";
+import { CreateFacultyType, UpdateFacultyType } from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
 
 export class AdminFacultyService {
@@ -20,8 +21,14 @@ export class AdminFacultyService {
 
   static async create(
     request: CreateFacultyType &
-      CreateUserType & { headers: IncomingHttpHeaders }
+      CreateUserType & {
+        headers: IncomingHttpHeaders;
+        imageFile: Express.Multer.File;
+      }
   ): Promise<BaseResponse<unknown>> {
+    let createdAuthUserId: string | null = null;
+    let uploadedImageUrl: string | null = null;
+
     try {
       // 1. Create the global auth user
       const userService = new UserService({
@@ -41,16 +48,48 @@ export class AdminFacultyService {
         throw new Error(authUser.message || "Failed to create auth user");
       }
 
+      createdAuthUserId = authUser.data.id;
+
+      const { generateFileName, uploadToS3 } = await import(
+        "@webcampus/api/src/utils/s3"
+      );
+      const imageFileName = generateFileName(
+        request.imageFile.originalname,
+        "faculty_image_"
+      );
+      const uploadResult = await uploadToS3(
+        request.imageFile.buffer,
+        imageFileName,
+        request.imageFile.mimetype
+      );
+
+      if (!uploadResult.success || !uploadResult.url) {
+        throw new Error("Failed to upload faculty image");
+      }
+
+      uploadedImageUrl = uploadResult.url;
+
+      await db.user.update({
+        where: { id: createdAuthUserId },
+        data: {
+          image: uploadedImageUrl,
+        },
+      });
+
       // 2. Generate the Short Name automatically
       const shortName = this.generateShortName(request.name);
 
       // 3. Create the Faculty record linked to the Department
       const faculty = await db.faculty.create({
         data: {
-          userId: authUser.data.id,
+          userId: createdAuthUserId,
           departmentId: request.departmentId,
           designation: request.designation,
           shortName: shortName,
+          employeeId: request.employeeId,
+          staffType: request.staffType,
+          dob: request.dob,
+          dateOfJoining: request.dateOfJoining,
         },
         include: {
           user: true,
@@ -65,6 +104,34 @@ export class AdminFacultyService {
       logger.info(response);
       return response;
     } catch (error) {
+      if (uploadedImageUrl) {
+        try {
+          const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+          await deleteFromS3(uploadedImageUrl);
+        } catch (cleanupError) {
+          logger.warn("Failed to clean up uploaded faculty image after create failure", {
+            uploadedImageUrl,
+            cleanupError,
+          });
+        }
+      }
+
+      if (createdAuthUserId) {
+        try {
+          await auth.api.removeUser({
+            headers: fromNodeHeaders(request.headers),
+            body: {
+              userId: createdAuthUserId,
+            },
+          });
+        } catch (cleanupError) {
+          logger.warn("Failed to clean up auth user after faculty create failure", {
+            createdAuthUserId,
+            cleanupError,
+          });
+        }
+      }
+
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
@@ -76,43 +143,123 @@ export class AdminFacultyService {
     }
   }
 
-  static async getByDepartmentId(
-    departmentId: string
+  static async getAll(
+    departmentId?: string
   ): Promise<BaseResponse<unknown>> {
     try {
+      await UserService.backfillMissingProfileFields();
+
       const faculties = await db.faculty.findMany({
-        where: { departmentId },
+        where: departmentId ? { departmentId } : undefined,
         include: {
           user: {
             select: {
               name: true,
               email: true,
+              username: true,
+              displayUsername: true,
+            },
+          },
+          department: {
+            select: {
+              name: true,
             },
           },
           hod: true,
         },
       });
 
-      const response: BaseResponse<unknown> = {
+      return {
         status: "success",
         message: "Faculty fetched successfully",
         data: faculties,
       };
-      return response;
     } catch (error) {
       logger.error("Failed to fetch faculty", error);
       throw error;
     }
   }
 
+  static async getByDepartmentId(
+    departmentId: string
+  ): Promise<BaseResponse<unknown>> {
+    return AdminFacultyService.getAll(departmentId);
+  }
+
   static async update(
     id: string,
-    data: Parameters<typeof db.faculty.update>[0]["data"]
+    data: UpdateFacultyType,
+    imageFile?: Express.Multer.File
   ): Promise<BaseResponse<unknown>> {
     try {
+      const existingFaculty = await db.faculty.findUnique({
+        where: { id },
+        include: {
+          user: {
+            select: {
+              id: true,
+              image: true,
+            },
+          },
+        },
+      });
+
+      if (!existingFaculty) {
+        throw new Error("Faculty not found");
+      }
+
+      if (imageFile) {
+        const { deleteFromS3, generateFileName, uploadToS3 } = await import(
+          "@webcampus/api/src/utils/s3"
+        );
+        const nextImageFileName = generateFileName(
+          imageFile.originalname,
+          "faculty_image_"
+        );
+        const uploadResult = await uploadToS3(
+          imageFile.buffer,
+          nextImageFileName,
+          imageFile.mimetype
+        );
+
+        if (!uploadResult.success || !uploadResult.url) {
+          throw new Error("Failed to upload faculty image");
+        }
+
+        if (existingFaculty.user.image) {
+          await deleteFromS3(existingFaculty.user.image);
+        }
+
+        await db.user.update({
+          where: { id: existingFaculty.user.id },
+          data: {
+            image: uploadResult.url,
+          },
+        });
+      }
+
+      const nextUserData: { username?: string; displayUsername?: string } = {};
+      if (data.username !== undefined) {
+        nextUserData.username = data.username;
+      }
+      if (data.displayUsername !== undefined) {
+        nextUserData.displayUsername = data.displayUsername;
+      }
+
+      if (Object.keys(nextUserData).length > 0) {
+        await db.user.update({
+          where: { id: existingFaculty.user.id },
+          data: nextUserData,
+        });
+      }
+
+      const facultyData = { ...data } as Record<string, unknown>;
+      delete facultyData.username;
+      delete facultyData.displayUsername;
+
       const faculty = await db.faculty.update({
         where: { id },
-        data,
+        data: facultyData,
       });
       return { status: "success", message: "Faculty updated", data: faculty };
     } catch (error) {

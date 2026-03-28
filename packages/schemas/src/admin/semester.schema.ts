@@ -2,6 +2,18 @@ import { z } from "zod";
 
 export const SemesterTypeSchema = z.enum(["even", "odd"]);
 export const ProgramTypeSchema = z.enum(["UG", "PG"]);
+export const SemesterLifecycleStatusSchema = z.enum([
+  "ACTIVE",
+  "INACTIVE",
+  "ARCHIVED",
+]);
+
+const optionalQueryString = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((value) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }, schema.optional());
 
 export const CreateAcademicTermSchema = z.object({
   type: SemesterTypeSchema,
@@ -9,17 +21,18 @@ export const CreateAcademicTermSchema = z.object({
   isCurrent: z.boolean().default(false).optional(),
 });
 
-export const BaseSemesterConfigSchema = z
-  .object({
-    academicTermId: z.string().uuid(),
-    programType: ProgramTypeSchema,
-    semesterNumber: z.number().int().min(1).max(8),
-    termType: SemesterTypeSchema, // Client passes this so we can validate parity
-    startDate: z.coerce.date() as z.ZodDate,
-    endDate: z.coerce.date() as z.ZodDate,
-    userId: z.string(),
-  })
-  .superRefine((data, ctx) => {
+export const BaseSemesterConfigSchema = z.object({
+  academicTermId: z.string().uuid(),
+  programType: ProgramTypeSchema,
+  semesterNumber: z.number().int().min(1).max(8),
+  termType: SemesterTypeSchema, // Client passes this so we can validate parity
+  startDate: z.coerce.date() as z.ZodDate,
+  endDate: z.coerce.date() as z.ZodDate,
+  userId: z.string(),
+});
+
+export const CreateSemesterConfigSchema = BaseSemesterConfigSchema.superRefine(
+  (data, ctx) => {
     if (data.startDate >= data.endDate) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -66,9 +79,8 @@ export const BaseSemesterConfigSchema = z
         message: "Even term allows only 2, 4, 6, or 8",
       });
     }
-  });
-
-export const CreateSemesterConfigSchema = BaseSemesterConfigSchema;
+  }
+);
 
 export const AcademicTermResponseSchema = CreateAcademicTermSchema.extend({
   id: z.string().uuid(),
@@ -80,9 +92,23 @@ export const SemesterConfigResponseSchema = BaseSemesterConfigSchema.omit({
   id: z.string().uuid(),
   createdAt: z.date(),
   updatedAt: z.date().optional(),
+  status: SemesterLifecycleStatusSchema.optional(),
 });
 
-export const AcademicTermQuerySchema = AcademicTermResponseSchema.partial();
+export const AcademicTermQuerySchema = z.object({
+  id: optionalQueryString(z.uuid("Invalid term ID")),
+  type: optionalQueryString(SemesterTypeSchema),
+  year: optionalQueryString(z.string()),
+  isCurrent: z
+    .preprocess((value) => {
+      if (value === "true") return true;
+      if (value === "false") return false;
+      if (value === "") return undefined;
+      return value;
+    }, z.boolean().optional())
+    .optional(),
+  status: optionalQueryString(SemesterLifecycleStatusSchema),
+});
 export const SemesterConfigQuerySchema = SemesterConfigResponseSchema.partial();
 
 export type CreateAcademicTermType = z.infer<typeof CreateAcademicTermSchema>;
@@ -95,7 +121,11 @@ export type SemesterConfigResponseType = z.infer<
 export type AcademicTermResponseType = z.infer<
   typeof AcademicTermResponseSchema
 > & {
+  status?: z.infer<typeof SemesterLifecycleStatusSchema>;
   Semester?: SemesterConfigResponseType[];
 };
 export type AcademicTermQueryType = z.infer<typeof AcademicTermQuerySchema>;
 export type SemesterConfigQueryType = z.infer<typeof SemesterConfigQuerySchema>;
+export type SemesterLifecycleStatusType = z.infer<
+  typeof SemesterLifecycleStatusSchema
+>;

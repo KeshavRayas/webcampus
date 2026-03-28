@@ -184,8 +184,21 @@ export class AdmissionController {
       const user = await db.user.findUnique({ where: { id: userId } });
       const applicationId = user?.username;
 
-      if (!applicationId)
-        throw new Error("Unauthorized: Applicant ID not found");
+      if (!applicationId) {
+        logger.error("Applicant ID not found in user profile", {
+          userId,
+          userEmail: user?.email,
+          userRole: user?.role,
+        });
+        throw new Error(
+          "Unauthorized: Applicant ID not found. Please contact admin to verify your account setup."
+        );
+      }
+
+      logger.info("Starting application submission", {
+        userId,
+        applicationId,
+      });
 
       // Process the Multer files
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
@@ -202,6 +215,13 @@ export class AdmissionController {
           const result = await uploadToS3(file.buffer, fileName, file.mimetype);
           if (result.success && result.url) {
             fileUrls[field] = result.url;
+            logger.info("File uploaded successfully", { field, fileName });
+          } else {
+            logger.warn("File upload failed or incomplete", {
+              field,
+              fileName,
+              success: result.success,
+            });
           }
         }
       };
@@ -218,6 +238,11 @@ export class AdmissionController {
         handleUpload("studyCertificate", "study_cert_"),
       ]);
 
+      logger.info("File uploads completed", {
+        applicationId,
+        filesUploaded: Object.keys(fileUrls).length,
+      });
+
       // 3. Submit to the service
       const response = await AdmissionService.submitApplication(
         applicationId,
@@ -226,6 +251,7 @@ export class AdmissionController {
       );
 
       if (response.status === "success") {
+        logger.info("Application submitted successfully", { applicationId });
         sendResponse({
           res,
           status: "success",
@@ -235,12 +261,16 @@ export class AdmissionController {
         });
       }
     } catch (error) {
-      logger.error("Error submitting application", error);
+      const errorMessage =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      logger.error("Error submitting application", {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       sendResponse({
         res,
         status: "error",
-        message:
-          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message: errorMessage,
         statusCode:
           error instanceof Error && error.message.includes("Unauthorized")
             ? 401

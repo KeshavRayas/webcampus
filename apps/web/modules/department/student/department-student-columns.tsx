@@ -27,4 +27,9 @@ export const departmentStudentColumns: ColumnDef<DepartmentStudentResponseType>[
       accessorKey: "currentSemester",
       header: "Current Semester",
     },
+    {
+      accessorKey: "section",
+      header: "Section",
+      cell: ({ row }) => row.original.section ?? "-",
+    },
   ];

@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { DesignationEnum } from "@webcampus/schemas/faculty";
+import { DesignationEnum, StaffTypeEnum } from "@webcampus/schemas/faculty";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -55,6 +55,12 @@ import {
 
 const editSchema = z.object({
   designation: DesignationEnum,
+  username: z.string().min(1, "Username is required"),
+  displayUsername: z.string().min(1, "Display username is required"),
+  employeeId: z.string().optional(),
+  staffType: StaffTypeEnum.optional(),
+  dob: z.coerce.date().optional(),
+  dateOfJoining: z.coerce.date().optional(),
 });
 
 const hodCreateSchema = z.object({
@@ -74,6 +80,7 @@ export const AdminFacultyActions = ({
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isHodOpen, setIsHodOpen] = useState(false);
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
 
   // Grab existing faculty to find existing HODs
   const allFaculty =
@@ -96,6 +103,12 @@ export const AdminFacultyActions = ({
     resolver: zodResolver(editSchema),
     defaultValues: {
       designation: faculty.designation as z.infer<typeof DesignationEnum>,
+      username: faculty.user.username || "",
+      displayUsername: faculty.user.displayUsername || faculty.user.name || "",
+      employeeId: faculty.employeeId || "",
+      staffType: (faculty.staffType as any) || "",
+      dob: faculty.dob ? new Date(faculty.dob) : undefined,
+      dateOfJoining: faculty.dateOfJoining ? new Date(faculty.dateOfJoining) : undefined,
     },
   });
 
@@ -109,8 +122,13 @@ export const AdminFacultyActions = ({
 
   const onEditSubmit = (data: z.infer<typeof editSchema>) => {
     updateFaculty(
-      { id: faculty.id, data },
-      { onSuccess: () => setIsEditOpen(false) }
+      { id: faculty.id, data, imageFile: editImageFile },
+      {
+        onSuccess: () => {
+          setEditImageFile(null);
+          setIsEditOpen(false);
+        },
+      }
     );
   };
 
@@ -160,7 +178,7 @@ export const AdminFacultyActions = ({
 
       {/* EDIT DIALOG */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Faculty</DialogTitle>
           </DialogHeader>
@@ -169,38 +187,159 @@ export const AdminFacultyActions = ({
               onSubmit={editForm.handleSubmit(onEditSubmit)}
               className="space-y-4 py-4"
             >
-              <FormField
-                control={editForm.control}
-                name="designation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Designation</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FormField
+                  control={editForm.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select designation" />
-                        </SelectTrigger>
+                        <Input {...field} placeholder="faculty.username" />
                       </FormControl>
-                      <SelectContent>
-                        {DesignationEnum.options.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option
-                              .split("_")
-                              .map(
-                                (w) => w.charAt(0) + w.slice(1).toLowerCase()
-                              )
-                              .join(" ")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="displayUsername"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Username</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Display name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="designation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Designation</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select designation" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {DesignationEnum.options.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option
+                                .split("_")
+                                .map(
+                                  (w) => w.charAt(0) + w.slice(1).toLowerCase()
+                                )
+                                .join(" ")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="staffType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Staff Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select staff type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {StaffTypeEnum.options.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option.split("_").map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(" ")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="employeeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Employee ID</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g., EMP2357433" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="dob"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date of Birth</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          value={field.value ? new Date(field.value).toISOString().slice(0, 10) : ""}
+                          onChange={(event) => field.onChange(event.target.value)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="dateOfJoining"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date of Joining</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          value={field.value ? new Date(field.value).toISOString().slice(0, 10) : ""}
+                          onChange={(event) => field.onChange(event.target.value)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormItem>
+                <FormLabel>Update Faculty Image</FormLabel>
+                <FormControl>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] || null;
+                      setEditImageFile(file);
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+
               <DialogFooter>
                 <Button type="submit" disabled={isUpdating}>
                   {isUpdating ? "Saving..." : "Save Changes"}

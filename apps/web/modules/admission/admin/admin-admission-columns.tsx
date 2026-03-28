@@ -2,7 +2,6 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@webcampus/ui/components/badge";
-import dayjs from "dayjs";
 import { AdminAdmissionActions } from "./admin-admission-actions";
 
 export type AdmissionResponse = {
@@ -14,6 +13,12 @@ export type AdmissionResponse = {
 
   departmentId?: string | null;
   department?: { name: string } | null;
+  student?: {
+    usn: string;
+    user: {
+      name: string;
+    };
+  } | null;
 
   // Added all the fields from the database
   firstName?: string | null;
@@ -122,7 +127,6 @@ export type AdmissionResponse = {
   guardianOccupation?: string | null;
 
   tempUsn?: string | null;
-  usn?: string | null;
   uniqueId?: string | null;
 };
 
@@ -133,6 +137,28 @@ const baseColumns: ColumnDef<AdmissionResponse>[] = [
     cell: ({ row }) => (
       <div className="font-medium">{row.original.applicationId}</div>
     ),
+  },
+  {
+    id: "name",
+    header: "Name",
+    cell: ({ row }) => {
+      const studentName = row.original.student?.user?.name?.trim();
+      const admissionName = [
+        row.original.firstName?.trim(),
+        row.original.middleName?.trim(),
+        row.original.lastName?.trim(),
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join(" ")
+        .trim();
+
+      return <div>{studentName || admissionName || "-"}</div>;
+    },
+  },
+  {
+    accessorKey: "tempUsn",
+    header: "Temp USN",
+    cell: ({ row }) => <div>{row.original.tempUsn || "-"}</div>,
   },
   {
     accessorKey: "modeOfAdmission",
@@ -154,15 +180,6 @@ const baseColumns: ColumnDef<AdmissionResponse>[] = [
 
       return <Badge variant={variant}>{status}</Badge>;
     },
-  },
-  {
-    accessorKey: "createdAt",
-    header: "Created On",
-    cell: ({ row }) => (
-      <div suppressHydrationWarning>
-        {dayjs(row.original.createdAt).format("MMM D, YYYY")}
-      </div>
-    ),
   },
 ];
 

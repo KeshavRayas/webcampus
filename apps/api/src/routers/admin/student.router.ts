@@ -17,6 +17,17 @@ router.get(
   AdminStudentController.getAll
 );
 
+router.get(
+  "/:id",
+  protect({
+    role: "admin",
+    permissions: {
+      student: ["read"],
+    },
+  }),
+  AdminStudentController.getById
+);
+
 router.delete(
   "/:id",
   protect({

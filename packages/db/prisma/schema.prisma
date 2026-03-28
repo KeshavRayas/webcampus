@@ -167,6 +167,40 @@ enum Designation {
   VISITING_PROFESSOR
 }
 
+enum StaffType {
+  TEMPORARY
+  REGULAR
+  POP
+  ADJUNCT
+}
+
+enum FacultyGender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+  OTHER
+}
+
+enum QualificationProgramType {
+  FULL_TIME
+  PART_TIME
+}
+
+enum PublicationCategory {
+  JOURNAL
+  CONFERENCE
+  BOOK_CHAPTER_OR_BOOK
+  CASE_STUDY
+  PATENT
+}
+
 enum AdmissionStatus {
   PENDING    // Admin created the shell, student hasn't submitted yet
   SUBMITTED  // Student filled the form and uploaded docs
@@ -287,6 +321,7 @@ model Student {
   marks           Mark[]
   attendances     Attendance[]
   batches         Batch[]              @relation("BatchStudents")
+  admission       Admission?
 
   @@index([departmentName])
 }
@@ -299,10 +334,87 @@ model Faculty {
   departmentId   String             // Replaced departmentName
   shortName      String             // Added shortName
   designation    Designation        // Added designation
+  employeeId     String?            @unique
+  staffType      StaffType?
+  qualification  String?
+  dateOfJoining  DateTime?
+  researchArea   String?
+  officeRoom     String?
+  gender         FacultyGender?
+  dob            DateTime?
+  bloodGroup     String?
+  nationality    String?
+  phoneNumber    String?
+  personalEmail  String?
+  maritalStatus  MaritalStatus?
+  aboutYourself  String?
+  researchInterests String?
+  otherInformation  String?
+  contactInformation String?
+  mobileNumber      String?
+  alternateContactNumber String?
+  presentAddressLine    String?
+  presentCity           String?
+  presentState          String?
+  presentPincode        String?
+  permanentAddressLine  String?
+  permanentCity         String?
+  permanentState        String?
+  permanentPincode      String?
+  sameAsPresentAddress  Boolean         @default(false)
+  profileUpdatedAt      DateTime?
   teaches        CourseAssignment[]
+  qualifications FacultyQualification[]
+  publications   FacultyPublication[]
+  experiences    FacultyExperience[]
   hod            Hod?
 
   @@index([departmentId])
+}
+
+model FacultyQualification {
+  id             String                   @id @default(uuid())
+  faculty        Faculty                  @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  facultyId      String
+  program        String
+  degree         String
+  specialization String
+  institution    String
+  programType    QualificationProgramType
+  yearPassed     Int
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@index([facultyId])
+}
+
+model FacultyPublication {
+  id                 String              @id @default(uuid())
+  faculty            Faculty             @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  facultyId          String
+  category           PublicationCategory
+  publishedDate      DateTime
+  authors            String
+  publicationDetails String
+  weblink            String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([facultyId])
+}
+
+model FacultyExperience {
+  id              String    @id @default(uuid())
+  faculty         Faculty   @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  facultyId       String
+  designation     String
+  institutionName String
+  startDate       DateTime
+  endDate         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([facultyId])
 }
 
 model Admin {
@@ -495,12 +607,11 @@ model Admission {
   feePaid                      Float?
   hostel                       Boolean?
   hostelRoomNumber             String?
-  admissionType                String?
-  admissionDate                DateTime?
 
   // These are hidden from the applicant form, generated/assigned later
   tempUsn                      String?   @unique
-  usn                          String?   @unique
+  studentId                    String?   @unique
+  student                      Student?  @relation(fields: [studentId], references: [id])
   uniqueId                     String?   @unique
 
   nameAsPer10th          String?

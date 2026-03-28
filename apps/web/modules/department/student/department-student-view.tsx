@@ -5,9 +5,13 @@ import {
   createFilterQueryString,
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
+import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
+import { useDepartments } from "@/lib/use-departments";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { DepartmentStudentResponseType } from "@webcampus/schemas/department";
+import {
+  DepartmentStudentResponseType,
+} from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import {
@@ -21,22 +25,25 @@ import { Skeleton } from "@webcampus/ui/components/skeleton";
 import axios from "axios";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { departmentStudentColumns } from "./department-student-columns";
 
 type StudentFilters = {
   usn: string;
   name: string;
   departmentName: string;
-  currentSemester: string;
-  academicYear: string;
+  academicTerm: string;
+  semester: string;
+  section: string;
 };
 
 const EMPTY_FILTERS: StudentFilters = {
   usn: "",
   name: "",
   departmentName: "",
-  currentSemester: "",
-  academicYear: "",
+  academicTerm: "",
+  semester: "",
+  section: "",
 };
 
 export const DepartmentStudentView = () => {
@@ -45,6 +52,22 @@ export const DepartmentStudentView = () => {
   const searchParams = useSearchParams();
   const { data: session } = authClient.useSession();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+
+  // Track if we've checked authorization after hydration
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Initialize state early so it can be used in useMemo hooks below
+  const [draftFilters, setDraftFilters] = useState<StudentFilters>(() =>
+    getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
+  );
+  const [appliedFilters, setAppliedFilters] = useState<StudentFilters>(() =>
+    getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
+  );
+
+  // Mark when component has hydrated to avoid SSR/client mismatch
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   // Fetch department type for conditional filter rendering
   const { data: deptInfo } = useQuery({
@@ -63,6 +86,85 @@ export const DepartmentStudentView = () => {
   });
 
   const isDegreeGranting = deptInfo?.type === "DEGREE_GRANTING";
+
+  const { data: terms = [] } = useAcademicTerms();
+  const { data: departments = [] } = useDepartments();
+
+  const selectedTerm = useMemo(
+    () => terms.find((term) => term.id === draftFilters.academicTerm),
+    [terms, draftFilters.academicTerm]
+  );
+
+  const selectedTermSemesters = selectedTerm?.Semester || [];
+
+  // Sync filters when data changes (auto-clear if value no longer exists)
+  useCascadingFilterSync(draftFilters, setDraftFilters, {
+    academicTerms: terms,
+    semesters: selectedTermSemesters,
+    departments,
+  });
+
+  const semesterOptions = useMemo(
+    () =>
+      (selectedTermSemesters).map((semester) => ({
+        label: `${semester.programType} - Semester ${semester.semesterNumber}`,
+        value: `${semester.programType} - Semester ${semester.semesterNumber}`,
+      })),
+    [selectedTermSemesters]
+  );
+
+  const appliedTermYear = useMemo(() => {
+    if (!appliedFilters.academicTerm) {
+      return "";
+    }
+
+    return (
+      terms.find((term) => term.id === appliedFilters.academicTerm)?.year || ""
+    );
+  }, [terms, appliedFilters.academicTerm]);
+
+  const response = useQuery({
+    queryKey: ["department-students", appliedFilters, appliedTermYear],
+    queryFn: async () => {
+      const apiFilters = {
+        ...(appliedFilters.usn ? { usn: appliedFilters.usn } : {}),
+        ...(appliedFilters.name ? { name: appliedFilters.name } : {}),
+        ...(appliedFilters.departmentName
+          ? { departmentName: appliedFilters.departmentName }
+          : {}),
+        ...(appliedFilters.semester
+          ? { currentSemester: appliedFilters.semester }
+          : {}),
+        ...(appliedTermYear ? { academicYear: appliedTermYear } : {}),
+        ...(appliedFilters.section ? { section: appliedFilters.section } : {}),
+      };
+
+      const res = await axios.get<
+        BaseResponse<DepartmentStudentResponseType[]>
+      >(`${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/department/student`, {
+        params: apiFilters,
+        withCredentials: true,
+      });
+
+      if (res.data.status === "success" && Array.isArray(res.data.data)) {
+        return res.data.data;
+      }
+
+      return [] as DepartmentStudentResponseType[];
+    },
+  });
+
+  const sectionOptions = useMemo(() => {
+    const options = Array.from(
+      new Set((response.data || []).map((student) => student.section).filter(Boolean))
+    ) as string[];
+
+    if (draftFilters.section && !options.includes(draftFilters.section)) {
+      return [draftFilters.section, ...options];
+    }
+
+    return options;
+  }, [draftFilters.section, response.data]);
 
   // Build filter fields dynamically based on department type
   const studentFilterFields = useMemo(() => {
@@ -90,21 +192,36 @@ export const DepartmentStudentView = () => {
         placeholder: "Search by department",
       },
       {
-        key: "currentSemester",
-        label: "Current Semester",
+        key: "academicTerm",
+        label: "Academic Term",
+        type: "select",
+        allOptionLabel: "All terms",
+        placeholder: "All terms",
+        options: terms.map((term) => ({
+          label: `${term.type.toUpperCase()} ${term.year}`,
+          value: term.id,
+        })),
+      },
+      {
+        key: "semester",
+        label: "Semester",
         type: "select",
         allOptionLabel: "All semesters",
-        placeholder: "All semesters",
-        options: [
-          { label: "1", value: "1" },
-          { label: "2", value: "2" },
-          { label: "3", value: "3" },
-          { label: "4", value: "4" },
-          { label: "5", value: "5" },
-          { label: "6", value: "6" },
-          { label: "7", value: "7" },
-          { label: "8", value: "8" },
-        ],
+        placeholder: draftFilters.academicTerm
+          ? "All semesters"
+          : "Select term first",
+        options: semesterOptions,
+      },
+      {
+        key: "section",
+        label: "Section",
+        type: "select",
+        allOptionLabel: "All sections",
+        placeholder: "All sections",
+        options: sectionOptions.map((section) => ({
+          label: section,
+          value: section,
+        })),
       },
     ];
 
@@ -112,14 +229,13 @@ export const DepartmentStudentView = () => {
     return isDegreeGranting
       ? allFields.filter((f) => f.key !== "departmentName")
       : allFields;
-  }, [isDegreeGranting]);
-
-  const [draftFilters, setDraftFilters] = useState<StudentFilters>(() =>
-    getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
-  );
-  const [appliedFilters, setAppliedFilters] = useState<StudentFilters>(() =>
-    getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
-  );
+  }, [
+    draftFilters.academicTerm,
+    isDegreeGranting,
+    sectionOptions,
+    semesterOptions,
+    terms,
+  ]);
 
   useEffect(() => {
     const nextFilters = getFiltersFromSearchParams(searchParams, EMPTY_FILTERS);
@@ -131,6 +247,15 @@ export const DepartmentStudentView = () => {
     setDraftFilters((current) => ({
       ...current,
       [key]: value,
+    }));
+  };
+
+  const updateAcademicTermFilter = (value: string) => {
+    setDraftFilters((current) => ({
+      ...current,
+      academicTerm: value,
+      semester: "",
+      section: "",
     }));
   };
 
@@ -148,46 +273,10 @@ export const DepartmentStudentView = () => {
     router.replace(pathname, { scroll: false });
   };
 
-  const response = useQuery({
-    queryKey: ["department-students", appliedFilters],
-    queryFn: async () => {
-      const apiFilters = {
-        ...(appliedFilters.usn ? { usn: appliedFilters.usn } : {}),
-        ...(appliedFilters.name ? { name: appliedFilters.name } : {}),
-        ...(appliedFilters.departmentName
-          ? { departmentName: appliedFilters.departmentName }
-          : {}),
-        ...(appliedFilters.currentSemester
-          ? {
-              currentSemester: Number.parseInt(
-                appliedFilters.currentSemester,
-                10
-              ),
-            }
-          : {}),
-        ...(appliedFilters.academicYear
-          ? { academicYear: appliedFilters.academicYear }
-          : {}),
-      };
-
-      const res = await axios.get<
-        BaseResponse<DepartmentStudentResponseType[]>
-      >(`${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/department/student`, {
-        params: apiFilters,
-        withCredentials: true,
-      });
-
-      if (res.data.status === "success" && Array.isArray(res.data.data)) {
-        return res.data.data;
-      }
-
-      return [] as DepartmentStudentResponseType[];
-    },
-  });
-
   const isDepartmentAdmin = session?.user?.role === "department";
 
-  if (!isDepartmentAdmin) {
+  // Only enforce authorization check after hydration to avoid SSR/client mismatch
+  if (isHydrated && !isDepartmentAdmin) {
     return (
       <div className="text-muted-foreground rounded-lg border p-4 text-sm">
         Students are available in read-only mode for department admins.
@@ -230,9 +319,16 @@ export const DepartmentStudentView = () => {
         <FilterBuilder
           fields={studentFilterFields}
           draftFilters={draftFilters}
-          onDraftChange={updateDraftFilter}
+          onDraftChange={(key, value) => {
+            if (key === "academicTerm") {
+              updateAcademicTermFilter(value);
+              return;
+            }
+
+            updateDraftFilter(key, value);
+          }}
           allValue={DEFAULT_FILTER_ALL_VALUE}
-          className="md:grid-cols-2 xl:grid-cols-5"
+          className="md:grid-cols-2 xl:grid-cols-6"
         />
 
         <FilterActions onApply={applyFilters} onReset={resetFilters} />

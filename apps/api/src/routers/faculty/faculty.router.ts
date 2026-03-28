@@ -1,35 +1,62 @@
 import { FacultyController } from "@webcampus/api/src/controllers/faculty/faculty.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
-  CreateFacultySchema,
-  UpdateFacultySchema,
+  CreateFacultyExperienceSchema,
+  CreateFacultyPublicationSchema,
+  CreateFacultyQualificationSchema,
+  UpdateFacultyExperienceSchema,
+  UpdateFacultyProfileSchema,
+  UpdateFacultyPublicationSchema,
+  UpdateFacultyQualificationSchema,
 } from "@webcampus/schemas/faculty";
 import { Router } from "express";
 
-const router = Router();
+const router: ReturnType<typeof Router> = Router();
 
-// Apply role-based protection to all routes
 router.use(
   protect({
-    role: "admin",
-    permissions: {
-      user: ["set-role"],
-    },
+    role: ["faculty", "admin"],
+    permissions: {},
   })
 );
 
+router.get("/", FacultyController.getMyProfile);
+router.put("/", validateRequest(UpdateFacultyProfileSchema), FacultyController.updateMyProfile);
+
 router.post(
-  "/",
-  validateRequest(CreateFacultySchema),
-  FacultyController.create
+  "/qualifications",
+  validateRequest(CreateFacultyQualificationSchema),
+  FacultyController.createQualification
 );
-router.get("/", FacultyController.getAll);
-router.get("/:id", FacultyController.getById);
 router.put(
-  "/:id",
-  validateRequest(UpdateFacultySchema),
-  FacultyController.update
+  "/qualifications/:id",
+  validateRequest(UpdateFacultyQualificationSchema),
+  FacultyController.updateQualification
 );
-router.delete("/:id", FacultyController.delete);
+router.delete("/qualifications/:id", FacultyController.deleteQualification);
+
+router.post(
+  "/publications",
+  validateRequest(CreateFacultyPublicationSchema),
+  FacultyController.createPublication
+);
+router.put(
+  "/publications/:id",
+  validateRequest(UpdateFacultyPublicationSchema),
+  FacultyController.updatePublication
+);
+router.delete("/publications/:id", FacultyController.deletePublication);
+
+router.post(
+  "/experiences",
+  validateRequest(CreateFacultyExperienceSchema),
+  FacultyController.createExperience
+);
+router.put(
+  "/experiences/:id",
+  validateRequest(UpdateFacultyExperienceSchema),
+  FacultyController.updateExperience
+);
+router.delete("/experiences/:id", FacultyController.deleteExperience);
 
 export default router;

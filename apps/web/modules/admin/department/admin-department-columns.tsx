@@ -7,6 +7,8 @@ import { AdminDepartmentActions } from "./admin-department-actions";
 export type DepartmentTableItem = DepartmentResponseDTO & {
   email?: string;
   emailVerified?: boolean;
+  username?: string | null;
+  displayUsername?: string | null;
 };
 
 export const adminDepartmentColumns: ColumnDef<DepartmentTableItem>[] = [
@@ -25,6 +27,14 @@ export const adminDepartmentColumns: ColumnDef<DepartmentTableItem>[] = [
   {
     accessorKey: "email",
     header: "Email",
+  },
+  {
+    accessorKey: "username",
+    header: "Username",
+  },
+  {
+    accessorKey: "displayUsername",
+    header: "Display Username",
   },
   {
     accessorKey: "emailVerified",

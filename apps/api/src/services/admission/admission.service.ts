@@ -11,6 +11,33 @@ import {
 import { BaseResponse } from "@webcampus/types/api";
 
 export class AdmissionService {
+  private static getStudentFullName(admission: {
+    firstName?: string | null;
+    middleName?: string | null;
+    lastName?: string | null;
+  }): string | null {
+    const fullName = [
+      admission.firstName?.trim(),
+      admission.middleName?.trim(),
+      admission.lastName?.trim(),
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(" ")
+      .trim();
+
+    return fullName.length > 0 ? fullName : null;
+  }
+
+  private static getSortableApplicantName(admission: {
+    firstName?: string | null;
+    middleName?: string | null;
+    lastName?: string | null;
+  }): string {
+    return (
+      AdmissionService.getStudentFullName(admission)?.toLocaleLowerCase() || ""
+    );
+  }
+
   private static normalizeApplicationId(value: string): string {
     return value.trim().toLowerCase();
   }
@@ -101,12 +128,14 @@ export class AdmissionService {
     let autoCreatedUsers = 0;
 
     for (const applicationId of missingApplicationIds) {
+      // Username is normalized to lowercase for Better Auth credential lookup compatibility.
+      const normalizedUsername = AdmissionService.normalizeApplicationId(applicationId);
       const userService = new UserService({
         request: {
           email:
             AdmissionService.applicantEmailFromApplicationId(applicationId),
           name: `Applicant ${applicationId.toUpperCase()}`,
-          username: applicationId.toUpperCase(),
+          username: normalizedUsername,
           password: "password",
           role: "applicant",
         },
@@ -251,11 +280,12 @@ export class AdmissionService {
 
       if (!existingApplicantUser) {
         // We generate a dummy email and name since the applicant has not filled it out yet.
+        // Username is normalized to lowercase for Better Auth compatibility.
         const userService = new UserService({
           request: {
             email: applicantEmail,
             name: `Applicant ${applicationId}`,
-            username: applicationId,
+            username: AdmissionService.normalizeApplicationId(applicationId),
             password: "password", // Dummy password
             role: "applicant",
           },
@@ -358,6 +388,16 @@ export class AdmissionService {
         include: {
           semester: true,
           department: true,
+          student: {
+            select: {
+              usn: true,
+              user: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -388,7 +428,20 @@ export class AdmissionService {
           mode: "insensitive",
         },
       },
-      include: { semester: true, department: true },
+      include: {
+        semester: true,
+        department: true,
+        student: {
+          select: {
+            usn: true,
+            user: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
     return { status: "success", message: "Fetched", data: admission };
   }
@@ -469,25 +522,27 @@ export class AdmissionService {
       if (!semester) throw new Error("Semester not found");
 
       const yearPrefix = semester.academicTerm.year.toString().slice(-2);
-      const formattedBranch = branchCode.toUpperCase().substring(0, 2);
-      const prefix = `1BM${yearPrefix}TMP${formattedBranch}`;
+      const formattedBranch = branchCode
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .substring(0, 4);
+      const prefix = `TBM${yearPrefix}${formattedBranch}`;
 
       const lastAdmission = await client.admission.findFirst({
         where: { tempUsn: { startsWith: prefix } },
         orderBy: { tempUsn: "desc" },
       });
 
-      if (!lastAdmission || !lastAdmission.tempUsn) return `${prefix}001`;
+      if (!lastAdmission || !lastAdmission.tempUsn) return `${prefix}0001`;
 
-      const lastNumberStr = lastAdmission.tempUsn.slice(-3);
+      const lastNumberStr = lastAdmission.tempUsn.slice(-4);
       const lastNumber = parseInt(lastNumberStr, 10);
 
-      if (isNaN(lastNumber)) return `${prefix}001`;
+      if (isNaN(lastNumber)) return `${prefix}0001`;
 
-      let nextNumber = lastNumber + 1;
-      if (nextNumber > 399 && nextNumber < 600) nextNumber = 600;
+      const nextNumber = lastNumber + 1;
 
-      return `${prefix}${nextNumber.toString().padStart(3, "0")}`;
+      return `${prefix}${nextNumber.toString().padStart(4, "0")}`;
     } catch (error) {
       logger.error("Failed to generate Temp USN", error);
       throw new Error("Failed to generate Temp USN");
@@ -511,6 +566,12 @@ export class AdmissionService {
     fileUrls: { [key: string]: string } // S3 URLs
   ): Promise<BaseResponse<unknown>> {
     try {
+      // Log the incoming applicationId for debugging
+      logger.info("submitApplication called", {
+        applicationId,
+        receivedFields: Object.keys(data),
+      });
+
       // Find the existing shell case-insensitively
       const existingAdmission = await db.admission.findFirst({
         where: {
@@ -522,21 +583,53 @@ export class AdmissionService {
       });
 
       if (!existingAdmission) {
-        throw new Error("Admission shell not found.");
+        logger.error("Admission shell not found", {
+          applicationId,
+          searchMode: "case-insensitive",
+        });
+        throw new Error(
+          `Admission shell not found for application ID: ${applicationId}. Please ensure the admin created the admission shell.`
+        );
       }
+
+      logger.info("Admission shell found", {
+        id: existingAdmission.id,
+        applicationId: existingAdmission.applicationId,
+        departmentId: existingAdmission.departmentId,
+      });
 
       // Department is already strictly locked to the shell
       const department = await db.department.findUnique({
         where: { id: existingAdmission.departmentId },
       });
 
-      if (!department) throw new Error("Assigned department does not exist.");
+      if (!department) {
+        logger.error("Department not found", {
+          departmentId: existingAdmission.departmentId,
+        });
+        throw new Error(
+          `Assigned department does not exist (ID: ${existingAdmission.departmentId}).`
+        );
+      }
 
-      // Use the official department code for USN generation (e.g., "CS")
-      const tempUsn = await AdmissionService.generateTempUsn(
-        existingAdmission.semesterId,
-        department.code
-      );
+      logger.info("Department found", { name: department.name });
+
+      // Validate aadharNumber uniqueness: allow if same record or if aadhar doesn't exist elsewhere
+      if (data.aadharNumber && data.aadharNumber !== existingAdmission.aadharNumber) {
+        const existingAadhar = await db.admission.findUnique({
+          where: { aadharNumber: data.aadharNumber },
+        });
+        if (existingAadhar && existingAadhar.id !== existingAdmission.id) {
+          logger.error("Aadhar number already in use by different applicant", {
+            aadharNumber: data.aadharNumber,
+            existingAdmissionId: existingAadhar.id,
+            currentAdmissionId: existingAdmission.id,
+          });
+          throw new Error(
+            `Aadhar number ${data.aadharNumber} is already registered with another applicant. Please verify and submit again.`
+          );
+        }
+      }
 
       // Update the record using its exact unique database ID
       const updatedAdmission = await db.admission.update({
@@ -558,8 +651,6 @@ export class AdmissionService {
           feePaid: data.feePaid ? parseFloat(data.feePaid) : null,
           hostel: data.hostel === "true",
           hostelRoomNumber: data.hostelRoomNumber ?? null,
-
-          tempUsn: tempUsn,
 
           // Personal Information
           nameAsPer10th: data.nameAsPer10th,
@@ -688,8 +779,16 @@ export class AdmissionService {
         data: updatedAdmission,
       };
     } catch (error) {
-      logger.error("Failed to submit application", error);
-      throw new Error("Failed to submit application");
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error("Failed to submit application", {
+        applicationId,
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw new Error(
+        errorMessage || "Failed to submit application. Please contact support."
+      );
     }
   }
 
@@ -753,12 +852,18 @@ export class AdmissionService {
               semesterId: payload.semesterId,
               status: "APPROVED",
             },
+            orderBy: [{ applicationId: "asc" }],
             select: {
               id: true,
               applicationId: true,
               departmentId: true,
               tempUsn: true,
-              usn: true,
+              studentId: true,
+              firstName: true,
+              middleName: true,
+              lastName: true,
+              primaryEmail: true,
+              photo: true,
             },
           }),
         ]
@@ -775,8 +880,19 @@ export class AdmissionService {
       }
 
       const approvedUnportedAdmissions = approvedAdmissions.filter(
-        (admission) => !admission.usn
+        (admission) => !admission.studentId
       );
+
+      approvedUnportedAdmissions.sort((left, right) => {
+        const leftName = AdmissionService.getSortableApplicantName(left);
+        const rightName = AdmissionService.getSortableApplicantName(right);
+
+        if (leftName !== rightName) {
+          return leftName.localeCompare(rightName);
+        }
+
+        return left.applicationId.localeCompare(right.applicationId);
+      });
 
       const allApprovedApplicationIds = approvedAdmissions.map(
         (admission) => admission.applicationId
@@ -788,11 +904,12 @@ export class AdmissionService {
           headers
         );
 
-      const result = await db.$transaction(async (tx) => {
-        let newlyPorted = 0;
-        let alreadyPorted = 0;
+      let newlyPorted = 0;
+      let alreadyPorted = 0;
+      const failedPorts: { applicationId: string; reason: string }[] = [];
 
-        for (const admission of approvedUnportedAdmissions) {
+      for (const admission of approvedUnportedAdmissions) {
+        try {
           const userId = userIdByApplicationId.get(
             AdmissionService.normalizeApplicationId(admission.applicationId)
           );
@@ -808,95 +925,154 @@ export class AdmissionService {
             );
           }
 
-          const department = await tx.department.findUnique({
-            where: { id: admission.departmentId },
-            select: { name: true, code: true },
-          });
+          await db.$transaction(async (tx) => {
+            const department = await tx.department.findUnique({
+              where: { id: admission.departmentId },
+              select: { name: true, code: true },
+            });
 
-          if (!department) {
-            throw new Error(
-              `Department not found for application ID ${admission.applicationId}`
-            );
-          }
+            if (!department) {
+              throw new Error(
+                `Department not found for application ID ${admission.applicationId}`
+              );
+            }
 
-          let finalUsn = admission.tempUsn?.trim();
-          if (!finalUsn) {
-            // Legacy/generated admissions may skip submit flow; backfill temp USN here.
-            finalUsn = await AdmissionService.generateTempUsnWithClient(
-              tx,
-              payload.semesterId,
-              department.code
-            );
-          }
+            let finalUsn = admission.tempUsn?.trim();
+            if (!finalUsn) {
+              // Legacy/generated admissions may skip submit flow; backfill temp USN here.
+              finalUsn = await AdmissionService.generateTempUsnWithClient(
+                tx,
+                payload.semesterId,
+                department.code
+              );
+            }
 
-          const existingStudent = await tx.student.findFirst({
-            where: {
-              OR: [{ userId }, { usn: finalUsn }],
-            },
-            select: {
-              id: true,
-              usn: true,
-            },
-          });
+            const fullName = AdmissionService.getStudentFullName(admission);
+            const primaryEmail = admission.primaryEmail?.trim().toLowerCase();
 
-          if (existingStudent) {
+            if (!fullName) {
+              throw new Error(
+                `Cannot port ${admission.applicationId}: student full name is missing`
+              );
+            }
+
+            if (!primaryEmail) {
+              throw new Error(
+                `Cannot port ${admission.applicationId}: student primary email is missing`
+              );
+            }
+
+            const existingEmailOwner = await tx.user.findFirst({
+              where: {
+                email: primaryEmail,
+                id: { not: userId },
+              },
+              select: { id: true },
+            });
+
+            if (existingEmailOwner) {
+              throw new Error(
+                `Cannot port ${admission.applicationId}: email ${primaryEmail} is already used by another user`
+              );
+            }
+
+            const existingStudent = await tx.student.findFirst({
+              where: {
+                OR: [{ userId }, { usn: finalUsn }],
+              },
+              select: {
+                id: true,
+                usn: true,
+              },
+            });
+
+            const finalStudentUsn = existingStudent?.usn ?? finalUsn;
+
+            if (existingStudent) {
+              await tx.admission.update({
+                where: { id: admission.id },
+                data: {
+                  tempUsn: finalStudentUsn,
+                  studentId: existingStudent.id,
+                },
+              });
+
+              await tx.user.update({
+                where: { id: userId },
+                data: {
+                  role: "student",
+                  name: fullName,
+                  displayUsername: fullName,
+                  username: finalStudentUsn,
+                  email: primaryEmail,
+                  image: admission.photo ?? undefined,
+                },
+              });
+
+              alreadyPorted += 1;
+              return;
+            }
+
+            const createdStudent = await tx.student.create({
+              data: {
+                userId,
+                usn: finalStudentUsn,
+                departmentName: department.name,
+                currentSemester: semester.semesterNumber,
+                academicYear: semester.academicTerm.year,
+              },
+              select: {
+                id: true,
+              },
+            });
+
             await tx.admission.update({
               where: { id: admission.id },
               data: {
-                usn: existingStudent.usn,
+                tempUsn: finalStudentUsn,
+                studentId: createdStudent.id,
               },
             });
 
             await tx.user.update({
               where: { id: userId },
-              data: { role: "student" },
+              data: {
+                role: "student",
+                name: fullName,
+                displayUsername: fullName,
+                username: finalStudentUsn,
+                email: primaryEmail,
+                image: admission.photo ?? undefined,
+              },
             });
 
-            alreadyPorted += 1;
-            continue;
-          }
-
-          await tx.student.create({
-            data: {
-              userId,
-              usn: finalUsn,
-              departmentName: department.name,
-              currentSemester: semester.semesterNumber,
-              academicYear: semester.academicTerm.year,
-            },
+            newlyPorted += 1;
           });
-
-          await tx.admission.update({
-            where: { id: admission.id },
-            data: {
-              tempUsn: finalUsn,
-              usn: finalUsn,
-            },
+        } catch (studentError) {
+          const reason =
+            studentError instanceof Error
+              ? studentError.message
+              : "Failed to port student";
+          failedPorts.push({
+            applicationId: admission.applicationId,
+            reason,
           });
-
-          await tx.user.update({
-            where: { id: userId },
-            data: { role: "student" },
-          });
-
-          newlyPorted += 1;
         }
-
-        return {
-          newlyPorted,
-          alreadyPorted,
-        };
-      });
+      }
 
       return {
         status: "success",
-        message: "Students ported successfully",
+        message:
+          failedPorts.length > 0
+            ? "Students ported with partial failures"
+            : "Students ported successfully",
         data: {
           semesterId: payload.semesterId,
           semesterNumber: semester.semesterNumber,
           totalApproved: approvedAdmissions.length,
-          newlyPorted: result.newlyPorted,
-          alreadyPorted: result.alreadyPorted,
+          newlyPorted,
+          alreadyPorted,
+          failedPorts,
           autoCreatedApplicants: autoCreatedUsers,
           rejectedCount: await db.admission.count({
             where: {
@@ -926,3 +1102,4 @@ export class AdmissionService {
     }
   }
 }
+

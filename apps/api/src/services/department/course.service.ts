@@ -6,6 +6,85 @@ import {
 } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 
+const MODE_LOCKED_VALUES = {
+  INTEGRATED: {
+    tutorialCredits: 0,
+    skillCredits: 0,
+    maxNoOfCies: 3,
+    minNoOfCies: 2,
+    cieMaxMarks: 40,
+    cieMinMarks: 0,
+    cieWeightage: 50,
+    assignmentMaxMarks: 5,
+    labMaxMarks: 25,
+    labMinMarks: 10,
+    labWeightage: 0,
+    cumulativeMaxMarks: 100,
+    cumulativeMinMarks: 40,
+  },
+  NON_INTEGRATED: {
+    tutorialCredits: 0,
+    practicalCredits: 0,
+    skillCredits: 0,
+    maxNoOfCies: 3,
+    minNoOfCies: 2,
+    cieMaxMarks: 40,
+    cieMinMarks: 0,
+    cieWeightage: 100,
+    assignmentMaxMarks: 10,
+    labMaxMarks: 0,
+    labMinMarks: 0,
+    labWeightage: 0,
+    cumulativeMaxMarks: 100,
+    cumulativeMinMarks: 40,
+  },
+  FINAL_SUMMARY: {
+    tutorialCredits: 0,
+    practicalCredits: 0,
+    skillCredits: 0,
+    maxNoOfCies: 3,
+    minNoOfCies: 2,
+    cieMaxMarks: 50,
+    cieMinMarks: 20,
+    cieWeightage: 100,
+    noOfAssignments: 0,
+    assignmentMaxMarks: 0,
+    labMaxMarks: 0,
+    labMinMarks: 0,
+    labWeightage: 0,
+    cumulativeMaxMarks: 100,
+    cumulativeMinMarks: 40,
+  },
+  NCMC: {
+    tutorialCredits: 0,
+    practicalCredits: 0,
+    skillCredits: 0,
+    seeMaxMarks: 0,
+    seeMinMarks: 0,
+    seeWeightage: 0,
+    maxNoOfCies: 0,
+    minNoOfCies: 0,
+    cieMaxMarks: 0,
+    cieMinMarks: 0,
+    cieWeightage: 0,
+    noOfAssignments: 0,
+    assignmentMaxMarks: 0,
+    labMaxMarks: 0,
+    labMinMarks: 0,
+    labWeightage: 0,
+    cumulativeMaxMarks: 100,
+    cumulativeMinMarks: 40,
+  },
+} as const;
+
+const normalizeByMode = (data: CreateCourseDTO): CreateCourseDTO => {
+  const lockedValues = MODE_LOCKED_VALUES[data.courseMode];
+  return {
+    ...data,
+    ...lockedValues,
+  };
+};
+
 /** Compute derived course fields from user-provided input */
 const computeDerivedFields = (data: CreateCourseDTO) => {
   const totalCredits =
@@ -23,8 +102,9 @@ const computeDerivedFields = (data: CreateCourseDTO) => {
 export class CourseService {
   static async create(data: CreateCourseDTO): Promise<BaseResponse<Course>> {
     try {
-      const { departmentName, semesterId, cycle, ...courseData } = data;
-      const derived = computeDerivedFields(data);
+      const normalized = normalizeByMode(data);
+      const { departmentName, semesterId, cycle, ...courseData } = normalized;
+      const derived = computeDerivedFields(normalized);
 
       const course = await db.course.create({
         data: {
@@ -111,18 +191,27 @@ export class CourseService {
           updateFields.cumulativeMinMarks ?? existing.cumulativeMinMarks,
       };
 
-      const derived = computeDerivedFields(merged);
+      const normalizedMerged = normalizeByMode(merged);
+      const derived = computeDerivedFields(normalizedMerged);
+      const {
+        departmentName: normalizedDepartmentName,
+        semesterId: normalizedSemesterId,
+        cycle: normalizedCycle,
+        ...normalizedCourseFields
+      } = normalizedMerged;
 
       const course = await db.course.update({
         where: { id },
         data: {
-          ...updateFields,
+          ...normalizedCourseFields,
           ...derived,
-          ...(cycle ? { cycle } : {}),
-          ...(departmentName
-            ? { department: { connect: { name: departmentName } } }
+          ...(normalizedCycle ? { cycle: normalizedCycle } : {}),
+          ...(normalizedDepartmentName
+            ? { department: { connect: { name: normalizedDepartmentName } } }
             : {}),
-          ...(semesterId ? { semester: { connect: { id: semesterId } } } : {}),
+          ...(normalizedSemesterId
+            ? { semester: { connect: { id: normalizedSemesterId } } }
+            : {}),
         },
       });
 

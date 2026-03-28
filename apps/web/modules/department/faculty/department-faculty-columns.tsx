@@ -2,6 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { DepartmentFacultyResponseType } from "@webcampus/schemas/department";
+import { Badge } from "@webcampus/ui/components/badge";
 
 const formatDesignation = (designation: string) => {
   return designation
@@ -15,6 +16,16 @@ export const departmentFacultyColumns: ColumnDef<DepartmentFacultyResponseType>[
     {
       accessorKey: "name",
       header: "Faculty Name",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          {row.original.name}
+          {row.original.isHod ? (
+            <Badge variant="secondary" className="h-5 py-0 text-xs">
+              HOD
+            </Badge>
+          ) : null}
+        </div>
+      ),
     },
     {
       accessorKey: "email",

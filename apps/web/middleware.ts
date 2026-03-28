@@ -17,15 +17,24 @@ export async function middleware(request: NextRequest) {
   const isSignInPage = isSignInRoute(pathname);
   const isHomePage = pathname === "/" || pathname === "";
 
-  const { data: session } = await betterFetch<Session>(
-    `${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/api/auth/get-session`,
-    {
-      baseURL: request.nextUrl.origin,
-      headers: {
-        cookie: request.headers.get("cookie") || "",
-      },
-    }
-  );
+  let session: Session | null = null;
+
+  try {
+    const response = await betterFetch<Session>(
+      `${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/api/auth/get-session`,
+      {
+        baseURL: request.nextUrl.origin,
+        headers: {
+          cookie: request.headers.get("cookie") || "",
+        },
+      }
+    );
+    session = response.data ?? null;
+  } catch (error) {
+    // If the API is temporarily unavailable, continue as unauthenticated
+    // instead of crashing middleware with a runtime error.
+    console.error("Session fetch failed in middleware:", error);
+  }
 
   if (session && isSignInPage) {
     url.pathname = DASHBOARD_REDIRECTS[session.user?.role as Role];

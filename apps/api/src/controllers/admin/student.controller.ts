@@ -9,6 +9,39 @@ import {
 import { Request, Response } from "express";
 
 export class AdminStudentController {
+  static async getById(
+    req: Request<{ id: string }>,
+    res: Response
+  ): Promise<void> {
+    try {
+      const response = await AdminStudentService.getById(req.params.id);
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error fetching admin student details", error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      const statusCode = errorMessage.includes("not found") ? 404 : 500;
+
+      sendResponse({
+        res,
+        status: "error",
+        message: errorMessage,
+        statusCode,
+        error,
+      });
+    }
+  }
+
   static async getAll(req: Request, res: Response): Promise<void> {
     try {
       // Parse through Zod to ensure coercion (string "1" → number 1)

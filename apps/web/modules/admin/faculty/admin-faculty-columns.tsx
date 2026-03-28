@@ -13,6 +13,8 @@ export type AdminFacultyResponse = {
   user: {
     name: string;
     email: string;
+    username?: string | null;
+    displayUsername?: string | null;
   };
   hod?: { id: string } | null;
 };
@@ -36,6 +38,16 @@ export const AdminFacultyColumns: ColumnDef<AdminFacultyResponse>[] = [
     accessorKey: "user.email",
     header: "Email",
     cell: ({ row }) => <div>{row.original.user?.email}</div>,
+  },
+  {
+    accessorKey: "user.username",
+    header: "Username",
+    cell: ({ row }) => <div>{row.original.user?.username || "-"}</div>,
+  },
+  {
+    accessorKey: "user.displayUsername",
+    header: "Display Username",
+    cell: ({ row }) => <div>{row.original.user?.displayUsername || "-"}</div>,
   },
   {
     accessorKey: "shortName",

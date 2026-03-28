@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import axios, { AxiosError, AxiosResponse } from "axios";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -50,6 +50,7 @@ export const EditDepartmentDialog = ({
 }: EditDepartmentDialogProps) => {
   const queryClient = useQueryClient();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const form = useForm<z.infer<typeof UpdateDepartmentSchema>>({
     resolver: zodResolver(UpdateDepartmentSchema),
@@ -58,6 +59,8 @@ export const EditDepartmentDialog = ({
       code: department.code,
       abbreviation: department.abbreviation,
       type: department.type || "DEGREE_GRANTING",
+      username: department.username || "",
+      displayUsername: department.displayUsername || department.name,
     },
   });
 
@@ -69,16 +72,35 @@ export const EditDepartmentDialog = ({
         code: department.code,
         abbreviation: department.abbreviation,
         type: department.type || "DEGREE_GRANTING",
+        username: department.username || "",
+        displayUsername: department.displayUsername || department.name,
       });
+      setLogoFile(null);
     }
   }, [open, department, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (values: z.infer<typeof UpdateDepartmentSchema>) => {
+      const formData = new FormData();
+      Object.entries(values).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, String(value));
+        }
+      });
+
+      if (logoFile) {
+        formData.append("logo", logoFile);
+      }
+
       return await axios.patch<BaseResponse<unknown>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/department/${department.id}`,
-        values,
-        { withCredentials: true }
+        formData,
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
     },
     onSuccess: (data: AxiosResponse<BaseResponse<unknown>>) => {
@@ -155,6 +177,34 @@ export const EditDepartmentDialog = ({
 
             <FormField
               control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Username</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="text" placeholder="department.username" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="displayUsername"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Display Username</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="text" placeholder="Display name" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="type"
               render={({ field }) => (
                 <FormItem>
@@ -179,6 +229,21 @@ export const EditDepartmentDialog = ({
                 </FormItem>
               )}
             />
+
+            <FormItem>
+              <FormLabel>Update Department Logo</FormLabel>
+              <FormControl>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    setLogoFile(file);
+                  }}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
 
             <DialogFooter>
               <DialogClose asChild>

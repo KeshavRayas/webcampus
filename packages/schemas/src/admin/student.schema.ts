@@ -15,7 +15,24 @@ export const GetAdminStudentsQuerySchema = z.object({
   usn: optionalQueryString(z.string()),
   email: optionalQueryString(z.string()),
   departmentName: optionalQueryString(z.string()),
-  currentSemester: optionalQueryString(z.coerce.number().int().min(1).max(8)),
+  academicYear: optionalQueryString(z.string()),
+  currentSemester: optionalQueryString(
+    z.preprocess(
+      (value) => {
+        if (typeof value !== "string") {
+          return value;
+        }
+
+        const match = value.match(/(\d+)/);
+        if (!match) {
+          return value;
+        }
+
+        return Number(match[1]);
+      },
+      z.coerce.number().int().min(1).max(8)
+    )
+  ),
 });
 
 export const AdminStudentResponseSchema = z.object({
