@@ -17,34 +17,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
-import { ChevronDown, ChevronUp, Power, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AdminSemesterConfigForm } from "./admin-semester-config-form";
-import {
-  useDeleteAcademicTerm,
-  useUpdateAcademicTerm,
-} from "./use-academic-term";
+import { useDeleteAcademicTerm } from "./use-academic-term";
 
 export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { mutate: deleteTerm, isPending: isDeleting } = useDeleteAcademicTerm();
-  const { mutate: updateTerm, isPending: isUpdating } = useUpdateAcademicTerm();
   const lifecycleStatus = term.status ?? (term.isCurrent ? "ACTIVE" : "INACTIVE");
-  const disableManualInactive =
-    (lifecycleStatus === "ACTIVE" || lifecycleStatus === "ARCHIVED") &&
-    term.isCurrent;
-
-  const toggleIsCurrent = () => {
-    if (disableManualInactive) {
-      return;
-    }
-
-    updateTerm({
-      id: term.id,
-      data: { type: term.type, year: term.year, isCurrent: !term.isCurrent },
-    });
-  };
 
   const handleDelete = () => {
     deleteTerm(term.id);
@@ -115,20 +97,6 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant={term.isCurrent ? "secondary" : "default"}
-              size="sm"
-              onClick={toggleIsCurrent}
-              disabled={isUpdating || disableManualInactive}
-            >
-              <Power className="mr-1 hidden h-4 w-4 md:mr-2 md:inline-block" />
-              <span className="hidden md:inline-block">
-                {term.isCurrent ? "Set Inactive" : "Set Active"}
-              </span>
-              <span className="md:hidden">
-                <Power className="h-4 w-4" />
-              </span>
-            </Button>
             <Button
               variant="destructive"
               size="sm"

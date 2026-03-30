@@ -8,6 +8,8 @@
     "build": "tsup",
     "start": "bun run dist/index.js",
     "seed": "tsx scripts/seed.ts",
+    "mock:start": "tsx scripts/mock_start.ts",
+    "submit:mock-applicant": "tsx scripts/submit-mock-applicant.ts",
     "rewrite:admission-usn": "tsx scripts/rewrite-admission-usn.ts",
     "check-types": "tsc --noEmit --pretty",
     "format:write": "prettier --write \"**/*.{ts,tsx,mdx}\" --cache",

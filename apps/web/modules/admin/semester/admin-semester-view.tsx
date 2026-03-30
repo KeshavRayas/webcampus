@@ -43,21 +43,18 @@ type SemesterFilters = {
   status: string;
   type: string;
   year: string;
-  isCurrent: string;
 };
 
 const DEFAULT_SEMESTER_FILTERS: SemesterFilters = {
   status: "ACTIVE",
   type: "",
   year: "",
-  isCurrent: "",
 };
 
 const normalizeFilters = (filters: SemesterFilters): SemesterFilters => ({
   status: filters.status || "ACTIVE",
   type: filters.type || "",
   year: filters.year || "",
-  isCurrent: filters.isCurrent || "",
 });
 
 const createSchema = z.object({
@@ -99,12 +96,6 @@ export const AdminSemesterView = () => {
       ? (appliedFilters.type as z.infer<typeof SemesterTypeSchema>)
       : undefined,
     year: appliedFilters.year || undefined,
-    isCurrent:
-      appliedFilters.isCurrent === "true"
-        ? true
-        : appliedFilters.isCurrent === "false"
-          ? false
-          : undefined,
   });
   const { mutate: createTerm } = useCreateAcademicTerm();
 
@@ -164,17 +155,6 @@ export const AdminSemesterView = () => {
         label: year,
         value: year,
       })),
-    },
-    {
-      key: "isCurrent",
-      label: "Current",
-      type: "select",
-      placeholder: "All",
-      allOptionLabel: "All",
-      options: [
-        { label: "Current", value: "true" },
-        { label: "Not Current", value: "false" },
-      ],
     },
   ];
 

@@ -664,15 +664,15 @@ export const AdminAdmissionView = ({
                     </p>
                     <div className="max-h-56 overflow-auto rounded-md border">
                       <table className="w-full text-sm">
-                        <thead className="bg-muted/50 sticky top-0">
+                        <thead className="bg-muted sticky top-0 z-10">
                           <tr>
-                            <th className="px-3 py-2 text-left font-medium">
+                            <th className="bg-muted px-3 py-2 text-left font-medium">
                               Application ID
                             </th>
-                            <th className="px-3 py-2 text-left font-medium">
+                            <th className="bg-muted px-3 py-2 text-left font-medium">
                               Student Name
                             </th>
-                            <th className="px-3 py-2 text-left font-medium">
+                            <th className="bg-muted px-3 py-2 text-left font-medium">
                               Status
                             </th>
                           </tr>

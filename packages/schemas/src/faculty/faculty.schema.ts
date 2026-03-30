@@ -55,7 +55,6 @@ export const FacultyEditableProfileSchema = z.object({
   contactInformation: z.string().trim().max(300).optional().nullable(),
   mobileNumber: z.string().trim().max(30).optional().nullable(),
   alternateContactNumber: z.string().trim().max(30).optional().nullable(),
-  officeRoom: z.string().trim().max(120).optional().nullable(),
 });
 
 export const FacultyAdminOnlySchema = z.object({

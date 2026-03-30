@@ -10,7 +10,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@webcampus/ui/components/dialog";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
@@ -47,34 +46,47 @@ export const ExperienceSection = ({
   const [formData, setFormData] = useState<ExperiencePayload>(initialExperience);
 
   const title = useMemo(
-    () => (editingId ? "Edit Experience" : "Add Experience"),
+    () => (editingId ? "Update Experience" : "Add Experience"),
     [editingId]
   );
+
+  const resetForm = () => {
+    setEditingId(null);
+    setFormData(initialExperience);
+  };
 
   return (
     <section className="bg-card rounded-xl border p-6">
       <div className="mb-4 flex items-center justify-between">
         <h4 className="border-b pb-2 text-lg font-semibold">Working Experience</h4>
-        <Dialog
-          open={open}
-          onOpenChange={(nextOpen) => {
-            setOpen(nextOpen);
-            if (!nextOpen) {
-              setEditingId(null);
-              setFormData(initialExperience);
-            }
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            resetForm();
+            setOpen(true);
           }}
+          disabled={isWorking}
         >
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              Add experience
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{title}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
+          Update
+        </Button>
+      </div>
+
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          setOpen(nextOpen);
+          if (!nextOpen) {
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] w-[95vw] sm:max-w-xl md:max-w-2xl lg:max-w-4xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Designation</Label>
                 <Input
@@ -96,52 +108,56 @@ export const ExperienceSection = ({
                   }
                 />
               </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, startDate: event.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>End Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.endDate || ""}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, endDate: event.target.value }))
-                    }
-                  />
-                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, startDate: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Input
+                  type="date"
+                  value={formData.endDate || ""}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, endDate: event.target.value }))
+                  }
+                />
               </div>
             </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                disabled={isWorking}
-                onClick={() => {
-                  const payload = {
-                    ...formData,
-                    endDate: formData.endDate || undefined,
-                  };
-                  if (editingId) {
-                    onUpdate(editingId, payload);
-                  } else {
-                    onCreate(payload);
-                  }
-                  setOpen(false);
-                }}
-              >
-                {isWorking ? "Saving..." : "Save"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              disabled={isWorking}
+              onClick={() => {
+                const payload = {
+                  ...formData,
+                  endDate: formData.endDate || undefined,
+                };
+                if (editingId) {
+                  onUpdate(editingId, payload);
+                } else {
+                  onCreate(payload);
+                }
+                setOpen(false);
+              }}
+            >
+              {isWorking ? "Saving..." : editingId ? "Update" : "Add"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-4">
         {profile.experiences.length ? (

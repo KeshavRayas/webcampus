@@ -8,7 +8,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@webcampus/ui/components/dialog";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
@@ -68,67 +67,53 @@ export const QualificationsTable = ({
   const [formData, setFormData] = useState<QualificationPayload>(initialQualification);
 
   const title = useMemo(
-    () => (editingId ? "Edit Qualification" : "Add Qualification"),
+    () => (editingId ? "Update Qualification" : "Add Qualification"),
     [editingId]
   );
+
+  const resetForm = () => {
+    setEditingId(null);
+    setFormData(initialQualification);
+  };
 
   return (
     <section className="bg-card rounded-xl border p-6">
       <div className="mb-4 flex items-center justify-between">
         <h4 className="border-b pb-2 text-lg font-semibold">Academic Qualifications</h4>
-        <Dialog
-          open={open}
-          onOpenChange={(nextOpen) => {
-            setOpen(nextOpen);
-            if (!nextOpen) {
-              setEditingId(null);
-              setFormData(initialQualification);
-            }
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            resetForm();
+            setOpen(true);
           }}
+          disabled={isWorking}
         >
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              Add qualification
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{title}</DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-1 gap-4 py-2 md:grid-cols-2">
+          Update
+        </Button>
+      </div>
+
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          setOpen(nextOpen);
+          if (!nextOpen) {
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] w-[95vw] sm:max-w-xl md:max-w-3xl lg:max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
               <div className="space-y-2">
                 <Label>Program</Label>
                 <Input
                   value={formData.program}
                   onChange={(event) =>
                     setFormData((prev) => ({ ...prev, program: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Degree</Label>
-                <Input
-                  value={formData.degree}
-                  onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, degree: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Specialization</Label>
-                <Input
-                  value={formData.specialization}
-                  onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, specialization: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Institution</Label>
-                <Input
-                  value={formData.institution}
-                  onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, institution: event.target.value }))
                   }
                 />
               </div>
@@ -165,26 +150,59 @@ export const QualificationsTable = ({
                   }
                 />
               </div>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                disabled={isWorking}
-                onClick={() => {
-                  if (editingId) {
-                    onUpdate(editingId, formData);
-                  } else {
-                    onCreate(formData);
+              <div className="space-y-2">
+                <Label>Degree</Label>
+                <Input
+                  value={formData.degree}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, degree: event.target.value }))
                   }
-                  setOpen(false);
-                }}
-              >
-                {isWorking ? "Saving..." : "Save"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Specialization</Label>
+                <Input
+                  value={formData.specialization}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, specialization: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Institution / University Name</Label>
+                <Input
+                  value={formData.institution}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, institution: event.target.value }))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              disabled={isWorking}
+              onClick={() => {
+                if (editingId) {
+                  onUpdate(editingId, formData);
+                } else {
+                  onCreate(formData);
+                }
+                setOpen(false);
+              }}
+            >
+              {isWorking ? "Saving..." : editingId ? "Update" : "Add"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="overflow-x-auto">
         <Table>

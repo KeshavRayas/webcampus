@@ -9,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@webcampus/ui/components/dialog";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
@@ -20,7 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-import { DataField } from "./data-field";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@webcampus/ui/components/table";
 
 type PublicationPayload = {
   category: "JOURNAL" | "CONFERENCE" | "BOOK_CHAPTER_OR_BOOK" | "CASE_STUDY" | "PATENT";
@@ -62,34 +68,47 @@ export const PublicationsList = ({
   const [formData, setFormData] = useState<PublicationPayload>(initialPublication);
 
   const title = useMemo(
-    () => (editingId ? "Edit Publication" : "Add Publication"),
+    () => (editingId ? "Update Publication" : "Add Publication"),
     [editingId]
   );
+
+  const resetForm = () => {
+    setEditingId(null);
+    setFormData(initialPublication);
+  };
 
   return (
     <section className="bg-card rounded-xl border p-6">
       <div className="mb-4 flex items-center justify-between">
         <h4 className="border-b pb-2 text-lg font-semibold">Publications</h4>
-        <Dialog
-          open={open}
-          onOpenChange={(nextOpen) => {
-            setOpen(nextOpen);
-            if (!nextOpen) {
-              setEditingId(null);
-              setFormData(initialPublication);
-            }
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            resetForm();
+            setOpen(true);
           }}
+          disabled={isWorking}
         >
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              Add publication
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{title}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
+          Update
+        </Button>
+      </div>
+
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          setOpen(nextOpen);
+          if (!nextOpen) {
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] w-[95vw] sm:max-w-xl md:max-w-3xl lg:max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label>Category</Label>
                 <Select
@@ -110,29 +129,16 @@ export const PublicationsList = ({
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Published Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.publishedDate}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, publishedDate: event.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Weblink</Label>
-                  <Input
-                    value={formData.weblink}
-                    onChange={(event) =>
-                      setFormData((prev) => ({ ...prev, weblink: event.target.value }))
-                    }
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Published Date</Label>
+                <Input
+                  type="date"
+                  value={formData.publishedDate}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, publishedDate: event.target.value }))
+                  }
+                />
               </div>
-
               <div className="space-y-2">
                 <Label>Authors</Label>
                 <Input
@@ -142,114 +148,131 @@ export const PublicationsList = ({
                   }
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label>Publication Details</Label>
-                <Input
-                  value={formData.publicationDetails}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      publicationDetails: event.target.value,
-                    }))
-                  }
-                />
-              </div>
             </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                disabled={isWorking}
-                onClick={() => {
-                  if (editingId) {
-                    onUpdate(editingId, formData);
-                  } else {
-                    onCreate(formData);
-                  }
-                  setOpen(false);
-                }}
-              >
-                {isWorking ? "Saving..." : "Save"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
 
-      <div className="space-y-4">
-        {profile.publications.length ? (
-          profile.publications.map((publication) => (
-            <div key={publication.id} className="rounded-lg border p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="font-semibold">{formatCategory(publication.category)}</p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setEditingId(publication.id);
-                      setFormData({
-                        category: publication.category,
-                        publishedDate: new Date(publication.publishedDate)
-                          .toISOString()
-                          .slice(0, 10),
-                        authors: publication.authors,
-                        publicationDetails: publication.publicationDetails,
-                        weblink: publication.weblink || "",
-                      });
-                      setOpen(true);
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => onDelete(publication.id)}
-                    disabled={isWorking}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label>Publication Details</Label>
+              <Input
+                value={formData.publicationDetails}
+                onChange={(event) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    publicationDetails: event.target.value,
+                  }))
+                }
+              />
+            </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <DataField
-                  label="Published Date"
-                  value={new Date(publication.publishedDate).toLocaleDateString()}
-                />
-                <DataField label="Authors" value={publication.authors} />
-                <DataField
-                  label="Publication Title"
-                  value={publication.publicationDetails}
-                />
-                <DataField
-                  label="Weblink"
-                  value={
-                    publication.weblink ? (
+            <div className="space-y-2">
+              <Label>Weblink</Label>
+              <Input
+                value={formData.weblink}
+                onChange={(event) =>
+                  setFormData((prev) => ({ ...prev, weblink: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              disabled={isWorking}
+              onClick={() => {
+                if (editingId) {
+                  onUpdate(editingId, formData);
+                } else {
+                  onCreate(formData);
+                }
+                setOpen(false);
+              }}
+            >
+              {isWorking ? "Saving..." : editingId ? "Update" : "Add"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Category</TableHead>
+              <TableHead>Publication Details</TableHead>
+              <TableHead className="w-[140px]">Published Date</TableHead>
+              <TableHead className="w-[120px]">Weblink</TableHead>
+              <TableHead className="w-[140px] text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {profile.publications.length ? (
+              profile.publications.map((publication) => (
+                <TableRow key={publication.id}>
+                  <TableCell>{formatCategory(publication.category)}</TableCell>
+                  <TableCell>{publication.publicationDetails}</TableCell>
+                  <TableCell>
+                    {new Date(publication.publishedDate).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    {publication.weblink ? (
                       <a
                         href={publication.weblink}
                         target="_blank"
                         rel="noreferrer"
                         className="text-primary hover:underline"
                       >
-                        {publication.weblink}
+                        Weblink
                       </a>
                     ) : (
                       "-"
-                    )
-                  }
-                />
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="bg-secondary/20 rounded-xl border p-6 text-center">
-            <p className="text-muted-foreground text-sm">No publications added yet.</p>
-          </div>
-        )}
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingId(publication.id);
+                          setFormData({
+                            category: publication.category,
+                            publishedDate: new Date(publication.publishedDate)
+                              .toISOString()
+                              .slice(0, 10),
+                            authors: publication.authors,
+                            publicationDetails: publication.publicationDetails,
+                            weblink: publication.weblink || "",
+                          });
+                          setOpen(true);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => onDelete(publication.id)}
+                        disabled={isWorking}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center text-sm text-muted-foreground">
+                  No publications added yet.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
     </section>
   );

@@ -26,6 +26,11 @@ export class AdminStudentService {
               createdAt: true,
             },
           },
+          department: {
+            select: {
+              id: true,
+            },
+          },
         },
       });
 
@@ -34,7 +39,9 @@ export class AdminStudentService {
       }
 
       const admission = await db.admission.findFirst({
-        where: { usn: student.usn },
+        where: {
+          OR: [{ studentId: student.id }, { tempUsn: student.usn }],
+        },
         select: {
           applicationId: true,
           modeOfAdmission: true,
@@ -63,10 +70,39 @@ export class AdminStudentService {
           permanentState: true,
           permanentCountry: true,
           permanentPincode: true,
+          semesterId: true,
+          semester: {
+            select: {
+              programType: true,
+              semesterNumber: true,
+              academicTermId: true,
+              academicTerm: {
+                select: {
+                  type: true,
+                  year: true,
+                },
+              },
+            },
+          },
           createdAt: true,
           updatedAt: true,
         },
       });
+
+      const academicTermLabel = admission?.semester?.academicTerm
+        ? `${admission.semester.academicTerm.type.toUpperCase()} ${admission.semester.academicTerm.year}`
+        : null;
+
+      const resolvedProgramType =
+        student.programType ?? admission?.semester?.programType ?? null;
+      const resolvedSemesterId = student.semesterId ?? admission?.semesterId ?? null;
+      const resolvedTermId =
+        student.academicTermId ?? admission?.semester?.academicTermId ?? null;
+      const resolvedTermType =
+        student.academicTermType ?? admission?.semester?.academicTerm?.type ?? null;
+      const resolvedTermYear =
+        student.academicTermYear ?? admission?.semester?.academicTerm?.year ?? null;
+      const resolvedTermLabel = student.academicTermLabel ?? academicTermLabel;
 
       return {
         status: "success",
@@ -74,9 +110,16 @@ export class AdminStudentService {
         data: {
           id: student.id,
           usn: student.usn,
+          departmentId: student.department?.id ?? null,
           departmentName: student.departmentName,
           currentSemester: student.currentSemester,
           academicYear: student.academicYear,
+          semesterId: resolvedSemesterId,
+          programType: resolvedProgramType,
+          academicTermId: resolvedTermId,
+          academicTermType: resolvedTermType,
+          academicTermYear: resolvedTermYear,
+          academicTermLabel: resolvedTermLabel,
           user: student.user,
           admission,
         },
@@ -103,10 +146,11 @@ export class AdminStudentService {
         where.usn = { contains: query.usn, mode: "insensitive" };
       }
 
-      if (query.departmentName) {
-        where.departmentName = {
-          equals: query.departmentName,
-          mode: "insensitive",
+      if (query.departmentId) {
+        where.department = {
+          is: {
+            id: query.departmentId,
+          },
         };
       }
 
@@ -114,6 +158,20 @@ export class AdminStudentService {
         where.academicYear = {
           equals: query.academicYear,
           mode: "insensitive",
+        };
+      }
+
+      if (query.academicTermId || query.programType || query.semesterId) {
+        where.admission = {
+          is: {
+            ...(query.semesterId ? { semesterId: query.semesterId } : {}),
+            semester: {
+              ...(query.academicTermId
+                ? { academicTermId: query.academicTermId }
+                : {}),
+              ...(query.programType ? { programType: query.programType } : {}),
+            },
+          },
         };
       }
 
@@ -143,21 +201,60 @@ export class AdminStudentService {
               email: true,
             },
           },
+          department: {
+            select: {
+              id: true,
+            },
+          },
+          admission: {
+            select: {
+              semesterId: true,
+              semester: {
+                select: {
+                  programType: true,
+                  academicTermId: true,
+                  academicTerm: {
+                    select: {
+                      type: true,
+                      year: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: { usn: "asc" },
       });
 
       const students: AdminStudentResponseType[] = studentRecords.map(
-        (record) => ({
-          id: record.id,
-          userId: record.userId,
-          usn: record.usn,
-          name: record.user.name ?? null,
-          email: record.user.email ?? null,
-          departmentName: record.departmentName,
-          currentSemester: record.currentSemester,
-          academicYear: record.academicYear,
-        })
+        (record) => {
+          const term = record.admission?.semester?.academicTerm;
+
+          return {
+            id: record.id,
+            userId: record.userId,
+            usn: record.usn,
+            name: record.user.name ?? null,
+            email: record.user.email ?? null,
+            departmentId: record.department?.id ?? null,
+            departmentName: record.departmentName,
+            currentSemester: record.currentSemester,
+            academicYear: record.academicYear,
+            semesterId: record.semesterId ?? record.admission?.semesterId ?? null,
+            programType:
+              record.programType ?? record.admission?.semester?.programType ?? null,
+            academicTermId:
+              record.academicTermId ??
+              record.admission?.semester?.academicTermId ??
+              null,
+            academicTermType: record.academicTermType ?? term?.type ?? null,
+            academicTermYear: record.academicTermYear ?? term?.year ?? null,
+            academicTermLabel:
+              record.academicTermLabel ??
+              (term ? `${term.type.toUpperCase()} ${term.year}` : null),
+          };
+        }
       );
 
       return {

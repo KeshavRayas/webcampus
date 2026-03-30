@@ -23,6 +23,9 @@ export function useCascadingFilterSync<T extends Record<string, string>>(
   options: CascadingFilterOptions
 ) {
   useEffect(() => {
+    const departmentFilterValue =
+      (filters as any).departmentId || (filters as any).departmentName;
+
     // Check if selected academic term still exists
     if (
       filters.academicTerm &&
@@ -34,7 +37,8 @@ export function useCascadingFilterSync<T extends Record<string, string>>(
         academicTerm: "",
         semester: "",
         // Clear department if cascade deletion also affects it
-        ...(prev as any).departmentName ? { departmentName: "" } : {},
+        ...((prev as any).departmentId ? { departmentId: "" } : {}),
+        ...((prev as any).departmentName ? { departmentName: "" } : {}),
       }));
       return;
     }
@@ -54,13 +58,14 @@ export function useCascadingFilterSync<T extends Record<string, string>>(
 
     // Check if selected department still exists
     if (
-      (filters as any).departmentName &&
+      departmentFilterValue &&
       options.departments?.length &&
-      !options.departments.some((d) => d.id === (filters as any).departmentName)
+      !options.departments.some((d) => d.id === departmentFilterValue)
     ) {
       setFilters((prev) => ({
         ...prev,
-        departmentName: "",
+        ...((prev as any).departmentId ? { departmentId: "" } : {}),
+        ...((prev as any).departmentName ? { departmentName: "" } : {}),
       }));
       return;
     }

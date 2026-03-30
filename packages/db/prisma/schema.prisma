@@ -315,6 +315,13 @@ model Student {
   department      Department           @relation(fields: [departmentName], references: [name])
   departmentName  String
   currentSemester Int
+  semesterId      String?
+  semesterNumber  Int?
+  programType     ProgramType?
+  academicTermId  String?
+  academicTermType SemesterType?
+  academicTermYear String?
+  academicTermLabel String?
   studentSections StudentSection[]
   academicYear    String
   registrations   CourseRegistration[]
@@ -324,6 +331,10 @@ model Student {
   admission       Admission?
 
   @@index([departmentName])
+  @@index([semesterId])
+  @@index([semesterNumber])
+  @@index([programType])
+  @@index([academicTermId])
 }
 
 model Faculty {

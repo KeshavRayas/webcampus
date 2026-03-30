@@ -21,18 +21,20 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import { Skeleton } from "@webcampus/ui/components/skeleton";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { useAcademicTerms } from "../semester/use-academic-term";
-import { adminStudentColumns } from "./admin-students-columns";
+import { getAdminStudentColumns } from "./admin-students-columns";
 
 type StudentFilters = {
   usn: string;
   name: string;
   email: string;
-  departmentName: string;
+  departmentId: string;
   academicTerm: string;
+  programType: string;
   semester: string;
 };
 
@@ -40,8 +42,9 @@ const EMPTY_FILTERS: StudentFilters = {
   usn: "",
   name: "",
   email: "",
-  departmentName: "",
+  departmentId: "",
   academicTerm: "",
+  programType: "",
   semester: "",
 };
 
@@ -67,11 +70,17 @@ export const AdminStudentsView = () => {
   );
 
   const selectedTermSemesters = selectedTerm?.Semester || [];
+  const filteredTermSemesters =
+    draftFilters.programType.length > 0
+      ? selectedTermSemesters.filter(
+          (semester) => semester.programType === draftFilters.programType
+        )
+      : selectedTermSemesters;
 
   // Sync filters when data changes (auto-clear if value no longer exists)
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: selectedTermSemesters,
+    semesters: filteredTermSemesters,
     departments,
   });
 
@@ -88,16 +97,6 @@ export const AdminStudentsView = () => {
     }));
   };
 
-  const appliedTermYear = useMemo(() => {
-    if (!appliedFilters.academicTerm) {
-      return "";
-    }
-
-    return (
-      terms.find((term) => term.id === appliedFilters.academicTerm)?.year || ""
-    );
-  }, [terms, appliedFilters.academicTerm]);
-
   const applyFilters = () => {
     setAppliedFilters(draftFilters);
     const query = createFilterQueryString(draftFilters);
@@ -113,19 +112,24 @@ export const AdminStudentsView = () => {
   };
 
   const response = useQuery({
-    queryKey: ["admin-students", appliedFilters, appliedTermYear],
+    queryKey: ["admin-students", appliedFilters],
     queryFn: async () => {
       const apiFilters = {
         ...(appliedFilters.usn ? { usn: appliedFilters.usn } : {}),
         ...(appliedFilters.name ? { name: appliedFilters.name } : {}),
         ...(appliedFilters.email ? { email: appliedFilters.email } : {}),
-        ...(appliedFilters.departmentName
-          ? { departmentId: appliedFilters.departmentName }
+        ...(appliedFilters.departmentId
+          ? { departmentId: appliedFilters.departmentId }
+          : {}),
+        ...(appliedFilters.academicTerm
+          ? { academicTermId: appliedFilters.academicTerm }
+          : {}),
+        ...(appliedFilters.programType
+          ? { programType: appliedFilters.programType }
           : {}),
         ...(appliedFilters.semester
-          ? { currentSemester: appliedFilters.semester }
+          ? { semesterId: appliedFilters.semester }
           : {}),
-        ...(appliedTermYear ? { academicYear: appliedTermYear } : {}),
       };
 
       const res = await axios.get<BaseResponse<AdminStudentResponseType[]>>(
@@ -140,9 +144,27 @@ export const AdminStudentsView = () => {
         return res.data.data;
       }
 
-      return [] as AdminStudentResponseType[];
+      throw new Error(res.data.message || "Failed to fetch students");
     },
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
+
+  useEffect(() => {
+    if (!response.isError) {
+      return;
+    }
+
+    const message =
+      response.error instanceof AxiosError
+        ? response.error.response?.data?.error || "Failed to load students"
+        : response.error instanceof Error
+          ? response.error.message
+          : "Failed to load students";
+
+    toast.error(message);
+  }, [response.error, response.isError]);
 
   // Build department options from the fetched departments
   const departmentOptions = useMemo(
@@ -164,17 +186,26 @@ export const AdminStudentsView = () => {
 
   const semesterOptions = useMemo(
     () =>
-      selectedTermSemesters.map((semester) => ({
+      filteredTermSemesters.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
-        value: `${semester.programType} - Semester ${semester.semesterNumber}`,
+        value: semester.id,
       })),
-    [selectedTermSemesters]
+    [filteredTermSemesters]
   );
 
   const updateAcademicTermFilter = (value: string) => {
     setDraftFilters((current) => ({
       ...current,
       academicTerm: value,
+      programType: "",
+      semester: "",
+    }));
+  };
+
+  const updateProgramTypeFilter = (value: string) => {
+    setDraftFilters((current) => ({
+      ...current,
+      programType: value,
       semester: "",
     }));
   };
@@ -202,7 +233,7 @@ export const AdminStudentsView = () => {
       placeholder: "Search by email",
     },
     {
-      key: "departmentName",
+      key: "departmentId",
       label: "Department",
       type: "select",
       allOptionLabel: "All departments",
@@ -218,12 +249,27 @@ export const AdminStudentsView = () => {
       options: termOptions,
     },
     {
+      key: "programType",
+      label: "Program Type",
+      type: "select",
+      allOptionLabel: "All programs",
+      placeholder: draftFilters.academicTerm
+        ? "All programs"
+        : "Select term first",
+      options: [
+        { label: "UG", value: "UG" },
+        { label: "PG", value: "PG" },
+      ],
+    },
+    {
       key: "semester",
       label: "Semester",
       type: "select",
       allOptionLabel: "All semesters",
       placeholder: draftFilters.academicTerm
-        ? "All semesters"
+        ? draftFilters.programType
+          ? "All semesters"
+          : "Select program type"
         : "Select term first",
       options: semesterOptions,
     },
@@ -269,10 +315,15 @@ export const AdminStudentsView = () => {
               return;
             }
 
+            if (key === "programType") {
+              updateProgramTypeFilter(value);
+              return;
+            }
+
             updateDraftFilter(key, value);
           }}
           allValue={DEFAULT_FILTER_ALL_VALUE}
-          className="md:grid-cols-2 xl:grid-cols-6"
+          className="md:grid-cols-2 xl:grid-cols-7"
         />
         <FilterActions onApply={applyFilters} onReset={resetFilters} />
       </FilterPanel>
@@ -281,13 +332,24 @@ export const AdminStudentsView = () => {
         <p className="text-muted-foreground text-sm">Applying filters...</p>
       )}
 
-      {students.length === 0 ? (
+      {response.isError ? (
+        <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
+          We could not load students right now. Please retry after a moment.
+        </div>
+      ) : null}
+
+      {!response.isError && students.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
           No students found for the selected filters.
         </div>
-      ) : (
-        <DataTable columns={adminStudentColumns} data={students} />
-      )}
+      ) : !response.isError ? (
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-sm">
+            Showing {students.length} students
+          </p>
+          <DataTable columns={getAdminStudentColumns(true)} data={students} />
+        </div>
+      ) : null}
     </div>
   );
 };

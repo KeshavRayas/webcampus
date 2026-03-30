@@ -835,7 +835,8 @@ export class AdmissionService {
             where: { id: payload.semesterId },
             select: {
               id: true,
-              academicTerm: { select: { year: true } },
+              programType: true,
+              academicTerm: { select: { id: true, type: true, year: true } },
               semesterNumber: true,
             },
           }),
@@ -989,6 +990,24 @@ export class AdmissionService {
             const finalStudentUsn = existingStudent?.usn ?? finalUsn;
 
             if (existingStudent) {
+              const academicTermLabel = `${semester.academicTerm.type.toUpperCase()} ${semester.academicTerm.year}`;
+
+              await tx.student.update({
+                where: { id: existingStudent.id },
+                data: {
+                  departmentName: department.name,
+                  currentSemester: semester.semesterNumber,
+                  academicYear: semester.academicTerm.year,
+                  semesterId: semester.id,
+                  semesterNumber: semester.semesterNumber,
+                  programType: semester.programType,
+                  academicTermId: semester.academicTerm.id,
+                  academicTermType: semester.academicTerm.type,
+                  academicTermYear: semester.academicTerm.year,
+                  academicTermLabel,
+                },
+              });
+
               await tx.admission.update({
                 where: { id: admission.id },
                 data: {
@@ -1020,6 +1039,13 @@ export class AdmissionService {
                 departmentName: department.name,
                 currentSemester: semester.semesterNumber,
                 academicYear: semester.academicTerm.year,
+                semesterId: semester.id,
+                semesterNumber: semester.semesterNumber,
+                programType: semester.programType,
+                academicTermId: semester.academicTerm.id,
+                academicTermType: semester.academicTerm.type,
+                academicTermYear: semester.academicTerm.year,
+                academicTermLabel: `${semester.academicTerm.type.toUpperCase()} ${semester.academicTerm.year}`,
               },
               select: {
                 id: true,

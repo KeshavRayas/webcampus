@@ -40,7 +40,6 @@ export type FacultyProfilePayload = {
   qualification?: string | null;
   dateOfJoining?: string | null;
   researchArea?: string | null;
-  officeRoom?: string | null;
   gender?: z.infer<typeof FacultyGenderEnum> | null;
   dob?: string | null;
   bloodGroup?: string | null;

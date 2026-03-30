@@ -212,8 +212,10 @@ export class UserService {
    */
   private async createUserWithUsername(): Promise<Partial<User>> {
     try {
+      const { role: _ignoredRole, ...signUpBody } = this.body;
+
       const { user } = await auth.api.signUpEmail({
-        body: this.body,
+        body: signUpBody,
         headers: fromNodeHeaders(this.headers),
       });
       this.userId = user.id;
