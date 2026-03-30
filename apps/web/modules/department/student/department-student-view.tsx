@@ -6,7 +6,6 @@ import {
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
-import { useDepartments } from "@/lib/use-departments";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import {
@@ -31,8 +30,8 @@ import { departmentStudentColumns } from "./department-student-columns";
 type StudentFilters = {
   usn: string;
   name: string;
-  departmentName: string;
   academicTerm: string;
+  programType: string;
   semester: string;
   section: string;
 };
@@ -40,8 +39,8 @@ type StudentFilters = {
 const EMPTY_FILTERS: StudentFilters = {
   usn: "",
   name: "",
-  departmentName: "",
   academicTerm: "",
+  programType: "",
   semester: "",
   section: "",
 };
@@ -69,26 +68,7 @@ export const DepartmentStudentView = () => {
     setIsHydrated(true);
   }, []);
 
-  // Fetch department type for conditional filter rendering
-  const { data: deptInfo } = useQuery({
-    queryKey: ["department-info"],
-    queryFn: async () => {
-      const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
-        {
-          withCredentials: true,
-        }
-      );
-      if (res.data.status === "success") return res.data.data;
-      return { type: "DEGREE_GRANTING", name: "" };
-    },
-    enabled: !!session?.user?.id,
-  });
-
-  const isDegreeGranting = deptInfo?.type === "DEGREE_GRANTING";
-
   const { data: terms = [] } = useAcademicTerms();
-  const { data: departments = [] } = useDepartments();
 
   const selectedTerm = useMemo(
     () => terms.find((term) => term.id === draftFilters.academicTerm),
@@ -96,46 +76,43 @@ export const DepartmentStudentView = () => {
   );
 
   const selectedTermSemesters = selectedTerm?.Semester || [];
+  const filteredTermSemesters =
+    draftFilters.programType.length > 0
+      ? selectedTermSemesters.filter(
+          (semester) => semester.programType === draftFilters.programType
+        )
+      : selectedTermSemesters;
 
   // Sync filters when data changes (auto-clear if value no longer exists)
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: selectedTermSemesters,
-    departments,
+    semesters: filteredTermSemesters,
   });
 
   const semesterOptions = useMemo(
     () =>
-      (selectedTermSemesters).map((semester) => ({
+      filteredTermSemesters.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
-        value: `${semester.programType} - Semester ${semester.semesterNumber}`,
+        value: semester.id,
       })),
-    [selectedTermSemesters]
+    [filteredTermSemesters]
   );
 
-  const appliedTermYear = useMemo(() => {
-    if (!appliedFilters.academicTerm) {
-      return "";
-    }
-
-    return (
-      terms.find((term) => term.id === appliedFilters.academicTerm)?.year || ""
-    );
-  }, [terms, appliedFilters.academicTerm]);
-
   const response = useQuery({
-    queryKey: ["department-students", appliedFilters, appliedTermYear],
+    queryKey: ["department-students", appliedFilters],
     queryFn: async () => {
       const apiFilters = {
         ...(appliedFilters.usn ? { usn: appliedFilters.usn } : {}),
         ...(appliedFilters.name ? { name: appliedFilters.name } : {}),
-        ...(appliedFilters.departmentName
-          ? { departmentName: appliedFilters.departmentName }
+        ...(appliedFilters.academicTerm
+          ? { academicTermId: appliedFilters.academicTerm }
+          : {}),
+        ...(appliedFilters.programType
+          ? { programType: appliedFilters.programType }
           : {}),
         ...(appliedFilters.semester
-          ? { currentSemester: appliedFilters.semester }
+          ? { semesterId: appliedFilters.semester }
           : {}),
-        ...(appliedTermYear ? { academicYear: appliedTermYear } : {}),
         ...(appliedFilters.section ? { section: appliedFilters.section } : {}),
       };
 
@@ -166,7 +143,6 @@ export const DepartmentStudentView = () => {
     return options;
   }, [draftFilters.section, response.data]);
 
-  // Build filter fields dynamically based on department type
   const studentFilterFields = useMemo(() => {
     const allFields: FilterFieldConfig<StudentFilters>[] = [
       {
@@ -175,7 +151,6 @@ export const DepartmentStudentView = () => {
         type: "text",
         inputId: "department-student-usn",
         placeholder: "Search by USN",
-        className: "xl:col-span-2",
       },
       {
         key: "name",
@@ -183,13 +158,6 @@ export const DepartmentStudentView = () => {
         type: "text",
         inputId: "department-student-name",
         placeholder: "Search by student name",
-      },
-      {
-        key: "departmentName",
-        label: "Department",
-        type: "text",
-        inputId: "department-student-department-name",
-        placeholder: "Search by department",
       },
       {
         key: "academicTerm",
@@ -203,12 +171,27 @@ export const DepartmentStudentView = () => {
         })),
       },
       {
+        key: "programType",
+        label: "Program Type",
+        type: "select",
+        allOptionLabel: "All programs",
+        placeholder: draftFilters.academicTerm
+          ? "All programs"
+          : "Select term first",
+        options: [
+          { label: "UG", value: "UG" },
+          { label: "PG", value: "PG" },
+        ],
+      },
+      {
         key: "semester",
         label: "Semester",
         type: "select",
         allOptionLabel: "All semesters",
         placeholder: draftFilters.academicTerm
-          ? "All semesters"
+          ? draftFilters.programType
+            ? "All semesters"
+            : "Select program type"
           : "Select term first",
         options: semesterOptions,
       },
@@ -225,13 +208,10 @@ export const DepartmentStudentView = () => {
       },
     ];
 
-    // DEGREE_GRANTING sees only their own students — hide redundant dept filter
-    return isDegreeGranting
-      ? allFields.filter((f) => f.key !== "departmentName")
-      : allFields;
+    return allFields;
   }, [
     draftFilters.academicTerm,
-    isDegreeGranting,
+    draftFilters.programType,
     sectionOptions,
     semesterOptions,
     terms,
@@ -254,6 +234,16 @@ export const DepartmentStudentView = () => {
     setDraftFilters((current) => ({
       ...current,
       academicTerm: value,
+      programType: "",
+      semester: "",
+      section: "",
+    }));
+  };
+
+  const updateProgramTypeFilter = (value: string) => {
+    setDraftFilters((current) => ({
+      ...current,
+      programType: value,
       semester: "",
       section: "",
     }));
@@ -322,6 +312,11 @@ export const DepartmentStudentView = () => {
           onDraftChange={(key, value) => {
             if (key === "academicTerm") {
               updateAcademicTermFilter(value);
+              return;
+            }
+
+            if (key === "programType") {
+              updateProgramTypeFilter(value);
               return;
             }
 

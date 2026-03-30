@@ -41,6 +41,22 @@ export class DepartmentStudentService {
 
       const isBasicSciences = department.type === "BASIC_SCIENCES";
 
+      let resolvedSemesterNumber: number | undefined;
+      if (typeof query.currentSemester === "number") {
+        resolvedSemesterNumber = query.currentSemester;
+      } else if (query.semesterId) {
+        const semester = await db.semester.findUnique({
+          where: {
+            id: query.semesterId,
+          },
+          select: {
+            semesterNumber: true,
+          },
+        });
+
+        resolvedSemesterNumber = semester?.semesterNumber;
+      }
+
       const studentRecords = await db.student.findMany({
         where: {
           ...(isBasicSciences
@@ -55,6 +71,23 @@ export class DepartmentStudentService {
                   mode: "insensitive",
                 },
               }),
+          ...(query.academicTermId || query.programType || query.semesterId
+            ? {
+                admission: {
+                  is: {
+                    ...(query.semesterId ? { semesterId: query.semesterId } : {}),
+                    semester: {
+                      ...(query.academicTermId
+                        ? { academicTermId: query.academicTermId }
+                        : {}),
+                      ...(query.programType
+                        ? { programType: query.programType }
+                        : {}),
+                    },
+                  },
+                },
+              }
+            : {}),
           ...(query.usn
             ? {
                 usn: {
@@ -63,23 +96,15 @@ export class DepartmentStudentService {
                 },
               }
             : {}),
-          ...(query.currentSemester
+          ...(resolvedSemesterNumber
             ? {
-                currentSemester: Number(query.currentSemester),
+                currentSemester: resolvedSemesterNumber,
               }
             : {}),
           ...(query.academicYear
             ? {
                 academicYear: {
                   contains: query.academicYear,
-                  mode: "insensitive",
-                },
-              }
-            : {}),
-          ...(query.departmentName
-            ? {
-                departmentName: {
-                  equals: query.departmentName,
                   mode: "insensitive",
                 },
               }
@@ -104,8 +129,8 @@ export class DepartmentStudentService {
                         mode: "insensitive",
                       },
                     },
-                    ...(query.currentSemester
-                      ? { semester: Number(query.currentSemester) }
+                    ...(resolvedSemesterNumber
+                      ? { semester: resolvedSemesterNumber }
                       : {}),
                     ...(query.academicYear
                       ? {
@@ -141,8 +166,8 @@ export class DepartmentStudentService {
                 studentId: {
                   in: studentIds,
                 },
-                ...(query.currentSemester
-                  ? { semester: Number(query.currentSemester) }
+                ...(resolvedSemesterNumber
+                  ? { semester: resolvedSemesterNumber }
                   : {}),
                 ...(query.academicYear
                   ? {

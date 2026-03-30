@@ -20,24 +20,10 @@ export const AdmissionStatusEnum = z.enum([
 export const DepartmentStudentQuerySchema = z.object({
   usn: optionalQueryString(z.string()),
   name: optionalQueryString(z.string()),
-  departmentName: optionalQueryString(z.string()),
-  currentSemester: optionalQueryString(
-    z.preprocess(
-      (value) => {
-        if (typeof value !== "string") {
-          return value;
-        }
-
-        const match = value.match(/(\d+)/);
-        if (!match) {
-          return value;
-        }
-
-        return Number(match[1]);
-      },
-      z.coerce.number().int().min(1).max(8)
-    )
-  ),
+  academicTermId: optionalQueryString(z.string().uuid()),
+  programType: optionalQueryString(z.enum(["UG", "PG"])),
+  semesterId: optionalQueryString(z.string().uuid()),
+  currentSemester: optionalQueryString(z.coerce.number().int().min(1).max(8)),
   academicYear: optionalQueryString(z.string()),
   section: optionalQueryString(z.string()),
 });
