@@ -91,6 +91,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Courses",
           url: "/department/courses",
           icon: Library,
+          children: [
+            { name: "Course Configuration", url: "/department/courses" },
+            { name: "Course Mapping", url: "/department/course-mapping" },
+          ],
         },
         {
           name: "Sections",

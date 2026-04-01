@@ -11,7 +11,7 @@ import {
 } from "@webcampus/schemas/department";
 import { NextFunction, Request, Response, Router } from "express";
 
-const router = Router();
+const router: Router = Router();
 
 const resolveRequestingUserId = async (req: Request): Promise<string> => {
   const session = await auth.api.getSession({
@@ -91,7 +91,7 @@ const guardSectionWriteAccessFromParams = async (
   next: NextFunction
 ) => {
   try {
-    const sectionId = req.params.id;
+    const sectionId = req.params.id as string;
     if (!sectionId) {
       res.status(400).json({
         status: "error",

@@ -298,12 +298,44 @@ export class CourseService {
       logger.info(response);
       return response;
     } catch (error) {
+      if (error instanceof Error && error.message === "Course not found") {
+        throw error;
+      }
       logger.error("Failed to fetch course", error);
       throw error;
     }
   }
 
   static async getByBranch(
+    name: string,
+    semesterId?: string
+  ): Promise<BaseResponse<Course[]>> {
+    try {
+      const courses = await db.course.findMany({
+        where: {
+          department: {
+            name: {
+              equals: name,
+              mode: "insensitive",
+            },
+          },
+          ...(semesterId ? { semesterId } : {}),
+        },
+        orderBy: { code: "asc" },
+      });
+
+      return {
+        status: "success",
+        message: "Courses fetched successfully",
+        data: courses,
+      };
+    } catch (error) {
+      logger.error("Error fetching courses by branch", error);
+      throw new Error("Failed to fetch courses");
+    }
+  }
+
+  static async getAllByDepartment(
     name: string,
     semesterId?: string
   ): Promise<BaseResponse<Course[]>> {

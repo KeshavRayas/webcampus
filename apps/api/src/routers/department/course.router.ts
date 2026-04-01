@@ -8,7 +8,7 @@ import {
 } from "@webcampus/schemas/department";
 import { Router } from "express";
 
-const router = Router();
+const router: Router = Router();
 
 router.post(
   "/",
@@ -56,6 +56,17 @@ router.get(
     },
   }),
   CourseController.getByBranch
+);
+
+router.get(
+  "/:id",
+  protect({
+    role: "department",
+    permissions: {
+      courses: ["read"],
+    },
+  }),
+  CourseController.getById
 );
 
 export default router;

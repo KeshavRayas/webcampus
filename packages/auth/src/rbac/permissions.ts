@@ -11,7 +11,7 @@ const statement = {
   department: ["create", "read", "update", "delete"],
   hod: ["create", "read", "remove"],
   sectionAssignment: ["create", "read", "update", "delete"],
-  courseAssignment: ["create"],
+  courseAssignment: ["create", "read"],
   section: ["create", "read", "delete"],
   freeze: ["read", "lock"],
   faculty: ["create", "read", "update", "delete"],
@@ -62,6 +62,7 @@ export const roles = {
     sectionAssignment: ["create", "read", "update", "delete"],
     section: ["create", "read", "delete"],
     semester: ["read"],
+    courseAssignment: ["create", "read"],
   }),
   admission_admin: ac.newRole({
     semester: ["read"],

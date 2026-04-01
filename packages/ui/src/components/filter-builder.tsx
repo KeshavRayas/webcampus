@@ -36,6 +36,7 @@ export type FilterFieldConfig<TFilters extends Record<string, string>> = {
   className?: string;
   options?: FilterOption[];
   allOptionLabel?: string;
+  hideAllOption?: boolean;
   formatOptionLabel?: (option: FilterOption) => React.ReactNode;
 };
 
@@ -120,6 +121,7 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
           const options = field.options ?? [];
           const allOptionLabel =
             field.allOptionLabel ?? `All ${field.label.toLowerCase()}`;
+          const shouldHideAll = field.hideAllOption === true;
 
           return (
             <div
@@ -128,11 +130,11 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
             >
               <Label>{field.label}</Label>
               <Select
-                value={value || allValue}
+                value={shouldHideAll ? value || undefined : value || allValue}
                 onValueChange={(nextValue) =>
                   onDraftChange(
                     filterKey,
-                    nextValue === allValue ? "" : nextValue
+                    !shouldHideAll && nextValue === allValue ? "" : nextValue
                   )
                 }
               >
@@ -142,7 +144,9 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={allValue}>{allOptionLabel}</SelectItem>
+                  {!shouldHideAll && (
+                    <SelectItem value={allValue}>{allOptionLabel}</SelectItem>
+                  )}
                   {options.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {field.formatOptionLabel
