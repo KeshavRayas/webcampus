@@ -58,4 +58,15 @@ router.get(
   CourseController.getByBranch
 );
 
+router.get(
+  "/:id",
+  protect({
+    role: "department",
+    permissions: {
+      courses: ["read"],
+    },
+  }),
+  CourseController.getById
+);
+
 export default router;

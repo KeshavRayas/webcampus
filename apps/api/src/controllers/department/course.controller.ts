@@ -105,12 +105,15 @@ export class CourseController {
         });
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      const statusCode = message === "Course not found" ? 404 : 500;
+      
       logger.error("Error Fetching Course", error);
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message,
+        statusCode,
         error,
       });
     }

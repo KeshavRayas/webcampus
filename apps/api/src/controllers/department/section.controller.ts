@@ -44,7 +44,7 @@ export class SectionController {
   static async create(req: Request, res: Response): Promise<void> {
     try {
       const request: CreateSectionType = req.body;
-      const requestingUserId = await this.getRequestingUserId(req);
+      const requestingUserId = await SectionController.getRequestingUserId(req);
       const response = await SectionService.create(request, requestingUserId);
       if (response.status === "success") {
         sendResponse({
@@ -62,7 +62,7 @@ export class SectionController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: this.getErrorStatusCode(error),
+        statusCode: SectionController.getErrorStatusCode(error),
         error,
       });
     }
@@ -71,7 +71,7 @@ export class SectionController {
   static async getAll(req: Request, res: Response): Promise<void> {
     try {
       const query: SectionQueryType = req.query;
-      const requestingUserId = await this.getRequestingUserId(req);
+      const requestingUserId = await SectionController.getRequestingUserId(req);
       const response = await SectionService.getAll(query, requestingUserId);
       if (response.status === "success") {
         sendResponse({
@@ -89,7 +89,7 @@ export class SectionController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: this.getErrorStatusCode(error),
+        statusCode: SectionController.getErrorStatusCode(error),
         error,
       });
     }
@@ -127,7 +127,7 @@ export class SectionController {
     res: Response
   ): Promise<void> {
     try {
-      const requestingUserId = await this.getRequestingUserId(req);
+      const requestingUserId = await SectionController.getRequestingUserId(req);
       await SectionService.assertSectionWriteAccess(
         req.params.id,
         requestingUserId
@@ -150,7 +150,7 @@ export class SectionController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: this.getErrorStatusCode(error),
+        statusCode: SectionController.getErrorStatusCode(error),
         error,
       });
     }
@@ -159,7 +159,7 @@ export class SectionController {
   static async generateSections(req: Request, res: Response): Promise<void> {
     try {
       const data: GenerateSectionsDTO = req.body;
-      const requestingUserId = await this.getRequestingUserId(req);
+      const requestingUserId = await SectionController.getRequestingUserId(req);
       const response = await SectionService.generateSections(
         data,
         requestingUserId
@@ -180,7 +180,7 @@ export class SectionController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: this.getErrorStatusCode(error),
+        statusCode: SectionController.getErrorStatusCode(error),
         error,
       });
     }
@@ -192,7 +192,7 @@ export class SectionController {
         semesterId: string;
         departmentName: string;
       };
-      const requestingUserId = await this.getRequestingUserId(req);
+      const requestingUserId = await SectionController.getRequestingUserId(req);
       const response = await SectionService.getUnassignedCount(
         semesterId,
         departmentName,
@@ -214,7 +214,7 @@ export class SectionController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: this.getErrorStatusCode(error),
+        statusCode: SectionController.getErrorStatusCode(error),
         error,
       });
     }
@@ -263,7 +263,7 @@ export class SectionController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: this.getErrorStatusCode(error),
+        statusCode: SectionController.getErrorStatusCode(error),
         error,
       });
     }
@@ -332,7 +332,7 @@ export class SectionController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: this.getErrorStatusCode(error),
+        statusCode: SectionController.getErrorStatusCode(error),
         error,
       });
     }
@@ -348,7 +348,7 @@ export class SectionController {
         studentIds: string[];
         academicYear: string;
       };
-      const requestingUserId = await this.getRequestingUserId(req);
+      const requestingUserId = await SectionController.getRequestingUserId(req);
       await SectionService.assertSectionWriteAccess(
         sectionId,
         requestingUserId
@@ -375,7 +375,7 @@ export class SectionController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: this.getErrorStatusCode(error),
+        statusCode: SectionController.getErrorStatusCode(error),
         error,
       });
     }
@@ -425,7 +425,7 @@ export class SectionController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: this.getErrorStatusCode(error),
+        statusCode: SectionController.getErrorStatusCode(error),
         error,
       });
     }
@@ -443,7 +443,7 @@ export class SectionController {
         studentsPerSection,
       }: DetailedGenerationPreviewRequestDTO = req.body;
 
-      const requestingUserId = await this.getRequestingUserId(req);
+      const requestingUserId = await SectionController.getRequestingUserId(req);
 
       const response = await SectionService.getDetailedGenerationPreview(
         semesterId,

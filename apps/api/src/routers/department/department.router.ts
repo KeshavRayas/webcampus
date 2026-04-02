@@ -1,4 +1,5 @@
 import DepartmentCourseRouter from "@webcampus/api/src/routers/department/course.router";
+import DepartmentCourseAssignmentRouter from "@webcampus/api/src/routers/department/course-assignment.router";
 import DepartmentFacultyRouter from "@webcampus/api/src/routers/department/faculty.router";
 import DepartmentHODRouter from "@webcampus/api/src/routers/department/hod.router";
 import DepartmentSectionAssignmentRouter from "@webcampus/api/src/routers/department/section-assignment.router";
@@ -9,6 +10,8 @@ import { Router } from "express";
 const router: Router = Router();
 
 router.use("/course", DepartmentCourseRouter);
+
+router.use("/course-assignment", DepartmentCourseAssignmentRouter);
 
 router.use("/faculty", DepartmentFacultyRouter);
 

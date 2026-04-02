@@ -5,6 +5,10 @@ export interface NavMainProps {
     name: string;
     url: string;
     icon: LucideIcon;
+    children?: {
+      name: string;
+      url: string;
+    }[];
   }[];
 }
 
