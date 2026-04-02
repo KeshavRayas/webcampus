@@ -2,66 +2,48 @@
 
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
-import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
-import {
-  CourseMappingStatusItemType,
-  CourseResponseDTO,
-} from "@webcampus/schemas/department";
-import { BaseResponse } from "@webcampus/types/api";
 import {
   FilterActions,
   FilterBuilder,
   FilterFieldConfig,
   FilterPanel,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "react-toastify";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 const BASIC_SCIENCES_CYCLE_OPTIONS = ["PHYSICS", "CHEMISTRY"] as const;
 
-export type CourseMappingFiltersState = {
+export type CourseApprovalsFiltersState = {
   termId: string;
   semesterId: string;
   cycle: string;
-  courseId: string;
-  academicYear: string; // derived from term
+  academicYear: string;
 };
 
-const EMPTY_FILTERS: Omit<CourseMappingFiltersState, "academicYear"> = {
+const EMPTY_FILTERS: Omit<CourseApprovalsFiltersState, "academicYear"> = {
   termId: "",
   semesterId: "",
   cycle: "",
-  courseId: "",
 };
 
-interface CourseMappingFiltersProps {
+interface CourseApprovalsFiltersProps {
   deptInfo: { type: string; name: string } | null;
-  appliedFilters: CourseMappingFiltersState | null;
-  onAppliedFiltersChange: (filters: CourseMappingFiltersState | null) => void;
-  onCourseSelect: (course: CourseResponseDTO | null) => void;
+  onAppliedFiltersChange: (filters: CourseApprovalsFiltersState | null) => void;
 }
 
-export const CourseMappingFilters = ({
+export const CourseApprovalsFilters = ({
   deptInfo,
   onAppliedFiltersChange,
-  onCourseSelect,
-}: CourseMappingFiltersProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+}: CourseApprovalsFiltersProps) => {
   const isBasicSciences = deptInfo?.type === "BASIC_SCIENCES";
-
   const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
 
-  // Fetch academic terms
   const { data: rawTerms } = useAcademicTerms();
   const terms = rawTerms ?? [];
 
   const selectedDraftTerm = terms.find((t) => t.id === draftFilters.termId);
   const nestedSemesters = selectedDraftTerm?.Semester ?? [];
 
-  // Sync term/semester cascading drops
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
     semesters: nestedSemesters,
@@ -80,7 +62,6 @@ export const CourseMappingFilters = ({
     return nestedSemesters.filter((s) => isFirstYearUgSemester(s));
   }, [nestedSemesters, isBasicSciences]);
 
-  // Initial setup effects
   useEffect(() => {
     if (isBasicSciences && !draftFilters.cycle) {
       setDraftFilters((cur) => ({
@@ -115,81 +96,17 @@ export const CourseMappingFilters = ({
     }
   }, [draftFilters.semesterId, draftFilters.termId, semesterOptions]);
 
-  // Fetch courses with mapping status when semester is selected
-  const { data: rawCourses, isLoading: loadingCourses } = useQuery({
-    queryKey: [
-      "course-mapping-status",
-      draftFilters.semesterId,
-      deptInfo?.name,
-      selectedDraftTerm?.year,
-      draftFilters.cycle,
-    ],
-    queryFn: async () => {
-      if (
-        !draftFilters.semesterId ||
-        !deptInfo?.name ||
-        !selectedDraftTerm?.year
-      )
-        return [];
-
-      const res = await axios.get<BaseResponse<CourseMappingStatusItemType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/status`,
-        {
-          params: {
-            semesterId: draftFilters.semesterId,
-            departmentName: deptInfo.name,
-            academicYear: selectedDraftTerm.year,
-            ...(isBasicSciences && draftFilters.cycle
-              ? { cycle: draftFilters.cycle }
-              : {}),
-          },
-          withCredentials: true,
-        }
-      );
-      if (res.data.status === "success" && res.data.data) return res.data.data;
-      return [];
-    },
-    enabled:
-      !!draftFilters.semesterId &&
-      !!deptInfo?.name &&
-      !!selectedDraftTerm?.year,
-  });
-
-  const courses = rawCourses ?? [];
-
-  const applyFilters = async () => {
-    if (
-      !draftFilters.termId ||
-      !draftFilters.semesterId ||
-      !draftFilters.courseId
-    ) {
+  const applyFilters = () => {
+    if (!draftFilters.termId || !draftFilters.semesterId) {
       return;
     }
-
     const term = terms.find((t) => t.id === draftFilters.termId);
     if (!term) return;
 
-    // Fetch full course details to pass to the grid
-    try {
-      const res = await axios.get<BaseResponse<CourseResponseDTO>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/${draftFilters.courseId}`,
-        { withCredentials: true }
-      );
-      if (res.data.status === "success" && res.data.data) {
-        onCourseSelect(res.data.data);
-        onAppliedFiltersChange({
-          ...draftFilters,
-          academicYear: term.year,
-        });
-      } else {
-        toast.error(res.data.message || "Failed to load course details");
-      }
-    } catch (error) {
-      console.error("Failed to fetch course details", error);
-      toast.error(
-        "Failed to load course details. Ensure the course data exists."
-      );
-    }
+    onAppliedFiltersChange({
+      ...draftFilters,
+      academicYear: term.year,
+    });
   };
 
   const resetFilters = () => {
@@ -199,7 +116,6 @@ export const CourseMappingFilters = ({
       semesterId: draftFilters.semesterId,
     });
     onAppliedFiltersChange(null);
-    onCourseSelect(null);
   };
 
   const filterFields: FilterFieldConfig<typeof EMPTY_FILTERS>[] = [
@@ -237,19 +153,6 @@ export const CourseMappingFilters = ({
           } as FilterFieldConfig<typeof EMPTY_FILTERS>,
         ]
       : []),
-    {
-      key: "courseId",
-      label: "Course",
-      type: "select",
-      hideAllOption: true,
-      placeholder: loadingCourses
-        ? "Loading courses..."
-        : "Select a course to map",
-      options: courses.map((c) => ({
-        label: `${c.code} — ${c.name} [${c.status}]`,
-        value: c.courseId,
-      })),
-    },
   ];
 
   return (
@@ -258,21 +161,15 @@ export const CourseMappingFilters = ({
         fields={filterFields}
         draftFilters={draftFilters}
         onDraftChange={(key, value) => {
-          setDraftFilters((cur) => {
-            const next = { ...cur, [key]: value };
-            if (key === "termId" || key === "semesterId" || key === "cycle") {
-              next.courseId = ""; // reset course if upper level drops change
-            }
-            return next;
-          });
+          setDraftFilters((cur) => ({ ...cur, [key]: value }));
         }}
-        className="md:grid-cols-2 lg:grid-cols-4"
+        className="md:grid-cols-2 lg:grid-cols-3"
       />
       <div className="mt-4 flex justify-end">
         <FilterActions
           onApply={applyFilters}
           onReset={resetFilters}
-          applyLabel="Start Mapping"
+          applyLabel="View Approvals"
         />
       </div>
     </FilterPanel>

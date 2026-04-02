@@ -19,6 +19,7 @@ interface SemesterCourseBlockProps {
   programType: string;
   selectedCycle: CourseCycle;
   isBasicSciences: boolean;
+  isSemesterLocked: boolean;
 }
 
 export const SemesterCourseBlock = ({
@@ -27,6 +28,7 @@ export const SemesterCourseBlock = ({
   courses,
   selectedCycle,
   isBasicSciences,
+  isSemesterLocked,
 }: SemesterCourseBlockProps) => {
   const { form, onSubmit } = useCreateCourseForm(
     semesterId,
@@ -36,7 +38,8 @@ export const SemesterCourseBlock = ({
 
   const hasValidBasicSciencesCycle =
     selectedCycle === "PHYSICS" || selectedCycle === "CHEMISTRY";
-  const isAddCourseDisabled = isBasicSciences && !hasValidBasicSciencesCycle;
+  const isAddCourseDisabled =
+    (isBasicSciences && !hasValidBasicSciencesCycle) || isSemesterLocked;
 
   return (
     <div className="bg-card text-card-foreground mb-12 space-y-4 rounded-lg border p-6 shadow-sm">

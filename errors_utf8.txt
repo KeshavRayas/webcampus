@@ -1,0 +1,46 @@
+﻿
+C:\Projects\webcampus\apps\api\scripts\rewrite-admission-usn.ts
+  54:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Projects\webcampus\apps\api\src\routers\department\course-assignment.router.ts
+  4:3  error  'CourseMappingByCourseQuerySchema' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Projects\webcampus\apps\api\src\services\admin\user.service.ts
+  215:21  error  '_ignoredRole' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Projects\webcampus\apps\web\lib\use-cascading-filter-sync.ts
+  27:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  27:52  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  40:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  41:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  67:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  68:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Projects\webcampus\apps\web\modules\admin\coe\coe-view.tsx
+  50:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  57:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Projects\webcampus\apps\web\modules\admin\faculty\use-faculty.ts
+   9:34  error  'departmentId' is defined but never used  @typescript-eslint/no-unused-vars
+  52:34  error  'departmentId' is defined but never used  @typescript-eslint/no-unused-vars
+  99:39  error  'departmentId' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Projects\webcampus\apps\web\modules\department\course-approvals\course-approvals-table.tsx
+    5:10  error  'CourseResponseDTO' is defined but never used    @typescript-eslint/no-unused-vars
+   51:48  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+   89:21  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+  119:28  error  Unexpected any. Specify a different type         @typescript-eslint/no-explicit-any
+  145:15  error  'isUnmapped' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Projects\webcampus\apps\web\modules\department\course-mapping\course-details-card.tsx
+  5:29  error  'CardHeader' is defined but never used  @typescript-eslint/no-unused-vars
+  5:41  error  'CardTitle' is defined but never used   @typescript-eslint/no-unused-vars
+
+C:\Projects\webcampus\apps\web\modules\department\course-mapping\course-mapping-filters.tsx
+  46:3  error  'appliedFilters' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Projects\webcampus\apps\web\modules\department\course-mapping\course-mapping-grid.tsx
+  197:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 23 problems (23 errors, 0 warnings)
+

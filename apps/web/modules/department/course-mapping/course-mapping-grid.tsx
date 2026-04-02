@@ -1,12 +1,15 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { CourseResponseDTO, CourseMappingByCourseItemType } from "@webcampus/schemas/department";
+import {
+  CourseMappingByCourseItemType,
+  CourseResponseDTO,
+} from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { Combobox } from "@webcampus/ui/molecules/combobox";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
@@ -29,6 +32,7 @@ interface CourseMappingGridProps {
   academicYear: string;
   cycle: string;
   isBasicSciences: boolean;
+  isLocked?: boolean;
 }
 
 type SectionMappingState = {
@@ -45,11 +49,14 @@ export const CourseMappingGrid = ({
   academicYear,
   cycle,
   isBasicSciences,
+  isLocked = false,
 }: CourseMappingGridProps) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
-  const hasTheory = ["INTEGRATED", "NON_INTEGRATED", "NCMC"].includes(course.courseMode);
+  const hasTheory = ["INTEGRATED", "NON_INTEGRATED", "NCMC"].includes(
+    course.courseMode
+  );
   const hasLab = ["INTEGRATED", "FINAL_SUMMARY"].includes(course.courseMode);
 
   // Fetch sections
@@ -60,7 +67,9 @@ export const CourseMappingGrid = ({
         `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/sections`,
         { params: { semesterId, cycle }, withCredentials: true }
       );
-      return res.data.status === "success" && res.data.data ? res.data.data : [];
+      return res.data.status === "success" && res.data.data
+        ? res.data.data
+        : [];
     },
     enabled: !!semesterId,
   });
@@ -75,7 +84,9 @@ export const CourseMappingGrid = ({
         `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/faculty`,
         { withCredentials: true }
       );
-      return res.data.status === "success" && res.data.data ? res.data.data : [];
+      return res.data.status === "success" && res.data.data
+        ? res.data.data
+        : [];
     },
   });
 
@@ -85,14 +96,15 @@ export const CourseMappingGrid = ({
   const { data: rawExistingMappings, isLoading: loadingExisting } = useQuery({
     queryKey: ["course-mapping", course.id, semesterId, academicYear],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<CourseMappingByCourseItemType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/by-course`,
-        {
-          params: { courseId: course.id, semesterId, academicYear },
-          withCredentials: true,
-        }
-      );
-      return res.data.status === "success" && res.data.data ? res.data.data : [];
+      const res = await axios.get<
+        BaseResponse<CourseMappingByCourseItemType[]>
+      >(`${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/by-course`, {
+        params: { courseId: course.id, semesterId, academicYear },
+        withCredentials: true,
+      });
+      return res.data.status === "success" && res.data.data
+        ? res.data.data
+        : [];
     },
     enabled: !!course.id && !!semesterId && !!academicYear,
   });
@@ -151,7 +163,11 @@ export const CourseMappingGrid = ({
     );
   };
 
-  const updateLab = (sectionId: string, batchName: string, facultyId: string | null) => {
+  const updateLab = (
+    sectionId: string,
+    batchName: string,
+    facultyId: string | null
+  ) => {
     setMappings((prev) =>
       prev.map((m) => {
         if (m.sectionId !== sectionId) return m;
@@ -192,8 +208,12 @@ export const CourseMappingGrid = ({
       queryClient.invalidateQueries({ queryKey: ["course-mapping"] });
       queryClient.invalidateQueries({ queryKey: ["course-mapping-status"] });
     },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message || "Failed to save mappings");
+    onError: (err) => {
+      const message =
+        err instanceof AxiosError
+          ? err.response?.data?.message
+          : "Failed to save mappings";
+      toast.error(message || "Failed to save mappings");
     },
   });
 
@@ -201,31 +221,43 @@ export const CourseMappingGrid = ({
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center p-12 text-muted-foreground">
+      <div className="text-muted-foreground flex items-center justify-center p-12">
         <Loader2 className="size-8 animate-spin" />
       </div>
     );
   }
 
   if (sections.length === 0) {
-    return <div className="p-8 text-center text-muted-foreground">No sections found for this semester.</div>;
+    return (
+      <div className="text-muted-foreground p-8 text-center">
+        No sections found for this semester.
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-muted leading-normal font-medium border-b">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-muted border-b font-medium leading-normal">
             <tr>
-              <th className="px-4 py-3 min-w-[100px] border-r border-border">Section</th>
+              <th className="border-border min-w-[100px] border-r px-4 py-3">
+                Section
+              </th>
               {hasTheory && (
-                <th className="px-4 py-3 min-w-[200px] border-r border-border">Theory Faculty</th>
-              )}
-              {hasLab && DEFAULT_BATCHES.map((batch) => (
-                <th key={batch} className="px-4 py-3 min-w-[200px] border-r border-border last:border-0 text-center">
-                  Lab: {batch}
+                <th className="border-border min-w-[200px] border-r px-4 py-3">
+                  Theory Faculty
                 </th>
-              ))}
+              )}
+              {hasLab &&
+                DEFAULT_BATCHES.map((batch) => (
+                  <th
+                    key={batch}
+                    className="border-border min-w-[200px] border-r px-4 py-3 text-center last:border-0"
+                  >
+                    Lab: {batch}
+                  </th>
+                ))}
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -234,37 +266,50 @@ export const CourseMappingGrid = ({
               if (!state) return null;
 
               return (
-                <tr key={section.id} className="hover:bg-muted/50 transition-colors group">
-                  <td className="px-4 py-4 font-medium border-r border-border bg-muted/20 group-hover:bg-muted/60">
+                <tr
+                  key={section.id}
+                  className="hover:bg-muted/50 group transition-colors"
+                >
+                  <td className="border-border bg-muted/20 group-hover:bg-muted/60 border-r px-4 py-4 font-medium">
                     {section.name}
                   </td>
-                  
+
                   {hasTheory && (
-                    <td className="px-4 border-r border-border">
+                    <td className="border-border border-r px-4">
                       <Combobox
                         options={facultyOptions}
                         value={state.theoryFacultyId}
                         onValueChange={(val) => updateTheory(section.id, val)}
                         placeholder="Select Theory Faculty"
                         className="bg-background"
+                        disabled={isLocked}
                       />
                     </td>
                   )}
-                  
-                  {hasLab && DEFAULT_BATCHES.map((batchName) => {
-                    const batchState = state.labFacultyByBatch.find((b) => b.batchName === batchName);
-                    return (
-                      <td key={batchName} className="px-4 border-r border-border last:border-0">
-                        <Combobox
-                          options={facultyOptions}
-                          value={batchState?.facultyId ?? null}
-                          onValueChange={(val) => updateLab(section.id, batchName, val)}
-                          placeholder={`Select ${batchName} Faculty`}
-                          className="bg-background text-xs"
-                        />
-                      </td>
-                    );
-                  })}
+
+                  {hasLab &&
+                    DEFAULT_BATCHES.map((batchName) => {
+                      const batchState = state.labFacultyByBatch.find(
+                        (b) => b.batchName === batchName
+                      );
+                      return (
+                        <td
+                          key={batchName}
+                          className="border-border border-r px-4 last:border-0"
+                        >
+                          <Combobox
+                            options={facultyOptions}
+                            value={batchState?.facultyId ?? null}
+                            onValueChange={(val) =>
+                              updateLab(section.id, batchName, val)
+                            }
+                            placeholder={`Select ${batchName} Faculty`}
+                            className="bg-background text-xs"
+                            disabled={isLocked}
+                          />
+                        </td>
+                      );
+                    })}
                 </tr>
               );
             })}
@@ -273,12 +318,14 @@ export const CourseMappingGrid = ({
       </div>
 
       <div className="flex justify-end pt-4">
-        <Button 
-          onClick={() => saveMutation.mutate()} 
-          disabled={saveMutation.isPending}
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending || isLocked}
           size="lg"
         >
-          {saveMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+          {saveMutation.isPending && (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          )}
           Save Mappings
         </Button>
       </div>

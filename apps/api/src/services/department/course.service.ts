@@ -100,8 +100,30 @@ const computeDerivedFields = (data: CreateCourseDTO) => {
 };
 
 export class CourseService {
+  private static _ensureCourseIsEditable(status?: string) {
+    if (status === "PENDING" || status === "APPROVED") {
+      throw new Error(
+        "403 Forbidden: Course is locked for review/approval and cannot be modified"
+      );
+    }
+  }
+
   static async create(data: CreateCourseDTO): Promise<BaseResponse<Course>> {
     try {
+      const existingInSameSemester = await db.course.findFirst({
+        where: {
+          departmentName: data.departmentName,
+          semesterId: data.semesterId,
+          cycle: data.cycle ?? "NONE",
+          approvalStatus: { in: ["PENDING", "APPROVED"] },
+        },
+      });
+      if (existingInSameSemester) {
+        throw new Error(
+          "403 Forbidden: Cannot add courses to a semester that is pending or approved."
+        );
+      }
+
       const normalized = normalizeByMode(data);
       const { departmentName, semesterId, cycle, ...courseData } = normalized;
       const derived = computeDerivedFields(normalized);
@@ -154,6 +176,8 @@ export class CourseService {
       if (!existing) {
         throw new Error("Course not found");
       }
+
+      this._ensureCourseIsEditable(existing.approvalStatus);
 
       const merged: CreateCourseDTO = {
         code: updateFields.code ?? existing.code,
@@ -251,6 +275,8 @@ export class CourseService {
         throw new Error("Course not found");
       }
 
+      this._ensureCourseIsEditable(existing.approvalStatus);
+
       const { assignments, registrations, marks, attendances } =
         existing._count;
       if (assignments + registrations + marks + attendances > 0) {
@@ -308,9 +334,43 @@ export class CourseService {
 
   static async getByBranch(
     name: string,
-    semesterId?: string
-  ): Promise<BaseResponse<Course[]>> {
+    semesterId?: string,
+    cycle?: string
+  ): Promise<
+    BaseResponse<
+      Array<
+        Course & {
+          isFullyMapped: boolean;
+          isPartiallyMapped: boolean;
+          isUnmapped: boolean;
+        }
+      >
+    >
+  > {
     try {
+      const relevantSections = await db.section.findMany({
+        where: {
+          departmentName: name,
+          ...(semesterId ? { semesterId } : {}),
+          ...(cycle && cycle !== "NONE"
+            ? { cycle: cycle as import("@webcampus/db").Cycle }
+            : {}),
+        },
+        include: {
+          _count: { select: { batches: true } },
+        },
+      });
+
+      const sectionCounts = relevantSections.reduce(
+        (acc, sec) => {
+          const key = `${sec.semesterId}_${sec.cycle}`;
+          if (!acc[key]) acc[key] = { sections: 0, batches: 0 };
+          acc[key].sections += 1;
+          acc[key].batches += sec._count.batches;
+          return acc;
+        },
+        {} as Record<string, { sections: number; batches: number }>
+      );
       const courses = await db.course.findMany({
         where: {
           department: {
@@ -320,14 +380,52 @@ export class CourseService {
             },
           },
           ...(semesterId ? { semesterId } : {}),
+          ...(cycle && cycle !== "NONE"
+            ? { cycle: cycle as import("@webcampus/db").Cycle }
+            : {}),
+        },
+        include: {
+          _count: {
+            select: { assignments: true },
+          },
         },
         orderBy: { code: "asc" },
+      });
+
+      const mappedCourses = courses.map((course) => {
+        const key = `${course.semesterId}_${course.cycle}`;
+        const counts = sectionCounts[key] || { sections: 0, batches: 0 };
+
+        let expectedAssignments = 0;
+        if (
+          course.courseMode === "NON_INTEGRATED" ||
+          course.courseMode === "NCMC"
+        ) {
+          expectedAssignments = counts.sections;
+        } else if (course.courseMode === "FINAL_SUMMARY") {
+          expectedAssignments = counts.batches;
+        } else if (course.courseMode === "INTEGRATED") {
+          expectedAssignments = counts.sections + counts.batches;
+        }
+
+        const assignmentCount = course._count.assignments;
+
+        return {
+          ...course,
+          isFullyMapped:
+            expectedAssignments > 0
+              ? assignmentCount >= expectedAssignments
+              : true,
+          isPartiallyMapped:
+            assignmentCount > 0 && assignmentCount < expectedAssignments,
+          isUnmapped: assignmentCount === 0 || expectedAssignments === 0,
+        };
       });
 
       return {
         status: "success",
         message: "Courses fetched successfully",
-        data: courses,
+        data: mappedCourses,
       };
     } catch (error) {
       logger.error("Error fetching courses by branch", error);
@@ -337,7 +435,8 @@ export class CourseService {
 
   static async getAllByDepartment(
     name: string,
-    semesterId?: string
+    semesterId?: string,
+    cycle?: string
   ): Promise<BaseResponse<Course[]>> {
     try {
       const courses = await db.course.findMany({
@@ -349,6 +448,9 @@ export class CourseService {
             },
           },
           ...(semesterId ? { semesterId } : {}),
+          ...(cycle && cycle !== "NONE"
+            ? { cycle: cycle as import("@webcampus/db").Cycle }
+            : {}),
         },
         include: {
           semester: {
@@ -369,6 +471,220 @@ export class CourseService {
     } catch (error) {
       logger.error("Failed to fetch courses by department", error);
       throw error;
+    }
+  }
+
+  static async bulkSubmitForApproval(
+    semesterId: string,
+    departmentName: string,
+    cycle?: string
+  ): Promise<BaseResponse<{ count: number }>> {
+    try {
+      const result = await db.course.updateMany({
+        where: {
+          semesterId,
+          departmentName,
+          approvalStatus: { in: ["DRAFT", "NEEDS_REVISION"] },
+          ...(cycle && cycle !== "NONE"
+            ? { cycle: cycle as import("@webcampus/db").Cycle }
+            : {}),
+        },
+        data: {
+          approvalStatus: "PENDING",
+          hasAdminApproved: false,
+          hasCoeApproved: false,
+          adminNotes: null,
+          coeNotes: null,
+        },
+      });
+
+      const response: BaseResponse<{ count: number }> = {
+        status: "success",
+        message: `Successfully submitted ${result.count} courses for approval`,
+        data: { count: result.count },
+      };
+      logger.info(response);
+      return response;
+    } catch (error) {
+      logger.error("Failed to bulk submit courses for approval", error);
+      throw new Error("Failed to bulk submit courses");
+    }
+  }
+
+  static async getGroupedCourseSubmissions(role: "admin" | "coe"): Promise<
+    BaseResponse<
+      Array<{
+        id: string;
+        departmentName: string;
+        departmentCode?: string;
+        semesterId: string;
+        semester: import("@webcampus/db").Semester & {
+          academicTerm: import("@webcampus/db").AcademicTerm;
+        };
+        cycle: string;
+        courseCount: number;
+        courses: Course[];
+      }>
+    >
+  > {
+    try {
+      const pendingCourses = await db.course.findMany({
+        where: {
+          approvalStatus: "PENDING",
+          ...(role === "admin" ? { hasAdminApproved: false } : {}),
+          ...(role === "coe" ? { hasCoeApproved: false } : {}),
+        },
+        include: {
+          department: { select: { code: true } },
+          semester: {
+            include: { academicTerm: true },
+          },
+          assignments: {
+            include: {
+              faculty: { select: { shortName: true } },
+              batch: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { code: "asc" },
+      });
+
+      const groupedMap = new Map<
+        string,
+        {
+          id: string;
+          departmentName: string;
+          departmentCode?: string;
+          semesterId: string;
+          semester: import("@webcampus/db").Semester & {
+            academicTerm: import("@webcampus/db").AcademicTerm;
+          };
+          cycle: string;
+          courseCount: number;
+          courses: Course[];
+        }
+      >();
+
+      for (const course of pendingCourses) {
+        const key = `${course.departmentName}_${course.semesterId}_${course.cycle}`;
+        if (!groupedMap.has(key)) {
+          groupedMap.set(key, {
+            id: key,
+            departmentName: course.departmentName,
+            departmentCode: course.department?.code,
+            semesterId: course.semesterId,
+            semester: course.semester,
+            cycle: course.cycle,
+            courseCount: 0,
+            courses: [],
+          });
+        }
+        const group = groupedMap.get(key);
+        if (group) {
+          group.courseCount += 1;
+          group.courses.push(course);
+        }
+      }
+
+      const groupedArray = Array.from(groupedMap.values());
+
+      return {
+        status: "success",
+        message: "Fetched grouped course submissions",
+        data: groupedArray,
+      };
+    } catch (error) {
+      logger.error("Failed to fetch grouped course submissions", error);
+      throw new Error("Failed to fetch pending courses");
+    }
+  }
+
+  static async approveSemesterCourses(
+    semesterId: string,
+    departmentName: string,
+    cycle?: string,
+    role?: "admin" | "coe"
+  ): Promise<BaseResponse<{ count: number }>> {
+    try {
+      if (!role) throw new Error("Role is required for approval");
+      // Step 1: Update the role's specific approval flag
+      const result = await db.course.updateMany({
+        where: {
+          semesterId,
+          departmentName,
+          approvalStatus: "PENDING",
+          ...(cycle && cycle !== "NONE"
+            ? { cycle: cycle as import("@webcampus/db").Cycle }
+            : {}),
+        },
+        data:
+          role === "admin"
+            ? { hasAdminApproved: true }
+            : { hasCoeApproved: true },
+      });
+
+      // Step 2: Check if both are approved, and lock it to APPROVED globally
+      await db.course.updateMany({
+        where: {
+          semesterId,
+          departmentName,
+          approvalStatus: "PENDING",
+          hasAdminApproved: true,
+          hasCoeApproved: true,
+          ...(cycle && cycle !== "NONE"
+            ? { cycle: cycle as import("@webcampus/db").Cycle }
+            : {}),
+        },
+        data: {
+          approvalStatus: "APPROVED",
+        },
+      });
+
+      return {
+        status: "success",
+        message: `Successfully approved ${result.count} courses`,
+        data: { count: result.count },
+      };
+    } catch (error) {
+      logger.error("Failed to approve courses", error);
+      throw new Error("Failed to approve courses");
+    }
+  }
+
+  static async requestRevisionForSemester(
+    semesterId: string,
+    departmentName: string,
+    reviewerNotes: string,
+    cycle?: string,
+    role?: "admin" | "coe"
+  ): Promise<BaseResponse<{ count: number }>> {
+    try {
+      if (!role) throw new Error("Role is required for requesting revision");
+      const result = await db.course.updateMany({
+        where: {
+          semesterId,
+          departmentName,
+          approvalStatus: "PENDING",
+          ...(cycle && cycle !== "NONE"
+            ? { cycle: cycle as import("@webcampus/db").Cycle }
+            : {}),
+        },
+        data: {
+          approvalStatus: "NEEDS_REVISION",
+          ...(role === "admin"
+            ? { adminNotes: reviewerNotes }
+            : { coeNotes: reviewerNotes }),
+        },
+      });
+
+      return {
+        status: "success",
+        message: `Successfully requested revision for ${result.count} courses`,
+        data: { count: result.count },
+      };
+    } catch (error) {
+      logger.error("Failed to request revision for courses", error);
+      throw new Error("Failed to request revision for courses");
     }
   }
 }

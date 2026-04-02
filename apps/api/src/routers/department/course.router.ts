@@ -58,6 +58,26 @@ router.get(
   CourseController.getByBranch
 );
 
+router.post(
+  "/bulk-submit",
+  protect({
+    role: "department",
+    permissions: {
+      courses: ["update"],
+    },
+  }),
+  CourseController.bulkSubmitForApproval
+);
+
+router.get(
+  "/pending-submissions",
+  protect({
+    role: ["admin", "coe"],
+    permissions: {},
+  }),
+  CourseController.getGroupedCourseSubmissions
+);
+
 router.get(
   "/:id",
   protect({
@@ -67,6 +87,24 @@ router.get(
     },
   }),
   CourseController.getById
+);
+
+router.post(
+  "/approve",
+  protect({
+    role: ["admin", "coe"],
+    permissions: {},
+  }),
+  CourseController.approveSemesterCourses
+);
+
+router.post(
+  "/request-revision",
+  protect({
+    role: ["admin", "coe"],
+    permissions: {},
+  }),
+  CourseController.requestRevisionForSemester
 );
 
 export default router;

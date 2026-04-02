@@ -1,0 +1,490 @@
+[96mmodules/admin/faculty/admin-faculty-actions.tsx[0m:[93m103[0m:[93m5[0m - [91merror[0m[90m TS2322: [0mType 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: unknown; dateOfJoining?: unknown; }, any, { ...; }>' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+  Types of parameters 'options' and 'options' are incompatible.
+    Type 'ResolverOptions<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }>' is not assignable to type 'ResolverOptions<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: unknown; dateOfJoining?: unknown; }>'.
+      Type 'unknown' is not assignable to type 'Date | undefined'.
+
+[7m103[0m     resolver: zodResolver(editSchema),
+[7m   [0m [91m    ~~~~~~~~[0m
+
+[96mmodules/admin/faculty/admin-faculty-actions.tsx[0m:[93m187[0m:[93m47[0m - [91merror[0m[90m TS2345: [0mArgument of type '(data: z.infer<typeof editSchema>) => void' is not assignable to parameter of type 'SubmitHandler<TFieldValues>'.
+  Types of parameters 'data' and 'data' are incompatible.
+    Type 'TFieldValues' is not assignable to type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }'.
+      Type 'FieldValues' is missing the following properties from type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }': designation, username, displayUsername
+
+[7m187[0m               onSubmit={editForm.handleSubmit(onEditSubmit)}
+[7m   [0m [91m                                              ~~~~~~~~~~~~[0m
+
+[96mmodules/admin/faculty/admin-faculty-actions.tsx[0m:[93m192[0m:[93m19[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>...' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }> | u...'.
+      Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+        Type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, TFieldValues...' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }': designation, username, displayUsername
+
+[7m192[0m                   control={editForm.control}
+[7m   [0m [91m                  ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; ... 4 more ...; dateOfJoining?: Date | undefined; }, "username">; fieldState: ControllerFieldState; f...'
+
+[96mmodules/admin/faculty/admin-faculty-actions.tsx[0m:[93m206[0m:[93m19[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>...' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }> | u...'.
+      Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+        Type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, TFieldValues...' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }': designation, username, displayUsername
+
+[7m206[0m                   control={editForm.control}
+[7m   [0m [91m                  ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; ... 4 more ...; dateOfJoining?: Date | undefined; }, "displayUsername">; fieldState: ControllerFieldS...'
+
+[96mmodules/admin/faculty/admin-faculty-actions.tsx[0m:[93m220[0m:[93m19[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>...' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }> | u...'.
+      Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+        Type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, TFieldValues...' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }': designation, username, displayUsername
+
+[7m220[0m                   control={editForm.control}
+[7m   [0m [91m                  ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; ... 4 more ...; dateOfJoining?: Date | undefined; }, "designation">; fieldState: ControllerFieldState...'
+
+[96mmodules/admin/faculty/admin-faculty-actions.tsx[0m:[93m253[0m:[93m19[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>...' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }> | u...'.
+      Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+        Type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, TFieldValues...' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }': designation, username, displayUsername
+
+[7m253[0m                   control={editForm.control}
+[7m   [0m [91m                  ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; ... 4 more ...; dateOfJoining?: Date | undefined; }, "staffType">; fieldState: ControllerFieldState; ...'
+
+[96mmodules/admin/faculty/admin-faculty-actions.tsx[0m:[93m278[0m:[93m19[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>...' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }> | u...'.
+      Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+        Type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, TFieldValues...' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }': designation, username, displayUsername
+
+[7m278[0m                   control={editForm.control}
+[7m   [0m [91m                  ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; ... 4 more ...; dateOfJoining?: Date | undefined; }, "employeeId">; fieldState: ControllerFieldState;...'
+
+[96mmodules/admin/faculty/admin-faculty-actions.tsx[0m:[93m292[0m:[93m19[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>...' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }> | u...'.
+      Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+        Type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, TFieldValues...' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }': designation, username, displayUsername
+
+[7m292[0m                   control={editForm.control}
+[7m   [0m [91m                  ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; ... 4 more ...; dateOfJoining?: Date | undefined; }, "dob">; fieldState: ControllerFieldState; formSt...'
+
+[96mmodules/admin/faculty/admin-faculty-actions.tsx[0m:[93m310[0m:[93m19[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Control<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>...' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }> | u...'.
+      Type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, TFieldValues>' is not assignable to type 'Resolver<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, any, { ...; }>'.
+        Type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, TFieldValues...' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }, { ...; }> | ...'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }>'.
+              Type 'TFieldValues' is not assignable to type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }'.
+                Type 'FieldValues' is missing the following properties from type '{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; displayUsername: string; employeeId?: string | undefined; staffType?: "TEMPORARY" | ... 3 more ... | undefined; dob?: Date | undefined; dateOfJoining?: Date | undefined; }': designation, username, displayUsername
+
+[7m310[0m                   control={editForm.control}
+[7m   [0m [91m                  ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; username: string; ... 4 more ...; dateOfJoining?: Date | undefined; }, "dateOfJoining">; fieldState: ControllerFieldSta...'
+
+[96mmodules/admin/faculty/admin-faculty-view.tsx[0m:[93m119[0m:[93m15[0m - [91merror[0m[90m TS2322: [0mType 'UseFormReturn<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'UseFormReturn<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+  Types of property 'handleSubmit' are incompatible.
+    Type 'UseFormHandleSubmit<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, TFieldValues>' is not assignable to type 'UseFormHandleSubmit<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }>'.
+      Types of parameters 'onValid' and 'onValid' are incompatible.
+        Types of parameters 'data' and 'data' are incompatible.
+          Type 'TFieldValues' is not assignable to type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }'.
+            Type 'FieldValues' is missing the following properties from type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }': employeeId, staffType, dob, dateOfJoining, and 7 more.
+
+[7m119[0m               form={form}
+[7m   [0m [91m              ~~~~[0m
+
+  [96m../../packages/ui/src/molecules/dialog-form.tsx[0m:[93m24[0m:[93m3[0m
+    [7m24[0m   form: UseFormReturn<T>;
+    [7m  [0m [96m  ~~~~[0m
+    The expected type comes from property 'form' which is declared here on type 'IntrinsicAttributes & DialogFormProps<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; ... 5 more ...; role: string; }>'
+
+[96mmodules/admin/faculty/admin-faculty-view.tsx[0m:[93m127[0m:[93m21[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }> | undefined'.
+      Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+        Type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+              Type 'TFieldValues' is not assignable to type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }'.
+                Type 'FieldValues' is missing the following properties from type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }': employeeId, staffType, dob, dateOfJoining, and 7 more.
+
+[7m127[0m                     control={form.control}
+[7m   [0m [91m                    ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; ... 6 more ...; role: string; }, "name">; fieldState: ControllerFieldState; formState: UseFormStateReturn<.....'
+
+[96mmodules/admin/faculty/admin-faculty-view.tsx[0m:[93m141[0m:[93m21[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }> | undefined'.
+      Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+        Type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+              Type 'TFieldValues' is not assignable to type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }'.
+                Type 'FieldValues' is missing the following properties from type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }': employeeId, staffType, dob, dateOfJoining, and 7 more.
+
+[7m141[0m                     control={form.control}
+[7m   [0m [91m                    ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; ... 6 more ...; role: string; }, "email">; fieldState: ControllerFieldState; formState: UseFormStateReturn<....'
+
+[96mmodules/admin/faculty/admin-faculty-view.tsx[0m:[93m159[0m:[93m21[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }> | undefined'.
+      Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+        Type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+              Type 'TFieldValues' is not assignable to type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }'.
+                Type 'FieldValues' is missing the following properties from type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }': employeeId, staffType, dob, dateOfJoining, and 7 more.
+
+[7m159[0m                     control={form.control}
+[7m   [0m [91m                    ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; ... 6 more ...; role: string; }, "designation">; fieldState: ControllerFieldState; formState: UseFormStateRe...'
+
+[96mmodules/admin/faculty/admin-faculty-view.tsx[0m:[93m189[0m:[93m21[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }> | undefined'.
+      Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+        Type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+              Type 'TFieldValues' is not assignable to type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }'.
+                Type 'FieldValues' is missing the following properties from type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }': employeeId, staffType, dob, dateOfJoining, and 7 more.
+
+[7m189[0m                     control={form.control}
+[7m   [0m [91m                    ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; ... 6 more ...; role: string; }, "dob">; fieldState: ControllerFieldState; formState: UseFormStateReturn<......'
+
+[96mmodules/admin/faculty/admin-faculty-view.tsx[0m:[93m214[0m:[93m21[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }> | undefined'.
+      Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+        Type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+              Type 'TFieldValues' is not assignable to type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }'.
+                Type 'FieldValues' is missing the following properties from type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }': employeeId, staffType, dob, dateOfJoining, and 7 more.
+
+[7m214[0m                     control={form.control}
+[7m   [0m [91m                    ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; ... 6 more ...; role: string; }, "username">; fieldState: ControllerFieldState; formState: UseFormStateRetur...'
+
+[96mmodules/admin/faculty/admin-faculty-view.tsx[0m:[93m228[0m:[93m21[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }> | undefined'.
+      Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+        Type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+              Type 'TFieldValues' is not assignable to type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }'.
+                Type 'FieldValues' is missing the following properties from type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }': employeeId, staffType, dob, dateOfJoining, and 7 more.
+
+[7m228[0m                     control={form.control}
+[7m   [0m [91m                    ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; ... 6 more ...; role: string; }, "password">; fieldState: ControllerFieldState; formState: UseFormStateRetur...'
+
+[96mmodules/admin/faculty/admin-faculty-view.tsx[0m:[93m246[0m:[93m21[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }> | undefined'.
+      Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+        Type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+              Type 'TFieldValues' is not assignable to type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }'.
+                Type 'FieldValues' is missing the following properties from type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }': employeeId, staffType, dob, dateOfJoining, and 7 more.
+
+[7m246[0m                     control={form.control}
+[7m   [0m [91m                    ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; ... 6 more ...; role: string; }, "employeeId">; fieldState: ControllerFieldState; formState: UseFormStateRet...'
+
+[96mmodules/admin/faculty/admin-faculty-view.tsx[0m:[93m260[0m:[93m21[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }> | undefined'.
+      Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+        Type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+              Type 'TFieldValues' is not assignable to type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }'.
+                Type 'FieldValues' is missing the following properties from type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }': employeeId, staffType, dob, dateOfJoining, and 7 more.
+
+[7m260[0m                     control={form.control}
+[7m   [0m [91m                    ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; ... 6 more ...; role: string; }, "staffType">; fieldState: ControllerFieldState; formState: UseFormStateRetu...'
+
+[96mmodules/admin/faculty/admin-faculty-view.tsx[0m:[93m290[0m:[93m21[0m - [91merror[0m[90m TS2322: [0mType 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Control<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+  The types of '_options.resolver' are incompatible between these types.
+    Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues> | undefined' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }> | undefined'.
+      Type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, TFieldValues>' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+        Type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, TFieldValues> | Promise<...>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+          Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverResult<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, { ...; }> | Promise<...>'.
+            Type 'ResolverSuccess<TFieldValues>' is not assignable to type 'ResolverSuccess<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+              Type 'TFieldValues' is not assignable to type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }'.
+                Type 'FieldValues' is missing the following properties from type '{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }': employeeId, staffType, dob, dateOfJoining, and 7 more.
+
+[7m290[0m                     control={form.control}
+[7m   [0m [91m                    ~~~~~~~[0m
+
+  [96m../../node_modules/.bun/react-hook-form@7.72.0+b1ab299f0a400331/node_modules/react-hook-form/dist/types/controller.d.ts[0m:[93m24[0m:[93m5[0m
+    [7m24[0m     control?: Control<TFieldValues, any, TTransformedValues>;
+    [7m  [0m [96m    ~~~~~~~[0m
+    The expected type comes from property 'control' which is declared here on type 'IntrinsicAttributes & { render: ({ field, fieldState, formState, }: { field: ControllerRenderProps<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; ... 6 more ...; role: string; }, "dateOfJoining">; fieldState: ControllerFieldState; formState: UseFormState...'
+
+[96mmodules/admin/faculty/use-create-admin-faculty-form.tsx[0m:[93m25[0m:[93m5[0m - [91merror[0m[90m TS2322: [0mType 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: unknown; dateOfJoining: unknown; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>' is not assignable to type 'Resolver<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }, any, { ...; }>'.
+  Types of parameters 'options' and 'options' are incompatible.
+    Type 'ResolverOptions<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: Date; dateOfJoining: Date; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>' is not assignable to type 'ResolverOptions<{ employeeId: string; staffType: "TEMPORARY" | "REGULAR" | "POP" | "ADJUNCT"; dob: unknown; dateOfJoining: unknown; departmentId: string; designation: "ASSOCIATE_PROFESSOR" | "ASSISTANT_PROFESSOR" | "PROFESSOR" | "VISITING_PROFESSOR"; ... 4 more ...; role: string; }>'.
+      Type 'unknown' is not assignable to type 'Date'.
+
+[7m25[0m     resolver: zodResolver(FormSchema),
+[7m  [0m [91m    ~~~~~~~~[0m
+
+[96mmodules/admin/students/admin-students-view.tsx[0m:[93m68[0m:[93m11[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m68[0m     () => terms.find((term) => term.id === draftFilters.academicTerm),
+[7m  [0m [91m          ~~~~~[0m
+
+[96mmodules/admin/students/admin-students-view.tsx[0m:[93m82[0m:[93m5[0m - [91merror[0m[90m TS2322: [0mType 'AcademicTermResponseType[] | null' is not assignable to type '{ id: string; }[] | undefined'.
+  Type 'null' is not assignable to type '{ id: string; }[] | undefined'.
+
+[7m82[0m     academicTerms: terms,
+[7m  [0m [91m    ~~~~~~~~~~~~~[0m
+
+  [96mlib/use-cascading-filter-sync.ts[0m:[93m6[0m:[93m3[0m
+    [7m6[0m   academicTerms?: Array<{ id: string }>;
+    [7m [0m [96m  ~~~~~~~~~~~~~[0m
+    The expected type comes from property 'academicTerms' which is declared here on type 'CascadingFilterOptions'
+
+[96mmodules/admin/students/admin-students-view.tsx[0m:[93m180[0m:[93m7[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m180[0m       terms.map((term) => ({
+[7m   [0m [91m      ~~~~~[0m
+
+[96mmodules/admission/admin/admin-admission-view.tsx[0m:[93m127[0m:[93m24[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m127[0m   const selectedTerm = terms.find(
+[7m   [0m [91m                       ~~~~~[0m
+
+[96mmodules/admission/admin/admin-admission-view.tsx[0m:[93m132[0m:[93m5[0m - [91merror[0m[90m TS2322: [0mType 'AcademicTermResponseType[] | null' is not assignable to type '{ id: string; }[] | undefined'.
+  Type 'null' is not assignable to type '{ id: string; }[] | undefined'.
+
+[7m132[0m     academicTerms: terms,
+[7m   [0m [91m    ~~~~~~~~~~~~~[0m
+
+  [96mlib/use-cascading-filter-sync.ts[0m:[93m6[0m:[93m3[0m
+    [7m6[0m   academicTerms?: Array<{ id: string }>;
+    [7m [0m [96m  ~~~~~~~~~~~~~[0m
+    The expected type comes from property 'academicTerms' which is declared here on type 'CascadingFilterOptions'
+
+[96mmodules/admission/admin/admin-admission-view.tsx[0m:[93m238[0m:[93m16[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m238[0m       options: terms.map((term) => ({
+[7m   [0m [91m               ~~~~~[0m
+
+[96mmodules/admission/admin/admin-admission-view.tsx[0m:[93m368[0m:[93m20[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m368[0m                   {terms.map((term) => (
+[7m   [0m [91m                   ~~~~~[0m
+
+[96mmodules/department/courses/courses-view.tsx[0m:[93m102[0m:[93m29[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m102[0m   const selectedDraftTerm = terms.find((t) => t.id === draftFilters.termId);
+[7m   [0m [91m                            ~~~~~[0m
+
+[96mmodules/department/courses/courses-view.tsx[0m:[93m107[0m:[93m5[0m - [91merror[0m[90m TS2322: [0mType 'AcademicTermResponseType[] | null' is not assignable to type '{ id: string; }[] | undefined'.
+  Type 'null' is not assignable to type '{ id: string; }[] | undefined'.
+
+[7m107[0m     academicTerms: terms,
+[7m   [0m [91m    ~~~~~~~~~~~~~[0m
+
+  [96mlib/use-cascading-filter-sync.ts[0m:[93m6[0m:[93m3[0m
+    [7m6[0m   academicTerms?: Array<{ id: string }>;
+    [7m [0m [96m  ~~~~~~~~~~~~~[0m
+    The expected type comes from property 'academicTerms' which is declared here on type 'CascadingFilterOptions'
+
+[96mmodules/department/courses/courses-view.tsx[0m:[93m130[0m:[93m31[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m130[0m   const selectedAppliedTerm = terms.find(
+[7m   [0m [91m                              ~~~~~[0m
+
+[96mmodules/department/courses/courses-view.tsx[0m:[93m183[0m:[93m32[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m183[0m     if (draftFilters.termId || terms.length === 0) {
+[7m   [0m [91m                               ~~~~~[0m
+
+[96mmodules/department/courses/courses-view.tsx[0m:[93m188[0m:[93m7[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m188[0m       terms.find((term) => term.isCurrent) ?? terms[0];
+[7m   [0m [91m      ~~~~~[0m
+
+[96mmodules/department/courses/courses-view.tsx[0m:[93m188[0m:[93m47[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m188[0m       terms.find((term) => term.isCurrent) ?? terms[0];
+[7m   [0m [91m                                              ~~~~~[0m
+
+[96mmodules/department/courses/courses-view.tsx[0m:[93m273[0m:[93m16[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m273[0m       options: terms.map((term) => ({
+[7m   [0m [91m               ~~~~~[0m
+
+[96mmodules/department/section/department-section-view.tsx[0m:[93m97[0m:[93m29[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m97[0m   const selectedDraftTerm = terms.find(
+[7m  [0m [91m                            ~~~~~[0m
+
+[96mmodules/department/section/department-section-view.tsx[0m:[93m104[0m:[93m5[0m - [91merror[0m[90m TS2322: [0mType 'AcademicTermResponseType[] | null' is not assignable to type '{ id: string; }[] | undefined'.
+  Type 'null' is not assignable to type '{ id: string; }[] | undefined'.
+
+[7m104[0m     academicTerms: terms,
+[7m   [0m [91m    ~~~~~~~~~~~~~[0m
+
+  [96mlib/use-cascading-filter-sync.ts[0m:[93m6[0m:[93m3[0m
+    [7m6[0m   academicTerms?: Array<{ id: string }>;
+    [7m [0m [96m  ~~~~~~~~~~~~~[0m
+    The expected type comes from property 'academicTerms' which is declared here on type 'CascadingFilterOptions'
+
+[96mmodules/department/section/department-section-view.tsx[0m:[93m108[0m:[93m31[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m108[0m   const selectedAppliedTerm = terms.find(
+[7m   [0m [91m                              ~~~~~[0m
+
+[96mmodules/department/section/department-section-view.tsx[0m:[93m156[0m:[93m32[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m156[0m     if (draftFilters.termId || terms.length === 0) {
+[7m   [0m [91m                               ~~~~~[0m
+
+[96mmodules/department/section/department-section-view.tsx[0m:[93m161[0m:[93m7[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m161[0m       terms.find((term) => term.isCurrent) ?? terms[0];
+[7m   [0m [91m      ~~~~~[0m
+
+[96mmodules/department/section/department-section-view.tsx[0m:[93m161[0m:[93m47[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m161[0m       terms.find((term) => term.isCurrent) ?? terms[0];
+[7m   [0m [91m                                              ~~~~~[0m
+
+[96mmodules/department/section/department-section-view.tsx[0m:[93m260[0m:[93m16[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m260[0m       options: terms.map((term) => ({
+[7m   [0m [91m               ~~~~~[0m
+
+[96mmodules/department/student/department-student-view.tsx[0m:[93m74[0m:[93m11[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m74[0m     () => terms.find((term) => term.id === draftFilters.academicTerm),
+[7m  [0m [91m          ~~~~~[0m
+
+[96mmodules/department/student/department-student-view.tsx[0m:[93m88[0m:[93m5[0m - [91merror[0m[90m TS2322: [0mType 'AcademicTermResponseType[] | null' is not assignable to type '{ id: string; }[] | undefined'.
+  Type 'null' is not assignable to type '{ id: string; }[] | undefined'.
+
+[7m88[0m     academicTerms: terms,
+[7m  [0m [91m    ~~~~~~~~~~~~~[0m
+
+  [96mlib/use-cascading-filter-sync.ts[0m:[93m6[0m:[93m3[0m
+    [7m6[0m   academicTerms?: Array<{ id: string }>;
+    [7m [0m [96m  ~~~~~~~~~~~~~[0m
+    The expected type comes from property 'academicTerms' which is declared here on type 'CascadingFilterOptions'
+
+[96mmodules/department/student/department-student-view.tsx[0m:[93m168[0m:[93m18[0m - [91merror[0m[90m TS18047: [0m'terms' is possibly 'null'.
+
+[7m168[0m         options: terms.map((term) => ({
+[7m   [0m [91m                 ~~~~~[0m
+
+
+Found 44 errors in 8 files.
+
+Errors  Files
+     9  modules/admin/faculty/admin-faculty-actions.tsx[90m:103[0m
+    10  modules/admin/faculty/admin-faculty-view.tsx[90m:119[0m
+     1  modules/admin/faculty/use-create-admin-faculty-form.tsx[90m:25[0m
+     3  modules/admin/students/admin-students-view.tsx[90m:68[0m
+     4  modules/admission/admin/admin-admission-view.tsx[90m:127[0m
+     7  modules/department/courses/courses-view.tsx[90m:102[0m
+     7  modules/department/section/department-section-view.tsx[90m:97[0m
+     3  modules/department/student/department-student-view.tsx[90m:74[0m

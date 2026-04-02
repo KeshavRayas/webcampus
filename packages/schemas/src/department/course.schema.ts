@@ -252,6 +252,14 @@ export const CourseResponseSchema = BaseCourseSchema.extend({
         .optional(),
     })
     .optional(),
+  isFullyMapped: z.boolean().optional(),
+  isPartiallyMapped: z.boolean().optional(),
+  isUnmapped: z.boolean().optional(),
+  approvalStatus: z.string().optional(),
+  adminNotes: z.string().nullable().optional(),
+  coeNotes: z.string().nullable().optional(),
+  hasAdminApproved: z.boolean().optional(),
+  hasCoeApproved: z.boolean().optional(),
 });
 
 export type CreateCourseDTO = z.infer<typeof CreateCourseSchema>;

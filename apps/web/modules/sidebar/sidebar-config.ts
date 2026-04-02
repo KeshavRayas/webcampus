@@ -65,6 +65,16 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/admin/students",
           icon: GraduationCap,
         },
+        {
+          name: "Manage COE",
+          url: "/admin/coe",
+          icon: Users,
+        },
+        {
+          name: "Approvals",
+          url: "/admin/course-approvals",
+          icon: Library,
+        },
       ],
     },
     navSecondary,
@@ -94,6 +104,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Course Configuration", url: "/department/courses" },
             { name: "Course Mapping", url: "/department/course-mapping" },
+            { name: "Approvals", url: "/department/course-approvals" },
           ],
         },
         {
@@ -240,6 +251,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Dashboard",
           url: "/coe",
           icon: LayoutDashboard,
+        },
+        {
+          name: "Approvals",
+          url: "/coe/course-approvals",
+          icon: Library,
         },
         {
           name: "Examinations",

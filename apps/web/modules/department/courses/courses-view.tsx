@@ -19,6 +19,7 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import axios from "axios";
+import { Lock } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { SemesterCourseBlock } from "./semester-course-block";
@@ -341,8 +342,29 @@ export const CoursesView: React.FC = () => {
     );
   }, [appliedCycle, appliedFilters.cycle, courses, isBasicSciences]);
 
+  const isSemesterLocked = useMemo(() => {
+    return filteredCourses.some(
+      (c) => c.approvalStatus === "PENDING" || c.approvalStatus === "APPROVED"
+    );
+  }, [filteredCourses]);
+
   return (
     <div className="space-y-8">
+      {isSemesterLocked && (
+        <div className="border-destructive/20 bg-destructive/10 text-destructive flex items-start gap-3 rounded-lg border p-4">
+          <Lock className="mt-0.5 h-5 w-5" />
+          <div className="flex flex-col gap-1">
+            <h5 className="font-medium leading-none tracking-tight">
+              Semester Locked
+            </h5>
+            <div className="text-sm">
+              This semester is currently locked for review/approval. You cannot
+              add, edit, or delete courses.
+            </div>
+          </div>
+        </div>
+      )}
+
       <FilterPanel>
         <FilterBuilder
           fields={courseFilterFields}
@@ -380,6 +402,7 @@ export const CoursesView: React.FC = () => {
               programType={selectedAppliedSemester.programType}
               selectedCycle={appliedCycle}
               isBasicSciences={isBasicSciences}
+              isSemesterLocked={isSemesterLocked}
             />
           )}
         </div>

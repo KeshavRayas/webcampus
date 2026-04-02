@@ -28,7 +28,7 @@ model User {
   frozenAsFaculty Freeze[]  @relation("FrozenByFaculty")
   frozenAsHod     Freeze[]  @relation("FrozenByHod")
   frozenAsAdmin   Freeze[]  @relation("FrozenByAdmin")
-  coe Coe?
+  coe             Coe?
 
   banned     Boolean?
   banReason  String?
@@ -65,9 +65,9 @@ model Semester {
   updatedAt      DateTime     @updatedAt
   createdBy      User         @relation(fields: [userId], references: [id])
   userId         String
-  Section   Section[]
-  Course    Course[]
-  Admission Admission[]
+  Section        Section[]
+  Course         Course[]
+  Admission      Admission[]
 
   @@unique([academicTermId, programType, semesterNumber])
 }
@@ -235,12 +235,19 @@ enum Cycle {
   NONE
 }
 
+enum CourseApprovalStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  NEEDS_REVISION
+}
+
 model Department {
-  id           String    @id @default(uuid())
+  id           String         @id @default(uuid())
   userId       String
-  user         User      @relation(fields: [userId], references: [id])
-  name         String    @unique
-  code         String    @unique
+  user         User           @relation(fields: [userId], references: [id])
+  name         String         @unique
+  code         String         @unique
   abbreviation String
   type         DepartmentType @default(DEGREE_GRANTING)
   hods         Hod[]
@@ -308,27 +315,27 @@ model StudentSection {
 }
 
 model Student {
-  id              String               @id @default(uuid())
-  user            User                 @relation(fields: [userId], references: [id])
-  userId          String               @unique
-  usn             String               @unique
-  department      Department           @relation(fields: [departmentName], references: [name])
-  departmentName  String
-  currentSemester Int
-  semesterId      String?
-  semesterNumber  Int?
-  programType     ProgramType?
-  academicTermId  String?
-  academicTermType SemesterType?
-  academicTermYear String?
+  id                String               @id @default(uuid())
+  user              User                 @relation(fields: [userId], references: [id])
+  userId            String               @unique
+  usn               String               @unique
+  department        Department           @relation(fields: [departmentName], references: [name])
+  departmentName    String
+  currentSemester   Int
+  semesterId        String?
+  semesterNumber    Int?
+  programType       ProgramType?
+  academicTermId    String?
+  academicTermType  SemesterType?
+  academicTermYear  String?
   academicTermLabel String?
-  studentSections StudentSection[]
-  academicYear    String
-  registrations   CourseRegistration[]
-  marks           Mark[]
-  attendances     Attendance[]
-  batches         Batch[]              @relation("BatchStudents")
-  admission       Admission?
+  studentSections   StudentSection[]
+  academicYear      String
+  registrations     CourseRegistration[]
+  marks             Mark[]
+  attendances       Attendance[]
+  batches           Batch[]              @relation("BatchStudents")
+  admission         Admission?
 
   @@index([departmentName])
   @@index([semesterId])
@@ -338,47 +345,47 @@ model Student {
 }
 
 model Faculty {
-  id             String             @id @default(uuid())
-  user           User               @relation(fields: [userId], references: [id])
-  userId         String             @unique
-  department     Department         @relation(fields: [departmentId], references: [id])
-  departmentId   String             // Replaced departmentName
-  shortName      String             // Added shortName
-  designation    Designation        // Added designation
-  employeeId     String?            @unique
-  staffType      StaffType?
-  qualification  String?
-  dateOfJoining  DateTime?
-  researchArea   String?
-  officeRoom     String?
-  gender         FacultyGender?
-  dob            DateTime?
-  bloodGroup     String?
-  nationality    String?
-  phoneNumber    String?
-  personalEmail  String?
-  maritalStatus  MaritalStatus?
-  aboutYourself  String?
-  researchInterests String?
-  otherInformation  String?
-  contactInformation String?
-  mobileNumber      String?
+  id                     String                 @id @default(uuid())
+  user                   User                   @relation(fields: [userId], references: [id])
+  userId                 String                 @unique
+  department             Department             @relation(fields: [departmentId], references: [id])
+  departmentId           String // Replaced departmentName
+  shortName              String // Added shortName
+  designation            Designation // Added designation
+  employeeId             String?                @unique
+  staffType              StaffType?
+  qualification          String?
+  dateOfJoining          DateTime?
+  researchArea           String?
+  officeRoom             String?
+  gender                 FacultyGender?
+  dob                    DateTime?
+  bloodGroup             String?
+  nationality            String?
+  phoneNumber            String?
+  personalEmail          String?
+  maritalStatus          MaritalStatus?
+  aboutYourself          String?
+  researchInterests      String?
+  otherInformation       String?
+  contactInformation     String?
+  mobileNumber           String?
   alternateContactNumber String?
-  presentAddressLine    String?
-  presentCity           String?
-  presentState          String?
-  presentPincode        String?
-  permanentAddressLine  String?
-  permanentCity         String?
-  permanentState        String?
-  permanentPincode      String?
-  sameAsPresentAddress  Boolean         @default(false)
-  profileUpdatedAt      DateTime?
-  teaches        CourseAssignment[]
-  qualifications FacultyQualification[]
-  publications   FacultyPublication[]
-  experiences    FacultyExperience[]
-  hod            Hod?
+  presentAddressLine     String?
+  presentCity            String?
+  presentState           String?
+  presentPincode         String?
+  permanentAddressLine   String?
+  permanentCity          String?
+  permanentState         String?
+  permanentPincode       String?
+  sameAsPresentAddress   Boolean                @default(false)
+  profileUpdatedAt       DateTime?
+  teaches                CourseAssignment[]
+  qualifications         FacultyQualification[]
+  publications           FacultyPublication[]
+  experiences            FacultyExperience[]
+  hod                    Hod?
 
   @@index([departmentId])
 }
@@ -446,6 +453,12 @@ model Course {
   semesterId     String
   semester       Semester             @relation(fields: [semesterId], references: [id])
   semesterNumber Int
+
+  approvalStatus   CourseApprovalStatus @default(DRAFT)
+  hasAdminApproved Boolean              @default(false)
+  hasCoeApproved   Boolean              @default(false)
+  adminNotes       String?
+  coeNotes         String?
 
   // Credit fields (L-T-P-S)
   lectureCredits          Int     @default(0)
@@ -558,6 +571,7 @@ model Mark {
   @@unique([studentId, courseId])
   @@index([courseId])
 }
+
 model Coe {
   id       String @id @default(uuid())
   user     User   @relation(fields: [userId], references: [id])

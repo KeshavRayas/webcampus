@@ -60,6 +60,9 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  const isLocked =
+    course.approvalStatus === "PENDING" || course.approvalStatus === "APPROVED";
+
   // ── Edit Form ──
   const form = useForm<CreateCourseDTO>({
     resolver: zodResolver(CreateCourseSchema),
@@ -142,12 +145,16 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+          <DropdownMenuItem
+            onSelect={() => setEditOpen(true)}
+            disabled={isLocked}
+          >
             <Pencil className="mr-2 h-4 w-4" />
             Edit
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => setDeleteOpen(true)}
+            disabled={isLocked}
             className="text-destructive focus:text-destructive"
           >
             <Trash2 className="mr-2 h-4 w-4" />

@@ -4,7 +4,6 @@ import type { UpsertCourseMappingType } from "@webcampus/schemas/department";
 import type { BaseResponse } from "@webcampus/types/api";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
-const DEFAULT_BATCH_NAMES = ["L1", "L2", "L3", "L4"];
 
 export class CourseAssignmentService {
   /**
@@ -38,7 +37,9 @@ export class CourseAssignmentService {
         where: {
           semesterId,
           departmentName,
-          ...(cycle && cycle !== "NONE" ? { cycle: cycle as any } : {}),
+          ...(cycle && cycle !== "NONE"
+            ? { cycle: cycle as import("@webcampus/db").Cycle }
+            : {}),
         },
         select: {
           id: true,
@@ -156,15 +157,26 @@ export class CourseAssignmentService {
   ): Promise<BaseResponse<{ created: number }>> {
     try {
       const department =
-        await CourseAssignmentService.getRequestingDepartment(
-          requestingUserId
-        );
+        await CourseAssignmentService.getRequestingDepartment(requestingUserId);
 
       const semester = await db.semester.findUnique({
         where: { id: data.semesterId },
         include: { academicTerm: true },
       });
       if (!semester) throw new Error("Semester not found");
+
+      const course = await db.course.findUnique({
+        where: { id: data.courseId },
+      });
+      if (!course) throw new Error("Course not found");
+      if (
+        course.approvalStatus === "PENDING" ||
+        course.approvalStatus === "APPROVED"
+      ) {
+        throw new Error(
+          "403 Forbidden: Cannot modify faculty assignments for a locked course"
+        );
+      }
 
       // RBAC: non-BASIC_SCIENCES cannot map first-year UG semesters
       if (
@@ -299,15 +311,11 @@ export class CourseAssignmentService {
   static async getFacultyForMapping(
     requestingUserId: string
   ): Promise<
-    BaseResponse<
-      { id: string; name: string; departmentAbbreviation: string }[]
-    >
+    BaseResponse<{ id: string; name: string; departmentAbbreviation: string }[]>
   > {
     try {
       const department =
-        await CourseAssignmentService.getRequestingDepartment(
-          requestingUserId
-        );
+        await CourseAssignmentService.getRequestingDepartment(requestingUserId);
 
       const whereClause: Prisma.FacultyWhereInput =
         department.type === "BASIC_SCIENCES"
@@ -355,15 +363,13 @@ export class CourseAssignmentService {
   > {
     try {
       const department =
-        await CourseAssignmentService.getRequestingDepartment(
-          requestingUserId
-        );
+        await CourseAssignmentService.getRequestingDepartment(requestingUserId);
 
       const sections = await db.section.findMany({
         where: {
           semesterId,
           ...(department.type === "BASIC_SCIENCES" && cycle && cycle !== "NONE"
-            ? { cycle: cycle as any }
+            ? { cycle: cycle as import("@webcampus/db").Cycle }
             : { departmentName: department.name }),
         },
         include: {
