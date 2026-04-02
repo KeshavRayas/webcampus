@@ -159,7 +159,12 @@ export const GenerateSectionsDialog = ({
     academicYear: selectedTerm?.year ?? "",
   });
 
-  const { data: unassignedCounts } = useQuery({
+  const {
+    data: unassignedCounts,
+    isLoading: isLoadingUnassignedCounts,
+    isFetching: isFetchingUnassignedCounts,
+    isError: isUnassignedCountsError,
+  } = useQuery({
     queryKey: ["unassigned-counts", termId, semesterNumber],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<UnassignedDepartmentCount[]>>(
@@ -266,9 +271,13 @@ export const GenerateSectionsDialog = ({
     [allocationValues]
   );
 
+  const hasSelectedAllocations = selectedAllocations.length > 0;
+
   const {
     data: detailedPreviewSections,
     isFetching: isFetchingDetailedPreview,
+    isError: isDetailedPreviewError,
+    error: detailedPreviewError,
   } = useQuery({
     queryKey: [
       "detailed-generation-preview",
@@ -300,7 +309,7 @@ export const GenerateSectionsDialog = ({
       isCycleMode &&
       !!semesterId &&
       cycleStudentsPerSection > 0 &&
-      selectedAllocations.length > 0,
+      hasSelectedAllocations,
   });
 
   const standardMutation = useMutation({
@@ -354,7 +363,13 @@ export const GenerateSectionsDialog = ({
           Generate Sections
         </Button>
       </DialogTrigger>
-      <DialogContent className={isCycleMode ? "sm:max-w-3xl" : "sm:max-w-lg"}>
+      <DialogContent
+        className={
+          isCycleMode
+            ? "max-h-[90vh] overflow-hidden sm:max-w-3xl"
+            : "sm:max-w-lg"
+        }
+      >
         <Form
           {...((isCycleMode
             ? cycleSectionForm.form
@@ -369,186 +384,272 @@ export const GenerateSectionsDialog = ({
                   }
                 : standardForm.handleSubmit(handleStandardSubmit)
             }
-            className="space-y-4"
+            className={
+              isCycleMode
+                ? "flex max-h-[calc(90vh-7rem)] flex-col"
+                : "space-y-4"
+            }
           >
-            <DialogHeader>
+            <DialogHeader className={isCycleMode ? "shrink-0 pb-4" : ""}>
               <DialogTitle>Generate Sections</DialogTitle>
             </DialogHeader>
 
-            <div className="bg-muted rounded-md p-3 text-sm">
-              <p>
-                Academic Term: <strong>{selectedTerm?.year ?? "--"}</strong>
-              </p>
-              <p>
-                Semester:{" "}
-                <strong>
-                  {selectedSemester?.programType ?? "--"} - {semesterNumber}
-                </strong>
-              </p>
-              {isCycleMode ? (
-                <p>
-                  Cycle: <strong>{selectedCycle}</strong>
-                </p>
-              ) : null}
-            </div>
-
-            {isUgFirstYearReadOnly ? (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                <strong>403 Unauthorized:</strong> First-year sections are
-                managed by the Basic Sciences department.
-              </div>
-            ) : null}
-
             {isCycleMode ? (
               <>
-                <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                    Department Allocation
-                  </p>
+                <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+                  <div className="bg-muted rounded-md p-3 text-sm">
+                    <p>
+                      Academic Term:{" "}
+                      <strong>{selectedTerm?.year ?? "--"}</strong>
+                    </p>
+                    <p>
+                      Semester:{" "}
+                      <strong>
+                        {selectedSemester?.programType ?? "--"} -{" "}
+                        {semesterNumber}
+                      </strong>
+                    </p>
+                    <p>
+                      Cycle: <strong>{selectedCycle}</strong>
+                    </p>
+                  </div>
+
+                  {isUgFirstYearReadOnly ? (
+                    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      <strong>403 Unauthorized:</strong> First-year sections are
+                      managed by the Basic Sciences department.
+                    </div>
+                  ) : null}
+
                   <div className="space-y-2">
-                    {(unassignedCounts ?? []).map((department, index) => {
-                      const row = allocationValues?.[index];
-                      const isDisabled = department.unassignedCount === 0;
+                    <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                      Department Allocation
+                    </p>
+                    <div className="max-h-[28vh] space-y-2 overflow-y-auto rounded-md border p-2 md:max-h-[30vh]">
+                      {isLoadingUnassignedCounts ||
+                      isFetchingUnassignedCounts ? (
+                        <div className="bg-muted rounded-md p-3 text-sm">
+                          Loading department unassigned counts...
+                        </div>
+                      ) : isUnassignedCountsError ? (
+                        <div className="bg-muted rounded-md p-3 text-sm">
+                          Failed to load department counts. Please retry.
+                        </div>
+                      ) : (unassignedCounts ?? []).length === 0 ? (
+                        <div className="bg-muted rounded-md p-3 text-sm">
+                          No departments found for allocation.
+                        </div>
+                      ) : (
+                        (unassignedCounts ?? []).map((department, index) => {
+                          const row = allocationValues?.[index];
+                          const isDisabled = department.unassignedCount === 0;
 
-                      return (
-                        <div
-                          key={department.departmentId}
-                          className="bg-muted grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md p-3"
-                        >
-                          <Button
-                            type="button"
-                            variant={row?.selected ? "default" : "outline"}
-                            className={
-                              row?.selected
-                                ? "bg-green-600 text-white hover:bg-green-600/90"
-                                : undefined
-                            }
-                            disabled={isDisabled}
-                            onClick={() => {
-                              cycleSectionForm.form.setValue(
-                                `allocations.${index}.selected`,
-                                !row?.selected
-                              );
-                            }}
-                          >
-                            {department.abbreviation}
-                          </Button>
+                          return (
+                            <div
+                              key={department.departmentId}
+                              className="bg-muted grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md p-3"
+                            >
+                              <Button
+                                type="button"
+                                variant={row?.selected ? "default" : "outline"}
+                                className={
+                                  row?.selected
+                                    ? "bg-green-600 text-white hover:bg-green-600/90"
+                                    : undefined
+                                }
+                                disabled={isDisabled}
+                                onClick={() => {
+                                  cycleSectionForm.form.setValue(
+                                    `allocations.${index}.selected`,
+                                    !row?.selected
+                                  );
+                                }}
+                              >
+                                {department.abbreviation}
+                              </Button>
 
-                          <div className="text-sm">
-                            <p className="font-medium">
-                              {department.departmentName}
-                            </p>
-                            <p className="text-muted-foreground text-xs">
-                              Unassigned: {department.unassignedCount}
-                            </p>
-                          </div>
+                              <div className="text-sm">
+                                <p className="font-medium">
+                                  {department.departmentName}
+                                </p>
+                                <p className="text-muted-foreground text-xs">
+                                  Unassigned: {department.unassignedCount}
+                                </p>
+                              </div>
 
+                              <Input
+                                type="number"
+                                min={0}
+                                max={department.unassignedCount}
+                                value={row?.count ?? 0}
+                                className="w-24"
+                                onChange={(event) => {
+                                  const raw = parseInt(event.target.value, 10);
+                                  const safeValue = Number.isNaN(raw)
+                                    ? 0
+                                    : Math.max(
+                                        0,
+                                        Math.min(
+                                          raw,
+                                          department.unassignedCount
+                                        )
+                                      );
+                                  cycleSectionForm.form.setValue(
+                                    `allocations.${index}.count`,
+                                    safeValue
+                                  );
+                                }}
+                              />
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  <FormField
+                    control={cycleSectionForm.form.control}
+                    name="studentsPerSection"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Students Per Section</FormLabel>
+                        <FormControl>
                           <Input
                             type="number"
-                            min={0}
-                            max={department.unassignedCount}
-                            value={row?.count ?? 0}
-                            className="w-24"
+                            min="1"
+                            max="200"
+                            value={field.value}
                             onChange={(event) => {
-                              const raw = parseInt(event.target.value, 10);
-                              const safeValue = Number.isNaN(raw)
-                                ? 0
-                                : Math.max(
-                                    0,
-                                    Math.min(raw, department.unassignedCount)
-                                  );
-                              cycleSectionForm.form.setValue(
-                                `allocations.${index}.count`,
-                                safeValue
+                              field.onChange(
+                                parseInt(event.target.value, 10) || 0
                               );
                             }}
                           />
-                        </div>
-                      );
-                    })}
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="bg-muted rounded-md p-3 text-sm">
+                    <p>
+                      Preview: <strong>{totalSelectedStudents}</strong> /{" "}
+                      <strong>{cycleStudentsPerSection || 0}</strong> ={" "}
+                      <strong>{cycleSectionsPreview}</strong> section(s)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                      Detailed Preview
+                    </p>
+
+                    {!hasSelectedAllocations ? (
+                      <div className="bg-muted rounded-md p-3 text-sm">
+                        Select at least one department and set a count to
+                        preview sections.
+                      </div>
+                    ) : isFetchingDetailedPreview ? (
+                      <div className="bg-muted rounded-md p-3 text-sm">
+                        Loading section preview...
+                      </div>
+                    ) : isDetailedPreviewError ? (
+                      <div className="bg-muted rounded-md p-3 text-sm text-red-600">
+                        {axios.isAxiosError(detailedPreviewError)
+                          ? detailedPreviewError.response?.data?.message ||
+                            detailedPreviewError.response?.data?.error ||
+                            "Failed to load detailed preview. Please retry."
+                          : "Failed to load detailed preview. Please retry."}
+                      </div>
+                    ) : detailedPreviewSections &&
+                      detailedPreviewSections.length > 0 ? (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {detailedPreviewSections.map((section) => (
+                          <div
+                            key={section.sectionName}
+                            className="bg-muted rounded-md p-3"
+                          >
+                            <p className="mb-2 text-sm font-semibold">
+                              Section {section.sectionName}
+                            </p>
+                            <div className="max-h-40 space-y-1 overflow-y-auto rounded border p-2">
+                              {section.studentUsns.length > 0 ? (
+                                section.studentUsns.map((usn) => (
+                                  <p
+                                    key={`${section.sectionName}-${usn}`}
+                                    className="font-mono text-xs"
+                                  >
+                                    {usn}
+                                  </p>
+                                ))
+                              ) : (
+                                <p className="text-muted-foreground text-xs">
+                                  No students in this section
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-muted rounded-md p-3 text-sm">
+                        No eligible students found for the selected allocations
+                        in this semester.
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <FormField
-                  control={cycleSectionForm.form.control}
-                  name="studentsPerSection"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Students Per Section</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min="1"
-                          max="200"
-                          value={field.value}
-                          onChange={(event) => {
-                            field.onChange(
-                              parseInt(event.target.value, 10) || 0
-                            );
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="bg-muted rounded-md p-3 text-sm">
-                  <p>
-                    Preview: <strong>{totalSelectedStudents}</strong> /{" "}
-                    <strong>{cycleStudentsPerSection || 0}</strong> ={" "}
-                    <strong>{cycleSectionsPreview}</strong> section(s)
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                    Detailed Preview
-                  </p>
-
-                  {isFetchingDetailedPreview ? (
-                    <div className="bg-muted rounded-md p-3 text-sm">
-                      Loading section preview...
-                    </div>
-                  ) : detailedPreviewSections &&
-                    detailedPreviewSections.length > 0 ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {detailedPreviewSections.map((section) => (
-                        <div
-                          key={section.sectionName}
-                          className="bg-muted rounded-md p-3"
-                        >
-                          <p className="mb-2 text-sm font-semibold">
-                            Section {section.sectionName}
-                          </p>
-                          <div className="max-h-40 space-y-1 overflow-y-auto rounded border p-2">
-                            {section.studentUsns.length > 0 ? (
-                              section.studentUsns.map((usn) => (
-                                <p
-                                  key={`${section.sectionName}-${usn}`}
-                                  className="font-mono text-xs"
-                                >
-                                  {usn}
-                                </p>
-                              ))
-                            ) : (
-                              <p className="text-muted-foreground text-xs">
-                                No students in this section
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                <DialogFooter className="shrink-0 pt-4">
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">
+                      Cancel
+                    </Button>
+                  </DialogClose>
+                  {isUgFirstYearReadOnly ? (
+                    <Button type="button" disabled>
+                      Restricted (Managed by Basic Sciences)
+                    </Button>
                   ) : (
-                    <div className="bg-muted rounded-md p-3 text-sm">
-                      Select departments and set counts to preview sections.
-                    </div>
+                    <Button
+                      type="submit"
+                      disabled={
+                        isPending ||
+                        !semesterId ||
+                        isLoadingTerms ||
+                        (isCycleMode && totalSelectedStudents === 0)
+                      }
+                    >
+                      {isPending
+                        ? "Generating..."
+                        : isCycleMode
+                          ? `Generate ${cycleSectionsPreview} Sections`
+                          : `Generate ${standardPreview.length} Sections`}
+                    </Button>
                   )}
-                </div>
+                </DialogFooter>
               </>
             ) : (
               <>
+                <div className="bg-muted rounded-md p-3 text-sm">
+                  <p>
+                    Academic Term: <strong>{selectedTerm?.year ?? "--"}</strong>
+                  </p>
+                  <p>
+                    Semester:{" "}
+                    <strong>
+                      {selectedSemester?.programType ?? "--"} - {semesterNumber}
+                    </strong>
+                  </p>
+                </div>
+
+                {isUgFirstYearReadOnly ? (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    <strong>403 Unauthorized:</strong> First-year sections are
+                    managed by the Basic Sciences department.
+                  </div>
+                ) : null}
+
                 <FormField
                   control={standardForm.control}
                   name="studentsPerSection"
@@ -584,7 +685,7 @@ export const GenerateSectionsDialog = ({
 
                 {standardPreview.length > 0 ? (
                   <div className="bg-muted space-y-1 rounded-md p-3">
-                    <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
+                    <p className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">
                       Preview ({standardPreview.length} sections)
                     </p>
                     {standardPreview.map((section) => (
@@ -602,37 +703,36 @@ export const GenerateSectionsDialog = ({
                     ))}
                   </div>
                 ) : null}
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">
+                      Cancel
+                    </Button>
+                  </DialogClose>
+                  {isUgFirstYearReadOnly ? (
+                    <Button type="button" disabled>
+                      Restricted (Managed by Basic Sciences)
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      disabled={
+                        isPending ||
+                        !semesterId ||
+                        isLoadingTerms ||
+                        (isCycleMode && totalSelectedStudents === 0)
+                      }
+                    >
+                      {isPending
+                        ? "Generating..."
+                        : isCycleMode
+                          ? `Generate ${cycleSectionsPreview} Sections`
+                          : `Generate ${standardPreview.length} Sections`}
+                    </Button>
+                  )}
+                </DialogFooter>
               </>
             )}
-
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">
-                  Cancel
-                </Button>
-              </DialogClose>
-              {isUgFirstYearReadOnly ? (
-                <Button type="button" disabled>
-                  Restricted (Managed by Basic Sciences)
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  disabled={
-                    isPending ||
-                    !semesterId ||
-                    isLoadingTerms ||
-                    (isCycleMode && totalSelectedStudents === 0)
-                  }
-                >
-                  {isPending
-                    ? "Generating..."
-                    : isCycleMode
-                      ? `Generate ${cycleSectionsPreview} Sections`
-                      : `Generate ${standardPreview.length} Sections`}
-                </Button>
-              )}
-            </DialogFooter>
           </form>
         </Form>
       </DialogContent>

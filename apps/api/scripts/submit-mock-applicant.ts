@@ -12,7 +12,64 @@ const IMAGE_URL =
 const PDF_URL =
   "https://adminportal-fileupload.s3.ap-southeast-2.amazonaws.com/aadhar_card_0be79490-379c-4895-ae90-ab574a47b685.pdf";
 
-const DEFAULT_COUNT = 1200;
+interface ParsedArgs {
+  count: number;
+  departmentCode: string;
+}
+
+const parseCliArguments = (): ParsedArgs => {
+  const args = process.argv.slice(2);
+  const result: Partial<ParsedArgs> = {};
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--count") {
+      const countValue = args[i + 1];
+      if (typeof countValue !== "string") {
+        throw new Error(
+          "Missing value for --count. Usage: npm run submit-mock-applicant --count <number> --dept <code>"
+        );
+      }
+
+      const parsed = Number.parseInt(countValue, 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        result.count = parsed;
+      } else {
+        throw new Error(
+          `Invalid --count value: "${countValue}". Must be a positive integer.`
+        );
+      }
+      i++;
+    } else if (args[i] === "--dept") {
+      const departmentValue = args[i + 1];
+      if (typeof departmentValue !== "string") {
+        throw new Error(
+          "Missing value for --dept. Usage: npm run submit-mock-applicant --count <number> --dept <code>"
+        );
+      }
+
+      result.departmentCode = departmentValue;
+      i++;
+    }
+  }
+
+  if (!result.count) {
+    throw new Error(
+      "Missing required parameter --count.\n" +
+        "Usage: npm run submit-mock-applicant --count <number> --dept <code>\n" +
+        "Example: npm run submit-mock-applicant --count 500 --dept CS"
+    );
+  }
+
+  if (!result.departmentCode) {
+    throw new Error(
+      "Missing required parameter --dept.\n" +
+        "Usage: npm run submit-mock-applicant --count <number> --dept <code>\n" +
+        "Example: npm run submit-mock-applicant --count 500 --dept CS"
+    );
+  }
+
+  return result as ParsedArgs;
+};
 
 const randomPhone = (serial: number): string => {
   const tail = String((serial % 1_000_000_000) + 1).padStart(9, "0");
@@ -57,7 +114,7 @@ const getNextApplicationNumber = async (): Promise<number> => {
   return maxNumber + 1;
 };
 
-const resolveContext = async () => {
+const resolveContext = async (departmentCode: string) => {
   const { ADMIN_USER_EMAIL, ADMIN_USER_PASSWORD } = backendEnv();
 
   const signInResponse = await auth.api.signInEmail({
@@ -72,12 +129,25 @@ const resolveContext = async () => {
   }
 
   const department = await db.department.findFirst({
-    where: { code: "CS" },
+    where: { code: departmentCode },
     select: { id: true, name: true, code: true },
   });
 
   if (!department) {
-    throw new Error("Department with code CS not found");
+    // Fetch all available departments to show in error message
+    const availableDepartments = await db.department.findMany({
+      select: { code: true, name: true },
+      orderBy: { code: "asc" },
+    });
+
+    const deptList = availableDepartments
+      .map((d) => `${d.code} (${d.name})`)
+      .join(", ");
+
+    throw new Error(
+      `Department with code "${departmentCode}" not found.\n` +
+        `Available departments: ${deptList}`
+    );
   }
 
   const term = await db.academicTerm.findFirst({
@@ -164,25 +234,29 @@ const submitAndApprove = async (
 
   if (approveResponse.status !== "success") {
     throw new Error(
-      approveResponse.message || `Failed to approve application ${applicationId}`
+      approveResponse.message ||
+        `Failed to approve application ${applicationId}`
     );
   }
 };
 
 async function main() {
-  const requestedCount = Number.parseInt(process.argv[2] ?? `${DEFAULT_COUNT}`, 10);
-  const targetCount = Number.isFinite(requestedCount) && requestedCount > 0
-    ? requestedCount
-    : DEFAULT_COUNT;
+  let args: ParsedArgs;
+  try {
+    args = parseCliArguments();
+  } catch (error) {
+    logger.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 
-  const context = await resolveContext();
+  const context = await resolveContext(args.departmentCode);
   let nextApplicationNumber = await getNextApplicationNumber();
   let approvedCreated = 0;
 
   logger.info("Starting bulk applicant generation", {
-    targetCount,
+    targetCount: args.count,
     modeOfAdmission: "KCET",
-    department: "CS",
+    department: args.departmentCode,
     term: "odd 2026",
     semester: "UG 1",
     quota: "MERIT",
@@ -190,7 +264,7 @@ async function main() {
     porting: false,
   });
 
-  while (approvedCreated < targetCount) {
+  while (approvedCreated < args.count) {
     const applicationId = `APP${nextApplicationNumber}`;
     nextApplicationNumber += 1;
 
@@ -251,10 +325,10 @@ async function main() {
       await submitAndApprove(applicationId, nextApplicationNumber, admissionId);
       approvedCreated += 1;
 
-      if (approvedCreated % 50 === 0 || approvedCreated === targetCount) {
+      if (approvedCreated % 50 === 0 || approvedCreated === args.count) {
         logger.info("Bulk progress", {
           approvedCreated,
-          targetCount,
+          targetCount: args.count,
           latestApplicationId: applicationId,
         });
       }
@@ -268,7 +342,7 @@ async function main() {
 
   logger.info("Bulk applicant script completed", {
     approvedCreated,
-    targetCount,
+    targetCount: args.count,
     status: "APPROVED",
     portingTriggered: false,
   });

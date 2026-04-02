@@ -118,22 +118,35 @@ export class SectionService {
       return [];
     }
 
+    const departmentIds = [
+      ...new Set(validAllocations.map((a) => a.departmentId)),
+    ];
+    const departments = await db.department.findMany({
+      where: { id: { in: departmentIds } },
+      select: { id: true, name: true },
+    });
+    const departmentNameById = new Map(
+      departments.map((department) => [department.id, department.name])
+    );
+
     const pooledStudents: { id: string; usn: string }[] = [];
 
     for (const allocation of validAllocations) {
+      const departmentName = departmentNameById.get(allocation.departmentId);
+      if (!departmentName) {
+        continue;
+      }
+
       const students = await db.student.findMany({
         where: {
-          department: {
-            is: {
-              id: allocation.departmentId,
-            },
-          },
+          departmentName,
           currentSemester: semester.semesterNumber,
           studentSections: {
             none: {
-              academicYear: semester.academicTerm.year,
               section: {
-                semesterId,
+                semester: {
+                  academicTermId: semester.academicTermId,
+                },
               },
             },
           },
