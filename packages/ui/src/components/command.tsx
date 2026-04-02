@@ -1,32 +1,74 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Command as CommandPrimitive } from "cmdk"
-import { SearchIcon } from "lucide-react"
-
-import { cn } from "@webcampus/ui/lib/utils"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@webcampus/ui/components/dialog"
+} from "@webcampus/ui/components/dialog";
+import { cn } from "@webcampus/ui/lib/utils";
+import { SearchIcon } from "lucide-react";
+import * as React from "react";
+
+type CommandContextValue = {
+  search: string;
+  setSearch: React.Dispatch<React.SetStateAction<string>>;
+  registerItem: (id: string, visible: boolean) => void;
+  visibleCount: number;
+};
+
+const CommandContext = React.createContext<CommandContextValue | null>(null);
+
+function useCommandContext() {
+  return React.useContext(CommandContext);
+}
 
 function Command({
   className,
+  children,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive>) {
+}: React.ComponentPropsWithoutRef<"div">) {
+  const [search, setSearch] = React.useState("");
+  const [visibleCount, setVisibleCount] = React.useState(0);
+  const visibilityMapRef = React.useRef(new Map<string, boolean>());
+
+  const registerItem = React.useCallback((id: string, visible: boolean) => {
+    const previous = visibilityMapRef.current.get(id);
+
+    if (previous === visible) {
+      return;
+    }
+
+    visibilityMapRef.current.set(id, visible);
+
+    let nextVisibleCount = 0;
+
+    visibilityMapRef.current.forEach((itemVisible) => {
+      if (itemVisible) {
+        nextVisibleCount += 1;
+      }
+    });
+
+    setVisibleCount(nextVisibleCount);
+  }, []);
+
   return (
-    <CommandPrimitive
-      data-slot="command"
-      className={cn(
-        "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
+    <CommandContext.Provider
+      value={{ search, setSearch, registerItem, visibleCount }}
+    >
+      <div
+        data-slot="command"
+        className={cn(
+          "bg-popover text-popover-foreground flex h-full w-full flex-col overflow-hidden rounded-md",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    </CommandContext.Provider>
+  );
 }
 
 function CommandDialog({
@@ -37,10 +79,10 @@ function CommandDialog({
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof Dialog> & {
-  title?: string
-  description?: string
-  className?: string
-  showCloseButton?: boolean
+  title?: string;
+  description?: string;
+  className?: string;
+  showCloseButton?: boolean;
 }) {
   return (
     <Dialog {...props}>
@@ -52,107 +94,147 @@ function CommandDialog({
         className={cn("overflow-hidden p-0", className)}
         showCloseButton={showCloseButton}
       >
-        <Command className="**:data-[slot=command-input-wrapper]:h-12 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+        <Command className="**:data-[slot=command-input-wrapper]:h-12 [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
           {children}
         </Command>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function CommandInput({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentPropsWithoutRef<"input">) {
+  const commandContext = useCommandContext();
+
   return (
     <div
       data-slot="command-input-wrapper"
       className="flex h-9 items-center gap-2 border-b px-3"
     >
       <SearchIcon className="size-4 shrink-0 opacity-50" />
-      <CommandPrimitive.Input
+      <input
         data-slot="command-input"
         className={cn(
-          "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+          "outline-hidden placeholder:text-muted-foreground flex h-10 w-full rounded-md bg-transparent py-3 text-sm disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         {...props}
+        value={commandContext?.search ?? ""}
+        onChange={(event) => commandContext?.setSearch(event.target.value)}
       />
     </div>
-  )
+  );
 }
 
 function CommandList({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.List>) {
+}: React.ComponentPropsWithoutRef<"div">) {
   return (
-    <CommandPrimitive.List
+    <div
       data-slot="command-list"
       className={cn(
-        "max-h-[300px] scroll-py-1 overflow-x-hidden overflow-y-auto",
+        "max-h-[300px] scroll-py-1 overflow-y-auto overflow-x-hidden",
         className
       )}
       {...props}
     />
-  )
+  );
 }
 
-function CommandEmpty({
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Empty>) {
+function CommandEmpty({ ...props }: React.ComponentPropsWithoutRef<"div">) {
+  const commandContext = useCommandContext();
+
+  if ((commandContext?.visibleCount ?? 0) > 0) {
+    return null;
+  }
+
   return (
-    <CommandPrimitive.Empty
+    <div
       data-slot="command-empty"
       className="py-6 text-center text-sm"
       {...props}
     />
-  )
+  );
 }
 
 function CommandGroup({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Group>) {
+}: React.ComponentPropsWithoutRef<"div">) {
   return (
-    <CommandPrimitive.Group
+    <div
       data-slot="command-group"
       className={cn(
-        "overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground",
+        "text-foreground [&_[cmdk-group-heading]]:text-muted-foreground overflow-hidden p-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium",
         className
       )}
       {...props}
     />
-  )
+  );
 }
 
 function CommandSeparator({
   className,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Separator>) {
+}: React.ComponentPropsWithoutRef<"div">) {
   return (
-    <CommandPrimitive.Separator
+    <div
       data-slot="command-separator"
-      className={cn("-mx-1 h-px bg-border", className)}
+      className={cn("bg-border -mx-1 h-px", className)}
       {...props}
     />
-  )
+  );
 }
 
 function CommandItem({
   className,
+  value,
+  onSelect,
+  onClick,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Item>) {
+}: React.ComponentPropsWithoutRef<"div"> & {
+  value?: string;
+  onSelect?: () => void;
+}) {
+  const commandContext = useCommandContext();
+  const itemId = React.useId();
+  const normalizedSearch = (commandContext?.search ?? "").trim().toLowerCase();
+  const normalizedValue = (value ?? "").toLowerCase();
+  const isVisible =
+    normalizedSearch.length === 0 || normalizedValue.includes(normalizedSearch);
+
+  React.useEffect(() => {
+    commandContext?.registerItem(itemId, isVisible);
+
+    return () => {
+      commandContext?.registerItem(itemId, false);
+    };
+  }, [commandContext, itemId, isVisible]);
+
+  if (!isVisible) {
+    return null;
+  }
+
   return (
-    <CommandPrimitive.Item
+    <div
       data-slot="command-item"
+      role="option"
+      tabIndex={-1}
+      aria-selected={false}
+      {...props}
+      onClick={(event) => {
+        onClick?.(event);
+        onSelect?.();
+      }}
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        "outline-hidden data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className
       )}
-      {...props}
     />
-  )
+  );
 }
 
 function CommandShortcut({
@@ -163,12 +245,12 @@ function CommandShortcut({
     <span
       data-slot="command-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground",
+        "text-muted-foreground ml-auto text-xs tracking-widest",
         className
       )}
       {...props}
     />
-  )
+  );
 }
 
 export {
@@ -181,4 +263,4 @@ export {
   CommandItem,
   CommandShortcut,
   CommandSeparator,
-}
+};
