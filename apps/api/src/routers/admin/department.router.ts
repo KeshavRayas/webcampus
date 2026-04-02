@@ -8,7 +8,7 @@ import {
 import { Router } from "express";
 import multer from "multer";
 
-const router = Router();
+const router: Router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.post(

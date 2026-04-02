@@ -6,9 +6,8 @@ import {
   CreateSemesterConfigSchema,
 } from "@webcampus/schemas/admin";
 import { Router } from "express";
-import { z } from "zod";
 
-const router = Router();
+const router: Router = Router();
 
 router.post(
   "/",
@@ -54,7 +53,7 @@ router.get(
 
 router.put(
   "/:id/semesters",
-  validateRequest(z.array(CreateSemesterConfigSchema)),
+  validateRequest(CreateSemesterConfigSchema.array()),
   protect({
     role: "admin",
     permissions: { semester: ["update"] },

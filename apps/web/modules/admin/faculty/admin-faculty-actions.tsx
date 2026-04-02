@@ -43,7 +43,7 @@ import {
 } from "@webcampus/ui/components/tabs";
 import { MoreHorizontal } from "lucide-react";
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminFacultyResponse } from "./admin-faculty-columns";
 import {
@@ -68,6 +68,8 @@ const hodCreateSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
+
+type EditFormOutput = z.output<typeof editSchema>;
 
 export const AdminFacultyActions = ({
   faculty,
@@ -99,16 +101,18 @@ export const AdminFacultyActions = ({
   const { mutate: reassignHodAccount, isPending: isReassigningHod } =
     useReassignHodAccount(departmentId);
 
-  const editForm = useForm<z.infer<typeof editSchema>>({
-    resolver: zodResolver(editSchema),
+  const editForm = useForm<EditFormOutput>({
+    resolver: zodResolver(editSchema) as Resolver<EditFormOutput>,
     defaultValues: {
       designation: faculty.designation as z.infer<typeof DesignationEnum>,
       username: faculty.user.username || "",
       displayUsername: faculty.user.displayUsername || faculty.user.name || "",
       employeeId: faculty.employeeId || "",
-      staffType: (faculty.staffType as any) || "",
+      staffType: faculty.staffType as z.infer<typeof StaffTypeEnum> | undefined,
       dob: faculty.dob ? new Date(faculty.dob) : undefined,
-      dateOfJoining: faculty.dateOfJoining ? new Date(faculty.dateOfJoining) : undefined,
+      dateOfJoining: faculty.dateOfJoining
+        ? new Date(faculty.dateOfJoining)
+        : undefined,
     },
   });
 
@@ -120,7 +124,7 @@ export const AdminFacultyActions = ({
   const [selectedHodIdToReassign, setSelectedHodIdToReassign] =
     useState<string>("");
 
-  const onEditSubmit = (data: z.infer<typeof editSchema>) => {
+  const onEditSubmit = (data: EditFormOutput) => {
     updateFaculty(
       { id: faculty.id, data, imageFile: editImageFile },
       {
@@ -178,7 +182,7 @@ export const AdminFacultyActions = ({
 
       {/* EDIT DIALOG */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Edit Faculty</DialogTitle>
           </DialogHeader>
@@ -255,7 +259,10 @@ export const AdminFacultyActions = ({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Staff Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || ""}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select staff type" />
@@ -264,7 +271,12 @@ export const AdminFacultyActions = ({
                         <SelectContent>
                           {StaffTypeEnum.options.map((option) => (
                             <SelectItem key={option} value={option}>
-                              {option.split("_").map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(" ")}
+                              {option
+                                .split("_")
+                                .map(
+                                  (w) => w.charAt(0) + w.slice(1).toLowerCase()
+                                )
+                                .join(" ")}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -297,8 +309,14 @@ export const AdminFacultyActions = ({
                       <FormControl>
                         <Input
                           type="date"
-                          value={field.value ? new Date(field.value).toISOString().slice(0, 10) : ""}
-                          onChange={(event) => field.onChange(event.target.value)}
+                          value={
+                            field.value
+                              ? new Date(field.value).toISOString().slice(0, 10)
+                              : ""
+                          }
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -315,8 +333,14 @@ export const AdminFacultyActions = ({
                       <FormControl>
                         <Input
                           type="date"
-                          value={field.value ? new Date(field.value).toISOString().slice(0, 10) : ""}
-                          onChange={(event) => field.onChange(event.target.value)}
+                          value={
+                            field.value
+                              ? new Date(field.value).toISOString().slice(0, 10)
+                              : ""
+                          }
+                          onChange={(event) =>
+                            field.onChange(event.target.value)
+                          }
                         />
                       </FormControl>
                       <FormMessage />

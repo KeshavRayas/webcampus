@@ -6,7 +6,7 @@ import UserRouter from "@webcampus/api/src/routers/admin/user.router";
 import { Router } from "express";
 import facultyRouter from "./faculty.router";
 
-const router = Router();
+const router: Router = Router();
 
 router.use("/user", UserRouter);
 router.use("/admission-users", AdmissionUserRouter);

@@ -8,6 +8,7 @@ import {
 } from "@/lib/filter-search-params";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAdmissionDepartments, useDepartments } from "@/lib/use-departments";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
@@ -46,8 +47,6 @@ import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
-import { useSemestersByTerm } from "@/modules/admin/semester/use-semester-config";
 import {
   AdmissionResponse,
   getAdminAdmissionColumns,
@@ -119,14 +118,13 @@ export const AdminAdmissionView = ({
   }, [searchParams, showFilters]);
 
   // Use standardized hooks for fresh data
-  const { data: terms = [] } = useAcademicTerms();
+  const { data: termsData } = useAcademicTerms();
+  const terms = termsData ?? [];
   const { data: departments = [] } = useDepartments();
   const { data: admissionDepartments = [] } = useAdmissionDepartments();
 
   // Sync filters when data changes (auto-clear if value no longer exists)
-  const selectedTerm = terms.find(
-    (t) => t.id === draftFilters.academicTerm
-  );
+  const selectedTerm = terms.find((t) => t.id === draftFilters.academicTerm);
   const nestedSemesters = selectedTerm?.Semester || [];
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,

@@ -1,8 +1,12 @@
 import { AdminSemesterView } from "@/modules/admin/semester/admin-semester-view";
-import React from "react";
+import React, { Suspense } from "react";
 
 const Page = () => {
-  return <AdminSemesterView />;
+  return (
+    <Suspense fallback={<div className="p-4 text-sm">Loading semester...</div>}>
+      <AdminSemesterView />
+    </Suspense>
+  );
 };
 
 export default Page;

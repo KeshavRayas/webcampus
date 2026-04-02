@@ -8,7 +8,7 @@ import { CreateFacultySchema } from "@webcampus/schemas/faculty";
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
 import axios, { AxiosError, AxiosResponse } from "axios";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
 
@@ -22,7 +22,7 @@ export const useCreateAdminFacultyForm = (departmentId: string) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   const form = useForm<FormType>({
-    resolver: zodResolver(FormSchema),
+    resolver: zodResolver(FormSchema) as Resolver<FormType>,
     defaultValues: {
       name: "",
       username: "",

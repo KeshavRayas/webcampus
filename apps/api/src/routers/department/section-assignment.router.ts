@@ -9,7 +9,7 @@ import {
 } from "@webcampus/schemas/department";
 import { NextFunction, Request, Response, Router } from "express";
 
-const router = Router();
+const router: Router = Router();
 
 const resolveRequestingUserId = async (req: Request): Promise<string> => {
   const session = await auth.api.getSession({
@@ -22,6 +22,9 @@ const resolveRequestingUserId = async (req: Request): Promise<string> => {
 
   return session.user.id;
 };
+
+const paramAsString = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value[0] : value;
 
 const guardSectionWriteAccessFromBody = async (
   req: Request,
@@ -56,8 +59,14 @@ const guardSectionWriteAccessFromAssignmentId = async (
   next: NextFunction
 ) => {
   try {
+    const assignmentId = paramAsString(req.params.id);
+    if (!assignmentId) {
+      res.status(400).json({ status: "error", message: "id is required" });
+      return;
+    }
+
     const assignment = await db.studentSection.findUnique({
-      where: { id: req.params.id },
+      where: { id: assignmentId },
       select: { sectionId: true },
     });
 

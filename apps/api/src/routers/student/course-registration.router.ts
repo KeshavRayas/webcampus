@@ -6,7 +6,7 @@ import {
 } from "@webcampus/schemas/student";
 import { Router } from "express";
 
-const router = Router();
+const router: Router = Router();
 
 router.post(
   "/",

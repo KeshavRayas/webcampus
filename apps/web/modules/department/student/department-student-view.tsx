@@ -6,11 +6,10 @@ import {
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import {
-  DepartmentStudentResponseType,
-} from "@webcampus/schemas/department";
+import { DepartmentStudentResponseType } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import {
@@ -24,7 +23,6 @@ import { Skeleton } from "@webcampus/ui/components/skeleton";
 import axios from "axios";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
-import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { departmentStudentColumns } from "./department-student-columns";
 
 type StudentFilters = {
@@ -68,7 +66,8 @@ export const DepartmentStudentView = () => {
     setIsHydrated(true);
   }, []);
 
-  const { data: terms = [] } = useAcademicTerms();
+  const { data: termsData } = useAcademicTerms();
+  const terms = termsData ?? [];
 
   const selectedTerm = useMemo(
     () => terms.find((term) => term.id === draftFilters.academicTerm),
@@ -118,7 +117,7 @@ export const DepartmentStudentView = () => {
 
       const res = await axios.get<
         BaseResponse<DepartmentStudentResponseType[]>
-      >(`${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/department/student`, {
+      >(`${NEXT_PUBLIC_API_BASE_URL}/department/student`, {
         params: apiFilters,
         withCredentials: true,
       });
@@ -133,7 +132,9 @@ export const DepartmentStudentView = () => {
 
   const sectionOptions = useMemo(() => {
     const options = Array.from(
-      new Set((response.data || []).map((student) => student.section).filter(Boolean))
+      new Set(
+        (response.data || []).map((student) => student.section).filter(Boolean)
+      )
     ) as string[];
 
     if (draftFilters.section && !options.includes(draftFilters.section)) {

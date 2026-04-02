@@ -6,7 +6,7 @@ import DepartmentSectionRouter from "@webcampus/api/src/routers/department/secti
 import DepartmentStudentRouter from "@webcampus/api/src/routers/department/student.router";
 import { Router } from "express";
 
-const router = Router();
+const router: Router = Router();
 
 router.use("/course", DepartmentCourseRouter);
 

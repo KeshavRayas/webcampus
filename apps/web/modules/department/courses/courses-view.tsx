@@ -6,6 +6,7 @@ import {
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
@@ -20,7 +21,6 @@ import {
 import axios from "axios";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
-import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { SemesterCourseBlock } from "./semester-course-block";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
@@ -97,7 +97,8 @@ export const CoursesView: React.FC = () => {
   }, [draftFilters.cycle, isBasicSciences]);
 
   // Fetch all available academic terms (with nested semesters)
-  const { data: terms = [] } = useAcademicTerms();
+  const { data: termsData } = useAcademicTerms();
+  const terms = termsData ?? [];
 
   const selectedDraftTerm = terms.find((t) => t.id === draftFilters.termId);
   const allSemestersForSelectedDraftTerm = selectedDraftTerm?.Semester ?? [];
@@ -184,8 +185,7 @@ export const CoursesView: React.FC = () => {
       return;
     }
 
-    const currentTerm =
-      terms.find((term) => term.isCurrent) ?? terms[0];
+    const currentTerm = terms.find((term) => term.isCurrent) ?? terms[0];
     if (currentTerm) {
       setDraftFilters((current) => ({
         ...current,
@@ -312,7 +312,10 @@ export const CoursesView: React.FC = () => {
       const res = await axios.get<BaseResponse<CourseResponseDTO[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/course/branch`,
         {
-          params: { name: departmentName, semesterId: appliedFilters.semesterId },
+          params: {
+            name: departmentName,
+            semesterId: appliedFilters.semesterId,
+          },
           withCredentials: true,
         }
       );
@@ -333,7 +336,9 @@ export const CoursesView: React.FC = () => {
       return courseList;
     }
 
-    return courseList.filter((course) => (course.cycle ?? "NONE") === appliedCycle);
+    return courseList.filter(
+      (course) => (course.cycle ?? "NONE") === appliedCycle
+    );
   }, [appliedCycle, appliedFilters.cycle, courses, isBasicSciences]);
 
   return (

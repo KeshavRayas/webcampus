@@ -3,14 +3,14 @@ import DepartmentRouter from "@webcampus/api/src/routers/department/department.r
 import { auth, toNodeHandler } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import cors from "cors";
-import express from "express";
+import express, { type Express } from "express";
 import adminRouter from "./routers/admin/admin.router";
 import admissionRouter from "./routers/admission/admission.router";
 import coeRouter from "./routers/coe/coe.router";
 import facultyProfileRouter from "./routers/faculty/faculty.router";
 import hodRouter from "./routers/hod/hod.router";
 
-const app = express();
+const app: Express = express();
 
 app.use(
   cors({

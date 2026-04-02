@@ -4,7 +4,7 @@ import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import { DepartmentStudentQuerySchema } from "@webcampus/schemas/department";
 import { Router } from "express";
 
-const router = Router();
+const router: Router = Router();
 
 router.use(
   protect({

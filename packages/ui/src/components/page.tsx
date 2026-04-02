@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import React from "react";
 import { capitalize } from "../lib/utils";
 
@@ -22,15 +21,13 @@ export const Page = ({ children }: PageProps) => {
 };
 
 export const PageHeader = ({ children, title }: PageHeaderProps) => {
-  const pathname = usePathname();
-  const pathSegments = pathname.split("/").filter(Boolean);
-  const pageTitle = pathSegments[pathSegments.length - 1];
+  const pageTitle = title ? capitalize(title) : null;
 
   return (
     <div className="flex items-center justify-between py-4">
-      <h1 className="text-xl font-semibold">
-        {capitalize(title || pageTitle!)}
-      </h1>
+      {pageTitle ? (
+        <h1 className="text-xl font-semibold">{pageTitle}</h1>
+      ) : null}
       {children}
     </div>
   );

@@ -3,7 +3,7 @@ import { validateRequest } from "@webcampus/backend-utils/middlewares";
 import { CreateCourseAssignmentSchema } from "@webcampus/schemas/hod";
 import { Router } from "express";
 
-const router = Router();
+const router: Router = Router();
 
 router.post(
   "/",

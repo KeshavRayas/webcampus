@@ -6,6 +6,7 @@ import {
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
@@ -16,14 +17,9 @@ import {
   FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import {
-  usePathname,
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
 import axios from "axios";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo } from "react";
-import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { GenerateSectionsDialog } from "./generate-sections-dialog";
 import { SectionCardsView } from "./section-cards-view";
 
@@ -91,7 +87,8 @@ export const DepartmentSectionView = () => {
     enabled: !!session?.user?.id,
   });
 
-  const { data: terms = [] } = useAcademicTerms();
+  const { data: termsData } = useAcademicTerms();
+  const terms = termsData ?? [];
 
   const isBasicSciences = deptInfo?.type === "BASIC_SCIENCES";
   const selectedDraftTerm = terms.find(
@@ -107,9 +104,6 @@ export const DepartmentSectionView = () => {
 
   const selectedAppliedTerm = terms.find(
     (term) => term.id === appliedFilters.termId
-  );
-  const selectedAppliedSemester = (selectedAppliedTerm?.Semester || []).find(
-    (semester) => semester.id === appliedFilters.semesterId
   );
   const academicYear = selectedAppliedTerm?.year ?? "";
 
@@ -157,8 +151,7 @@ export const DepartmentSectionView = () => {
       return;
     }
 
-    const currentTerm =
-      terms.find((term) => term.isCurrent) ?? terms[0];
+    const currentTerm = terms.find((term) => term.isCurrent) ?? terms[0];
     if (currentTerm) {
       setDraftFilters((current) => ({
         ...current,

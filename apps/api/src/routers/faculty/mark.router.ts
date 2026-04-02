@@ -3,7 +3,7 @@ import { validateRequest } from "@webcampus/backend-utils/middlewares";
 import { CreateMarkSchema, UpdateMarkSchema } from "@webcampus/schemas/faculty";
 import { Router } from "express";
 
-const router = Router();
+const router: Router = Router();
 
 router.post("/", validateRequest(CreateMarkSchema), MarkController.create);
 router.get("/", MarkController.getAll);

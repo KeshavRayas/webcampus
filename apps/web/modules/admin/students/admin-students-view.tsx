@@ -8,9 +8,7 @@ import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useDepartments } from "@/lib/use-departments";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import {
-  AdminStudentResponseType,
-} from "@webcampus/schemas/admin";
+import { AdminStudentResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import {
@@ -54,7 +52,8 @@ export const AdminStudentsView = () => {
   const searchParams = useSearchParams();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
-  const { data: terms = [] } = useAcademicTerms();
+  const { data: termsData } = useAcademicTerms();
+  const terms = termsData ?? [];
   const { data: departments = [] } = useDepartments();
 
   const [draftFilters, setDraftFilters] = useState<StudentFilters>(() =>
@@ -168,10 +167,11 @@ export const AdminStudentsView = () => {
 
   // Build department options from the fetched departments
   const departmentOptions = useMemo(
-    () => departments.map((dept) => ({
-      label: dept.name,
-      value: dept.id,
-    })),
+    () =>
+      departments.map((dept) => ({
+        label: dept.name,
+        value: dept.id,
+      })),
     [departments]
   );
 
