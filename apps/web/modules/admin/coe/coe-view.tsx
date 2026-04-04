@@ -128,11 +128,9 @@ export const CoeView = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            Controller of Examinations (COE)
-          </h2>
+          <h2 className="text-2xl font-bold tracking-tight">COE Users</h2>
           <p className="text-muted-foreground text-sm">
-            Manage COE user accounts and their system access.
+            Manage COE users and their system access.
           </p>
         </div>
         <CoeForm />

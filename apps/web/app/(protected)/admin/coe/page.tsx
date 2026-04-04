@@ -4,7 +4,7 @@ import React, { Suspense } from "react";
 const Page = () => {
   return (
     <Suspense
-      fallback={<div className="p-4 text-sm">Loading COE management...</div>}
+      fallback={<div className="p-4 text-sm">Loading COE users...</div>}
     >
       <CoeView />
     </Suspense>

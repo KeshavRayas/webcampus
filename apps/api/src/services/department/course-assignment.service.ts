@@ -5,11 +5,32 @@ import type { BaseResponse } from "@webcampus/types/api";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 
+type MappingContext = {
+  departmentName?: string;
+  requesterRole?: "admin" | "department";
+};
+
 export class CourseAssignmentService {
   /**
    * Resolve the requesting department from the user session.
    */
-  private static async getRequestingDepartment(requestingUserId: string) {
+  private static async getRequestingDepartment(
+    requestingUserId: string,
+    context?: MappingContext
+  ) {
+    if (context?.departmentName) {
+      const explicitDepartment = await db.department.findUnique({
+        where: { name: context.departmentName },
+        select: { id: true, name: true, type: true, abbreviation: true },
+      });
+
+      if (!explicitDepartment) {
+        throw new Error("Department not found");
+      }
+
+      return explicitDepartment;
+    }
+
     const department = await db.department.findFirst({
       where: { userId: requestingUserId },
       select: { id: true, name: true, type: true, abbreviation: true },
@@ -153,11 +174,14 @@ export class CourseAssignmentService {
    */
   static async upsertMapping(
     data: UpsertCourseMappingType,
-    requestingUserId: string
+    requestingUserId: string,
+    context?: MappingContext
   ): Promise<BaseResponse<{ created: number }>> {
     try {
-      const department =
-        await CourseAssignmentService.getRequestingDepartment(requestingUserId);
+      const department = await CourseAssignmentService.getRequestingDepartment(
+        requestingUserId,
+        context
+      );
 
       const semester = await db.semester.findUnique({
         where: { id: data.semesterId },
@@ -180,6 +204,7 @@ export class CourseAssignmentService {
 
       // RBAC: non-BASIC_SCIENCES cannot map first-year UG semesters
       if (
+        context?.requesterRole !== "admin" &&
         department.type !== "BASIC_SCIENCES" &&
         semester.programType === "UG" &&
         FIRST_YEAR_UG_SEMESTERS.has(semester.semesterNumber)
@@ -202,12 +227,17 @@ export class CourseAssignmentService {
         }
 
         if (allFacultyIds.size > 0) {
+          const requestedFacultyIds = Array.from(allFacultyIds);
           const facultyRecords = await db.faculty.findMany({
             where: {
-              id: { in: Array.from(allFacultyIds) },
+              id: { in: requestedFacultyIds },
             },
             select: { id: true, departmentId: true },
           });
+
+          if (facultyRecords.length !== requestedFacultyIds.length) {
+            throw new Error("One or more faculty records are invalid");
+          }
 
           for (const faculty of facultyRecords) {
             if (faculty.departmentId !== department.id) {
@@ -309,13 +339,16 @@ export class CourseAssignmentService {
    * DEGREE_GRANTING: only faculty from the requesting department.
    */
   static async getFacultyForMapping(
-    requestingUserId: string
+    requestingUserId: string,
+    context?: MappingContext
   ): Promise<
     BaseResponse<{ id: string; name: string; departmentAbbreviation: string }[]>
   > {
     try {
-      const department =
-        await CourseAssignmentService.getRequestingDepartment(requestingUserId);
+      const department = await CourseAssignmentService.getRequestingDepartment(
+        requestingUserId,
+        context
+      );
 
       const whereClause: Prisma.FacultyWhereInput =
         department.type === "BASIC_SCIENCES"
@@ -355,15 +388,18 @@ export class CourseAssignmentService {
   static async getSectionsForMapping(
     semesterId: string,
     requestingUserId: string,
-    cycle?: string
+    cycle?: string,
+    context?: MappingContext
   ): Promise<
     BaseResponse<
       { id: string; name: string; batches: { id: string; name: string }[] }[]
     >
   > {
     try {
-      const department =
-        await CourseAssignmentService.getRequestingDepartment(requestingUserId);
+      const department = await CourseAssignmentService.getRequestingDepartment(
+        requestingUserId,
+        context
+      );
 
       const sections = await db.section.findMany({
         where: {
@@ -396,6 +432,41 @@ export class CourseAssignmentService {
       logger.error("Error fetching sections for mapping:", { error });
       if (error instanceof Error) throw error;
       throw new Error("Failed to fetch sections for mapping");
+    }
+  }
+
+  static async deleteMappings(
+    courseId: string,
+    semesterId: string,
+    academicYear: string
+  ): Promise<BaseResponse<{ deleted: number }>> {
+    try {
+      const semester = await db.semester.findUnique({
+        where: { id: semesterId },
+      });
+
+      if (!semester) {
+        throw new Error("Semester not found");
+      }
+
+      const result = await db.courseAssignment.deleteMany({
+        where: {
+          courseId,
+          semester: semester.semesterNumber,
+          academicYear,
+          section: { semesterId },
+        },
+      });
+
+      return {
+        status: "success",
+        message: `Deleted ${result.count} mappings`,
+        data: { deleted: result.count },
+      };
+    } catch (error) {
+      logger.error("Error deleting course mappings:", { error });
+      if (error instanceof Error) throw error;
+      throw new Error("Failed to delete course mappings");
     }
   }
 }

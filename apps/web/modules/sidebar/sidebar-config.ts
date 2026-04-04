@@ -56,9 +56,13 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: Users,
         },
         {
-          name: "Admission Users",
+          name: "Users",
           url: "/admin/admission-users",
-          icon: UserSearch,
+          icon: Users,
+          children: [
+            { name: "Admission Users", url: "/admin/admission-users" },
+            { name: "COE Users", url: "/admin/coe" },
+          ],
         },
         {
           name: "Students",
@@ -66,14 +70,14 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: GraduationCap,
         },
         {
-          name: "Manage COE",
-          url: "/admin/coe",
-          icon: Users,
-        },
-        {
-          name: "Approvals",
-          url: "/admin/course-approvals",
+          name: "Courses",
+          url: "/admin/courses",
           icon: Library,
+          children: [
+            { name: "Course Configuration", url: "/admin/courses" },
+            { name: "Course Mapping", url: "/admin/course-mapping" },
+            { name: "Course Approvals", url: "/admin/course-approvals" },
+          ],
         },
       ],
     },

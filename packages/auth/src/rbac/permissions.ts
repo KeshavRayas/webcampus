@@ -24,6 +24,9 @@ export const ac = createAccessControl(statement);
 export const roles = {
   admin: ac.newRole({
     ...adminAc.statements,
+    courses: ["create", "read", "update", "delete"],
+    courseAssignment: ["create", "read"],
+    section: ["read"],
     semester: ["create", "read", "delete", "update"],
     department: ["create", "read", "update", "delete"],
     sectionAssignment: ["create", "read", "update", "delete"],

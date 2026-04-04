@@ -1,5 +1,7 @@
 import AdmissionUserRouter from "@webcampus/api/src/routers/admin/admission-user.router";
 import CoeRouter from "@webcampus/api/src/routers/admin/coe.router";
+import AdminCourseAssignmentRouter from "@webcampus/api/src/routers/admin/course-assignment.router";
+import AdminCourseRouter from "@webcampus/api/src/routers/admin/course.router";
 import DepartmentRouter from "@webcampus/api/src/routers/admin/department.router";
 import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
 import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
@@ -20,5 +22,9 @@ router.use("/semester", SemesterRouter);
 router.use("/faculty", facultyRouter);
 
 router.use("/student", StudentRouter);
+
+router.use("/course", AdminCourseRouter);
+
+router.use("/course-assignment", AdminCourseAssignmentRouter);
 
 export default router;
