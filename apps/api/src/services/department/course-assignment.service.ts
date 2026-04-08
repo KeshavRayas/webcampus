@@ -10,6 +10,9 @@ import type { DepartmentRequestContext } from "@webcampus/types/request-context"
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 
+const getCourseMappingStatus = (assignmentCount: number): "Mapped" | "Unmapped" =>
+  assignmentCount > 0 ? "Mapped" : "Unmapped";
+
 type MappingContext = {
   departmentId?: string;
   departmentName?: string;
@@ -224,8 +227,8 @@ export class CourseAssignmentService {
         tutorialCredits: course.tutorialCredits,
         practicalCredits: course.practicalCredits,
         assignments: course.assignments,
-        status: course.assignments.length > 0 ? "Mapped" : "Unmapped",
-      }));
+        status: getCourseMappingStatus(course.assignments.length),
+      })) satisfies CourseMappingStatusResponseType["courses"];
 
       return {
         status: "success",
