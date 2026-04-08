@@ -1,6 +1,6 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
+import { stripDepartmentOwnershipFields } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
@@ -36,14 +36,18 @@ interface UseCreateCycleSectionsFormOptions {
   academicYear: string;
 }
 
+type DepartmentScopedCreateSectionPayload = Omit<
+  CreateSectionType,
+  "departmentId" | "departmentName"
+>;
+
 export const useCreateSectionForm = (
   options: UseCreateSectionFormOptions = {}
 ) => {
   const queryClient = useQueryClient();
-  const { data: session } = authClient.useSession();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const departmentName =
-    options.fixedDepartmentName ?? (session?.user?.name as string);
+    options.fixedDepartmentName ?? "AUTH_SCOPED";
   const semesterId = options.fixedSemesterId ?? "";
 
   const form = useForm({
@@ -55,7 +59,7 @@ export const useCreateSectionForm = (
     },
   });
   const createSectionMutation = useMutation({
-    mutationFn: async (data: CreateSectionType) => {
+    mutationFn: async (data: DepartmentScopedCreateSectionPayload) => {
       return await axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/department/section`,
         data,
@@ -73,11 +77,12 @@ export const useCreateSectionForm = (
     },
   });
   const onSubmit = async (data: CreateSectionType) => {
-    createSectionMutation.mutate({
-      ...data,
-      departmentName: options.fixedDepartmentName ?? data.departmentName,
+    const payload: DepartmentScopedCreateSectionPayload = {
+      ...stripDepartmentOwnershipFields(data),
       semesterId: options.fixedSemesterId ?? data.semesterId,
-    });
+    };
+
+    createSectionMutation.mutate(payload);
   };
   return { createSectionMutation, form, onSubmit };
 };

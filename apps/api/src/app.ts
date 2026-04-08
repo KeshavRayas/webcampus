@@ -7,7 +7,7 @@ import express, { type Express } from "express";
 import adminRouter from "./routers/admin/admin.router";
 import admissionRouter from "./routers/admission/admission.router";
 import coeRouter from "./routers/coe/coe.router";
-import facultyProfileRouter from "./routers/faculty/faculty.router";
+import facultyRouter from "./routers/faculty/faculty-domain.router";
 import hodRouter from "./routers/hod/hod.router";
 
 const app: Express = express();
@@ -34,7 +34,7 @@ app.use("/department", DepartmentRouter);
 
 app.use("/coe", coeRouter);
 
-app.use("/faculty/profile", facultyProfileRouter);
+app.use("/faculty", facultyRouter);
 
 app.use("/admission", admissionRouter);
 

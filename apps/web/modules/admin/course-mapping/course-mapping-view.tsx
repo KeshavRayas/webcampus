@@ -21,9 +21,9 @@ export const AdminCourseMappingView = () => {
   const selectedDepartment = useMemo(
     () =>
       departments.find(
-        (department) => department.name === appliedFilters?.departmentName
+        (department) => department.id === appliedFilters?.departmentId
       ),
-    [appliedFilters?.departmentName, departments]
+    [appliedFilters?.departmentId, departments]
   );
 
   const isBasicSciences = selectedDepartment?.type === "BASIC_SCIENCES";
@@ -54,7 +54,7 @@ export const AdminCourseMappingView = () => {
       />
 
       {selectedCourse &&
-        appliedFilters?.departmentName &&
+        selectedDepartment &&
         appliedFilters?.semesterId &&
         appliedFilters?.academicYear && (
           <div className="flex w-full flex-col gap-6">
@@ -67,7 +67,8 @@ export const AdminCourseMappingView = () => {
                 </h3>
                 <AdminCourseMappingGrid
                   course={selectedCourse}
-                  departmentName={appliedFilters.departmentName}
+                  departmentId={selectedDepartment.id}
+                  departmentName={selectedDepartment.name}
                   semesterId={appliedFilters.semesterId}
                   academicYear={appliedFilters.academicYear}
                   cycle={appliedFilters.cycle}

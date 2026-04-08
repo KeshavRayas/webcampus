@@ -1,5 +1,4 @@
 import { CourseAssignmentService } from "@webcampus/api/src/services/department/course-assignment.service";
-import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
@@ -8,21 +7,10 @@ import type {
   CourseMappingStatusQueryType,
   UpsertCourseMappingType,
 } from "@webcampus/schemas/department";
+import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
 import type { Request, Response } from "express";
 
 export class CourseAssignmentController {
-  private static async getRequestingUserId(req: Request): Promise<string> {
-    const session = await auth.api.getSession({
-      headers: fromNodeHeaders(req.headers),
-    });
-
-    if (!session?.user?.id) {
-      throw new Error("Unauthorized");
-    }
-
-    return session.user.id;
-  }
-
   /**
    * GET /status
    * Returns mapping status for all courses in a semester/department.
@@ -32,14 +20,19 @@ export class CourseAssignmentController {
     res: Response
   ): Promise<void> {
     try {
-      const { semesterId, departmentName, academicYear, cycle } =
+      const { semesterId, academicYear, cycle } =
         req.query as CourseMappingStatusQueryType;
+      const departmentContext = await getDepartmentRequestContext(req);
 
       const response = await CourseAssignmentService.getMappingStatus(
         semesterId,
-        departmentName,
         academicYear,
-        cycle
+        departmentContext.userId,
+        cycle,
+        {
+          requesterRole: "department",
+          requestContext: departmentContext,
+        }
       );
 
       if (response.status === "success") {
@@ -73,14 +66,19 @@ export class CourseAssignmentController {
     res: Response
   ): Promise<void> {
     try {
-      const { courseId, semesterId, academicYear } = req.query as {
-        courseId: string;
-      } & CourseMappingByCourseQueryType;
+      const { courseId, semesterId, academicYear } =
+        req.query as CourseMappingByCourseQueryType;
+      const departmentContext = await getDepartmentRequestContext(req);
 
       const response = await CourseAssignmentService.getMappingByCourse(
         courseId,
         semesterId,
-        academicYear
+        academicYear,
+        departmentContext.userId,
+        {
+          requesterRole: "department",
+          requestContext: departmentContext,
+        }
       );
 
       if (response.status === "success") {
@@ -115,12 +113,15 @@ export class CourseAssignmentController {
   ): Promise<void> {
     try {
       const data: UpsertCourseMappingType = req.body;
-      const requestingUserId =
-        await CourseAssignmentController.getRequestingUserId(req);
+      const departmentContext = await getDepartmentRequestContext(req);
 
       const response = await CourseAssignmentService.upsertMapping(
         data,
-        requestingUserId
+        departmentContext.userId,
+        {
+          requesterRole: "department",
+          requestContext: departmentContext,
+        }
       );
 
       if (response.status === "success") {
@@ -154,11 +155,15 @@ export class CourseAssignmentController {
     res: Response
   ): Promise<void> {
     try {
-      const requestingUserId =
-        await CourseAssignmentController.getRequestingUserId(req);
+      const departmentContext = await getDepartmentRequestContext(req);
 
-      const response =
-        await CourseAssignmentService.getFacultyForMapping(requestingUserId);
+      const response = await CourseAssignmentService.getFacultyForMapping(
+        departmentContext.userId,
+        {
+          requesterRole: "department",
+          requestContext: departmentContext,
+        }
+      );
 
       if (response.status === "success") {
         sendResponse({
@@ -195,14 +200,16 @@ export class CourseAssignmentController {
         semesterId: string;
         cycle?: string;
       };
-
-      const requestingUserId =
-        await CourseAssignmentController.getRequestingUserId(req);
+      const departmentContext = await getDepartmentRequestContext(req);
 
       const response = await CourseAssignmentService.getSectionsForMapping(
         semesterId,
-        requestingUserId,
-        cycle
+        departmentContext.userId,
+        cycle,
+        {
+          requesterRole: "department",
+          requestContext: departmentContext,
+        }
       );
 
       if (response.status === "success") {

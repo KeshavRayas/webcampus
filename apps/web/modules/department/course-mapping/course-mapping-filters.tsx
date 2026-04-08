@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import {
   CourseMappingStatusItemType,
+  CourseMappingStatusResponseType,
   CourseResponseDTO,
 } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
@@ -132,7 +133,7 @@ export const CourseMappingFilters = ({
       )
         return [];
 
-      const res = await axios.get<BaseResponse<CourseMappingStatusItemType[]>>(
+      const res = await axios.get<BaseResponse<CourseMappingStatusResponseType>>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/status`,
         {
           params: {
@@ -146,7 +147,9 @@ export const CourseMappingFilters = ({
           withCredentials: true,
         }
       );
-      if (res.data.status === "success" && res.data.data) return res.data.data;
+      if (res.data.status === "success" && res.data.data?.courses) {
+        return res.data.data.courses;
+      }
       return [];
     },
     enabled:

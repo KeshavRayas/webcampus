@@ -36,10 +36,19 @@ model User {
   role       String?
   Semester   Semester[]
   Department Department[]
+  departmentMemberships DepartmentUser[]
 
   @@unique([email])
   @@unique([username])
   @@map("user")
+}
+
+enum DepartmentScopedRole {
+  ADMIN
+  HOD
+  FACULTY
+  STAFF
+  VIEWER
 }
 
 model AcademicTerm {
@@ -255,9 +264,24 @@ model Department {
   students     Student[]
   faculties    Faculty[]
   Course       Course[]
+  courseAssignments CourseAssignment[]
   Admissions   Admission[]
+  userMemberships DepartmentUser[]
 
   @@index([name])
+}
+
+model DepartmentUser {
+  id           String               @id @default(uuid())
+  userId       String
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   Department           @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  role         DepartmentScopedRole
+  isPrimary    Boolean              @default(false)
+
+  @@unique([userId, departmentId, role])
+  @@index([departmentId, role])
 }
 
 model Hod {
@@ -273,8 +297,9 @@ model Hod {
 model Section {
   id              String             @id @default(uuid())
   name            String
-  department      Department         @relation(fields: [departmentName], references: [name])
-  departmentName  String
+  departmentId    String
+  department      Department         @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  departmentName  String?
   semesterId      String
   semester        Semester           @relation(fields: [semesterId], references: [id])
   courses         CourseAssignment[]
@@ -282,8 +307,10 @@ model Section {
   batches         Batch[]
   cycle           Cycle              @default(NONE)
 
-  @@unique([name, departmentName, semesterId])
-  @@index([departmentName, semesterId])
+  @@unique([id, departmentId])
+  @@unique([name, departmentId, semesterId])
+  @@index([departmentId, semesterId])
+  @@index([departmentId, semesterId, cycle])
 }
 
 /**
@@ -298,6 +325,7 @@ model Batch {
   CourseAssignment CourseAssignment[]
 
   @@unique([name, sectionId])
+  @@index([sectionId])
 }
 
 model StudentSection {
@@ -312,6 +340,7 @@ model StudentSection {
   @@unique([studentId, sectionId, semester, academicYear])
   @@index([studentId])
   @@index([sectionId])
+  @@index([sectionId, semester, academicYear])
 }
 
 model Student {
@@ -338,6 +367,7 @@ model Student {
   admission         Admission?
 
   @@index([departmentName])
+  @@index([departmentName, currentSemester])
   @@index([semesterId])
   @@index([semesterNumber])
   @@index([programType])
@@ -387,6 +417,7 @@ model Faculty {
   experiences            FacultyExperience[]
   hod                    Hod?
 
+  @@unique([id, departmentId])
   @@index([departmentId])
 }
 
@@ -448,17 +479,21 @@ model Course {
   courseMode     CourseMode
   courseType     CourseType
   cycle          Cycle                @default(NONE)
-  department     Department           @relation(fields: [departmentName], references: [name])
-  departmentName String
+  departmentId   String
+  department     Department           @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  departmentName String?
   semesterId     String
   semester       Semester             @relation(fields: [semesterId], references: [id])
   semesterNumber Int
 
-  approvalStatus   CourseApprovalStatus @default(DRAFT)
-  hasAdminApproved Boolean              @default(false)
-  hasCoeApproved   Boolean              @default(false)
-  adminNotes       String?
-  coeNotes         String?
+  approvalStatus          CourseApprovalStatus @default(DRAFT)
+  approvedByRole          String?
+  approvedByUsername      String?
+  approvedByDisplay       String?
+  approvedAt              DateTime?
+  revisionRequestedByRole String?
+  revisionNotes           String?
+  revisionRequestedAt     DateTime?
 
   // Credit fields (L-T-P-S)
   lectureCredits          Int     @default(0)
@@ -497,16 +532,22 @@ model Course {
   marks          Mark[]
   attendances    Attendance[]
 
+  @@unique([id, departmentId])
   @@index([code])
+  @@index([departmentId, semesterId])
+  @@index([departmentId, semesterId, cycle, approvalStatus])
+  @@index([departmentId, semesterId, semesterNumber])
 }
 
 model CourseAssignment {
   id             String         @id @default(uuid())
-  course         Course         @relation(fields: [courseId], references: [id])
+  departmentId   String
+  department     Department     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  course         Course         @relation(fields: [courseId, departmentId], references: [id, departmentId], onDelete: Restrict)
   courseId       String
-  faculty        Faculty        @relation(fields: [facultyId], references: [id])
+  faculty        Faculty        @relation(fields: [facultyId, departmentId], references: [id, departmentId], onDelete: Restrict)
   facultyId      String
-  section        Section        @relation(fields: [sectionId], references: [id])
+  section        Section        @relation(fields: [sectionId, departmentId], references: [id, departmentId], onDelete: Restrict)
   sectionId      String
   batch          Batch?         @relation(fields: [batchId], references: [id])
   batchId        String?
@@ -515,8 +556,12 @@ model CourseAssignment {
   academicYear   String
   freezes        Freeze[]
 
-  @@unique([courseId, facultyId, sectionId, batchId, assignmentType, semester, academicYear])
+  @@unique([departmentId, courseId, facultyId, sectionId, batchId, assignmentType, semester, academicYear])
   @@index([sectionId, semester])
+  @@index([departmentId, sectionId, semester])
+  @@index([departmentId, courseId, semester])
+  @@index([courseId, semester, academicYear])
+  @@index([facultyId, semester, academicYear])
   @@index([batchId])
 }
 
@@ -735,4 +780,5 @@ model Admission {
   updatedAt DateTime @updatedAt
 
   @@index([semesterId])
+  @@index([departmentId])
 }

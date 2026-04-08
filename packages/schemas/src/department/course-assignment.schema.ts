@@ -36,20 +36,32 @@ export const CourseAssignmentResponseSchema = BaseCourseAssignmentSchema.extend(
   id: z.uuid("Invalid course assignment ID"),
 });
 
-export const CourseMappingStatusQuerySchema = z.object({
-  semesterId: z.uuid("Invalid semester ID"),
-  departmentName: z.string().min(1, "Department is required"),
-  academicYear: z.string().min(1, "Academic year is required"),
-  cycle: z
-    .enum(["PHYSICS", "CHEMISTRY"])
-    .or(z.literal(""))
-    .transform((v) => (v === "" ? undefined : v))
-    .optional(),
-});
+export const CourseMappingStatusQuerySchema = z
+  .object({
+    semesterId: z.uuid("Invalid semester ID"),
+    academicYear: z.string().min(1, "Academic year is required"),
+    cycle: z
+      .enum(["PHYSICS", "CHEMISTRY"])
+      .or(z.literal(""))
+      .transform((v) => (v === "" ? undefined : v))
+      .optional(),
+  });
 
 export const CourseMappingByCourseQuerySchema = z.object({
+  courseId: z.uuid("Invalid course ID"),
   semesterId: z.uuid("Invalid semester ID"),
   academicYear: z.string().min(1, "Academic year is required"),
+});
+
+export const CourseMappingFacultyQuerySchema = z.object({});
+
+export const CourseMappingSectionsQuerySchema = z.object({
+  semesterId: z.uuid("Invalid semester ID"),
+  cycle: z
+    .enum(["PHYSICS", "CHEMISTRY", "NONE"])
+    .or(z.literal(""))
+    .transform((value) => (value === "" ? undefined : value))
+    .optional(),
 });
 
 export const CourseMappingSectionSchema = z.object({
@@ -97,6 +109,12 @@ export const CourseMappingStatusItemSchema = z.object({
   status: z.enum(["Mapped", "Unmapped"]),
 });
 
+export const CourseMappingStatusResponseSchema = z.object({
+  departmentId: z.uuid(),
+  departmentName: z.string(),
+  courses: z.array(CourseMappingStatusItemSchema),
+});
+
 export const CourseMappingByCourseItemSchema = z.object({
   id: z.uuid(),
   sectionId: z.uuid(),
@@ -121,9 +139,18 @@ export type CourseMappingStatusQueryType = z.infer<
 export type CourseMappingByCourseQueryType = z.infer<
   typeof CourseMappingByCourseQuerySchema
 >;
+export type CourseMappingFacultyQueryType = z.infer<
+  typeof CourseMappingFacultyQuerySchema
+>;
+export type CourseMappingSectionsQueryType = z.infer<
+  typeof CourseMappingSectionsQuerySchema
+>;
 export type UpsertCourseMappingType = z.infer<typeof UpsertCourseMappingSchema>;
 export type CourseMappingStatusItemType = z.infer<
   typeof CourseMappingStatusItemSchema
+>;
+export type CourseMappingStatusResponseType = z.infer<
+  typeof CourseMappingStatusResponseSchema
 >;
 export type CourseMappingByCourseItemType = z.infer<
   typeof CourseMappingByCourseItemSchema

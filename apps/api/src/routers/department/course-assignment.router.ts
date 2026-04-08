@@ -2,7 +2,9 @@ import { CourseAssignmentController } from "@webcampus/api/src/controllers/depar
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   CourseMappingByCourseQuerySchema,
+  CourseMappingFacultyQuerySchema,
   CourseMappingStatusQuerySchema,
+  CourseMappingSectionsQuerySchema,
   UpsertCourseMappingSchema,
 } from "@webcampus/schemas/department";
 import { Router } from "express";
@@ -25,6 +27,7 @@ router.get(
 // GET /by-course — existing mappings for a specific course
 router.get(
   "/by-course",
+  validateRequest(CourseMappingByCourseQuerySchema, "query"),
   protect({
     role: "department",
     permissions: {
@@ -50,6 +53,7 @@ router.post(
 // GET /faculty — faculty available for mapping
 router.get(
   "/faculty",
+  validateRequest(CourseMappingFacultyQuerySchema, "query"),
   protect({
     role: "department",
     permissions: {
@@ -62,6 +66,7 @@ router.get(
 // GET /sections — sections with batches for the mapping grid
 router.get(
   "/sections",
+  validateRequest(CourseMappingSectionsQuerySchema, "query"),
   protect({
     role: "department",
     permissions: {

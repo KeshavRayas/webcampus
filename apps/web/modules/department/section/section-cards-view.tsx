@@ -61,6 +61,12 @@ interface SectionWithStudents {
   };
 }
 
+interface SectionsWithStudentsResponse {
+  departmentId: string;
+  departmentName: string;
+  sections: SectionWithStudents[];
+}
+
 interface SectionCardsViewProps {
   semesterId: string;
   academicYear: string;
@@ -96,14 +102,19 @@ export const SectionCardsView = ({
   const { data: sections, isLoading } = useQuery({
     queryKey: ["sections-with-students", semesterId, departmentName],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<SectionWithStudents[]>>(
+      const res = await axios.get<BaseResponse<SectionsWithStudentsResponse>>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/section/with-students`,
         {
           params: { semesterId, departmentName },
           withCredentials: true,
         }
       );
-      if (res.data.status === "success") return res.data.data;
+      if (
+        res.data.status === "success" &&
+        Array.isArray(res.data.data?.sections)
+      ) {
+        return res.data.data.sections;
+      }
       return [] as SectionWithStudents[];
     },
     enabled: !!semesterId && !!departmentName,
@@ -128,7 +139,7 @@ export const SectionCardsView = ({
   });
 
   const visibleSections = useMemo(() => {
-    if (!sections) {
+    if (!Array.isArray(sections)) {
       return [] as SectionWithStudents[];
     }
 

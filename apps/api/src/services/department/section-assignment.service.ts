@@ -11,19 +11,31 @@ export class SectionAssignment {
   static async validateSameDepartment(studentId: string, sectionId: string) {
     const student = await db.student.findUnique({
       where: { id: studentId },
-      select: { departmentName: true },
+      select: {
+        department: {
+          select: {
+            id: true,
+          },
+        },
+      },
     });
 
     if (!student) throw new Error("Student not found");
 
     const section = await db.section.findUnique({
       where: { id: sectionId },
-      select: { departmentName: true },
+      select: {
+        department: {
+          select: {
+            id: true,
+          },
+        },
+      },
     });
 
     if (!section) throw new Error("Section not found");
 
-    if (student.departmentName !== section.departmentName) {
+    if (student.department.id !== section.department.id) {
       throw new Error(
         "Student and Section do not belong to the same department"
       );

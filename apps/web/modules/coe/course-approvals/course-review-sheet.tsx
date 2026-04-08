@@ -39,6 +39,7 @@ export const CourseReviewSheet = ({
         `${NEXT_PUBLIC_API_BASE_URL}/department/course/approve`,
         {
           semesterId: group.semesterId,
+          departmentId: group.departmentId,
           departmentName: group.departmentName,
           cycle: group.cycle,
         },
@@ -75,6 +76,7 @@ export const CourseReviewSheet = ({
         `${NEXT_PUBLIC_API_BASE_URL}/department/course/request-revision`,
         {
           semesterId: group.semesterId,
+          departmentId: group.departmentId,
           departmentName: group.departmentName,
           cycle: group.cycle,
           reviewerNotes: revisionNotes,

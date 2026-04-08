@@ -1,9 +1,11 @@
 import { logger } from "@webcampus/common/logger";
 import { Course, db, Prisma } from "@webcampus/db";
+import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import {
   CreateCourseDTO,
   UpdateCourseDTO,
 } from "@webcampus/schemas/department";
+import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 import { BaseResponse } from "@webcampus/types/api";
 
 const MODE_LOCKED_VALUES = {
@@ -99,6 +101,17 @@ const computeDerivedFields = (data: CreateCourseDTO) => {
   return { totalCredits, hasLaboratoryComponent };
 };
 
+type CourseWithDepartmentContext = Course & {
+  departmentId: string;
+  departmentName: string;
+};
+
+type MappedCourseWithDepartmentContext = CourseWithDepartmentContext & {
+  isFullyMapped: boolean;
+  isPartiallyMapped: boolean;
+  isUnmapped: boolean;
+};
+
 export class CourseService {
   private static _ensureCourseIsEditable(status?: string) {
     if (status === "PENDING" || status === "APPROVED") {
@@ -108,11 +121,62 @@ export class CourseService {
     }
   }
 
-  static async create(data: CreateCourseDTO): Promise<BaseResponse<Course>> {
+  private static async resolveCourseDepartmentContext(input: {
+    source: string;
+    departmentId?: string;
+    departmentName?: string;
+    requestContext?: DepartmentRequestContext;
+  }) {
+    if (input.requestContext?.departmentId) {
+      return DepartmentContextResolver.resolve({
+        source: input.source,
+        departmentId: input.requestContext.departmentId,
+        departmentName: input.requestContext.departmentName,
+      });
+    }
+
+    return DepartmentContextResolver.resolve({
+      source: input.source,
+      departmentId: input.departmentId,
+      departmentName: input.departmentName,
+    });
+  }
+
+  private static isKnownApprovalError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    return [
+      "Role is required for approval",
+      "Role is required for requesting revision",
+      "Department not found",
+      "Ambiguous departmentName mapping",
+      "departmentId and departmentName do not match",
+      "departmentId is required",
+      "Forbidden: department scope mismatch",
+    ].includes(error.message);
+  }
+
+  static async create(
+    data: CreateCourseDTO,
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<CourseWithDepartmentContext>> {
     try {
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.create",
+        departmentId: data.departmentId,
+        departmentName: data.departmentName,
+        requestContext,
+      });
+
       const existingInSameSemester = await db.course.findFirst({
         where: {
-          departmentName: data.departmentName,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
           semesterId: data.semesterId,
           cycle: data.cycle ?? "NONE",
           approvalStatus: { in: ["PENDING", "APPROVED"] },
@@ -124,8 +188,18 @@ export class CourseService {
         );
       }
 
-      const normalized = normalizeByMode(data);
-      const { departmentName, semesterId, cycle, ...courseData } = normalized;
+      const normalized = normalizeByMode({
+        ...data,
+        departmentId: resolvedDepartment.departmentId,
+        departmentName: resolvedDepartment.departmentName,
+      });
+      const {
+        departmentId: _departmentId,
+        departmentName,
+        semesterId,
+        cycle,
+        ...courseData
+      } = normalized;
       const derived = computeDerivedFields(normalized);
 
       const course = await db.course.create({
@@ -135,7 +209,7 @@ export class CourseService {
           cycle: cycle ?? "NONE",
           department: {
             connect: {
-              name: departmentName,
+              id: resolvedDepartment.departmentId,
             },
           },
           semester: {
@@ -146,10 +220,14 @@ export class CourseService {
         },
       });
 
-      const response: BaseResponse<Course> = {
+      const response: BaseResponse<CourseWithDepartmentContext> = {
         status: "success",
         message: "Course created successfully",
-        data: course,
+        data: {
+          ...course,
+          departmentId: resolvedDepartment.departmentId,
+          departmentName: resolvedDepartment.departmentName,
+        },
       };
       logger.info(response);
       return response;
@@ -167,12 +245,30 @@ export class CourseService {
     }
   }
 
-  static async update(data: UpdateCourseDTO): Promise<BaseResponse<Course>> {
+  static async update(
+    data: UpdateCourseDTO,
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<CourseWithDepartmentContext>> {
     try {
       const { id, departmentName, semesterId, cycle, ...updateFields } = data;
 
-      // Fetch existing course to merge with partial update for derived computation
-      const existing = await db.course.findUnique({ where: { id } });
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.update",
+        departmentId: data.departmentId,
+        departmentName: departmentName,
+        requestContext,
+      });
+
+      const existing = await db.course.findFirst({
+        where: {
+          id,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
+        },
+      });
       if (!existing) {
         throw new Error("Course not found");
       }
@@ -185,7 +281,8 @@ export class CourseService {
         courseMode: updateFields.courseMode ?? existing.courseMode,
         courseType: updateFields.courseType ?? existing.courseType,
         cycle: cycle ?? existing.cycle,
-        departmentName: departmentName ?? existing.departmentName,
+        departmentId: resolvedDepartment.departmentId,
+        departmentName: resolvedDepartment.departmentName,
         semesterId: semesterId ?? existing.semesterId,
         semesterNumber: updateFields.semesterNumber ?? existing.semesterNumber,
         lectureCredits: updateFields.lectureCredits ?? existing.lectureCredits,
@@ -218,11 +315,19 @@ export class CourseService {
       const normalizedMerged = normalizeByMode(merged);
       const derived = computeDerivedFields(normalizedMerged);
       const {
+        departmentId: normalizedDepartmentId,
         departmentName: normalizedDepartmentName,
         semesterId: normalizedSemesterId,
         cycle: normalizedCycle,
         ...normalizedCourseFields
       } = normalizedMerged;
+
+      if (
+        normalizedDepartmentId &&
+        normalizedDepartmentId !== resolvedDepartment.departmentId
+      ) {
+        throw new Error("Forbidden: department scope mismatch");
+      }
 
       const course = await db.course.update({
         where: { id },
@@ -231,7 +336,13 @@ export class CourseService {
           ...derived,
           ...(normalizedCycle ? { cycle: normalizedCycle } : {}),
           ...(normalizedDepartmentName
-            ? { department: { connect: { name: normalizedDepartmentName } } }
+            ? {
+                department: {
+                  connect: {
+                    id: resolvedDepartment.departmentId,
+                  },
+                },
+              }
             : {}),
           ...(normalizedSemesterId
             ? { semester: { connect: { id: normalizedSemesterId } } }
@@ -239,10 +350,14 @@ export class CourseService {
         },
       });
 
-      const response: BaseResponse<Course> = {
+      const response: BaseResponse<CourseWithDepartmentContext> = {
         status: "success",
         message: "Course updated successfully",
-        data: course,
+        data: {
+          ...course,
+          departmentId: resolvedDepartment.departmentId,
+          departmentName: resolvedDepartment.departmentName,
+        },
       };
       logger.info(response);
       return response;
@@ -255,10 +370,25 @@ export class CourseService {
     }
   }
 
-  static async delete(id: string): Promise<BaseResponse<null>> {
+  static async delete(
+    id: string,
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<null>> {
     try {
-      const existing = await db.course.findUnique({
-        where: { id },
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.delete",
+        requestContext,
+      });
+
+      const existing = await db.course.findFirst({
+        where: {
+          id,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
+        },
         include: {
           _count: {
             select: {
@@ -303,10 +433,25 @@ export class CourseService {
     }
   }
 
-  static async getById(id: string): Promise<BaseResponse<Course>> {
+  static async getById(
+    id: string,
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<Course>> {
     try {
-      const course = await db.course.findUnique({
-        where: { id },
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.getById",
+        requestContext,
+      });
+
+      const course = await db.course.findFirst({
+        where: {
+          id,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
+        },
       });
 
       if (!course) {
@@ -333,24 +478,29 @@ export class CourseService {
   }
 
   static async getByBranch(
-    name: string,
+    departmentId?: string,
+    departmentName?: string,
     semesterId?: string,
-    cycle?: string
+    cycle?: string,
+    requestContext?: DepartmentRequestContext
   ): Promise<
-    BaseResponse<
-      Array<
-        Course & {
-          isFullyMapped: boolean;
-          isPartiallyMapped: boolean;
-          isUnmapped: boolean;
-        }
-      >
-    >
+    BaseResponse<MappedCourseWithDepartmentContext[]>
   > {
     try {
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.getByBranch",
+        departmentId,
+        departmentName,
+        requestContext,
+      });
+
       const relevantSections = await db.section.findMany({
         where: {
-          departmentName: name,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
           ...(semesterId ? { semesterId } : {}),
           ...(cycle && cycle !== "NONE"
             ? { cycle: cycle as import("@webcampus/db").Cycle }
@@ -374,9 +524,8 @@ export class CourseService {
       const courses = await db.course.findMany({
         where: {
           department: {
-            name: {
-              equals: name,
-              mode: "insensitive",
+            is: {
+              id: resolvedDepartment.departmentId,
             },
           },
           ...(semesterId ? { semesterId } : {}),
@@ -412,6 +561,8 @@ export class CourseService {
 
         return {
           ...course,
+          departmentId: resolvedDepartment.departmentId,
+          departmentName: resolvedDepartment.departmentName,
           isFullyMapped:
             expectedAssignments > 0
               ? assignmentCount >= expectedAssignments
@@ -434,17 +585,23 @@ export class CourseService {
   }
 
   static async getAllByDepartment(
-    name: string,
+    departmentId?: string,
+    departmentName?: string,
     semesterId?: string,
     cycle?: string
-  ): Promise<BaseResponse<Course[]>> {
+  ): Promise<BaseResponse<CourseWithDepartmentContext[]>> {
     try {
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.getAllByDepartment",
+        departmentId,
+        departmentName,
+      });
+
       const courses = await db.course.findMany({
         where: {
           department: {
-            name: {
-              equals: name,
-              mode: "insensitive",
+            is: {
+              id: resolvedDepartment.departmentId,
             },
           },
           ...(semesterId ? { semesterId } : {}),
@@ -461,10 +618,14 @@ export class CourseService {
         },
       });
 
-      const response: BaseResponse<Course[]> = {
+      const response: BaseResponse<CourseWithDepartmentContext[]> = {
         status: "success",
         message: "Courses fetched successfully",
-        data: courses,
+        data: courses.map((course) => ({
+          ...course,
+          departmentId: resolvedDepartment.departmentId,
+          departmentName: resolvedDepartment.departmentName,
+        })),
       };
       logger.info(response);
       return response;
@@ -476,14 +637,27 @@ export class CourseService {
 
   static async bulkSubmitForApproval(
     semesterId: string,
-    departmentName: string,
-    cycle?: string
+    departmentId?: string,
+    departmentName?: string,
+    cycle?: string,
+    requestContext?: DepartmentRequestContext
   ): Promise<BaseResponse<{ count: number }>> {
     try {
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.bulkSubmitForApproval",
+        departmentId,
+        departmentName,
+        requestContext,
+      });
+
       const result = await db.course.updateMany({
         where: {
           semesterId,
-          departmentName,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
           approvalStatus: { in: ["DRAFT", "NEEDS_REVISION"] },
           ...(cycle && cycle !== "NONE"
             ? { cycle: cycle as import("@webcampus/db").Cycle }
@@ -491,10 +665,13 @@ export class CourseService {
         },
         data: {
           approvalStatus: "PENDING",
-          hasAdminApproved: false,
-          hasCoeApproved: false,
-          adminNotes: null,
-          coeNotes: null,
+          approvedByRole: null,
+          approvedByUsername: null,
+          approvedByDisplay: null,
+          approvedAt: null,
+          revisionRequestedByRole: null,
+          revisionNotes: null,
+          revisionRequestedAt: null,
         },
       });
 
@@ -511,10 +688,11 @@ export class CourseService {
     }
   }
 
-  static async getGroupedCourseSubmissions(role: "admin" | "coe"): Promise<
+  static async getGroupedCourseSubmissions(_role: "admin" | "coe"): Promise<
     BaseResponse<
       Array<{
         id: string;
+        departmentId: string;
         departmentName: string;
         departmentCode?: string;
         semesterId: string;
@@ -531,11 +709,9 @@ export class CourseService {
       const pendingCourses = await db.course.findMany({
         where: {
           approvalStatus: "PENDING",
-          ...(role === "admin" ? { hasAdminApproved: false } : {}),
-          ...(role === "coe" ? { hasCoeApproved: false } : {}),
         },
         include: {
-          department: { select: { code: true } },
+          department: { select: { id: true, code: true, name: true } },
           semester: {
             include: { academicTerm: true },
           },
@@ -553,6 +729,7 @@ export class CourseService {
         string,
         {
           id: string;
+          departmentId: string;
           departmentName: string;
           departmentCode?: string;
           semesterId: string;
@@ -566,11 +743,12 @@ export class CourseService {
       >();
 
       for (const course of pendingCourses) {
-        const key = `${course.departmentName}_${course.semesterId}_${course.cycle}`;
+        const key = `${course.department.id}_${course.semesterId}_${course.cycle}`;
         if (!groupedMap.has(key)) {
           groupedMap.set(key, {
             id: key,
-            departmentName: course.departmentName,
+            departmentId: course.department.id,
+            departmentName: course.department.name,
             departmentCode: course.department?.code,
             semesterId: course.semesterId,
             semester: course.semester,
@@ -601,42 +779,44 @@ export class CourseService {
 
   static async approveSemesterCourses(
     semesterId: string,
-    departmentName: string,
+    departmentId?: string,
+    departmentName?: string,
     cycle?: string,
-    role?: "admin" | "coe"
+    role?: "admin" | "coe",
+    approverUsername?: string | null,
+    approverDisplayUsername?: string | null
   ): Promise<BaseResponse<{ count: number }>> {
     try {
       if (!role) throw new Error("Role is required for approval");
-      // Step 1: Update the role's specific approval flag
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.approveSemesterCourses",
+        departmentId,
+        departmentName,
+      });
+
+      const resolvedCoeUsername =
+        approverDisplayUsername?.trim() || approverUsername?.trim() || "COE";
+      const approvedByDisplay = role === "admin" ? "Admin" : resolvedCoeUsername;
+
       const result = await db.course.updateMany({
         where: {
           semesterId,
-          departmentName,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
           approvalStatus: "PENDING",
-          ...(cycle && cycle !== "NONE"
-            ? { cycle: cycle as import("@webcampus/db").Cycle }
-            : {}),
-        },
-        data:
-          role === "admin"
-            ? { hasAdminApproved: true }
-            : { hasCoeApproved: true },
-      });
-
-      // Step 2: Check if both are approved, and lock it to APPROVED globally
-      await db.course.updateMany({
-        where: {
-          semesterId,
-          departmentName,
-          approvalStatus: "PENDING",
-          hasAdminApproved: true,
-          hasCoeApproved: true,
           ...(cycle && cycle !== "NONE"
             ? { cycle: cycle as import("@webcampus/db").Cycle }
             : {}),
         },
         data: {
           approvalStatus: "APPROVED",
+          approvedByRole: role,
+          approvedByUsername: role === "coe" ? resolvedCoeUsername : approverUsername ?? null,
+          approvedByDisplay,
+          approvedAt: new Date(),
         },
       });
 
@@ -647,23 +827,37 @@ export class CourseService {
       };
     } catch (error) {
       logger.error("Failed to approve courses", error);
+      if (CourseService.isKnownApprovalError(error)) {
+        throw error;
+      }
+
       throw new Error("Failed to approve courses");
     }
   }
 
   static async requestRevisionForSemester(
     semesterId: string,
-    departmentName: string,
+    departmentId: string | undefined,
+    departmentName: string | undefined,
     reviewerNotes: string,
     cycle?: string,
     role?: "admin" | "coe"
   ): Promise<BaseResponse<{ count: number }>> {
     try {
       if (!role) throw new Error("Role is required for requesting revision");
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.requestRevisionForSemester",
+        departmentId,
+        departmentName,
+      });
       const result = await db.course.updateMany({
         where: {
           semesterId,
-          departmentName,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
           approvalStatus: "PENDING",
           ...(cycle && cycle !== "NONE"
             ? { cycle: cycle as import("@webcampus/db").Cycle }
@@ -671,9 +865,9 @@ export class CourseService {
         },
         data: {
           approvalStatus: "NEEDS_REVISION",
-          ...(role === "admin"
-            ? { adminNotes: reviewerNotes }
-            : { coeNotes: reviewerNotes }),
+          revisionRequestedByRole: role,
+          revisionNotes: reviewerNotes,
+          revisionRequestedAt: new Date(),
         },
       });
 
@@ -684,6 +878,10 @@ export class CourseService {
       };
     } catch (error) {
       logger.error("Failed to request revision for courses", error);
+      if (CourseService.isKnownApprovalError(error)) {
+        throw error;
+      }
+
       throw new Error("Failed to request revision for courses");
     }
   }

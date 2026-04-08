@@ -26,7 +26,6 @@ export const validateRequest =
     logger.info("Validating request", {
       path: req.path,
       source,
-      data: req[source],
     });
     const result = schema.safeParse(req[source]);
 

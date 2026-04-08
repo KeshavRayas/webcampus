@@ -2,33 +2,48 @@ import { CourseAssignmentService } from "@webcampus/api/src/services/department/
 import { UpsertCourseMappingType } from "@webcampus/schemas/department";
 
 type AdminContext = {
-  departmentName: string;
+  departmentId?: string;
+  departmentName?: string;
 };
 
 export class AdminCourseAssignmentService {
   static getMappingStatus(
     semesterId: string,
-    departmentName: string,
     academicYear: string,
+    requestingUserId: string,
+    context: AdminContext,
     cycle?: string
   ) {
     return CourseAssignmentService.getMappingStatus(
       semesterId,
-      departmentName,
       academicYear,
-      cycle
+      requestingUserId,
+      cycle,
+      {
+        departmentId: context.departmentId,
+        departmentName: context.departmentName,
+        requesterRole: "admin",
+      }
     );
   }
 
   static getMappingByCourse(
     courseId: string,
     semesterId: string,
-    academicYear: string
+    academicYear: string,
+    requestingUserId: string,
+    context: AdminContext
   ) {
     return CourseAssignmentService.getMappingByCourse(
       courseId,
       semesterId,
-      academicYear
+      academicYear,
+      requestingUserId,
+      {
+        departmentId: context.departmentId,
+        departmentName: context.departmentName,
+        requesterRole: "admin",
+      }
     );
   }
 
@@ -38,6 +53,7 @@ export class AdminCourseAssignmentService {
     context: AdminContext
   ) {
     return CourseAssignmentService.upsertMapping(data, requestingUserId, {
+      departmentId: context.departmentId,
       departmentName: context.departmentName,
       requesterRole: "admin",
     });
@@ -45,6 +61,7 @@ export class AdminCourseAssignmentService {
 
   static getFacultyForMapping(requestingUserId: string, context: AdminContext) {
     return CourseAssignmentService.getFacultyForMapping(requestingUserId, {
+      departmentId: context.departmentId,
       departmentName: context.departmentName,
       requesterRole: "admin",
     });
@@ -61,6 +78,7 @@ export class AdminCourseAssignmentService {
       requestingUserId,
       cycle,
       {
+        departmentId: context.departmentId,
         departmentName: context.departmentName,
         requesterRole: "admin",
       }
@@ -70,12 +88,20 @@ export class AdminCourseAssignmentService {
   static deleteMappings(
     courseId: string,
     semesterId: string,
-    academicYear: string
+    academicYear: string,
+    requestingUserId: string,
+    context: AdminContext
   ) {
     return CourseAssignmentService.deleteMappings(
       courseId,
       semesterId,
-      academicYear
+      academicYear,
+      requestingUserId,
+      {
+        departmentId: context.departmentId,
+        departmentName: context.departmentName,
+        requesterRole: "admin",
+      }
     );
   }
 }

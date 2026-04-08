@@ -130,10 +130,11 @@ export class AdminCourseController {
 
   static async getByDepartment(req: Request, res: Response): Promise<void> {
     try {
-      const { departmentName, semesterId, cycle } =
+      const { departmentId, departmentName, semesterId, cycle } =
         req.query as AdminCourseBranchQueryType;
       const response = await AdminCourseService.getByDepartment(
-        departmentName,
+        departmentId,
+        departmentId ? undefined : departmentName,
         semesterId,
         cycle
       );

@@ -12,10 +12,13 @@ export type PaginationMeta = {
   page: number;
   limit: number;
   total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 };
 
 export type PaginatedPayload<T> = {
-  data: T[];
+  items: T[];
   pagination: PaginationMeta;
 };
 
@@ -108,5 +111,16 @@ export const extractPaginatedData = <T>(
     return payload;
   }
 
-  return payload.data;
+  return payload.items;
+};
+
+export const stripDepartmentOwnershipFields = <
+  T extends {
+    departmentId?: unknown;
+    departmentName?: unknown;
+  },
+>(payload: T): Omit<T, "departmentId" | "departmentName"> => {
+  const { departmentId: _departmentId, departmentName: _departmentName, ...rest } =
+    payload;
+  return rest;
 };

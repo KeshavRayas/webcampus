@@ -1,6 +1,5 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
@@ -20,7 +19,6 @@ export const useCreateCourseForm = (
   defaultCycle: "PHYSICS" | "CHEMISTRY" | "NONE"
 ) => {
   const queryClient = useQueryClient();
-  const { data: session } = authClient.useSession();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
   const form = useForm<CreateCourseDTO>({
@@ -31,7 +29,7 @@ export const useCreateCourseForm = (
       courseMode: undefined,
       courseType: undefined,
       cycle: "NONE",
-      departmentName: "",
+      departmentName: "AUTH_SCOPED",
       semesterId: semesterId,
       semesterNumber: semesterNumber,
 
@@ -67,16 +65,10 @@ export const useCreateCourseForm = (
   const { isSubmitSuccessful } = form.formState;
 
   useEffect(() => {
-    if (session?.user?.name) {
-      form.setValue("departmentName", session.user.name, {
-        shouldValidate: true,
-      });
-    }
     form.setValue("semesterId", semesterId, { shouldValidate: true });
     form.setValue("semesterNumber", semesterNumber, { shouldValidate: true });
     form.setValue("cycle", defaultCycle, { shouldValidate: true });
   }, [
-    session,
     form,
     isSubmitSuccessful,
     semesterId,

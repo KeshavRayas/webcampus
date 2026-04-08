@@ -46,7 +46,6 @@ export const CoursesView: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const departmentName = session?.user?.name;
 
   // Fetch department type for conditional rendering
   const { data: deptInfo } = useQuery({
@@ -308,13 +307,12 @@ export const CoursesView: React.FC = () => {
 
   // Fetch courses ONLY for the selected semester instance
   const { data: courses, isLoading: coursesLoading } = useQuery({
-    queryKey: ["courses", departmentName, appliedFilters.semesterId],
+    queryKey: ["courses", appliedFilters.semesterId],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<CourseResponseDTO[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/course/branch`,
         {
           params: {
-            name: departmentName,
             semesterId: appliedFilters.semesterId,
           },
           withCredentials: true,
@@ -323,7 +321,7 @@ export const CoursesView: React.FC = () => {
       if (res.data.status === "success") return res.data.data;
       return [];
     },
-    enabled: !!departmentName && !!appliedFilters.semesterId,
+    enabled: !!appliedFilters.semesterId,
   });
 
   const appliedCycle =

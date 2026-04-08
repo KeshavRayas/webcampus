@@ -11,6 +11,7 @@ import { CourseReviewSheet } from "./course-review-sheet";
 
 export interface GroupedCourse {
   id: string;
+  departmentId: string;
   departmentName: string;
   departmentCode?: string;
   semesterId: string;

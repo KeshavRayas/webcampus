@@ -8,6 +8,7 @@
   "exports": {
     "./rbac": "./src/rbac.ts",
     "./api": "./src/api.ts",
+    "./request-context": "./src/request-context.ts",
     "./tanstack": "./src/tanstack.d.ts"
   },
   "devDependencies": {

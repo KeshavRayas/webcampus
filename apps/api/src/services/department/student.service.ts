@@ -66,9 +66,10 @@ export class DepartmentStudentService {
                 },
               }
             : {
-                departmentName: {
-                  equals: department.name,
-                  mode: "insensitive",
+                department: {
+                  is: {
+                    id: department.id,
+                  },
                 },
               }),
           ...(query.academicTermId || query.programType || query.semesterId

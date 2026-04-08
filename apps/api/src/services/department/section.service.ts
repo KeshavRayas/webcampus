@@ -1,5 +1,6 @@
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma, Section } from "@webcampus/db";
+import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import {
   CreateSectionType,
   DetailedGenerationPreviewSectionDTO,
@@ -9,6 +10,7 @@ import {
   SectionQueryType,
   SectionResponseType,
 } from "@webcampus/schemas/department";
+import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 import { BaseResponse } from "@webcampus/types/api";
 
 type SectionCycle = "PHYSICS" | "CHEMISTRY";
@@ -18,6 +20,11 @@ interface DetailedSectionPlan {
   studentUsns: string[];
   studentIds: string[];
 }
+
+type SectionWithDepartmentContext = Section & {
+  departmentId: string;
+  departmentName: string | null;
+};
 
 const UNAUTHORIZED_FIRST_YEAR_MESSAGE =
   "First-year sections are managed by the Basic Sciences department.";
@@ -30,7 +37,44 @@ const isRestrictedUgFirstYearSemester = (semester: {
   (semester.semesterNumber === 1 || semester.semesterNumber === 2);
 
 export class SectionService {
-  private static async getRequestingDepartment(requestingUserId: string) {
+  private static async resolveDepartmentContext(input: {
+    source: string;
+    departmentId?: string;
+    departmentName?: string;
+    requestContext?: DepartmentRequestContext;
+  }) {
+    if (input.requestContext?.departmentId) {
+      return DepartmentContextResolver.resolve({
+        source: input.source,
+        departmentId: input.requestContext.departmentId,
+        departmentName: input.requestContext.departmentName,
+      });
+    }
+
+    return DepartmentContextResolver.resolve({
+      source: input.source,
+      departmentId: input.departmentId,
+      departmentName: input.departmentName,
+    });
+  }
+
+  private static async getRequestingDepartment(
+    requestingUserId: string,
+    requestContext?: DepartmentRequestContext
+  ) {
+    if (requestContext?.departmentId) {
+      const department = await db.department.findUnique({
+        where: { id: requestContext.departmentId },
+        select: { id: true, name: true, type: true },
+      });
+
+      if (!department) {
+        throw new Error("Requesting department not found");
+      }
+
+      return department;
+    }
+
     const department = await db.department.findFirst({
       where: { userId: requestingUserId },
       select: { id: true, name: true, type: true },
@@ -45,14 +89,15 @@ export class SectionService {
 
   static async assertSemesterWriteAccess(
     semesterId: string,
-    requestingUserId: string
+    requestingUserId: string,
+    requestContext?: DepartmentRequestContext
   ): Promise<void> {
     const [semester, department] = await Promise.all([
       db.semester.findUnique({
         where: { id: semesterId },
         select: { semesterNumber: true, programType: true },
       }),
-      this.getRequestingDepartment(requestingUserId),
+      this.getRequestingDepartment(requestingUserId, requestContext),
     ]);
 
     if (!semester) {
@@ -69,10 +114,23 @@ export class SectionService {
 
   static async assertSectionWriteAccess(
     sectionId: string,
-    requestingUserId: string
+    requestingUserId: string,
+    requestContext?: DepartmentRequestContext
   ): Promise<void> {
-    const section = await db.section.findUnique({
-      where: { id: sectionId },
+    const department = await this.getRequestingDepartment(
+      requestingUserId,
+      requestContext
+    );
+
+    const section = await db.section.findFirst({
+      where: {
+        id: sectionId,
+        department: {
+          is: {
+            id: department.id,
+          },
+        },
+      },
       include: {
         semester: {
           select: {
@@ -87,7 +145,6 @@ export class SectionService {
       throw new Error("Section not found");
     }
 
-    const department = await this.getRequestingDepartment(requestingUserId);
     if (
       department.type !== "BASIC_SCIENCES" &&
       isRestrictedUgFirstYearSemester(section.semester)
@@ -125,41 +182,63 @@ export class SectionService {
       where: { id: { in: departmentIds } },
       select: { id: true, name: true },
     });
-    const departmentNameById = new Map(
-      departments.map((department) => [department.id, department.name])
-    );
-
-    const pooledStudents: { id: string; usn: string }[] = [];
-
-    for (const allocation of validAllocations) {
-      const departmentName = departmentNameById.get(allocation.departmentId);
-      if (!departmentName) {
-        continue;
-      }
-
-      const students = await db.student.findMany({
-        where: {
-          departmentName,
-          currentSemester: semester.semesterNumber,
-          studentSections: {
-            none: {
-              section: {
-                semester: {
-                  academicTermId: semester.academicTermId,
-                },
+    const allStudents = await db.student.findMany({
+      where: {
+        department: {
+          is: {
+            id: {
+              in: departmentIds,
+            },
+          },
+        },
+        currentSemester: semester.semesterNumber,
+        studentSections: {
+          none: {
+            section: {
+              semester: {
+                academicTermId: semester.academicTermId,
               },
             },
           },
         },
-        orderBy: { usn: "asc" },
-        take: allocation.count,
-        select: {
-          id: true,
-          usn: true,
+      },
+      orderBy: [{ departmentName: "asc" }, { usn: "asc" }],
+      select: {
+        id: true,
+        usn: true,
+        department: {
+          select: {
+            id: true,
+          },
         },
-      });
+      },
+    });
 
-      pooledStudents.push(...students);
+    const studentsByDepartmentId = new Map<
+      string,
+      { id: string; usn: string }[]
+    >();
+
+    for (const student of allStudents) {
+      const students = studentsByDepartmentId.get(student.department.id) ?? [];
+      students.push({ id: student.id, usn: student.usn });
+      studentsByDepartmentId.set(student.department.id, students);
+    }
+
+    const departmentCursorById = new Map<string, number>();
+    const pooledStudents: { id: string; usn: string }[] = [];
+
+    for (const allocation of validAllocations) {
+      if (!departments.some((department) => department.id === allocation.departmentId)) {
+        continue;
+      }
+
+      const students = studentsByDepartmentId.get(allocation.departmentId) ?? [];
+      const cursor = departmentCursorById.get(allocation.departmentId) ?? 0;
+      const selectedStudents = students.slice(cursor, cursor + allocation.count);
+      departmentCursorById.set(allocation.departmentId, cursor + allocation.count);
+
+      pooledStudents.push(...selectedStudents);
     }
 
     if (pooledStudents.length === 0) {
@@ -203,11 +282,24 @@ export class SectionService {
     allocations: SectionAllocationDTO[],
     cycle: SectionCycle,
     studentsPerSection = 60,
-    requestingUserId?: string
+    requestingUserId?: string,
+    requestContext?: DepartmentRequestContext
   ): Promise<BaseResponse<DetailedGenerationPreviewSectionDTO[]>> {
     try {
       if (requestingUserId) {
-        await this.assertSemesterWriteAccess(semesterId, requestingUserId);
+        const requestingDepartment = await this.getRequestingDepartment(
+          requestingUserId,
+          requestContext
+        );
+        await DepartmentContextResolver.resolve({
+          source: "section.getDetailedGenerationPreview",
+          departmentId: requestingDepartment.id,
+        });
+        await this.assertSemesterWriteAccess(
+          semesterId,
+          requestingUserId,
+          requestContext
+        );
       }
 
       const sectionPlans = await this.buildDetailedSectionPlan(
@@ -234,15 +326,30 @@ export class SectionService {
 
   static async create(
     data: CreateSectionType,
-    requestingUserId?: string
+    requestingUserId?: string,
+    requestContext?: DepartmentRequestContext
   ): Promise<BaseResponse<SectionResponseType>> {
     try {
       if (requestingUserId) {
-        await this.assertSemesterWriteAccess(data.semesterId, requestingUserId);
+        await this.assertSemesterWriteAccess(
+          data.semesterId,
+          requestingUserId,
+          requestContext
+        );
       }
 
+      const resolvedDepartment = await this.resolveDepartmentContext({
+        source: "section.create",
+        departmentName: data.departmentName,
+        requestContext,
+      });
+
       const section = await db.section.create({
-        data,
+        data: {
+          ...data,
+          departmentId: resolvedDepartment.departmentId,
+          departmentName: resolvedDepartment.departmentName,
+        },
       });
 
       const response: BaseResponse<SectionResponseType> = {
@@ -268,36 +375,49 @@ export class SectionService {
 
   static async getAll(
     query: SectionQueryType,
-    requestingUserId?: string
+    requestingUserId?: string,
+    requestContext?: DepartmentRequestContext
   ): Promise<BaseResponse<SectionResponseType[]>> {
     try {
+      const requestingDepartment = requestingUserId
+        ? await this.getRequestingDepartment(requestingUserId, requestContext)
+        : null;
+
       const whereClause: Prisma.SectionWhereInput = {
-        ...query,
-      };
-
-      if (requestingUserId) {
-        const requestingDepartment =
-          await this.getRequestingDepartment(requestingUserId);
-
-        if (requestingDepartment.type !== "BASIC_SCIENCES") {
-          const existingNotFilters = Array.isArray(whereClause.NOT)
-            ? whereClause.NOT
-            : whereClause.NOT
-              ? [whereClause.NOT]
-              : [];
-
-          whereClause.NOT = [
-            ...existingNotFilters,
-            {
-              semester: {
-                programType: "UG",
-                semesterNumber: {
-                  in: [1, 2],
+        ...(query.semesterId ? { semesterId: query.semesterId } : {}),
+        ...(query.cycle
+          ? { cycle: query.cycle as import("@webcampus/db").Cycle }
+          : {}),
+        ...(query.name ? { name: query.name } : {}),
+        ...(requestingDepartment
+          ? {
+              department: {
+                is: {
+                  id: requestingDepartment.id,
                 },
               },
+            }
+          : {}),
+      };
+
+      if (requestingDepartment?.type !== "BASIC_SCIENCES") {
+        const existingNotFilters = Array.isArray(whereClause.NOT)
+          ? whereClause.NOT
+          : whereClause.NOT
+            ? [whereClause.NOT]
+            : [];
+
+        whereClause.NOT = [
+          ...existingNotFilters,
+          {
+            semester: {
+              programType: "UG",
+              semesterNumber: {
+                in: [1, 2],
+              },
             },
-          ];
-        }
+          },
+        ];
       }
 
       const sections = await db.section.findMany({
@@ -324,10 +444,29 @@ export class SectionService {
     }
   }
 
-  static async getById(id: string): Promise<BaseResponse<SectionResponseType>> {
+  static async getById(
+    id: string,
+    requestingUserId?: string,
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<SectionResponseType>> {
     try {
-      const section = await db.section.findUnique({
-        where: { id },
+      const requestingDepartment = requestingUserId
+        ? await this.getRequestingDepartment(requestingUserId, requestContext)
+        : null;
+
+      const section = await db.section.findFirst({
+        where: {
+          id,
+          ...(requestingDepartment
+            ? {
+                department: {
+                  is: {
+                    id: requestingDepartment.id,
+                  },
+                },
+              }
+            : {}),
+        },
         include: {
           department: true,
           courses: true,
@@ -353,11 +492,30 @@ export class SectionService {
     }
   }
 
-  static async deleteSection(id: string): Promise<BaseResponse<void>> {
+  static async deleteSection(
+    id: string,
+    requestingUserId?: string,
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<void>> {
     try {
+      const requestingDepartment = requestingUserId
+        ? await this.getRequestingDepartment(requestingUserId, requestContext)
+        : null;
+
       await db.$transaction(async (tx) => {
-        const section = await tx.section.findUnique({
-          where: { id },
+        const section = await tx.section.findFirst({
+          where: {
+            id,
+            ...(requestingDepartment
+              ? {
+                  department: {
+                    is: {
+                      id: requestingDepartment.id,
+                    },
+                  },
+                }
+              : {}),
+          },
           select: {
             id: true,
             _count: {
@@ -407,18 +565,41 @@ export class SectionService {
    */
   static async getUnassignedCount(
     semesterId: string,
-    departmentName: string,
-    requestingUserId?: string
-  ): Promise<BaseResponse<{ count: number; semesterNumber: number }>> {
+    departmentId?: string,
+    departmentName?: string,
+    requestingUserId?: string,
+    requestContext?: DepartmentRequestContext
+  ): Promise<
+    BaseResponse<{
+      count: number;
+      semesterNumber: number;
+      departmentId: string;
+      departmentName: string;
+    }>
+  > {
     try {
       const semester = await db.semester.findUnique({
         where: { id: semesterId },
       });
       if (!semester) throw new Error("Semester not found");
 
+      const resolvedDepartment = await this.resolveDepartmentContext({
+        source: "section.getUnassignedCount",
+        departmentId,
+        departmentName,
+        requestContext,
+      });
+
       if (requestingUserId) {
         const requestingDepartment =
-          await this.getRequestingDepartment(requestingUserId);
+          await this.getRequestingDepartment(requestingUserId, requestContext);
+
+        if (
+          requestingDepartment.type !== "BASIC_SCIENCES" &&
+          resolvedDepartment.departmentId !== requestingDepartment.id
+        ) {
+          throw new Error("Forbidden: department scope mismatch");
+        }
 
         if (
           requestingDepartment.type !== "BASIC_SCIENCES" &&
@@ -430,7 +611,14 @@ export class SectionService {
 
       // Find existing section IDs for this semester + department
       const existingSections = await db.section.findMany({
-        where: { semesterId, departmentName },
+        where: {
+          semesterId,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
+        },
         select: { id: true },
       });
       const existingSectionIds = existingSections.map((s) => s.id);
@@ -438,7 +626,11 @@ export class SectionService {
       // Count students in this department+semester that are NOT in any section
       const count = await db.student.count({
         where: {
-          departmentName,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
           currentSemester: semester.semesterNumber,
           ...(existingSectionIds.length > 0
             ? {
@@ -455,7 +647,12 @@ export class SectionService {
       return {
         status: "success",
         message: "Unassigned student count fetched",
-        data: { count, semesterNumber: semester.semesterNumber },
+        data: {
+          count,
+          semesterNumber: semester.semesterNumber,
+          departmentId: resolvedDepartment.departmentId,
+          departmentName: resolvedDepartment.departmentName,
+        },
       };
     } catch (error) {
       if (error instanceof Error) throw error;
@@ -492,7 +689,11 @@ export class SectionService {
         departments.map(async (department) => {
           const unassignedCount = await db.student.count({
             where: {
-              departmentName: department.name,
+              department: {
+                is: {
+                  id: department.id,
+                },
+              },
               currentSemester: semesterNumber,
               studentSections: {
                 none: {
@@ -532,17 +733,26 @@ export class SectionService {
    */
   static async generateSections(
     data: GenerateSectionsDTO,
-    requestingUserId?: string
-  ): Promise<BaseResponse<Section[]>> {
+    requestingUserId?: string,
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<SectionWithDepartmentContext[]>> {
     try {
       const {
         semesterId,
+        departmentId,
         departmentName,
         studentsPerSection,
         academicYear,
         cycle,
         allocations,
       } = data;
+
+      const resolvedDepartment = await this.resolveDepartmentContext({
+        source: "section.generateSections",
+        departmentId,
+        departmentName,
+        requestContext,
+      });
 
       const semester = await db.semester.findUnique({
         where: { id: semesterId },
@@ -556,7 +766,18 @@ export class SectionService {
 
       // Access guard: only BASIC_SCIENCES can generate UG sem 1-2
       if (requestingUserId) {
-        const dept = await this.getRequestingDepartment(requestingUserId);
+        const dept = await this.getRequestingDepartment(
+          requestingUserId,
+          requestContext
+        );
+
+        if (
+          dept.type !== "BASIC_SCIENCES" &&
+          dept.id !== resolvedDepartment.departmentId
+        ) {
+          throw new Error("Forbidden: department scope mismatch");
+        }
+
         if (
           dept.type !== "BASIC_SCIENCES" &&
           isRestrictedUgFirstYearSemester(semester)
@@ -567,7 +788,14 @@ export class SectionService {
 
       // Find existing section IDs for this semester + department
       const existingSections = await db.section.findMany({
-        where: { semesterId, departmentName },
+        where: {
+          semesterId,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
+        },
         select: { id: true },
       });
 
@@ -590,7 +818,8 @@ export class SectionService {
             const section = await tx.section.create({
               data: {
                 name: plan.sectionName,
-                departmentName,
+                departmentId: resolvedDepartment.departmentId,
+                departmentName: resolvedDepartment.departmentName,
                 semesterId,
                 cycle,
               },
@@ -605,6 +834,31 @@ export class SectionService {
               })),
             });
 
+            // Allocate students to lab batches (roundrobin across all batches for the section)
+            const batches = await tx.batch.findMany({
+              where: { sectionId: section.id },
+              orderBy: { name: "asc" },
+            });
+
+            if (batches.length > 0) {
+              for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+                const studentsForBatch = plan.studentIds.filter(
+                  (_, studentIndex) => studentIndex % batches.length === batchIndex
+                );
+
+                if (studentsForBatch.length > 0) {
+                  await tx.batch.update({
+                    where: { id: batches[batchIndex]!.id },
+                    data: {
+                      students: {
+                        connect: studentsForBatch.map((studentId) => ({ id: studentId })),
+                      },
+                    },
+                  });
+                }
+              }
+            }
+
             sections.push(section);
           }
 
@@ -614,7 +868,11 @@ export class SectionService {
         return {
           status: "success",
           message: `Generated ${createdCycleSections.length} sections in ${cycle} cycle`,
-          data: createdCycleSections,
+          data: createdCycleSections.map((section) => ({
+            ...section,
+            departmentId: resolvedDepartment.departmentId,
+            departmentName: resolvedDepartment.departmentName,
+          })),
         };
       }
 
@@ -622,7 +880,11 @@ export class SectionService {
       // Students are ordered by USN for consistent "First N" selection
       const unassignedStudents = await db.student.findMany({
         where: {
-          departmentName,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
           currentSemester: semesterNumber,
           studentSections: {
             none: {
@@ -662,7 +924,8 @@ export class SectionService {
           const section = await tx.section.create({
             data: {
               name: sectionName,
-              departmentName,
+              departmentId: resolvedDepartment.departmentId,
+              departmentName: resolvedDepartment.departmentName,
               semesterId,
             },
           });
@@ -676,6 +939,32 @@ export class SectionService {
             })),
           });
 
+          // Allocate students to lab batches (roundrobin across all batches for the section)
+          const batches = await tx.batch.findMany({
+            where: { sectionId: section.id },
+            orderBy: { name: "asc" },
+          });
+
+          if (batches.length > 0) {
+            const chunkStudentIds = chunks[i]!.map((student) => student.id);
+            for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+              const studentsForBatch = chunkStudentIds.filter(
+                (_, studentIndex) => studentIndex % batches.length === batchIndex
+              );
+
+              if (studentsForBatch.length > 0) {
+                await tx.batch.update({
+                  where: { id: batches[batchIndex]!.id },
+                  data: {
+                    students: {
+                      connect: studentsForBatch.map((studentId) => ({ id: studentId })),
+                    },
+                  },
+                });
+              }
+            }
+          }
+
           sections.push(section);
         }
 
@@ -685,7 +974,11 @@ export class SectionService {
       return {
         status: "success",
         message: `Generated ${createdSections.length} sections with ${unassignedStudents.length} students assigned`,
-        data: createdSections,
+        data: createdSections.map((section) => ({
+          ...section,
+          departmentId: resolvedDepartment.departmentId,
+          departmentName: resolvedDepartment.departmentName,
+        })),
       };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -706,11 +999,40 @@ export class SectionService {
    */
   static async getSectionsWithStudents(
     semesterId: string,
-    departmentName: string
+    departmentId?: string,
+    departmentName?: string,
+    requestingUserId?: string,
+    requestContext?: DepartmentRequestContext
   ): Promise<BaseResponse<unknown>> {
     try {
+      const resolvedDepartment = await this.resolveDepartmentContext({
+        source: "section.getSectionsWithStudents",
+        departmentId,
+        departmentName,
+        requestContext,
+      });
+
+      if (requestingUserId) {
+        const requestingDepartment =
+          await this.getRequestingDepartment(requestingUserId, requestContext);
+
+        if (
+          requestingDepartment.type !== "BASIC_SCIENCES" &&
+          requestingDepartment.id !== resolvedDepartment.departmentId
+        ) {
+          throw new Error("Forbidden: department scope mismatch");
+        }
+      }
+
       const sections = await db.section.findMany({
-        where: { semesterId, departmentName },
+        where: {
+          semesterId,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
+        },
         include: {
           studentSections: {
             include: {
@@ -736,7 +1058,11 @@ export class SectionService {
       return {
         status: "success",
         message: "Sections with students fetched successfully",
-        data: sections,
+        data: {
+          departmentId: resolvedDepartment.departmentId,
+          departmentName: resolvedDepartment.departmentName,
+          sections,
+        },
       };
     } catch (error) {
       logger.error("Error fetching sections with students:", { error });
@@ -750,23 +1076,56 @@ export class SectionService {
    */
   static async getUnassignedStudents(
     semesterId: string,
-    departmentName: string
+    departmentId?: string,
+    departmentName?: string,
+    requestingUserId?: string,
+    requestContext?: DepartmentRequestContext
   ): Promise<BaseResponse<unknown>> {
     try {
+      const resolvedDepartment = await this.resolveDepartmentContext({
+        source: "section.getUnassignedStudents",
+        departmentId,
+        departmentName,
+        requestContext,
+      });
+
+      if (requestingUserId) {
+        const requestingDepartment =
+          await this.getRequestingDepartment(requestingUserId, requestContext);
+
+        if (
+          requestingDepartment.type !== "BASIC_SCIENCES" &&
+          requestingDepartment.id !== resolvedDepartment.departmentId
+        ) {
+          throw new Error("Forbidden: department scope mismatch");
+        }
+      }
+
       const semester = await db.semester.findUnique({
         where: { id: semesterId },
       });
       if (!semester) throw new Error("Semester not found");
 
       const existingSections = await db.section.findMany({
-        where: { semesterId, departmentName },
+        where: {
+          semesterId,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
+        },
         select: { id: true },
       });
       const existingSectionIds = existingSections.map((s) => s.id);
 
       const students = await db.student.findMany({
         where: {
-          departmentName,
+          department: {
+            is: {
+              id: resolvedDepartment.departmentId,
+            },
+          },
           currentSemester: semester.semesterNumber,
           ...(existingSectionIds.length > 0
             ? {
@@ -789,7 +1148,11 @@ export class SectionService {
       return {
         status: "success",
         message: "Unassigned students fetched successfully",
-        data: students,
+        data: {
+          departmentId: resolvedDepartment.departmentId,
+          departmentName: resolvedDepartment.departmentName,
+          students,
+        },
       };
     } catch (error) {
       if (error instanceof Error) throw error;
@@ -813,8 +1176,45 @@ export class SectionService {
       });
       if (!section) throw new Error("Section not found");
 
+      if (studentIds.length === 0) {
+        return {
+          status: "success",
+          message: `0 student(s) assigned to section ${section.name}`,
+          data: { count: 0 },
+        };
+      }
+
+      const normalizedStudentIds = Array.from(new Set(studentIds));
+      const students = await db.student.findMany({
+        where: {
+          id: { in: normalizedStudentIds },
+        },
+        select: {
+          id: true,
+          department: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      });
+
+      if (students.length !== normalizedStudentIds.length) {
+        throw new Error("One or more students are invalid");
+      }
+
+      const outOfDepartmentStudent = students.find(
+        (student) => student.department.id !== section.departmentId
+      );
+
+      if (outOfDepartmentStudent) {
+        throw new Error(
+          "Student and Section do not belong to the same department"
+        );
+      }
+
       const result = await db.studentSection.createMany({
-        data: studentIds.map((studentId) => ({
+        data: normalizedStudentIds.map((studentId) => ({
           studentId,
           sectionId,
           semester: section.semester.semesterNumber,
@@ -847,28 +1247,47 @@ export class SectionService {
    */
   static async generateCycleSections(
     data: GenerateCycleSectionsDTO,
-    requestingDepartmentName: string,
-    requestingUserId?: string
-  ): Promise<BaseResponse<Section[]>> {
+    requestingUserId: string,
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<SectionWithDepartmentContext[]>> {
     try {
       const {
         termId,
         semesterId,
         semesterNumber,
+        departmentId,
+        departmentName,
         cycle,
         studentsPerSection,
         academicYear,
         allocations,
       } = data;
 
+      const requestingDepartment = await this.getRequestingDepartment(
+        requestingUserId,
+        requestContext
+      );
+      const resolvedDepartment = await this.resolveDepartmentContext({
+        source: "section.generateCycleSections",
+        departmentId: departmentId ?? requestingDepartment.id,
+        departmentName,
+        requestContext,
+      });
+
+      if (resolvedDepartment.departmentId !== requestingDepartment.id) {
+        throw new Error("Forbidden: department scope mismatch");
+      }
+
       const semester = await db.semester.findUnique({
         where: { id: semesterId },
       });
       if (!semester) throw new Error("Semester not found");
 
-      if (requestingUserId) {
-        await this.assertSemesterWriteAccess(semesterId, requestingUserId);
-      }
+      await this.assertSemesterWriteAccess(
+        semesterId,
+        requestingUserId,
+        requestContext
+      );
 
       const semNum = semester.semesterNumber;
 
@@ -912,7 +1331,8 @@ export class SectionService {
           const section = await tx.section.create({
             data: {
               name: plan.sectionName,
-              departmentName: requestingDepartmentName,
+              departmentId: resolvedDepartment.departmentId,
+              departmentName: resolvedDepartment.departmentName,
               semesterId,
               cycle,
             },
@@ -936,7 +1356,11 @@ export class SectionService {
       return {
         status: "success",
         message: `Generated ${createdSections.length} sections in ${cycle} cycle`,
-        data: createdSections,
+        data: createdSections.map((section) => ({
+          ...section,
+          departmentId: resolvedDepartment.departmentId,
+          departmentName: resolvedDepartment.departmentName,
+        })),
       };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -1012,6 +1436,7 @@ export class SectionService {
           const newSection = await tx.section.create({
             data: {
               name: newName,
+              departmentId: oldSection.departmentId,
               departmentName: oldSection.departmentName,
               semesterId: toSemesterId,
               cycle: newCycle,

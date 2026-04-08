@@ -11,3 +11,4 @@ This monorepo contains both backend and frontend applications, organized as foll
 - **Scripts**: Utility scripts are in [scripts/](mdc:scripts/).
 
 Refer to this rule for high-level navigation and entry points.
+Always check shared packages before duplicating logic.

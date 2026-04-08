@@ -628,14 +628,60 @@ class MockStarter {
         image: IMAGE_URL,
       });
 
-      const existingDepartment = await db.department.findFirst({
+      let existingDepartment = await db.department.findUnique({
         where: {
-          OR: [{ code: department.code }, { name: department.name }],
+          code: department.code,
         },
         select: {
           id: true,
+          code: true,
         },
       });
+
+      if (!existingDepartment) {
+        const nameMatches = await db.department.findMany({
+          where: {
+            name: {
+              equals: department.name,
+              mode: "insensitive",
+            },
+          },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+          take: 2,
+        });
+
+        if (nameMatches.length > 1) {
+          logger.warn("Ambiguous department name mapping during seed", {
+            departmentCode: department.code,
+            departmentName: department.name,
+            candidateDepartmentIds: nameMatches.map((match) => match.id),
+          });
+          throw new Error(
+            `Ambiguous department mapping for code ${department.code}`
+          );
+        }
+
+        if (nameMatches.length === 1) {
+          existingDepartment = {
+            id: nameMatches[0]!.id,
+            code: nameMatches[0]!.code,
+          };
+          logger.warn("Legacy department name mapping used during seed", {
+            departmentCode: department.code,
+            departmentName: department.name,
+            resolvedDepartmentId: existingDepartment.id,
+          });
+        } else {
+          logger.info("No existing department mapping by code", {
+            departmentCode: department.code,
+            departmentName: department.name,
+          });
+        }
+      }
 
       if (existingDepartment) {
         const updatedDepartment = await db.department.update({

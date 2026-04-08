@@ -28,6 +28,7 @@ interface FacultyData {
 
 interface AdminCourseMappingGridProps {
   course: CourseResponseDTO;
+  departmentId: string;
   departmentName: string;
   semesterId: string;
   academicYear: string;
@@ -46,6 +47,7 @@ const DEFAULT_BATCHES = ["L1", "L2", "L3", "L4"];
 
 export const AdminCourseMappingGrid = ({
   course,
+  departmentId,
   departmentName,
   semesterId,
   academicYear,
@@ -61,12 +63,12 @@ export const AdminCourseMappingGrid = ({
   const hasLab = (course.practicalCredits ?? 0) > 0;
 
   const { data: rawSections, isLoading: loadingSections } = useQuery({
-    queryKey: ["admin-mapping-sections", departmentName, semesterId, cycle],
+    queryKey: ["admin-mapping-sections", departmentId, semesterId, cycle],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<SectionData[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/sections`,
         {
-          params: { semesterId, departmentName, cycle },
+          params: { semesterId, departmentId, departmentName, cycle },
           withCredentials: true,
         }
       );
@@ -75,18 +77,18 @@ export const AdminCourseMappingGrid = ({
         ? res.data.data
         : [];
     },
-    enabled: !!departmentName && !!semesterId,
+    enabled: !!departmentId && !!semesterId,
   });
 
   const sections = rawSections ?? [];
 
   const { data: rawFaculty, isLoading: loadingFaculty } = useQuery({
-    queryKey: ["admin-mapping-faculty", departmentName],
+    queryKey: ["admin-mapping-faculty", departmentId],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<FacultyData[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/faculty`,
         {
-          params: { departmentName },
+          params: { departmentId, departmentName },
           withCredentials: true,
         }
       );
@@ -95,7 +97,7 @@ export const AdminCourseMappingGrid = ({
         ? res.data.data
         : [];
     },
-    enabled: !!departmentName,
+    enabled: !!departmentId,
   });
 
   const faculty = rawFaculty ?? [];
@@ -110,6 +112,7 @@ export const AdminCourseMappingGrid = ({
           courseId: course.id,
           semesterId,
           academicYear,
+          departmentId,
           departmentName,
         },
         withCredentials: true,
@@ -119,7 +122,7 @@ export const AdminCourseMappingGrid = ({
         ? res.data.data
         : [];
     },
-    enabled: !!course.id && !!semesterId && !!academicYear && !!departmentName,
+    enabled: !!course.id && !!semesterId && !!academicYear && !!departmentId,
   });
 
   const existingMappings = rawExistingMappings ?? [];
@@ -207,6 +210,7 @@ export const AdminCourseMappingGrid = ({
     mutationFn: async () => {
       const payload = {
         courseId: course.id,
+        departmentId,
         departmentName,
         semesterId,
         academicYear,

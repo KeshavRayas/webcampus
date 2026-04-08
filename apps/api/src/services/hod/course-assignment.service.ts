@@ -11,8 +11,48 @@ export class CourseAssignment {
     data: CreateCourseAssignmentType
   ): Promise<BaseResponse<CourseAssignmentResponseType>> {
     try {
+      const section = await db.section.findUnique({
+        where: { id: data.sectionId },
+        select: { departmentId: true },
+      });
+
+      if (!section) {
+        throw new Error("Section not found");
+      }
+
+      const course = await db.course.findUnique({
+        where: { id: data.courseId },
+        select: { departmentId: true },
+      });
+
+      if (!course) {
+        throw new Error("Course not found");
+      }
+
+      if (course.departmentId !== section.departmentId) {
+        throw new Error("Course and section must belong to the same department");
+      }
+
+      const faculty = await db.faculty.findUnique({
+        where: { id: data.facultyId },
+        select: { departmentId: true },
+      });
+
+      if (!faculty) {
+        throw new Error("Faculty not found");
+      }
+
+      if (faculty.departmentId !== section.departmentId) {
+        throw new Error(
+          "Faculty, course, and section must belong to the same department"
+        );
+      }
+
       const assignment = await db.courseAssignment.create({
-        data,
+        data: {
+          ...data,
+          departmentId: section.departmentId,
+        },
       });
       const response: BaseResponse<CourseAssignmentResponseType> = {
         status: "success",

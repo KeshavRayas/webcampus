@@ -5,9 +5,9 @@ import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import type {
   AdminCourseMappingByCourseQueryType,
+  AdminCourseMappingStatusQueryType,
   AdminUpsertCourseMappingType,
 } from "@webcampus/schemas/admin";
-import type { CourseMappingStatusQueryType } from "@webcampus/schemas/department";
 import type { Request, Response } from "express";
 
 export class AdminCourseAssignmentController {
@@ -25,13 +25,19 @@ export class AdminCourseAssignmentController {
 
   static async getMappingStatus(req: Request, res: Response): Promise<void> {
     try {
-      const { semesterId, departmentName, academicYear, cycle } =
-        req.query as CourseMappingStatusQueryType;
+      const { semesterId, departmentId, departmentName, academicYear, cycle } =
+        req.query as AdminCourseMappingStatusQueryType;
+      const requestingUserId =
+        await AdminCourseAssignmentController.getRequestingUserId(req);
 
       const response = await AdminCourseAssignmentService.getMappingStatus(
         semesterId,
-        departmentName,
         academicYear,
+        requestingUserId,
+        {
+          departmentId,
+          departmentName: departmentId ? undefined : departmentName,
+        },
         cycle
       );
 
@@ -63,11 +69,23 @@ export class AdminCourseAssignmentController {
     try {
       const { courseId, semesterId, academicYear } =
         req.query as AdminCourseMappingByCourseQueryType;
+      const requestingUserId =
+        await AdminCourseAssignmentController.getRequestingUserId(req);
 
       const response = await AdminCourseAssignmentService.getMappingByCourse(
         courseId,
         semesterId,
-        academicYear
+        academicYear,
+        requestingUserId,
+        {
+          departmentId:
+            (req.query as AdminCourseMappingByCourseQueryType).departmentId,
+          departmentName:
+            (req.query as AdminCourseMappingByCourseQueryType).departmentId
+              ? undefined
+              : (req.query as AdminCourseMappingByCourseQueryType)
+                  .departmentName,
+        }
       );
 
       if (response.status !== "success") {
@@ -103,7 +121,10 @@ export class AdminCourseAssignmentController {
       const response = await AdminCourseAssignmentService.upsertMapping(
         data,
         requestingUserId,
-        { departmentName: data.departmentName }
+        {
+          departmentId: data.departmentId,
+          departmentName: data.departmentId ? undefined : data.departmentName,
+        }
       );
 
       if (response.status !== "success") {
@@ -137,11 +158,17 @@ export class AdminCourseAssignmentController {
     try {
       const requestingUserId =
         await AdminCourseAssignmentController.getRequestingUserId(req);
-      const { departmentName } = req.query as { departmentName: string };
+      const { departmentId, departmentName } = req.query as {
+        departmentId?: string;
+        departmentName?: string;
+      };
 
       const response = await AdminCourseAssignmentService.getFacultyForMapping(
         requestingUserId,
-        { departmentName }
+        {
+          departmentId,
+          departmentName: departmentId ? undefined : departmentName,
+        }
       );
 
       if (response.status !== "success") {
@@ -175,16 +202,20 @@ export class AdminCourseAssignmentController {
     try {
       const requestingUserId =
         await AdminCourseAssignmentController.getRequestingUserId(req);
-      const { semesterId, cycle, departmentName } = req.query as {
+      const { semesterId, cycle, departmentId, departmentName } = req.query as {
         semesterId: string;
         cycle?: string;
-        departmentName: string;
+        departmentId?: string;
+        departmentName?: string;
       };
 
       const response = await AdminCourseAssignmentService.getSectionsForMapping(
         semesterId,
         requestingUserId,
-        { departmentName },
+        {
+          departmentId,
+          departmentName: departmentId ? undefined : departmentName,
+        },
         cycle
       );
 
@@ -218,12 +249,23 @@ export class AdminCourseAssignmentController {
         courseId: string;
         semesterId: string;
         academicYear: string;
+        departmentId?: string;
+        departmentName?: string;
       };
+      const requestingUserId =
+        await AdminCourseAssignmentController.getRequestingUserId(req);
 
       const response = await AdminCourseAssignmentService.deleteMappings(
         courseId,
         semesterId,
-        academicYear
+        academicYear,
+        requestingUserId,
+        {
+          departmentId: (req.body as { departmentId?: string }).departmentId,
+          departmentName: (req.body as { departmentId?: string }).departmentId
+            ? undefined
+            : (req.body as { departmentName?: string }).departmentName,
+        }
       );
 
       if (response.status !== "success") {

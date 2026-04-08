@@ -14,6 +14,10 @@ const backendEnvSchema = commonEnvSchema.extend({
   BETTER_AUTH_URL: z.url(),
   PORT: z.coerce.number(),
   FRONTEND_URL: z.url(),
+  DEPARTMENT_CONTEXT_STRICT_MODE: z
+    .enum(["true", "false"])
+    .optional()
+    .default("true"),
   GMAIL_APP_PASSWORD: z.string(),
   SENDER_EMAIL: z.string(),
   ADMIN_USER_NAME: z.string(),

@@ -168,6 +168,13 @@ export const CourseApprovalsTable = ({
       cell: ({ row }) => {
         const course = row.original;
         const status = course.approvalStatus as string;
+        const approvedByRole = (course.approvedByRole || "").toLowerCase();
+        const approvedByText =
+          approvedByRole === "admin"
+            ? "Admin"
+            : course.approvedByUsername || course.approvedByDisplay || "COE";
+        const revisionByRole = (course.revisionRequestedByRole || "").toLowerCase();
+        const revisionByText = revisionByRole === "admin" ? "Admin" : "COE";
 
         let variant: "default" | "secondary" | "destructive" | "outline" =
           "default";
@@ -181,34 +188,25 @@ export const CourseApprovalsTable = ({
             <Badge variant={variant}>{status || "DRAFT"}</Badge>
 
             {status === "PENDING" && (
-              <div className="text-muted-foreground mt-1 flex gap-2 text-xs">
-                <span
-                  className={course.hasAdminApproved ? "text-green-600" : ""}
-                >
-                  Admin: {course.hasAdminApproved ? "✓" : "Pending"}
-                </span>
-                <span className={course.hasCoeApproved ? "text-green-600" : ""}>
-                  COE: {course.hasCoeApproved ? "✓" : "Pending"}
-                </span>
+              <div className="text-muted-foreground mt-1 text-xs">
+                Awaiting Admin or COE approval
+              </div>
+            )}
+
+            {status === "APPROVED" && (
+              <div className="text-muted-foreground mt-1 text-xs">
+                Approved by {approvedByText}
               </div>
             )}
 
             {status === "NEEDS_REVISION" && (
               <div className="text-destructive mt-1 flex flex-col gap-1 text-xs">
-                {course.adminNotes && (
+                {course.revisionNotes && (
                   <span
-                    title={course.adminNotes}
+                    title={course.revisionNotes}
                     className="cursor-help underline decoration-dotted"
                   >
-                    Admin Feedback
-                  </span>
-                )}
-                {course.coeNotes && (
-                  <span
-                    title={course.coeNotes}
-                    className="cursor-help underline decoration-dotted"
-                  >
-                    COE Feedback
+                    {revisionByText} Feedback
                   </span>
                 )}
               </div>

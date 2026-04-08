@@ -1,6 +1,7 @@
 import { auth, fromNodeHeaders } from "@webcampus/auth";
 import type { Permissions } from "@webcampus/auth/rbac";
 import { logger } from "@webcampus/common/logger";
+import type { RequestContext } from "@webcampus/types/request-context";
 import type { Role } from "@webcampus/types/rbac";
 import type { NextFunction, Request, Response } from "express";
 import { ERRORS } from "../errors";
@@ -68,6 +69,13 @@ export const protect =
           error: ERRORS.UNAUTHORIZED,
         });
       }
+
+      const requestContext: RequestContext = {
+        userId: session.user.id,
+        role: sessionRole,
+      };
+
+      req.requestContext = requestContext;
 
       if (role) {
         const allowedRoles = Array.isArray(role) ? role : [role];

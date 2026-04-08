@@ -8,6 +8,8 @@ import {
   GenerateCycleSectionsSchema,
   GenerateSectionsSchema,
   SectionQuerySchema,
+  SectionSemesterQuerySchema,
+  SectionUnassignedStudentCountsQuerySchema,
 } from "@webcampus/schemas/department";
 import { NextFunction, Request, Response, Router } from "express";
 
@@ -193,6 +195,7 @@ router.get(
 
 router.get(
   "/unassigned-count",
+  validateRequest(SectionSemesterQuerySchema, "query"),
   protect({
     role: "department",
     permissions: {
@@ -204,6 +207,7 @@ router.get(
 
 router.get(
   "/unassigned-counts",
+  validateRequest(SectionUnassignedStudentCountsQuerySchema, "query"),
   protect({
     role: "department",
     permissions: {
@@ -215,6 +219,7 @@ router.get(
 
 router.get(
   "/with-students",
+  validateRequest(SectionSemesterQuerySchema, "query"),
   protect({
     role: "department",
     permissions: {
@@ -226,6 +231,7 @@ router.get(
 
 router.get(
   "/unassigned-students",
+  validateRequest(SectionSemesterQuerySchema, "query"),
   protect({
     role: "department",
     permissions: {

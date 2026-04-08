@@ -1,6 +1,6 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
+import { stripDepartmentOwnershipFields } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
@@ -55,7 +55,6 @@ const COURSE_TYPE_LABELS: Record<string, string> = {
 const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
   const queryClient = useQueryClient();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const { data: session } = authClient.useSession();
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -72,7 +71,7 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
       courseMode: course.courseMode,
       courseType: course.courseType,
       cycle: course.cycle ?? "NONE",
-      departmentName: session?.user?.name ?? "",
+      departmentName: "AUTH_SCOPED",
       semesterId: course.semesterId,
       semesterNumber: course.semesterNumber,
       lectureCredits: course.lectureCredits,
@@ -101,7 +100,7 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
     mutationFn: async (values: CreateCourseDTO) => {
       return await axios.put(
         `${NEXT_PUBLIC_API_BASE_URL}/department/course`,
-        { id: course.id, ...values },
+        { id: course.id, ...stripDepartmentOwnershipFields(values) },
         { withCredentials: true }
       );
     },

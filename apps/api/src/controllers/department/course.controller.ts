@@ -3,6 +3,7 @@ import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
+import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
 import { UUIDType } from "@webcampus/schemas/common";
 import {
   CreateCourseDTO,
@@ -12,11 +13,50 @@ import {
 import { Request, Response } from "express";
 
 export class CourseController {
+  private static getApprovalErrorStatusCode(error: unknown): number {
+    if (!(error instanceof Error)) {
+      return 500;
+    }
+
+    if (error.message.includes("Unauthorized")) {
+      return 401;
+    }
+
+    if (error.message.includes("Forbidden")) {
+      return 403;
+    }
+
+    if (error.message.startsWith("Failed to approve")) {
+      return 500;
+    }
+
+    if (error.message.startsWith("Failed to request revision")) {
+      return 500;
+    }
+
+    if (
+      error.message === "Role is required for approval" ||
+      error.message === "Role is required for requesting revision" ||
+      error.message === "Department not found" ||
+      error.message === "Ambiguous departmentName mapping" ||
+      error.message === "departmentId and departmentName do not match" ||
+      error.message === "departmentId is required"
+    ) {
+      return 400;
+    }
+
+    return 500;
+  }
+
   static async create(req: Request, res: Response): Promise<void> {
     try {
       const request: CreateCourseDTO = req.body;
+      const departmentContext = await getDepartmentRequestContext(req);
       logger.debug("Creating Course", request);
-      const response = await CourseService.create(request);
+      const response = await CourseService.create({
+        ...request,
+        departmentId: departmentContext.departmentId,
+      }, departmentContext);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -28,11 +68,13 @@ export class CourseController {
       }
     } catch (error) {
       logger.error("Error Creating Course", error);
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message,
+        statusCode: error instanceof Error ? 400 : 500,
         error,
       });
     }
@@ -41,8 +83,12 @@ export class CourseController {
   static async update(req: Request, res: Response): Promise<void> {
     try {
       const request: UpdateCourseDTO = req.body;
+      const departmentContext = await getDepartmentRequestContext(req);
       logger.debug("Updating Course", request);
-      const response = await CourseService.update(request);
+      const response = await CourseService.update({
+        ...request,
+        departmentId: departmentContext.departmentId,
+      }, departmentContext);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -68,8 +114,12 @@ export class CourseController {
   static async delete(req: Request, res: Response): Promise<void> {
     try {
       const request: DeleteCourseDTO = req.body;
+      const departmentContext = await getDepartmentRequestContext(req);
       logger.debug("Deleting Course", request);
-      const response = await CourseService.delete(request.id);
+      const response = await CourseService.delete(
+        request.id,
+        departmentContext
+      );
       if (response.status === "success") {
         sendResponse({
           res,
@@ -95,7 +145,11 @@ export class CourseController {
   static async getById(req: Request, res: Response): Promise<void> {
     try {
       const request = req.params as UUIDType;
-      const response = await CourseService.getById(request.id);
+      const departmentContext = await getDepartmentRequestContext(req);
+      const response = await CourseService.getById(
+        request.id,
+        departmentContext
+      );
       if (response.status === "success") {
         sendResponse({
           res,
@@ -123,13 +177,19 @@ export class CourseController {
 
   static async getByBranch(req: Request, res: Response): Promise<void> {
     try {
-      const { name, semesterId, cycle } = req.query as {
-        name: string;
+      const { semesterId, cycle } = req.query as {
         semesterId?: string;
         cycle?: string;
       };
+      const departmentContext = await getDepartmentRequestContext(req);
 
-      const response = await CourseService.getByBranch(name, semesterId, cycle);
+      const response = await CourseService.getByBranch(
+        departmentContext.departmentId,
+        undefined,
+        semesterId,
+        cycle,
+        departmentContext
+      );
 
       if (response.status === "success") {
         sendResponse({
@@ -142,11 +202,13 @@ export class CourseController {
       }
     } catch (error) {
       logger.error("Error Fetching Courses by Branch", error);
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message,
+        statusCode: error instanceof Error ? 400 : 500,
         error,
       });
     }
@@ -157,11 +219,14 @@ export class CourseController {
     res: Response
   ): Promise<void> {
     try {
-      const { semesterId, departmentName, cycle } = req.body;
+      const { semesterId, cycle } = req.body;
+      const departmentContext = await getDepartmentRequestContext(req);
       const response = await CourseService.bulkSubmitForApproval(
         semesterId,
-        departmentName,
-        cycle
+        departmentContext.departmentId,
+        undefined,
+        cycle,
+        departmentContext
       );
 
       if (response.status === "success") {
@@ -227,14 +292,21 @@ export class CourseController {
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
-      const role = session?.user?.role as "admin" | "coe";
+      if (!session?.user?.id || !session?.user?.role) {
+        throw new Error("Unauthorized");
+      }
 
-      const { semesterId, departmentName, cycle } = req.body;
+      const role = session.user.role as "admin" | "coe";
+
+      const { semesterId, departmentId, departmentName, cycle } = req.body;
       const response = await CourseService.approveSemesterCourses(
         semesterId,
+        departmentId,
         departmentName,
         cycle,
-        role
+        role,
+        session.user.username,
+        session.user.displayUsername
       );
 
       if (response.status === "success") {
@@ -251,8 +323,9 @@ export class CourseController {
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: CourseController.getApprovalErrorStatusCode(error),
         error,
       });
     }
@@ -266,11 +339,17 @@ export class CourseController {
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
-      const role = session?.user?.role as "admin" | "coe";
+      if (!session?.user?.id || !session?.user?.role) {
+        throw new Error("Unauthorized");
+      }
 
-      const { semesterId, departmentName, reviewerNotes, cycle } = req.body;
+      const role = session.user.role as "admin" | "coe";
+
+      const { semesterId, departmentId, departmentName, reviewerNotes, cycle } =
+        req.body;
       const response = await CourseService.requestRevisionForSemester(
         semesterId,
+        departmentId,
         departmentName,
         reviewerNotes,
         cycle,
@@ -291,8 +370,9 @@ export class CourseController {
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: CourseController.getApprovalErrorStatusCode(error),
         error,
       });
     }

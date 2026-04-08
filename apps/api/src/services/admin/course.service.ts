@@ -24,13 +24,16 @@ export class AdminCourseService {
   }
 
   static getByDepartment(
-    departmentName: string,
+    departmentId?: string,
+    departmentName?: string,
     semesterId?: string,
     cycle?: string
   ): Promise<
     BaseResponse<
       Array<
         Course & {
+          departmentId: string;
+          departmentName: string;
           isFullyMapped: boolean;
           isPartiallyMapped: boolean;
           isUnmapped: boolean;
@@ -38,6 +41,11 @@ export class AdminCourseService {
       >
     >
   > {
-    return CourseService.getByBranch(departmentName, semesterId, cycle);
+    return CourseService.getByBranch(
+      departmentId,
+      departmentName,
+      semesterId,
+      cycle
+    );
   }
 }

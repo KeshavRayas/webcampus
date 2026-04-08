@@ -1,16 +1,89 @@
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
-import type { UpsertCourseMappingType } from "@webcampus/schemas/department";
+import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
+import type {
+  CourseMappingStatusResponseType,
+  UpsertCourseMappingType,
+} from "@webcampus/schemas/department";
+import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 import type { BaseResponse } from "@webcampus/types/api";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 
 type MappingContext = {
+  departmentId?: string;
   departmentName?: string;
   requesterRole?: "admin" | "department";
+  requestContext?: DepartmentRequestContext;
 };
 
 export class CourseAssignmentService {
+  private static async allocateSectionStudentsToBatches(
+    tx: Prisma.TransactionClient,
+    sectionId: string,
+    semester: number,
+    academicYear: string
+  ): Promise<void> {
+    const [batches, sectionStudents] = await Promise.all([
+      tx.batch.findMany({
+        where: { sectionId },
+        orderBy: { name: "asc" },
+        select: { id: true },
+      }),
+      tx.studentSection.findMany({
+        where: {
+          sectionId,
+          semester,
+          academicYear,
+        },
+        orderBy: {
+          student: {
+            usn: "asc",
+          },
+        },
+        select: {
+          studentId: true,
+        },
+      }),
+    ]);
+
+    if (batches.length === 0 || sectionStudents.length === 0) {
+      return;
+    }
+
+    for (const batch of batches) {
+      await tx.batch.update({
+        where: { id: batch.id },
+        data: {
+          students: {
+            set: [],
+          },
+        },
+      });
+    }
+
+    const studentIds = sectionStudents.map((entry) => entry.studentId);
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const studentsForBatch = studentIds.filter(
+        (_, studentIndex) => studentIndex % batches.length === batchIndex
+      );
+
+      if (studentsForBatch.length === 0) {
+        continue;
+      }
+
+      await tx.batch.update({
+        where: { id: batches[batchIndex]!.id },
+        data: {
+          students: {
+            connect: studentsForBatch.map((studentId) => ({ id: studentId })),
+          },
+        },
+      });
+    }
+  }
+
   /**
    * Resolve the requesting department from the user session.
    */
@@ -18,9 +91,31 @@ export class CourseAssignmentService {
     requestingUserId: string,
     context?: MappingContext
   ) {
-    if (context?.departmentName) {
+    if (context?.requestContext?.departmentId) {
+      const department = await db.department.findUnique({
+        where: { id: context.requestContext.departmentId },
+        select: { id: true, name: true, type: true, abbreviation: true },
+      });
+
+      if (!department) {
+        throw new Error("Department not found");
+      }
+
+      return department;
+    }
+
+    const hasExplicitDepartmentScope =
+      Boolean(context?.departmentId) || Boolean(context?.departmentName);
+
+    if (hasExplicitDepartmentScope) {
+      const resolved = await DepartmentContextResolver.resolve({
+        source: "course-assignment.getRequestingDepartment",
+        departmentId: context?.departmentId,
+        departmentName: context?.departmentName,
+      });
+
       const explicitDepartment = await db.department.findUnique({
-        where: { name: context.departmentName },
+        where: { id: resolved.departmentId },
         select: { id: true, name: true, type: true, abbreviation: true },
       });
 
@@ -28,19 +123,40 @@ export class CourseAssignmentService {
         throw new Error("Department not found");
       }
 
+      if (context?.requesterRole === "admin") {
+        return explicitDepartment;
+      }
+
+      const sessionDepartment = await db.department.findFirst({
+        where: { userId: requestingUserId },
+        select: { id: true, name: true, type: true, abbreviation: true },
+      });
+
+      if (!sessionDepartment) {
+        throw new Error("Requesting department not found");
+      }
+
+      if (explicitDepartment.id !== sessionDepartment.id) {
+        throw new Error("Forbidden: department scope mismatch");
+      }
+
       return explicitDepartment;
     }
 
-    const department = await db.department.findFirst({
+    if (context?.requesterRole === "admin") {
+      throw new Error("departmentId is required");
+    }
+
+    const sessionDepartment = await db.department.findFirst({
       where: { userId: requestingUserId },
       select: { id: true, name: true, type: true, abbreviation: true },
     });
 
-    if (!department) {
+    if (!sessionDepartment) {
       throw new Error("Requesting department not found");
     }
 
-    return department;
+    return sessionDepartment;
   }
 
   /**
@@ -49,15 +165,25 @@ export class CourseAssignmentService {
    */
   static async getMappingStatus(
     semesterId: string,
-    departmentName: string,
     academicYear: string,
-    cycle?: string
-  ): Promise<BaseResponse<unknown>> {
+    requestingUserId: string,
+    cycle?: string,
+    context?: MappingContext
+  ): Promise<BaseResponse<CourseMappingStatusResponseType>> {
     try {
+      const department = await CourseAssignmentService.getRequestingDepartment(
+        requestingUserId,
+        context
+      );
+
       const courses = await db.course.findMany({
         where: {
           semesterId,
-          departmentName,
+          department: {
+            is: {
+              id: department.id,
+            },
+          },
           ...(cycle && cycle !== "NONE"
             ? { cycle: cycle as import("@webcampus/db").Cycle }
             : {}),
@@ -104,7 +230,11 @@ export class CourseAssignmentService {
       return {
         status: "success",
         message: "Course mapping status fetched",
-        data,
+        data: {
+          departmentId: department.id,
+          departmentName: department.name,
+          courses: data,
+        },
       };
     } catch (error) {
       logger.error("Error fetching mapping status:", { error });
@@ -120,13 +250,36 @@ export class CourseAssignmentService {
   static async getMappingByCourse(
     courseId: string,
     semesterId: string,
-    academicYear: string
+    academicYear: string,
+    requestingUserId: string,
+    context?: MappingContext
   ): Promise<BaseResponse<unknown>> {
     try {
+      const department = await CourseAssignmentService.getRequestingDepartment(
+        requestingUserId,
+        context
+      );
+
       const semester = await db.semester.findUnique({
         where: { id: semesterId },
       });
       if (!semester) throw new Error("Semester not found");
+
+      const course = await db.course.findFirst({
+        where: {
+          id: courseId,
+          department: {
+            is: {
+              id: department.id,
+            },
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!course) {
+        throw new Error("Course not found");
+      }
 
       const assignments = await db.courseAssignment.findMany({
         where: {
@@ -189,8 +342,15 @@ export class CourseAssignmentService {
       });
       if (!semester) throw new Error("Semester not found");
 
-      const course = await db.course.findUnique({
-        where: { id: data.courseId },
+      const course = await db.course.findFirst({
+        where: {
+          id: data.courseId,
+          department: {
+            is: {
+              id: department.id,
+            },
+          },
+        },
       });
       if (!course) throw new Error("Course not found");
       if (
@@ -214,38 +374,59 @@ export class CourseAssignmentService {
         );
       }
 
-      // Validate faculty ownership
-      if (department.type !== "BASIC_SCIENCES") {
-        const allFacultyIds = new Set<string>();
-        for (const mapping of data.sectionMappings) {
-          if (mapping.theoryFacultyId) {
-            allFacultyIds.add(mapping.theoryFacultyId);
-          }
-          for (const batch of mapping.labFacultyByBatch ?? []) {
-            allFacultyIds.add(batch.facultyId);
-          }
+      // Validate faculty ownership for all departments.
+      const allFacultyIds = new Set<string>();
+      for (const mapping of data.sectionMappings) {
+        if (mapping.theoryFacultyId) {
+          allFacultyIds.add(mapping.theoryFacultyId);
+        }
+        for (const batch of mapping.labFacultyByBatch ?? []) {
+          allFacultyIds.add(batch.facultyId);
+        }
+      }
+
+      if (allFacultyIds.size > 0) {
+        const requestedFacultyIds = Array.from(allFacultyIds);
+        const facultyRecords = await db.faculty.findMany({
+          where: {
+            id: { in: requestedFacultyIds },
+          },
+          select: { id: true, departmentId: true },
+        });
+
+        if (facultyRecords.length !== requestedFacultyIds.length) {
+          throw new Error("One or more faculty records are invalid");
         }
 
-        if (allFacultyIds.size > 0) {
-          const requestedFacultyIds = Array.from(allFacultyIds);
-          const facultyRecords = await db.faculty.findMany({
-            where: {
-              id: { in: requestedFacultyIds },
+        for (const faculty of facultyRecords) {
+          if (faculty.departmentId !== department.id) {
+            throw new Error(
+              `Faculty ${faculty.id} does not belong to your department`
+            );
+          }
+        }
+      }
+
+      // Validate section ownership and semester invariants for every mapping row.
+      const sectionIds = [...new Set(data.sectionMappings.map((m) => m.sectionId))];
+      if (sectionIds.length > 0) {
+        const sectionRecords = await db.section.findMany({
+          where: {
+            id: { in: sectionIds },
+            semesterId: data.semesterId,
+            department: {
+              is: {
+                id: department.id,
+              },
             },
-            select: { id: true, departmentId: true },
-          });
+          },
+          select: { id: true },
+        });
 
-          if (facultyRecords.length !== requestedFacultyIds.length) {
-            throw new Error("One or more faculty records are invalid");
-          }
-
-          for (const faculty of facultyRecords) {
-            if (faculty.departmentId !== department.id) {
-              throw new Error(
-                `Faculty ${faculty.id} does not belong to your department`
-              );
-            }
-          }
+        if (sectionRecords.length !== sectionIds.length) {
+          throw new Error(
+            "One or more section mappings are invalid for the department or semester"
+          );
         }
       }
 
@@ -261,6 +442,7 @@ export class CourseAssignmentService {
         });
 
         let createdCount = 0;
+        const labSectionIds = new Set<string>();
 
         for (const mapping of data.sectionMappings) {
           // Create THEORY assignment
@@ -268,6 +450,7 @@ export class CourseAssignmentService {
             await tx.courseAssignment.create({
               data: {
                 courseId: data.courseId,
+                departmentId: department.id,
                 facultyId: mapping.theoryFacultyId,
                 sectionId: mapping.sectionId,
                 batchId: null,
@@ -298,9 +481,12 @@ export class CourseAssignmentService {
               });
             }
 
+            labSectionIds.add(mapping.sectionId);
+
             await tx.courseAssignment.create({
               data: {
                 courseId: data.courseId,
+                departmentId: department.id,
                 facultyId: batchMapping.facultyId,
                 sectionId: mapping.sectionId,
                 batchId: batch.id,
@@ -311,6 +497,15 @@ export class CourseAssignmentService {
             });
             createdCount++;
           }
+        }
+
+        for (const sectionId of labSectionIds) {
+          await CourseAssignmentService.allocateSectionStudentsToBatches(
+            tx,
+            sectionId,
+            semester.semesterNumber,
+            data.academicYear
+          );
         }
 
         return createdCount;
@@ -334,9 +529,7 @@ export class CourseAssignmentService {
   }
 
   /**
-   * Get faculty list for the mapping comboboxes.
-   * BASIC_SCIENCES: all faculty across all departments.
-   * DEGREE_GRANTING: only faculty from the requesting department.
+   * Get faculty list for the mapping comboboxes scoped to the resolved department.
    */
   static async getFacultyForMapping(
     requestingUserId: string,
@@ -350,10 +543,9 @@ export class CourseAssignmentService {
         context
       );
 
-      const whereClause: Prisma.FacultyWhereInput =
-        department.type === "BASIC_SCIENCES"
-          ? {}
-          : { departmentId: department.id };
+      const whereClause: Prisma.FacultyWhereInput = {
+        departmentId: department.id,
+      };
 
       const faculty = await db.faculty.findMany({
         where: whereClause,
@@ -404,9 +596,14 @@ export class CourseAssignmentService {
       const sections = await db.section.findMany({
         where: {
           semesterId,
-          ...(department.type === "BASIC_SCIENCES" && cycle && cycle !== "NONE"
+          department: {
+            is: {
+              id: department.id,
+            },
+          },
+          ...(cycle && cycle !== "NONE"
             ? { cycle: cycle as import("@webcampus/db").Cycle }
-            : { departmentName: department.name }),
+            : {}),
         },
         include: {
           batches: {
@@ -438,9 +635,16 @@ export class CourseAssignmentService {
   static async deleteMappings(
     courseId: string,
     semesterId: string,
-    academicYear: string
+    academicYear: string,
+    requestingUserId: string,
+    context?: MappingContext
   ): Promise<BaseResponse<{ deleted: number }>> {
     try {
+      const department = await CourseAssignmentService.getRequestingDepartment(
+        requestingUserId,
+        context
+      );
+
       const semester = await db.semester.findUnique({
         where: { id: semesterId },
       });
@@ -455,6 +659,13 @@ export class CourseAssignmentService {
           semester: semester.semesterNumber,
           academicYear,
           section: { semesterId },
+          course: {
+            department: {
+              is: {
+                id: department.id,
+              },
+            },
+          },
         },
       });
 

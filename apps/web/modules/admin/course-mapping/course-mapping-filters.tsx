@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import {
   CourseMappingStatusItemType,
+  CourseMappingStatusResponseType,
   CourseResponseDTO,
 } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
@@ -24,6 +25,7 @@ const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 const BASIC_SCIENCES_CYCLE_OPTIONS = ["PHYSICS", "CHEMISTRY"] as const;
 
 export type AdminCourseMappingFiltersState = {
+  departmentId: string;
   departmentName: string;
   termId: string;
   semesterId: string;
@@ -33,6 +35,7 @@ export type AdminCourseMappingFiltersState = {
 };
 
 const EMPTY_FILTERS: Omit<AdminCourseMappingFiltersState, "academicYear"> = {
+  departmentId: "",
   departmentName: "",
   termId: "",
   semesterId: "",
@@ -66,6 +69,7 @@ export const AdminCourseMappingFilters = ({
 
     setDraftFilters((current) => ({
       ...current,
+      departmentId: departments[0]!.id,
       departmentName: departments[0]!.name,
     }));
   }, [departments, draftFilters.departmentName]);
@@ -149,6 +153,7 @@ export const AdminCourseMappingFilters = ({
     ],
     queryFn: async () => {
       if (
+        !draftFilters.departmentId ||
         !draftFilters.departmentName ||
         !draftFilters.semesterId ||
         !selectedDraftTerm?.year
@@ -156,10 +161,11 @@ export const AdminCourseMappingFilters = ({
         return [];
       }
 
-      const res = await axios.get<BaseResponse<CourseMappingStatusItemType[]>>(
+      const res = await axios.get<BaseResponse<CourseMappingStatusResponseType>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/status`,
         {
           params: {
+            departmentId: draftFilters.departmentId,
             departmentName: draftFilters.departmentName,
             semesterId: draftFilters.semesterId,
             academicYear: selectedDraftTerm.year,
@@ -171,13 +177,14 @@ export const AdminCourseMappingFilters = ({
         }
       );
 
-      if (res.data.status === "success" && res.data.data) {
-        return res.data.data;
+      if (res.data.status === "success" && res.data.data?.courses) {
+        return res.data.data.courses;
       }
 
       return [];
     },
     enabled:
+      !!draftFilters.departmentId &&
       !!draftFilters.departmentName &&
       !!draftFilters.semesterId &&
       !!selectedDraftTerm?.year,
@@ -187,6 +194,7 @@ export const AdminCourseMappingFilters = ({
 
   const applyFilters = async () => {
     if (
+      !draftFilters.departmentId ||
       !draftFilters.departmentName ||
       !draftFilters.termId ||
       !draftFilters.semesterId ||
@@ -224,6 +232,7 @@ export const AdminCourseMappingFilters = ({
   const resetFilters = () => {
     setDraftFilters({
       ...EMPTY_FILTERS,
+      departmentId: draftFilters.departmentId,
       departmentName: draftFilters.departmentName,
       termId: draftFilters.termId,
       semesterId: draftFilters.semesterId,
@@ -308,6 +317,10 @@ export const AdminCourseMappingFilters = ({
               next.courseId = "";
             }
             if (key === "departmentName") {
+              const selected = departments.find(
+                (department) => department.name === value
+              );
+              next.departmentId = selected?.id ?? "";
               next.termId = "";
               next.semesterId = "";
               next.cycle = "";

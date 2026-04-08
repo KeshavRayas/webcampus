@@ -46,7 +46,9 @@ const BaseCourseSchema = z.object({
 
   cycle: z.enum(COURSE_CYCLES).optional(),
 
-  departmentName: z.string().min(1, "Department is required"),
+  departmentId: z.string().uuid("Invalid department ID").optional(),
+
+  departmentName: z.string().min(1, "Department is required").optional(),
 
   semesterId: z.string().min(1, "Semester is required"),
 
@@ -200,6 +202,14 @@ const validateModeLockedValues = (
  * Schema for creating a new course
  */
 export const CreateCourseSchema = BaseCourseSchema.superRefine((value, ctx) => {
+  if (!value.departmentId && !value.departmentName) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["departmentId"],
+      message: "departmentId or departmentName is required",
+    });
+  }
+
   validateModeLockedValues(
     value as unknown as Record<string, unknown>,
     value.courseMode,
@@ -233,11 +243,59 @@ export const DeleteCourseSchema = z.object({
   id: z.string().uuid("Course ID is required"),
 });
 
+const ApprovalScopeSchema = z.object({
+  semesterId: z.string().uuid("Invalid semester ID"),
+  departmentId: z.string().uuid("Invalid department ID").optional(),
+  departmentName: z.string().min(1, "Department is required").optional(),
+  cycle: z
+    .enum(COURSE_CYCLES)
+    .or(z.literal(""))
+    .transform((value) => (value === "" ? undefined : value))
+    .optional(),
+});
+
+const requireDepartmentScope = <T extends {
+  departmentId?: string;
+  departmentName?: string;
+}>(value: T, ctx: z.RefinementCtx) => {
+  if (!value.departmentId && !value.departmentName) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["departmentId"],
+      message: "departmentId or departmentName is required",
+    });
+  }
+};
+
+export const ApproveSemesterCoursesSchema = ApprovalScopeSchema.superRefine(
+  (value, ctx) => {
+    requireDepartmentScope(value, ctx);
+  }
+);
+
+export const RequestRevisionForSemesterSchema = ApprovalScopeSchema.extend({
+  reviewerNotes: z.string().trim().min(1, "Revision notes are required"),
+}).superRefine((value, ctx) => {
+  requireDepartmentScope(value, ctx);
+});
+
+export const CourseBranchQuerySchema = z
+  .object({
+    semesterId: z.string().uuid("Invalid semester ID").optional(),
+    cycle: z
+      .enum(COURSE_CYCLES)
+      .or(z.literal(""))
+      .transform((value) => (value === "" ? undefined : value))
+      .optional(),
+  });
+
 /**
  * Response schema for a single course (includes backend-computed fields)
  */
 export const CourseResponseSchema = BaseCourseSchema.extend({
   id: z.string().uuid(),
+  departmentId: z.string().uuid("Invalid department ID"),
+  departmentName: z.string().nullable().optional(),
   totalCredits: z.number().int(),
   hasLaboratoryComponent: z.boolean(),
   semester: z
@@ -256,13 +314,17 @@ export const CourseResponseSchema = BaseCourseSchema.extend({
   isPartiallyMapped: z.boolean().optional(),
   isUnmapped: z.boolean().optional(),
   approvalStatus: z.string().optional(),
-  adminNotes: z.string().nullable().optional(),
-  coeNotes: z.string().nullable().optional(),
-  hasAdminApproved: z.boolean().optional(),
-  hasCoeApproved: z.boolean().optional(),
+  approvedByRole: z.string().nullable().optional(),
+  approvedByUsername: z.string().nullable().optional(),
+  approvedByDisplay: z.string().nullable().optional(),
+  approvedAt: z.string().nullable().optional(),
+  revisionRequestedByRole: z.string().nullable().optional(),
+  revisionNotes: z.string().nullable().optional(),
+  revisionRequestedAt: z.string().nullable().optional(),
 });
 
 export type CreateCourseDTO = z.infer<typeof CreateCourseSchema>;
 export type UpdateCourseDTO = z.infer<typeof UpdateCourseSchema>;
 export type DeleteCourseDTO = z.infer<typeof DeleteCourseSchema>;
+export type CourseBranchQueryType = z.infer<typeof CourseBranchQuerySchema>;
 export type CourseResponseDTO = z.infer<typeof CourseResponseSchema>;

@@ -1,8 +1,8 @@
 import { SectionService } from "@webcampus/api/src/services/department/section.service";
-import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
+import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
 import {
   CreateSectionType,
   DetailedGenerationPreviewRequestDTO,
@@ -29,23 +29,19 @@ export class SectionController {
     return 400;
   }
 
-  private static async getRequestingUserId(req: Request): Promise<string> {
-    const session = await auth.api.getSession({
-      headers: fromNodeHeaders(req.headers),
-    });
-
-    if (!session?.user?.id) {
-      throw new Error("Unauthorized");
-    }
-
-    return session.user.id;
+  private static async getRequestContext(req: Request) {
+    return getDepartmentRequestContext(req);
   }
 
   static async create(req: Request, res: Response): Promise<void> {
     try {
       const request: CreateSectionType = req.body;
-      const requestingUserId = await SectionController.getRequestingUserId(req);
-      const response = await SectionService.create(request, requestingUserId);
+      const requestContext = await SectionController.getRequestContext(req);
+      const response = await SectionService.create(
+        request,
+        requestContext.userId,
+        requestContext
+      );
       if (response.status === "success") {
         sendResponse({
           res,
@@ -71,8 +67,12 @@ export class SectionController {
   static async getAll(req: Request, res: Response): Promise<void> {
     try {
       const query: SectionQueryType = req.query;
-      const requestingUserId = await SectionController.getRequestingUserId(req);
-      const response = await SectionService.getAll(query, requestingUserId);
+      const requestContext = await SectionController.getRequestContext(req);
+      const response = await SectionService.getAll(
+        query,
+        requestContext.userId,
+        requestContext
+      );
       if (response.status === "success") {
         sendResponse({
           res,
@@ -100,7 +100,12 @@ export class SectionController {
     res: Response
   ): Promise<void> {
     try {
-      const response = await SectionService.getById(req.params.id);
+      const requestContext = await SectionController.getRequestContext(req);
+      const response = await SectionService.getById(
+        req.params.id,
+        requestContext.userId,
+        requestContext
+      );
       if (response.status === "success") {
         sendResponse({
           res,
@@ -127,13 +132,18 @@ export class SectionController {
     res: Response
   ): Promise<void> {
     try {
-      const requestingUserId = await SectionController.getRequestingUserId(req);
+      const requestContext = await SectionController.getRequestContext(req);
       await SectionService.assertSectionWriteAccess(
         req.params.id,
-        requestingUserId
+        requestContext.userId,
+        requestContext
       );
 
-      const response = await SectionService.deleteSection(req.params.id);
+      const response = await SectionService.deleteSection(
+        req.params.id,
+        requestContext.userId,
+        requestContext
+      );
       if (response.status === "success") {
         sendResponse({
           res,
@@ -159,10 +169,11 @@ export class SectionController {
   static async generateSections(req: Request, res: Response): Promise<void> {
     try {
       const data: GenerateSectionsDTO = req.body;
-      const requestingUserId = await SectionController.getRequestingUserId(req);
+      const requestContext = await SectionController.getRequestContext(req);
       const response = await SectionService.generateSections(
         data,
-        requestingUserId
+        requestContext.userId,
+        requestContext
       );
       if (response.status === "success") {
         sendResponse({
@@ -188,15 +199,16 @@ export class SectionController {
 
   static async getUnassignedCount(req: Request, res: Response): Promise<void> {
     try {
-      const { semesterId, departmentName } = req.query as {
+      const { semesterId } = req.query as {
         semesterId: string;
-        departmentName: string;
       };
-      const requestingUserId = await SectionController.getRequestingUserId(req);
+      const requestContext = await SectionController.getRequestContext(req);
       const response = await SectionService.getUnassignedCount(
         semesterId,
-        departmentName,
-        requestingUserId
+        requestContext.departmentId,
+        undefined,
+        requestContext.userId,
+        requestContext
       );
       if (response.status === "success") {
         sendResponse({
@@ -274,13 +286,16 @@ export class SectionController {
     res: Response
   ): Promise<void> {
     try {
-      const { semesterId, departmentName } = req.query as {
+      const { semesterId } = req.query as {
         semesterId: string;
-        departmentName: string;
       };
+      const requestContext = await SectionController.getRequestContext(req);
       const response = await SectionService.getSectionsWithStudents(
         semesterId,
-        departmentName
+        requestContext.departmentId,
+        undefined,
+        requestContext.userId,
+        requestContext
       );
       if (response.status === "success") {
         sendResponse({
@@ -308,13 +323,16 @@ export class SectionController {
     res: Response
   ): Promise<void> {
     try {
-      const { semesterId, departmentName } = req.query as {
+      const { semesterId } = req.query as {
         semesterId: string;
-        departmentName: string;
       };
+      const requestContext = await SectionController.getRequestContext(req);
       const response = await SectionService.getUnassignedStudents(
         semesterId,
-        departmentName
+        requestContext.departmentId,
+        undefined,
+        requestContext.userId,
+        requestContext
       );
       if (response.status === "success") {
         sendResponse({
@@ -348,10 +366,11 @@ export class SectionController {
         studentIds: string[];
         academicYear: string;
       };
-      const requestingUserId = await SectionController.getRequestingUserId(req);
+      const requestContext = await SectionController.getRequestContext(req);
       await SectionService.assertSectionWriteAccess(
         sectionId,
-        requestingUserId
+        requestContext.userId,
+        requestContext
       );
 
       const response = await SectionService.assignStudentsToSection(
@@ -387,27 +406,11 @@ export class SectionController {
   ): Promise<void> {
     try {
       const data: GenerateCycleSectionsDTO = req.body;
-
-      // Resolve the requesting department name from the session
-      const session = await auth.api.getSession({
-        headers: fromNodeHeaders(req.headers),
-      });
-      if (!session?.user?.id) {
-        sendResponse({
-          res,
-          status: "error",
-          statusCode: 401,
-          message: "Unauthorized",
-          error: "Unauthorized",
-        });
-        return;
-      }
-
-      const departmentName = session.user.name ?? "";
+      const requestContext = await SectionController.getRequestContext(req);
       const response = await SectionService.generateCycleSections(
         data,
-        departmentName,
-        session.user.id
+        requestContext.userId,
+        requestContext
       );
       if (response.status === "success") {
         sendResponse({
@@ -442,15 +445,15 @@ export class SectionController {
         cycle,
         studentsPerSection,
       }: DetailedGenerationPreviewRequestDTO = req.body;
-
-      const requestingUserId = await SectionController.getRequestingUserId(req);
+      const requestContext = await SectionController.getRequestContext(req);
 
       const response = await SectionService.getDetailedGenerationPreview(
         semesterId,
         allocations,
         cycle,
         studentsPerSection ?? 60,
-        requestingUserId
+        requestContext.userId,
+        requestContext
       );
 
       if (response.status === "success") {
@@ -477,10 +480,8 @@ export class SectionController {
 
   static async getDepartmentInfo(req: Request, res: Response): Promise<void> {
     try {
-      const session = await auth.api.getSession({
-        headers: fromNodeHeaders(req.headers),
-      });
-      if (!session?.user?.id) {
+      const requestContext = await SectionController.getRequestContext(req);
+      if (!requestContext.departmentId) {
         sendResponse({
           res,
           status: "error",
@@ -493,7 +494,7 @@ export class SectionController {
 
       const { db } = await import("@webcampus/db");
       const department = await db.department.findFirst({
-        where: { userId: session.user.id },
+        where: { id: requestContext.departmentId },
         select: { type: true, name: true, id: true },
       });
 

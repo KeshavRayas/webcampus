@@ -161,19 +161,23 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: LayoutDashboard,
         },
         {
-          name: "Courses",
-          url: "/faculty/courses",
+          name: "Handling",
+          url: "/faculty/handling/courses",
           icon: GraduationCap,
-        },
-        {
-          name: "Students",
-          url: "/faculty/students",
-          icon: Users,
+          children: [
+            { name: "Courses", url: "/faculty/handling/courses" },
+            { name: "Lab", url: "/faculty/handling/lab" },
+          ],
         },
         {
           name: "Attendance",
           url: "/faculty/attendance",
           icon: Fingerprint,
+        },
+        {
+          name: "Marks",
+          url: "/faculty/marks",
+          icon: BookOpenText,
         },
         {
           name: "Profile",

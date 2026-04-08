@@ -1,9 +1,11 @@
 import { CourseController } from "@webcampus/api/src/controllers/department/course.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
-import { StringParamSchema } from "@webcampus/schemas/common";
 import {
+  ApproveSemesterCoursesSchema,
+  CourseBranchQuerySchema,
   CreateCourseSchema,
   DeleteCourseSchema,
+  RequestRevisionForSemesterSchema,
   UpdateCourseSchema,
 } from "@webcampus/schemas/department";
 import { Router } from "express";
@@ -48,7 +50,7 @@ router.delete(
 
 router.get(
   "/branch",
-  validateRequest(StringParamSchema, "query"),
+  validateRequest(CourseBranchQuerySchema, "query"),
   protect({
     role: "department",
     permissions: {
@@ -91,6 +93,7 @@ router.get(
 
 router.post(
   "/approve",
+  validateRequest(ApproveSemesterCoursesSchema),
   protect({
     role: ["admin", "coe"],
     permissions: {},
@@ -100,6 +103,7 @@ router.post(
 
 router.post(
   "/request-revision",
+  validateRequest(RequestRevisionForSemesterSchema),
   protect({
     role: ["admin", "coe"],
     permissions: {},
