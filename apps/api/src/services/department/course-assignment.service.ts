@@ -1,12 +1,12 @@
+import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
-import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import type {
   CourseMappingStatusResponseType,
   UpsertCourseMappingType,
 } from "@webcampus/schemas/department";
-import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 import type { BaseResponse } from "@webcampus/types/api";
+import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 
@@ -408,7 +408,9 @@ export class CourseAssignmentService {
       }
 
       // Validate section ownership and semester invariants for every mapping row.
-      const sectionIds = [...new Set(data.sectionMappings.map((m) => m.sectionId))];
+      const sectionIds = [
+        ...new Set(data.sectionMappings.map((m) => m.sectionId)),
+      ];
       if (sectionIds.length > 0) {
         const sectionRecords = await db.section.findMany({
           where: {
