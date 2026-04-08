@@ -3,8 +3,6 @@
   "compilerOptions": {
     "declaration": false,
     "declarationMap": false,
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
       "@webcampus/ui/*": ["../../packages/ui/src/*"]

@@ -49,3 +49,5 @@ playwright/.auth
 .tsup
 
 .agents/
+
+.github/
