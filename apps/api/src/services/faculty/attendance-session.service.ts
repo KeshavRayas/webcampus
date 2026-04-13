@@ -16,6 +16,7 @@ import {
   FacultyAttendanceSessionStudentsDTO,
   PaginatedResponse,
 } from "@webcampus/types/api";
+import { AttendanceAggregationService } from "@webcampus/api/src/services/faculty/attendance-aggregation.service";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
@@ -653,6 +654,12 @@ export class FacultyAttendanceSessionService {
             },
           });
         }
+
+        // Aggregate attendance for all students in this course
+        await AttendanceAggregationService.aggregateAttendanceForCourse(
+          targetSession.courseId,
+          tx
+        );
 
         const absentCount = normalizedStatuses.reduce(
           (count, item) => (item.status === "ABSENT" ? count + 1 : count),
