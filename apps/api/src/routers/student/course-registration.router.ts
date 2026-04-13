@@ -1,26 +1,31 @@
 import { CourseRegistrationController } from "@webcampus/api/src/controllers/student/course-registration.controller";
-import { validateRequest } from "@webcampus/backend-utils/middlewares";
+import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   createCourseRegistrationSchema,
-  updateCourseRegistrationSchema,
 } from "@webcampus/schemas/student";
 import { Router } from "express";
 
 const router: Router = Router();
 
+const createMyCourseRegistrationRequestSchema = createCourseRegistrationSchema.pick({
+  courseId: true,
+  semester: true,
+  academicYear: true,
+});
+
+router.use(
+  protect({
+    role: "student",
+    permissions: {},
+  })
+);
+
 router.post(
   "/",
-  validateRequest(createCourseRegistrationSchema),
-  CourseRegistrationController.create
+  validateRequest(createMyCourseRegistrationRequestSchema),
+  CourseRegistrationController.createMyRegistration
 );
-router.get("/", CourseRegistrationController.getAll);
-router.get("/:id", CourseRegistrationController.getById);
-router.get("/student/:studentId", CourseRegistrationController.getByStudentId);
-router.put(
-  "/:id",
-  validateRequest(updateCourseRegistrationSchema),
-  CourseRegistrationController.update
-);
-router.delete("/:id", CourseRegistrationController.delete);
+router.get("/me", CourseRegistrationController.getMyRegistrations);
+router.get("/eligible", CourseRegistrationController.getMyEligibleCourses);
 
 export default router;

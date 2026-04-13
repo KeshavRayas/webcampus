@@ -101,7 +101,7 @@ export class AdmissionController {
 
   static async getMe(req: Request, res: Response): Promise<void> {
     try {
-      // Get session directly from Better Auth
+      // 1. FOOLPROOF WAY: Get session directly from Better Auth
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
@@ -109,7 +109,7 @@ export class AdmissionController {
 
       if (!userId) throw new Error("Unauthorized: User session not found");
 
-      // Fetch the user from the DB to get their Application ID
+      // 2. Fetch the user from the DB to get their Application ID
       const user = await db.user.findUnique({ where: { id: userId } });
       const applicationId = user?.username;
 
@@ -117,7 +117,7 @@ export class AdmissionController {
         throw new Error("Unauthorized: Applicant ID not found");
       }
 
-      // Fetch their admission shell
+      // 3. Fetch their admission shell
       const response = await AdmissionService.getByApplicationId(applicationId);
 
       if (response.status === "success") {
@@ -173,7 +173,7 @@ export class AdmissionController {
 
   static async submit(req: Request, res: Response): Promise<void> {
     try {
-      // Get session directly from Better Auth
+      // 1. FOOLPROOF WAY: Get session directly from Better Auth
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
@@ -184,23 +184,10 @@ export class AdmissionController {
       const user = await db.user.findUnique({ where: { id: userId } });
       const applicationId = user?.username;
 
-      if (!applicationId) {
-        logger.error("Applicant ID not found in user profile", {
-          userId,
-          userEmail: user?.email,
-          userRole: user?.role,
-        });
-        throw new Error(
-          "Unauthorized: Applicant ID not found. Please contact admin to verify your account setup."
-        );
-      }
+      if (!applicationId)
+        throw new Error("Unauthorized: Applicant ID not found");
 
-      logger.info("Starting application submission", {
-        userId,
-        applicationId,
-      });
-
-      // Process the Multer files
+      // 2. Process the Multer files
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
       const fileUrls: { [key: string]: string } = {};
 
@@ -215,13 +202,6 @@ export class AdmissionController {
           const result = await uploadToS3(file.buffer, fileName, file.mimetype);
           if (result.success && result.url) {
             fileUrls[field] = result.url;
-            logger.info("File uploaded successfully", { field, fileName });
-          } else {
-            logger.warn("File upload failed or incomplete", {
-              field,
-              fileName,
-              success: result.success,
-            });
           }
         }
       };
@@ -231,17 +211,7 @@ export class AdmissionController {
         handleUpload("class12thMarksPdf", "12th_marks_"),
         handleUpload("casteCertificate", "caste_cert_"),
         handleUpload("photo", "photo_"),
-        handleUpload("disabilityCertificate", "disability_cert_"),
-        handleUpload("economicallyBackwardCertificate", "eco_backward_cert_"),
-        handleUpload("aadharCard", "aadhar_card_"),
-        handleUpload("transferCertificate", "tc_"),
-        handleUpload("studyCertificate", "study_cert_"),
       ]);
-
-      logger.info("File uploads completed", {
-        applicationId,
-        filesUploaded: Object.keys(fileUrls).length,
-      });
 
       // 3. Submit to the service
       const response = await AdmissionService.submitApplication(
@@ -251,7 +221,6 @@ export class AdmissionController {
       );
 
       if (response.status === "success") {
-        logger.info("Application submitted successfully", { applicationId });
         sendResponse({
           res,
           status: "success",
@@ -261,16 +230,12 @@ export class AdmissionController {
         });
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
-      logger.error("Error submitting application", {
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
-      });
+      logger.error("Error submitting application", error);
       sendResponse({
         res,
         status: "error",
-        message: errorMessage,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode:
           error instanceof Error && error.message.includes("Unauthorized")
             ? 401

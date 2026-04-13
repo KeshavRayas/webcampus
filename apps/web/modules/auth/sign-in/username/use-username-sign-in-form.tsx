@@ -7,17 +7,11 @@ import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import z from "zod";
 
-export const useUsernameSignInForm = (role: string) => {
+export const useUsernameSignInForm = (role: "applicant") => {
   const router = useRouter();
 
-  // Move the schema inside so it can use the dynamic role for error messages
   const signInSchema = z.object({
-    username: z
-      .string()
-      .min(
-        1,
-        role === "student" ? "USN is required" : "Application ID is required"
-      ),
+    username: z.string().min(1, "Application ID is required"),
     password: z.string().min(8, "Password must be at least 8 characters"),
   });
 

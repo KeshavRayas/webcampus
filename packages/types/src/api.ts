@@ -88,3 +88,81 @@ export type FacultyHandlingFilterOptionsDTO = {
     semesterId: string;
   }[];
 };
+
+export type FacultyAttendanceCourseOptionDTO = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+export type FacultyAttendanceSectionOptionDTO = {
+  id: string;
+  name: string;
+  courseId: string;
+};
+
+export type FacultyAttendanceFilterOptionsDTO = {
+  courses: FacultyAttendanceCourseOptionDTO[];
+  sections: FacultyAttendanceSectionOptionDTO[];
+};
+
+export type FacultyAttendanceSessionDTO = {
+  id: string;
+  courseId: string;
+  sectionId: string;
+  sessionDate: string;
+  timingCode: string;
+  timingLabel: string;
+  timingStartTime: string;
+  timingEndTime: string;
+  courseCode: string;
+  courseName: string;
+  sectionName: string;
+  createdAt: string;
+};
+
+export type AttendanceRecordStatusDTO = "PRESENT" | "ABSENT";
+
+export type FacultyAttendanceStudentStatusInputDTO = {
+  studentId: string;
+  status: AttendanceRecordStatusDTO;
+};
+
+export type CreateOrOpenFacultyAttendanceSessionPayloadDTO = {
+  courseId: string;
+  sectionId: string;
+  sessionDate: string;
+  timingMode: "FIXED" | "CUSTOM";
+  timingCode?: string;
+  timingStartTime?: string;
+  timingEndTime?: string;
+  studentStatuses?: FacultyAttendanceStudentStatusInputDTO[];
+};
+
+export type FacultyAttendanceSessionInitializationSummaryDTO = {
+  totalStudents: number;
+  presentCount: number;
+  absentCount: number;
+};
+
+export type FacultyAttendanceSessionStudentDTO = {
+  studentId: string;
+  usn: string;
+  name: string;
+  status: AttendanceRecordStatusDTO;
+};
+
+export type FacultyAttendanceSessionStudentsDTO = {
+  students: FacultyAttendanceSessionStudentDTO[];
+};
+
+export type FacultyAttendanceSessionDetailDTO = {
+  session: FacultyAttendanceSessionDTO;
+  students: FacultyAttendanceSessionStudentDTO[];
+};
+
+export type CreateOrOpenFacultyAttendanceSessionDTO = {
+  session: FacultyAttendanceSessionDTO;
+  created: boolean;
+  attendanceInitialization: FacultyAttendanceSessionInitializationSummaryDTO;
+};

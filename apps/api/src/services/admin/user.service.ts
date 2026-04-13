@@ -77,10 +77,9 @@ export class UserService {
     let updatedCount = 0;
 
     for (const user of usersNeedingBackfill) {
+      // Keep credential identity stable once username is set.
       const nextUsername =
-        user.student?.usn ||
-        user.username ||
-        UserService.getDefaultUsername(user.email);
+        user.username || UserService.getDefaultUsername(user.email);
       const nextDisplayUsername =
         user.displayUsername || UserService.getDisplayUsername(user.name);
 

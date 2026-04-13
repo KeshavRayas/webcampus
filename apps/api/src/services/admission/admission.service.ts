@@ -9,6 +9,11 @@ import {
   PortStudentsType,
 } from "@webcampus/schemas/admission";
 import { BaseResponse } from "@webcampus/types/api";
+import {
+  buildStudentEmailAddress,
+  getStudentEmailYearSuffix,
+  normalizeStudentEmailToken,
+} from "./student-email";
 
 export class AdmissionService {
   private static getStudentFullName(admission: {
@@ -895,6 +900,61 @@ export class AdmissionService {
         return left.applicationId.localeCompare(right.applicationId);
       });
 
+      const studentEmailCollisionCountsByDepartmentId = new Map<
+        string,
+        {
+          firstNameCounts: Map<string, number>;
+          firstNameLastInitialCounts: Map<string, number>;
+        }
+      >();
+
+      for (const admission of approvedUnportedAdmissions) {
+        if (!admission.departmentId) {
+          continue;
+        }
+
+        const firstNameKey = normalizeStudentEmailToken(
+          admission.firstName ?? ""
+        );
+        if (!firstNameKey) {
+          continue;
+        }
+
+        const lastInitial = normalizeStudentEmailToken(
+          admission.lastName ?? ""
+        ).slice(0, 1);
+
+        const counts =
+          studentEmailCollisionCountsByDepartmentId.get(admission.departmentId) ??
+          {
+            firstNameCounts: new Map<string, number>(),
+            firstNameLastInitialCounts: new Map<string, number>(),
+          };
+
+        counts.firstNameCounts.set(
+          firstNameKey,
+          (counts.firstNameCounts.get(firstNameKey) ?? 0) + 1
+        );
+
+        const compositeKey = lastInitial
+          ? `${firstNameKey}:${lastInitial}`
+          : firstNameKey;
+        counts.firstNameLastInitialCounts.set(
+          compositeKey,
+          (counts.firstNameLastInitialCounts.get(compositeKey) ?? 0) + 1
+        );
+
+        studentEmailCollisionCountsByDepartmentId.set(
+          admission.departmentId,
+          counts
+        );
+      }
+
+      const studentEmailLocalPartsByDepartmentId = new Map<string, Set<string>>();
+      const academicYearSuffix = getStudentEmailYearSuffix(
+        semester.academicTerm.year
+      );
+
       const allApprovedApplicationIds = approvedAdmissions.map(
         (admission) => admission.applicationId
       );
@@ -949,7 +1009,8 @@ export class AdmissionService {
             }
 
             const fullName = AdmissionService.getStudentFullName(admission);
-            const primaryEmail = admission.primaryEmail?.trim().toLowerCase();
+            const firstName = admission.firstName?.trim();
+            const lastName = admission.lastName?.trim();
 
             if (!fullName) {
               throw new Error(
@@ -957,25 +1018,73 @@ export class AdmissionService {
               );
             }
 
-            if (!primaryEmail) {
+            if (!firstName) {
               throw new Error(
-                `Cannot port ${admission.applicationId}: student primary email is missing`
+                `Cannot port ${admission.applicationId}: student first name is missing`
               );
             }
 
-            const existingEmailOwner = await tx.user.findFirst({
-              where: {
-                email: primaryEmail,
-                id: { not: userId },
-              },
-              select: { id: true },
+            const firstNameKey = normalizeStudentEmailToken(firstName);
+            const lastInitial = normalizeStudentEmailToken(lastName ?? "").slice(
+              0,
+              1
+            );
+
+            const collisionCounts =
+              studentEmailCollisionCountsByDepartmentId.get(admission.departmentId) ??
+              {
+                firstNameCounts: new Map<string, number>(),
+                firstNameLastInitialCounts: new Map<string, number>(),
+              };
+
+            let occupiedLocalParts = studentEmailLocalPartsByDepartmentId.get(
+              admission.departmentId
+            );
+
+            if (!occupiedLocalParts) {
+              const sameDepartmentEmails = await tx.user.findMany({
+                where: {
+                  id: { not: userId },
+                  email: {
+                    endsWith: `.${normalizeStudentEmailToken(
+                      department.code
+                    )}${academicYearSuffix}@bmsce.ac.in`,
+                    mode: "insensitive",
+                  },
+                },
+                select: {
+                  email: true,
+                },
+              });
+
+              occupiedLocalParts = new Set(
+                sameDepartmentEmails.map(
+                  (user) => user.email.trim().toLowerCase().split("@")[0] ?? ""
+                )
+              );
+
+              studentEmailLocalPartsByDepartmentId.set(
+                admission.departmentId,
+                occupiedLocalParts
+              );
+            }
+
+            const studentEmail = buildStudentEmailAddress({
+              firstName,
+              lastName,
+              departmentCode: department.code,
+              academicYear: semester.academicTerm.year,
+              firstNameCount:
+                collisionCounts.firstNameCounts.get(firstNameKey) ?? 0,
+              firstNameLastInitialCount: lastInitial
+                ? collisionCounts.firstNameLastInitialCounts.get(
+                    `${firstNameKey}:${lastInitial}`
+                  ) ?? 0
+                : collisionCounts.firstNameLastInitialCounts.get(firstNameKey) ?? 0,
+              occupiedLocalParts,
             });
 
-            if (existingEmailOwner) {
-              throw new Error(
-                `Cannot port ${admission.applicationId}: email ${primaryEmail} is already used by another user`
-              );
-            }
+            occupiedLocalParts.add(studentEmail.split("@")[0] ?? studentEmail);
 
             const existingStudent = await tx.student.findFirst({
               where: {
@@ -1023,7 +1132,7 @@ export class AdmissionService {
                   name: fullName,
                   displayUsername: fullName,
                   username: finalStudentUsn,
-                  email: primaryEmail,
+                  email: studentEmail,
                   image: admission.photo ?? undefined,
                 },
               });
@@ -1067,7 +1176,7 @@ export class AdmissionService {
                 name: fullName,
                 displayUsername: fullName,
                 username: finalStudentUsn,
-                email: primaryEmail,
+                email: studentEmail,
                 image: admission.photo ?? undefined,
               },
             });

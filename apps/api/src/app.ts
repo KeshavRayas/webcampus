@@ -9,6 +9,7 @@ import admissionRouter from "./routers/admission/admission.router";
 import coeRouter from "./routers/coe/coe.router";
 import facultyRouter from "./routers/faculty/faculty-domain.router";
 import hodRouter from "./routers/hod/hod.router";
+import studentRouter from "./routers/student/student-domain.router";
 
 const app: Express = express();
 
@@ -37,6 +38,8 @@ app.use("/coe", coeRouter);
 app.use("/faculty", facultyRouter);
 
 app.use("/admission", admissionRouter);
+
+app.use("/student", studentRouter);
 
 app.get("/", (req, res) => {
   res.send({

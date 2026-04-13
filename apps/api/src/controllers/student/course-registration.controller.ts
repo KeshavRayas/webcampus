@@ -4,15 +4,25 @@ import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import {
   CreateCourseRegistrationType,
-  UpdateCourseRegistrationType,
 } from "@webcampus/schemas/student";
 import { Request, Response } from "express";
 
 export class CourseRegistrationController {
-  static async create(req: Request, res: Response): Promise<void> {
+  static async createMyRegistration(req: Request, res: Response): Promise<void> {
     try {
+      const userId = req.requestContext?.userId;
+      if (!userId) {
+        sendResponse({
+          res,
+          status: "error",
+          message: ERRORS.UNAUTHORIZED,
+          statusCode: 401,
+        });
+        return;
+      }
+
       const request: CreateCourseRegistrationType = req.body;
-      const response = await CourseRegistration.create(request);
+      const response = await CourseRegistration.createForStudent(userId, request);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -27,16 +37,27 @@ export class CourseRegistrationController {
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
         error,
       });
     }
   }
 
-  static async getAll(req: Request, res: Response): Promise<void> {
+  static async getMyRegistrations(req: Request, res: Response): Promise<void> {
     try {
-      const response = await CourseRegistration.getAll();
+      const userId = req.requestContext?.userId;
+      if (!userId) {
+        sendResponse({
+          res,
+          status: "error",
+          message: ERRORS.UNAUTHORIZED,
+          statusCode: 401,
+        });
+        return;
+      }
+
+      const response = await CourseRegistration.getByStudentUserId(userId);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -51,48 +72,27 @@ export class CourseRegistrationController {
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
         error,
       });
     }
   }
 
-  static async getById(
-    req: Request<{ id: string }>,
-    res: Response
-  ): Promise<void> {
+  static async getMyEligibleCourses(req: Request, res: Response): Promise<void> {
     try {
-      const response = await CourseRegistration.getById(req.params.id);
-      if (response.status === "success") {
+      const userId = req.requestContext?.userId;
+      if (!userId) {
         sendResponse({
           res,
-          status: "success",
-          message: response.message,
-          data: response.data,
-          statusCode: response.data ? 200 : 404,
+          status: "error",
+          message: ERRORS.UNAUTHORIZED,
+          statusCode: 401,
         });
+        return;
       }
-    } catch (error) {
-      logger.error("Error retrieving course registration:", { error });
-      sendResponse({
-        res,
-        status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
-        error,
-      });
-    }
-  }
 
-  static async getByStudentId(
-    req: Request<{ studentId: string }>,
-    res: Response
-  ): Promise<void> {
-    try {
-      const response = await CourseRegistration.getByStudentId(
-        req.params.studentId
-      );
+      const response = await CourseRegistration.getEligibleCoursesForStudent(userId);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -103,68 +103,12 @@ export class CourseRegistrationController {
         });
       }
     } catch (error) {
-      logger.error("Error retrieving student's course registrations:", {
-        error,
-      });
+      logger.error("Error retrieving eligible courses:", { error });
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
-        error,
-      });
-    }
-  }
-
-  static async update(
-    req: Request<{ id: string }, UpdateCourseRegistrationType>,
-    res: Response
-  ): Promise<void> {
-    try {
-      const response = await CourseRegistration.update(req.params.id, req.body);
-      if (response.status === "success") {
-        sendResponse({
-          res,
-          status: "success",
-          message: response.message,
-          data: response.data,
-          statusCode: 200,
-        });
-      }
-    } catch (error) {
-      logger.error("Error updating course registration:", { error });
-      sendResponse({
-        res,
-        status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
-        error,
-      });
-    }
-  }
-
-  static async delete(
-    req: Request<{ id: string }>,
-    res: Response
-  ): Promise<void> {
-    try {
-      const response = await CourseRegistration.delete(req.params.id);
-      if (response.status === "success") {
-        sendResponse({
-          res,
-          status: "success",
-          message: response.message,
-          data: response.data,
-          statusCode: 200,
-        });
-      }
-    } catch (error) {
-      logger.error("Error deleting course registration:", { error });
-      sendResponse({
-        res,
-        status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
         error,
       });
     }

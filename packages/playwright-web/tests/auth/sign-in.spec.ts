@@ -2,6 +2,32 @@ import { expect } from "@playwright/test";
 import { test } from "../fixtures/auth";
 
 test.describe("Sign in page", () => {
+  test("should render student sign in with email fields", async ({ page }) => {
+    await page.goto("/student/sign-in");
+
+    await expect(
+      page.getByRole("heading", { name: /Student sign in/i })
+    ).toBeVisible();
+    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(
+      page.locator('input[placeholder="Enter your email"]')
+    ).toBeVisible();
+    await expect(page.getByLabel("Password")).toBeVisible();
+  });
+
+  test("should render applicant sign in with application ID field", async ({ page }) => {
+    await page.goto("/applicant/sign-in");
+
+    await expect(
+      page.getByRole("heading", { name: /Applicant sign in/i })
+    ).toBeVisible();
+    await expect(page.getByLabel("Application ID")).toBeVisible();
+    await expect(
+      page.locator('input[placeholder="Enter your Application ID"]')
+    ).toBeVisible();
+    await expect(page.getByLabel("Password")).toBeVisible();
+  });
+
   test("should sign in as admin successfully", async ({
     page,
     adminCredentials,

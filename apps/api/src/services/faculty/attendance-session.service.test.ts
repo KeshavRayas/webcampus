@@ -1,0 +1,729 @@
+/// <reference types="bun" />
+
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+
+type SessionRecord = {
+  id: string;
+  courseId: string;
+  sectionId: string;
+  facultyId: string;
+  sessionDate: Date;
+  timingCode: string;
+  timingLabel: string;
+  timingStartTime: string;
+  timingEndTime: string;
+  createdAt: Date;
+  Course?: {
+    code: string;
+    name: string;
+  };
+  Section?: {
+    name: string;
+  };
+};
+
+const facultyByUserId: Record<string, string> = {
+  "user-1": "faculty-1",
+  "user-2": "faculty-2",
+};
+
+let assignments: Array<{ facultyId: string; courseId: string; sectionId: string }> = [];
+let sessions: SessionRecord[] = [];
+let simulateListIncludeFailure = false;
+
+const toMinutes = (time: string): number => {
+  const [hourText, minuteText] = time.split(":");
+  return Number(hourText) * 60 + Number(minuteText);
+};
+
+const hasOverlap = (
+  startTime: string,
+  endTime: string,
+  existingStartTime: string,
+  existingEndTime: string
+): boolean => {
+  const start = toMinutes(startTime);
+  const end = toMinutes(endTime);
+  const existingStart = toMinutes(existingStartTime);
+  const existingEnd = toMinutes(existingEndTime);
+
+  return start < existingEnd && end > existingStart;
+};
+
+const matchesOverlapScope = (where: any, session: SessionRecord): boolean => {
+  const facultyMatches = where.OR?.some((clause: any) => clause.facultyId === session.facultyId);
+  const sectionMatches = where.OR?.some((clause: any) => clause.sectionId === session.sectionId);
+
+  if (where.OR?.length) {
+    return Boolean(facultyMatches || sectionMatches);
+  }
+
+  return (
+    where.facultyId === session.facultyId || where.sectionId === session.sectionId
+  );
+};
+
+const dbMock = {
+  faculty: {
+    findUnique: async ({ where }: any) => {
+      const facultyId = facultyByUserId[where.userId];
+      return facultyId ? { id: facultyId } : null;
+    },
+  },
+  courseAssignment: {
+    findFirst: async ({ where }: any) => {
+      const match = assignments.find(
+        (assignment) =>
+          assignment.facultyId === where.facultyId &&
+          assignment.courseId === where.courseId &&
+          assignment.sectionId === where.sectionId
+      );
+
+      return match ? { id: "assignment-1" } : null;
+    },
+  },
+  classSession: {
+    findUnique: async ({ where }: any) => {
+      const key = where.courseId_sectionId_sessionDate_timingCode;
+      return (
+        sessions.find(
+          (session) =>
+            session.courseId === key.courseId &&
+            session.sectionId === key.sectionId &&
+            session.sessionDate.getTime() === key.sessionDate.getTime() &&
+            session.timingCode === key.timingCode
+        ) ?? null
+      );
+    },
+    count: async ({ where }: any) => {
+      return sessions.filter((session) => {
+        if (where.facultyId && session.facultyId !== where.facultyId) {
+          return false;
+        }
+
+        if (where.courseId && session.courseId !== where.courseId) {
+          return false;
+        }
+
+        if (where.sectionId && session.sectionId !== where.sectionId) {
+          return false;
+        }
+
+        if (where.sessionDate) {
+          const sessionTime = session.sessionDate.getTime();
+          if (where.sessionDate.gte && sessionTime < where.sessionDate.gte.getTime()) {
+            return false;
+          }
+
+          if (where.sessionDate.lt && sessionTime >= where.sessionDate.lt.getTime()) {
+            return false;
+          }
+        }
+
+        return true;
+      }).length;
+    },
+    findFirst: async ({ where }: any) => {
+      const requestedEnd = where.timingStartTime?.lt;
+      const requestedStart = where.timingEndTime?.gt;
+
+      return (
+        sessions.find((session) => {
+          if (session.sessionDate.getTime() !== where.sessionDate.getTime()) {
+            return false;
+          }
+
+          if (!matchesOverlapScope(where, session)) {
+            return false;
+          }
+
+          if (!requestedEnd || !requestedStart) {
+            return true;
+          }
+
+          return hasOverlap(
+            requestedStart,
+            requestedEnd,
+            session.timingStartTime,
+            session.timingEndTime
+          );
+        }) ?? null
+      );
+    },
+    findMany: async ({ where, skip, take }: any) => {
+      if (simulateListIncludeFailure) {
+        simulateListIncludeFailure = false;
+        throw new Error(
+          "Inconsistent query result: Field Course is required to return data, got null instead"
+        );
+      }
+
+      return sessions
+        .filter((session) => {
+          if (where.facultyId && session.facultyId !== where.facultyId) {
+            return false;
+          }
+
+          if (where.courseId && session.courseId !== where.courseId) {
+            return false;
+          }
+
+          if (where.sectionId && session.sectionId !== where.sectionId) {
+            return false;
+          }
+
+          if (where.sessionDate) {
+            const sessionTime = session.sessionDate.getTime();
+            if (where.sessionDate.gte && sessionTime < where.sessionDate.gte.getTime()) {
+              return false;
+            }
+
+            if (where.sessionDate.lt && sessionTime >= where.sessionDate.lt.getTime()) {
+              return false;
+            }
+          }
+
+          return true;
+        })
+        .sort((left, right) => {
+          if (left.sessionDate.getTime() !== right.sessionDate.getTime()) {
+            return right.sessionDate.getTime() - left.sessionDate.getTime();
+          }
+
+          return right.createdAt.getTime() - left.createdAt.getTime();
+        })
+        .slice(skip ?? 0, (skip ?? 0) + (take ?? sessions.length));
+    },
+    create: async ({ data }: any) => {
+      const created: SessionRecord = {
+        id: data.id,
+        courseId: data.courseId,
+        sectionId: data.sectionId,
+        facultyId: data.facultyId,
+        sessionDate: data.sessionDate,
+        timingCode: data.timingCode,
+        timingLabel: data.timingLabel,
+        timingStartTime: data.timingStartTime,
+        timingEndTime: data.timingEndTime,
+        createdAt: new Date("2026-04-13T05:00:00.000Z"),
+        Course: {
+          code: "CS301",
+          name: "Algorithms",
+        },
+        Section: {
+          name: "A",
+        },
+      };
+
+      sessions.push(created);
+      return created;
+    },
+  },
+  course: {
+    findMany: async ({ where }: any) => {
+      const ids: string[] = where?.id?.in ?? [];
+      const byId = new Map<string, { id: string; code: string; name: string }>();
+
+      for (const session of sessions) {
+        if (!session.Course) {
+          continue;
+        }
+
+        if (!ids.includes(session.courseId)) {
+          continue;
+        }
+
+        byId.set(session.courseId, {
+          id: session.courseId,
+          code: session.Course.code,
+          name: session.Course.name,
+        });
+      }
+
+      return Array.from(byId.values());
+    },
+  },
+  section: {
+    findMany: async ({ where }: any) => {
+      const ids: string[] = where?.id?.in ?? [];
+      const byId = new Map<string, { id: string; name: string }>();
+
+      for (const session of sessions) {
+        if (!session.Section) {
+          continue;
+        }
+
+        if (!ids.includes(session.sectionId)) {
+          continue;
+        }
+
+        byId.set(session.sectionId, {
+          id: session.sectionId,
+          name: session.Section.name,
+        });
+      }
+
+      return Array.from(byId.values());
+    },
+  },
+};
+
+mock.module("@webcampus/db", () => ({
+  db: dbMock,
+}));
+
+mock.module("@webcampus/common/logger", () => ({
+  logger: {
+    error: () => {},
+    info: () => {},
+  },
+}));
+
+describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
+  beforeEach(() => {
+    assignments = [{ facultyId: "faculty-1", courseId: "course-1", sectionId: "section-1" }];
+    sessions = [];
+    simulateListIncludeFailure = false;
+  });
+
+  it("lists existing sessions for the authenticated faculty", async () => {
+    sessions.push({
+      id: "session-list-1",
+      courseId: "course-1",
+      sectionId: "section-1",
+      facultyId: "faculty-1",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "08:00-08:55",
+      timingLabel: "08:00 AM - 08:55 AM",
+      timingStartTime: "08:00",
+      timingEndTime: "08:55",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS301", name: "Algorithms" },
+      Section: { name: "A" },
+    });
+
+    sessions.push({
+      id: "session-list-2",
+      courseId: "course-1",
+      sectionId: "section-1",
+      facultyId: "faculty-1",
+      sessionDate: new Date("2026-04-12T00:00:00.000Z"),
+      timingCode: "09:50-10:45",
+      timingLabel: "09:50 AM - 10:45 AM",
+      timingStartTime: "09:50",
+      timingEndTime: "10:45",
+      createdAt: new Date("2026-04-12T04:00:00.000Z"),
+      Course: { code: "CS301", name: "Algorithms" },
+      Section: { name: "A" },
+    });
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    const response = await FacultyAttendanceSessionService.listSessions("user-1", {
+      page: 1,
+      limit: 10,
+    });
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+
+    expect(response.data.items).toHaveLength(2);
+    const firstListedSession = response.data.items[0];
+    const secondListedSession = response.data.items[1];
+    if (!firstListedSession || !secondListedSession) {
+      throw new Error("Expected both listed sessions to be present");
+    }
+
+    expect(firstListedSession.id).toBe("session-list-1");
+    expect(secondListedSession.id).toBe("session-list-2");
+    expect(response.data.pagination.total).toBe(2);
+  });
+
+  it("filters listed sessions by session date", async () => {
+    sessions.push({
+      id: "session-filter-1",
+      courseId: "course-1",
+      sectionId: "section-1",
+      facultyId: "faculty-1",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "08:00-08:55",
+      timingLabel: "08:00 AM - 08:55 AM",
+      timingStartTime: "08:00",
+      timingEndTime: "08:55",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS301", name: "Algorithms" },
+      Section: { name: "A" },
+    });
+
+    sessions.push({
+      id: "session-filter-2",
+      courseId: "course-1",
+      sectionId: "section-1",
+      facultyId: "faculty-1",
+      sessionDate: new Date("2026-04-12T00:00:00.000Z"),
+      timingCode: "09:50-10:45",
+      timingLabel: "09:50 AM - 10:45 AM",
+      timingStartTime: "09:50",
+      timingEndTime: "10:45",
+      createdAt: new Date("2026-04-12T04:00:00.000Z"),
+      Course: { code: "CS301", name: "Algorithms" },
+      Section: { name: "A" },
+    });
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    const response = await FacultyAttendanceSessionService.listSessions("user-1", {
+      page: 1,
+      limit: 10,
+      sessionDate: "2026-04-13",
+    });
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+
+    expect(response.data.items).toHaveLength(1);
+    const filteredSession = response.data.items[0];
+    if (!filteredSession) {
+      throw new Error("Expected filtered session to be present");
+    }
+
+    expect(filteredSession.id).toBe("session-filter-1");
+  });
+
+  it("lists sessions when page and limit arrive as strings", async () => {
+    sessions.push({
+      id: "session-pagination-string-1",
+      courseId: "course-1",
+      sectionId: "section-1",
+      facultyId: "faculty-1",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "08:00-08:55",
+      timingLabel: "08:00 AM - 08:55 AM",
+      timingStartTime: "08:00",
+      timingEndTime: "08:55",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS301", name: "Algorithms" },
+      Section: { name: "A" },
+    });
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    const response = await FacultyAttendanceSessionService.listSessions(
+      "user-1",
+      {
+        page: "1" as unknown as number,
+        limit: "10" as unknown as number,
+      }
+    );
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+
+    expect(response.data.items).toHaveLength(1);
+    expect(response.data.pagination.page).toBe(1);
+    expect(response.data.pagination.limit).toBe(10);
+  });
+
+  it("lists sessions even when relation include resolution fails", async () => {
+    sessions.push({
+      id: "session-list-fallback-1",
+      courseId: "course-1",
+      sectionId: "section-1",
+      facultyId: "faculty-1",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "08:00-08:55",
+      timingLabel: "08:00 AM - 08:55 AM",
+      timingStartTime: "08:00",
+      timingEndTime: "08:55",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS301", name: "Algorithms" },
+      Section: { name: "A" },
+    });
+
+    simulateListIncludeFailure = true;
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    const response = await FacultyAttendanceSessionService.listSessions("user-1", {
+      page: 1,
+      limit: 10,
+    });
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+
+    expect(response.data.items).toHaveLength(1);
+    const fallbackListedSession = response.data.items[0];
+    if (!fallbackListedSession) {
+      throw new Error("Expected fallback listed session to be present");
+    }
+
+    expect(fallbackListedSession.courseCode).toBe("CS301");
+    expect(fallbackListedSession.sectionName).toBe("A");
+  });
+
+  it("opens existing same slot session for same faculty", async () => {
+    sessions.push({
+      id: "session-existing",
+      courseId: "course-1",
+      sectionId: "section-1",
+      facultyId: "faculty-1",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "08:00-08:55",
+      timingLabel: "08:00 AM - 08:55 AM",
+      timingStartTime: "08:00",
+      timingEndTime: "08:55",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS301", name: "Algorithms" },
+      Section: { name: "A" },
+    });
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    const response = await FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+      courseId: "course-1",
+      sectionId: "section-1",
+      sessionDate: new Date("2026-04-13"),
+      timingMode: "FIXED",
+      timingCode: "08:00-08:55",
+    });
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+
+    expect(response.data.created).toBe(false);
+    expect(response.data.session.id).toBe("session-existing");
+  });
+
+  it("returns ownership mismatch when same slot belongs to another faculty", async () => {
+    sessions.push({
+      id: "session-other-faculty",
+      courseId: "course-1",
+      sectionId: "section-1",
+      facultyId: "faculty-2",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "08:00-08:55",
+      timingLabel: "08:00 AM - 08:55 AM",
+      timingStartTime: "08:00",
+      timingEndTime: "08:55",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS301", name: "Algorithms" },
+      Section: { name: "A" },
+    });
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    const response = await FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+      courseId: "course-1",
+      sectionId: "section-1",
+      sessionDate: new Date("2026-04-13"),
+      timingMode: "FIXED",
+      timingCode: "08:00-08:55",
+    });
+
+    expect(response.status).toBe("error");
+    if (response.status !== "error") {
+      throw new Error("Expected error response");
+    }
+
+    expect(response.message).toContain("already exists for this slot");
+  });
+
+  it("throws when custom timing overlaps an existing session", async () => {
+    sessions.push({
+      id: "session-existing",
+      courseId: "course-1",
+      sectionId: "section-1",
+      facultyId: "faculty-1",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "09:00-10:00",
+      timingLabel: "09:00 - 10:00",
+      timingStartTime: "09:00",
+      timingEndTime: "10:00",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS301", name: "Algorithms" },
+      Section: { name: "A" },
+    });
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    await expect(
+      FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+        courseId: "course-1",
+        sectionId: "section-1",
+        sessionDate: new Date("2026-04-13"),
+        timingMode: "CUSTOM",
+        timingStartTime: "09:30",
+        timingEndTime: "10:15",
+      })
+    ).rejects.toThrow("Session time overlaps with an existing session");
+  });
+
+  it("creates a new session when timing is adjacent but non-overlapping", async () => {
+    sessions.push({
+      id: "session-existing",
+      courseId: "course-1",
+      sectionId: "section-1",
+      facultyId: "faculty-1",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "09:00-10:00",
+      timingLabel: "09:00 - 10:00",
+      timingStartTime: "09:00",
+      timingEndTime: "10:00",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS301", name: "Algorithms" },
+      Section: { name: "A" },
+    });
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    const response = await FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+      courseId: "course-1",
+      sectionId: "section-1",
+      sessionDate: new Date("2026-04-13"),
+      timingMode: "CUSTOM",
+      timingStartTime: "10:00",
+      timingEndTime: "11:00",
+    });
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+
+    expect(response.data.created).toBe(true);
+    expect(response.data.session.timingCode).toBe("10:00-11:00");
+  });
+
+  it("throws when overlapping a session owned by the same faculty in another section", async () => {
+    assignments = [
+      { facultyId: "faculty-1", courseId: "course-1", sectionId: "section-1" },
+      { facultyId: "faculty-1", courseId: "course-2", sectionId: "section-2" },
+    ];
+
+    sessions.push({
+      id: "session-same-faculty",
+      courseId: "course-2",
+      sectionId: "section-2",
+      facultyId: "faculty-1",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "09:00-10:00",
+      timingLabel: "09:00 - 10:00",
+      timingStartTime: "09:00",
+      timingEndTime: "10:00",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS302", name: "Data Structures" },
+      Section: { name: "B" },
+    });
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    await expect(
+      FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+        courseId: "course-1",
+        sectionId: "section-1",
+        sessionDate: new Date("2026-04-13"),
+        timingMode: "CUSTOM",
+        timingStartTime: "09:30",
+        timingEndTime: "10:15",
+      })
+    ).rejects.toThrow("Session time overlaps with an existing session");
+  });
+
+  it("throws when overlapping a session in the same section owned by another faculty", async () => {
+    sessions.push({
+      id: "session-same-section",
+      courseId: "course-2",
+      sectionId: "section-1",
+      facultyId: "faculty-2",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "09:00-10:00",
+      timingLabel: "09:00 - 10:00",
+      timingStartTime: "09:00",
+      timingEndTime: "10:00",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS302", name: "Data Structures" },
+      Section: { name: "A" },
+    });
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    await expect(
+      FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+        courseId: "course-1",
+        sectionId: "section-1",
+        sessionDate: new Date("2026-04-13"),
+        timingMode: "CUSTOM",
+        timingStartTime: "09:30",
+        timingEndTime: "10:15",
+      })
+    ).rejects.toThrow("Session time overlaps with an existing session");
+  });
+
+  it("creates a new session when overlap boundaries only touch", async () => {
+    sessions.push({
+      id: "session-boundary",
+      courseId: "course-2",
+      sectionId: "section-1",
+      facultyId: "faculty-2",
+      sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+      timingCode: "09:00-10:00",
+      timingLabel: "09:00 - 10:00",
+      timingStartTime: "09:00",
+      timingEndTime: "10:00",
+      createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      Course: { code: "CS302", name: "Data Structures" },
+      Section: { name: "A" },
+    });
+
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    const response = await FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+      courseId: "course-1",
+      sectionId: "section-1",
+      sessionDate: new Date("2026-04-13"),
+      timingMode: "CUSTOM",
+      timingStartTime: "10:00",
+      timingEndTime: "11:00",
+    });
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+
+    expect(response.data.created).toBe(true);
+    expect(response.data.session.timingCode).toBe("10:00-11:00");
+  });
+
+  it("creates new session when no existing or overlap is found", async () => {
+    const { FacultyAttendanceSessionService } = await import("./attendance-session.service");
+
+    const response = await FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+      courseId: "course-1",
+      sectionId: "section-1",
+      sessionDate: new Date("2026-04-13"),
+      timingMode: "FIXED",
+      timingCode: "11:15-12:10",
+    });
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+
+    expect(response.data.created).toBe(true);
+    expect(response.data.session.timingCode).toBe("11:15-12:10");
+    expect(sessions).toHaveLength(1);
+  });
+});

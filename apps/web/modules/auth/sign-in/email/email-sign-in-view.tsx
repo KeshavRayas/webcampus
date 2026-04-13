@@ -21,6 +21,7 @@ import { useEmailSignInForm } from "./use-email-sign-in-form";
 export const EmailSignIn = () => {
   const { role } = useParams<{ role: Role }>();
   const { form, onSubmit } = useEmailSignInForm({ role });
+  const isStudent = role === "student";
 
   return (
     <Form {...form}>
@@ -40,9 +41,14 @@ export const EmailSignIn = () => {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>{isStudent ? "Student Email" : "Email"}</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Enter your email" />
+                  <Input
+                    {...field}
+                    placeholder={
+                      isStudent ? "Enter your student email" : "Enter your email"
+                    }
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

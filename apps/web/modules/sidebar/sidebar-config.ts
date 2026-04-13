@@ -132,6 +132,9 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Courses",
           url: "/student/courses",
           icon: BookCopy,
+          children: [
+            { name: "Course Registration", url: "/student/courses" },
+          ],
         },
         {
           name: "Attendance",

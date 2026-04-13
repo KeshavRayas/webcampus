@@ -9,38 +9,649 @@ datasource db {
 }
 
 model User {
-  id              String    @id
-  name            String
-  email           String
-  emailVerified   Boolean
-  image           String?
-  createdAt       DateTime
-  updatedAt       DateTime
-  sessions        Session[]
-  accounts        Account[]
-  student         Student?
-  faculty         Faculty?
-  hod             Hod?
-  admin           Admin?
-  Freeze          Freeze[]
-  username        String?
-  displayUsername String?
-  frozenAsFaculty Freeze[]  @relation("FrozenByFaculty")
-  frozenAsHod     Freeze[]  @relation("FrozenByHod")
-  frozenAsAdmin   Freeze[]  @relation("FrozenByAdmin")
-  coe             Coe?
-
-  banned     Boolean?
-  banReason  String?
-  banExpires DateTime?
-  role       String?
-  Semester   Semester[]
-  Department Department[]
+  id                    String           @id
+  name                  String
+  email                 String           @unique
+  emailVerified         Boolean
+  image                 String?
+  createdAt             DateTime
+  updatedAt             DateTime
+  username              String?          @unique
+  displayUsername       String?
+  banned                Boolean?
+  banReason             String?
+  banExpires            DateTime?
+  role                  String?
+  admin                 Admin?
+  coe                   Coe?
+  Department            Department[]
   departmentMemberships DepartmentUser[]
+  faculty               Faculty?
+  frozenAsAdmin         Freeze[]         @relation("FrozenByAdmin")
+  frozenAsFaculty       Freeze[]         @relation("FrozenByFaculty")
+  frozenAsHod           Freeze[]         @relation("FrozenByHod")
+  Freeze                Freeze[]
+  hod                   Hod?
+  Semester              Semester[]
+  student               Student?
+  accounts              Account[]
+  sessions              Session[]
 
-  @@unique([email])
-  @@unique([username])
   @@map("user")
+}
+
+model AcademicTerm {
+  id        String       @id @default(uuid())
+  type      SemesterType
+  year      String
+  isCurrent Boolean      @default(false)
+  Semester  Semester[]
+
+  @@unique([type, year])
+}
+
+model Semester {
+  id             String       @id @default(uuid())
+  startDate      DateTime
+  endDate        DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  userId         String
+  semesterNumber Int
+  academicTermId String
+  programType    ProgramType
+  Admission      Admission[]
+  Course         Course[]
+  Section        Section[]
+  academicTerm   AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+  createdBy      User         @relation(fields: [userId], references: [id])
+
+  @@unique([academicTermId, programType, semesterNumber])
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String   @unique
+  createdAt      DateTime
+  updatedAt      DateTime
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  impersonatedBy String?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+model Department {
+  id                String             @id @default(uuid())
+  userId            String
+  name              String             @unique
+  abbreviation      String
+  code              String             @unique
+  type              DepartmentType     @default(DEGREE_GRANTING)
+  Admissions        Admission[]
+  Course            Course[]
+  courseAssignments CourseAssignment[]
+  user              User               @relation(fields: [userId], references: [id])
+  userMemberships   DepartmentUser[]
+  faculties         Faculty[]
+  hods              Hod[]
+  sections          Section[]
+  students          Student[]
+
+  @@index([name])
+}
+
+model DepartmentUser {
+  id           String               @id @default(uuid())
+  userId       String
+  departmentId String
+  role         DepartmentScopedRole
+  isPrimary    Boolean              @default(false)
+  department   Department           @relation(fields: [departmentId], references: [id])
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, departmentId, role])
+  @@index([departmentId, role])
+}
+
+model Hod {
+  id             String      @id @default(uuid())
+  userId         String      @unique
+  departmentName String?
+  facultyId      String?     @unique
+  department     Department? @relation(fields: [departmentName], references: [name])
+  faculty        Faculty?    @relation(fields: [facultyId], references: [id])
+  user           User        @relation(fields: [userId], references: [id])
+}
+
+model Section {
+  id              String             @id @default(uuid())
+  name            String
+  departmentName  String?
+  semesterId      String
+  cycle           Cycle              @default(NONE)
+  departmentId    String
+  batches         Batch[]
+  ClassSession    ClassSession[]
+  courses         CourseAssignment[]
+  department      Department         @relation(fields: [departmentId], references: [id])
+  semester        Semester           @relation(fields: [semesterId], references: [id])
+  studentSections StudentSection[]
+
+  @@unique([id, departmentId])
+  @@unique([name, departmentId, semesterId])
+  @@index([departmentId, semesterId])
+  @@index([departmentId, semesterId, cycle])
+}
+
+/// *
+///  * TODO Change the Name of this model to support L-T-P
+model Batch {
+  id               String             @id @default(uuid())
+  name             String
+  sectionId        String
+  section          Section            @relation(fields: [sectionId], references: [id])
+  CourseAssignment CourseAssignment[]
+  students         Student[]          @relation("BatchStudents")
+
+  @@unique([name, sectionId])
+  @@index([sectionId])
+}
+
+model StudentSection {
+  id           String  @id @default(uuid())
+  studentId    String
+  sectionId    String
+  semester     Int
+  academicYear String
+  section      Section @relation(fields: [sectionId], references: [id])
+  student      Student @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, sectionId, semester, academicYear])
+  @@index([studentId])
+  @@index([sectionId])
+  @@index([sectionId, semester, academicYear])
+}
+
+model Student {
+  id                String               @id @default(uuid())
+  userId            String               @unique
+  usn               String               @unique
+  departmentName    String
+  currentSemester   Int
+  academicYear      String
+  academicTermId    String?
+  academicTermLabel String?
+  academicTermType  SemesterType?
+  academicTermYear  String?
+  programType       ProgramType?
+  semesterId        String?
+  semesterNumber    Int?
+  admission         Admission?
+  attendances       Attendance[]
+  AttendanceRecord  AttendanceRecord[]
+  registrations     CourseRegistration[]
+  marks             Mark[]
+  department        Department           @relation(fields: [departmentName], references: [name])
+  user              User                 @relation(fields: [userId], references: [id])
+  studentSections   StudentSection[]
+  batches           Batch[]              @relation("BatchStudents")
+
+  @@index([departmentName])
+  @@index([departmentName, currentSemester])
+  @@index([semesterId])
+  @@index([semesterNumber])
+  @@index([programType])
+  @@index([academicTermId])
+}
+
+model Faculty {
+  id                     String                 @id @default(uuid())
+  userId                 String                 @unique
+  departmentId           String
+  designation            Designation
+  shortName              String
+  aboutYourself          String?
+  alternateContactNumber String?
+  bloodGroup             String?
+  contactInformation     String?
+  dateOfJoining          DateTime?
+  dob                    DateTime?
+  employeeId             String?                @unique
+  gender                 FacultyGender?
+  maritalStatus          MaritalStatus?
+  mobileNumber           String?
+  nationality            String?
+  officeRoom             String?
+  otherInformation       String?
+  permanentAddressLine   String?
+  permanentCity          String?
+  permanentPincode       String?
+  permanentState         String?
+  personalEmail          String?
+  phoneNumber            String?
+  presentAddressLine     String?
+  presentCity            String?
+  presentPincode         String?
+  presentState           String?
+  profileUpdatedAt       DateTime?
+  qualification          String?
+  researchArea           String?
+  researchInterests      String?
+  sameAsPresentAddress   Boolean                @default(false)
+  staffType              StaffType?
+  ClassSession           ClassSession[]
+  teaches                CourseAssignment[]
+  department             Department             @relation(fields: [departmentId], references: [id])
+  user                   User                   @relation(fields: [userId], references: [id])
+  experiences            FacultyExperience[]
+  publications           FacultyPublication[]
+  qualifications         FacultyQualification[]
+  hod                    Hod?
+
+  @@unique([id, departmentId])
+  @@index([departmentId])
+}
+
+model FacultyQualification {
+  id             String                   @id @default(uuid())
+  facultyId      String
+  program        String
+  degree         String
+  specialization String
+  institution    String
+  programType    QualificationProgramType
+  yearPassed     Int
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  faculty        Faculty                  @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+}
+
+model FacultyPublication {
+  id                 String              @id @default(uuid())
+  facultyId          String
+  category           PublicationCategory
+  publishedDate      DateTime
+  authors            String
+  publicationDetails String
+  weblink            String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  faculty            Faculty             @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+}
+
+model FacultyExperience {
+  id              String    @id @default(uuid())
+  facultyId       String
+  designation     String
+  institutionName String
+  startDate       DateTime
+  endDate         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  faculty         Faculty   @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId])
+}
+
+model Admin {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Course {
+  id                      String               @id @default(uuid())
+  code                    String               @unique
+  name                    String
+  departmentName          String?
+  semesterId              String
+  semesterNumber          Int
+  assignmentMaxMarks      Int                  @default(0)
+  cieMaxMarks             Int                  @default(0)
+  cieMinMarks             Int                  @default(0)
+  cieWeightage            Int                  @default(0)
+  courseMode              CourseMode
+  courseType              CourseType
+  cumulativeMaxMarks      Int                  @default(0)
+  cumulativeMinMarks      Int                  @default(0)
+  hasLaboratoryComponent  Boolean              @default(false)
+  labMaxMarks             Int                  @default(0)
+  labMinMarks             Int                  @default(0)
+  labWeightage            Int                  @default(0)
+  lectureCredits          Int                  @default(0)
+  maxNoOfCies             Int                  @default(0)
+  minNoOfCies             Int                  @default(0)
+  noOfAssignments         Int                  @default(0)
+  practicalCredits        Int                  @default(0)
+  seeMaxMarks             Int                  @default(0)
+  seeMinMarks             Int                  @default(0)
+  seeWeightage            Int                  @default(0)
+  skillCredits            Int                  @default(0)
+  totalCredits            Int
+  tutorialCredits         Int                  @default(0)
+  cycle                   Cycle                @default(NONE)
+  approvalStatus          CourseApprovalStatus @default(DRAFT)
+  departmentId            String
+  approvedByRole          String?
+  approvedByUsername      String?
+  approvedByDisplay       String?
+  approvedAt              DateTime?
+  revisionRequestedByRole String?
+  revisionNotes           String?
+  revisionRequestedAt     DateTime?
+  attendances             Attendance[]
+  ClassSession            ClassSession[]
+  department              Department           @relation(fields: [departmentId], references: [id])
+  semester                Semester             @relation(fields: [semesterId], references: [id])
+  assignments             CourseAssignment[]
+  registrations           CourseRegistration[]
+  marks                   Mark[]
+
+  @@unique([id, departmentId])
+  @@index([code])
+  @@index([departmentId, semesterId])
+  @@index([departmentId, semesterId, cycle, approvalStatus])
+  @@index([departmentId, semesterId, semesterNumber])
+}
+
+model CourseAssignment {
+  id             String         @id @default(uuid())
+  courseId       String
+  facultyId      String
+  sectionId      String
+  batchId        String?
+  assignmentType AssignmentType
+  semester       Int
+  academicYear   String
+  departmentId   String
+  batch          Batch?         @relation(fields: [batchId], references: [id])
+  course         Course         @relation(fields: [courseId, departmentId], references: [id, departmentId])
+  department     Department     @relation(fields: [departmentId], references: [id])
+  faculty        Faculty        @relation(fields: [facultyId, departmentId], references: [id, departmentId])
+  section        Section        @relation(fields: [sectionId, departmentId], references: [id, departmentId])
+  freezes        Freeze?
+
+  @@unique([departmentId, courseId, facultyId, sectionId, batchId, assignmentType, semester, academicYear])
+  @@index([sectionId, semester])
+  @@index([departmentId, sectionId, semester])
+  @@index([departmentId, courseId, semester])
+  @@index([courseId, semester, academicYear])
+  @@index([facultyId, semester, academicYear])
+  @@index([batchId])
+}
+
+model CourseRegistration {
+  id           String  @id @default(uuid())
+  studentId    String
+  courseId     String
+  semester     Int
+  academicYear String
+  hasDropped   Boolean @default(false)
+  course       Course  @relation(fields: [courseId], references: [id])
+  student      Student @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, courseId, semester, academicYear])
+  @@index([studentId])
+  @@index([courseId])
+}
+
+model Attendance {
+  id                String            @id @default(uuid())
+  studentId         String
+  courseId          String
+  total             Int
+  present           Int
+  absent            Int
+  condonationStatus CondonationStatus @default(NOT_REQUESTED)
+  percentage        Float
+  course            Course            @relation(fields: [courseId], references: [id])
+  student           Student           @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, courseId])
+  @@index([courseId])
+}
+
+model Mark {
+  id        String            @id @default(uuid())
+  studentId String
+  courseId  String
+  cie1      Float?
+  cie2      Float?
+  cie3      Float?
+  aat1      Float?
+  aat2      Float?
+  lab1      Float?
+  lab2      Float?
+  labTotal  Float?
+  cieTotal  Float?
+  status    EligibilityStatus
+  course    Course            @relation(fields: [courseId], references: [id])
+  student   Student           @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, courseId])
+  @@index([courseId])
+}
+
+model Coe {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Freeze {
+  id                 String           @id @default(uuid())
+  courseAssignmentId String           @unique
+  cie1Frozen         Boolean          @default(false)
+  cie2Frozen         Boolean          @default(false)
+  cie3Frozen         Boolean          @default(false)
+  cie1Deadline       DateTime?
+  cie2Deadline       DateTime?
+  cie3Deadline       DateTime?
+  facultyFrozen      Boolean          @default(false)
+  hodFrozen          Boolean          @default(false)
+  adminFrozen        Boolean          @default(false)
+  facultyFrozenAt    DateTime?
+  hodFrozenAt        DateTime?
+  adminFrozenAt      DateTime?
+  frozenByFacultyId  String?
+  frozenByHodId      String?
+  frozenByAdminId    String?
+  finalFrozen        Boolean          @default(false)
+  finalDeadline      DateTime?
+  frozenAt           DateTime?
+  userId             String?
+  courseAssignment   CourseAssignment @relation(fields: [courseAssignmentId], references: [id])
+  frozenByAdmin      User?            @relation("FrozenByAdmin", fields: [frozenByAdminId], references: [id])
+  frozenByFaculty    User?            @relation("FrozenByFaculty", fields: [frozenByFacultyId], references: [id])
+  frozenByHod        User?            @relation("FrozenByHod", fields: [frozenByHodId], references: [id])
+  User               User?            @relation(fields: [userId], references: [id])
+}
+
+model Admission {
+  id                              String          @id @default(uuid())
+  gender                          String?
+  fatherName                      String?
+  motherName                      String?
+  fatherEmail                     String?
+  motherEmail                     String?
+  fatherNumber                    String?
+  motherNumber                    String?
+  class10thMarksPdf               String?
+  class12thMarksPdf               String?
+  class10thSchoolName             String?
+  modeOfAdmission                 String
+  photo                           String?
+  createdAt                       DateTime        @default(now())
+  applicationId                   String          @unique
+  casteCertificate                String?
+  semesterId                      String
+  status                          AdmissionStatus @default(PENDING)
+  updatedAt                       DateTime        @updatedAt
+  aadharCard                      String?
+  aadharNumber                    String?         @unique
+  bloodGroup                      String?
+  caste                           String?
+  class10thAggregateScore         Float?
+  class10thAggregateTotal         Float?
+  class10thMediumOfTeaching       String?
+  class10thSchoolCity             String?
+  class10thSchoolCode             String?
+  class10thSchoolState            String?
+  class10thSchoolType             String?
+  class10thYearOfPassing          String?
+  class12thAggregateScore         Float?
+  class12thAggregateTotal         Float?
+  class12thBranch                 String?
+  class12thInstituteCity          String?
+  class12thInstituteCode          String?
+  class12thInstituteName          String?
+  class12thInstituteState         String?
+  class12thInstituteType          String?
+  class12thMediumOfTeaching       String?
+  class12thYearOfPassing          String?
+  currentAddress                  String?
+  currentArea                     String?
+  currentCity                     String?
+  currentCountry                  String?
+  currentDistrict                 String?
+  currentPincode                  String?
+  currentState                    String?
+  disability                      Boolean?
+  disabilityCertificate           String?
+  disabilityType                  String?
+  dob                             DateTime?
+  economicallyBackward            Boolean?
+  economicallyBackwardCertificate String?
+  emergencyContactNumber          String?
+  entranceExamRank                String?
+  fatherQualification             String?
+  fatherOccupation                String?
+  fatherPermanentAddress          String?
+  feePaid                         Float?
+  feePayable                      Float?
+  firstName                       String?
+  guardianEmail                   String?
+  guardianName                    String?
+  guardianNumber                  String?
+  guardianOccupation              String?
+  guardianPermanentAddress        String?
+  hostel                          Boolean?
+  hostelRoomNumber                String?
+  lastName                        String?
+  middleName                      String?
+  motherQualification             String?
+  motherOccupation                String?
+  motherPermanentAddress          String?
+  motherTongue                    String?
+  nameAsPer10th                   String?
+  nationality                     String?
+  nri                             Boolean?
+  originalAdmissionOrderDate      DateTime?
+  originalAdmissionOrderNumber    String?
+  passportNumber                  String?
+  permanentAddress                String?
+  permanentArea                   String?
+  permanentCity                   String?
+  permanentCountry                String?
+  permanentDistrict               String?
+  permanentPincode                String?
+  permanentState                  String?
+  placeOfBirth                    String?
+  primaryEmail                    String?         @unique
+  primaryPhoneNumber              String?
+  religion                        String?
+  secondaryEmail                  String?
+  secondaryPhoneNumber            String?
+  stateOfBirth                    String?
+  studyCertificate                String?
+  subCaste                        String?
+  tempUsn                         String?         @unique
+  transferCertificate             String?
+  uniqueId                        String?         @unique
+  visaValidityDetails             String?
+  departmentId                    String
+  studentId                       String?         @unique
+  categoryAllotted                Category
+  categoryClaimed                 Category
+  quota                           Quota
+  department                      Department      @relation(fields: [departmentId], references: [id])
+  semester                        Semester        @relation(fields: [semesterId], references: [id])
+  student                         Student?        @relation(fields: [studentId], references: [id])
+
+  @@index([semesterId])
+  @@index([departmentId])
+}
+
+model AttendanceRecord {
+  id           String           @id
+  sessionId    String
+  studentId    String
+  status       AttendanceStatus
+  markedAt     DateTime         @default(now())
+  ClassSession ClassSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  Student      Student          @relation(fields: [studentId], references: [id])
+
+  @@unique([sessionId, studentId])
+  @@index([studentId])
+}
+
+model ClassSession {
+  id               String             @id
+  courseId         String
+  sectionId        String
+  facultyId        String
+  sessionDate      DateTime
+  createdAt        DateTime           @default(now())
+  timingCode       String
+  timingLabel      String
+  timingStartTime  String
+  timingEndTime    String
+  AttendanceRecord AttendanceRecord[]
+  Course           Course             @relation(fields: [courseId], references: [id])
+  Faculty          Faculty            @relation(fields: [facultyId], references: [id])
+  Section          Section            @relation(fields: [sectionId], references: [id])
+
+  @@unique([courseId, sectionId, sessionDate, timingCode])
+  @@index([courseId])
+  @@index([sectionId])
 }
 
 enum DepartmentScopedRole {
@@ -49,36 +660,6 @@ enum DepartmentScopedRole {
   FACULTY
   STAFF
   VIEWER
-}
-
-model AcademicTerm {
-  id        String       @id @default(uuid())
-  type      SemesterType
-  year      String
-  isCurrent Boolean      @default(false)
-
-  Semester  Semester[]
-
-  @@unique([type, year])
-}
-
-model Semester {
-  id             String       @id @default(uuid())
-  academicTermId String
-  academicTerm   AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
-  programType    ProgramType
-  semesterNumber Int
-  startDate      DateTime
-  endDate        DateTime
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  createdBy      User         @relation(fields: [userId], references: [id])
-  userId         String
-  Section        Section[]
-  Course         Course[]
-  Admission      Admission[]
-
-  @@unique([academicTermId, programType, semesterNumber])
 }
 
 enum SemesterType {
@@ -103,53 +684,6 @@ enum CourseType {
   PE
   OE
   NCMC
-}
-
-model Session {
-  id        String   @id
-  expiresAt DateTime
-  token     String
-  createdAt DateTime
-  updatedAt DateTime
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  impersonatedBy String?
-
-  @@unique([token])
-  @@map("session")
-}
-
-model Account {
-  id                    String    @id
-  accountId             String
-  providerId            String
-  userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accessToken           String?
-  refreshToken          String?
-  idToken               String?
-  accessTokenExpiresAt  DateTime?
-  refreshTokenExpiresAt DateTime?
-  scope                 String?
-  password              String?
-  createdAt             DateTime
-  updatedAt             DateTime
-
-  @@map("account")
-}
-
-model Verification {
-  id         String    @id
-  identifier String
-  value      String
-  expiresAt  DateTime
-  createdAt  DateTime?
-  updatedAt  DateTime?
-
-  @@map("verification")
 }
 
 enum CondonationStatus {
@@ -211,10 +745,10 @@ enum PublicationCategory {
 }
 
 enum AdmissionStatus {
-  PENDING    // Admin created the shell, student hasn't submitted yet
-  SUBMITTED  // Student filled the form and uploaded docs
-  APPROVED   // Admin verified the documents
-  REJECTED   // Admin rejected the application
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
 }
 
 enum Category {
@@ -251,534 +785,7 @@ enum CourseApprovalStatus {
   NEEDS_REVISION
 }
 
-model Department {
-  id           String         @id @default(uuid())
-  userId       String
-  user         User           @relation(fields: [userId], references: [id])
-  name         String         @unique
-  code         String         @unique
-  abbreviation String
-  type         DepartmentType @default(DEGREE_GRANTING)
-  hods         Hod[]
-  sections     Section[]
-  students     Student[]
-  faculties    Faculty[]
-  Course       Course[]
-  courseAssignments CourseAssignment[]
-  Admissions   Admission[]
-  userMemberships DepartmentUser[]
-
-  @@index([name])
-}
-
-model DepartmentUser {
-  id           String               @id @default(uuid())
-  userId       String
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  departmentId String
-  department   Department           @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  role         DepartmentScopedRole
-  isPrimary    Boolean              @default(false)
-
-  @@unique([userId, departmentId, role])
-  @@index([departmentId, role])
-}
-
-model Hod {
-  id             String      @id @default(uuid())
-  user           User        @relation(fields: [userId], references: [id])
-  userId         String      @unique
-  departmentName String?
-  department     Department? @relation(fields: [departmentName], references: [name])
-  facultyId      String?     @unique
-  faculty        Faculty?    @relation(fields: [facultyId], references: [id])
-}
-
-model Section {
-  id              String             @id @default(uuid())
-  name            String
-  departmentId    String
-  department      Department         @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  departmentName  String?
-  semesterId      String
-  semester        Semester           @relation(fields: [semesterId], references: [id])
-  courses         CourseAssignment[]
-  studentSections StudentSection[]
-  batches         Batch[]
-  cycle           Cycle              @default(NONE)
-
-  @@unique([id, departmentId])
-  @@unique([name, departmentId, semesterId])
-  @@index([departmentId, semesterId])
-  @@index([departmentId, semesterId, cycle])
-}
-
-/**
- * TODO Change the Name of this model to support L-T-P
- */
-model Batch {
-  id               String             @id @default(uuid())
-  name             String
-  section          Section            @relation(fields: [sectionId], references: [id])
-  sectionId        String
-  students         Student[]          @relation("BatchStudents")
-  CourseAssignment CourseAssignment[]
-
-  @@unique([name, sectionId])
-  @@index([sectionId])
-}
-
-model StudentSection {
-  id           String  @id @default(uuid())
-  student      Student @relation(fields: [studentId], references: [id])
-  studentId    String
-  section      Section @relation(fields: [sectionId], references: [id])
-  sectionId    String
-  semester     Int
-  academicYear String
-
-  @@unique([studentId, sectionId, semester, academicYear])
-  @@index([studentId])
-  @@index([sectionId])
-  @@index([sectionId, semester, academicYear])
-}
-
-model Student {
-  id                String               @id @default(uuid())
-  user              User                 @relation(fields: [userId], references: [id])
-  userId            String               @unique
-  usn               String               @unique
-  department        Department           @relation(fields: [departmentName], references: [name])
-  departmentName    String
-  currentSemester   Int
-  semesterId        String?
-  semesterNumber    Int?
-  programType       ProgramType?
-  academicTermId    String?
-  academicTermType  SemesterType?
-  academicTermYear  String?
-  academicTermLabel String?
-  studentSections   StudentSection[]
-  academicYear      String
-  registrations     CourseRegistration[]
-  marks             Mark[]
-  attendances       Attendance[]
-  batches           Batch[]              @relation("BatchStudents")
-  admission         Admission?
-
-  @@index([departmentName])
-  @@index([departmentName, currentSemester])
-  @@index([semesterId])
-  @@index([semesterNumber])
-  @@index([programType])
-  @@index([academicTermId])
-}
-
-model Faculty {
-  id                     String                 @id @default(uuid())
-  user                   User                   @relation(fields: [userId], references: [id])
-  userId                 String                 @unique
-  department             Department             @relation(fields: [departmentId], references: [id])
-  departmentId           String // Replaced departmentName
-  shortName              String // Added shortName
-  designation            Designation // Added designation
-  employeeId             String?                @unique
-  staffType              StaffType?
-  qualification          String?
-  dateOfJoining          DateTime?
-  researchArea           String?
-  officeRoom             String?
-  gender                 FacultyGender?
-  dob                    DateTime?
-  bloodGroup             String?
-  nationality            String?
-  phoneNumber            String?
-  personalEmail          String?
-  maritalStatus          MaritalStatus?
-  aboutYourself          String?
-  researchInterests      String?
-  otherInformation       String?
-  contactInformation     String?
-  mobileNumber           String?
-  alternateContactNumber String?
-  presentAddressLine     String?
-  presentCity            String?
-  presentState           String?
-  presentPincode         String?
-  permanentAddressLine   String?
-  permanentCity          String?
-  permanentState         String?
-  permanentPincode       String?
-  sameAsPresentAddress   Boolean                @default(false)
-  profileUpdatedAt       DateTime?
-  teaches                CourseAssignment[]
-  qualifications         FacultyQualification[]
-  publications           FacultyPublication[]
-  experiences            FacultyExperience[]
-  hod                    Hod?
-
-  @@unique([id, departmentId])
-  @@index([departmentId])
-}
-
-model FacultyQualification {
-  id             String                   @id @default(uuid())
-  faculty        Faculty                  @relation(fields: [facultyId], references: [id], onDelete: Cascade)
-  facultyId      String
-  program        String
-  degree         String
-  specialization String
-  institution    String
-  programType    QualificationProgramType
-  yearPassed     Int
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-
-  @@index([facultyId])
-}
-
-model FacultyPublication {
-  id                 String              @id @default(uuid())
-  faculty            Faculty             @relation(fields: [facultyId], references: [id], onDelete: Cascade)
-  facultyId          String
-  category           PublicationCategory
-  publishedDate      DateTime
-  authors            String
-  publicationDetails String
-  weblink            String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-
-  @@index([facultyId])
-}
-
-model FacultyExperience {
-  id              String    @id @default(uuid())
-  faculty         Faculty   @relation(fields: [facultyId], references: [id], onDelete: Cascade)
-  facultyId       String
-  designation     String
-  institutionName String
-  startDate       DateTime
-  endDate         DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@index([facultyId])
-}
-
-model Admin {
-  id     String @id @default(uuid())
-  user   User   @relation(fields: [userId], references: [id])
-  userId String @unique
-}
-
-model Course {
-  id             String               @id @default(uuid())
-  code           String               @unique
-  name           String
-  courseMode     CourseMode
-  courseType     CourseType
-  cycle          Cycle                @default(NONE)
-  departmentId   String
-  department     Department           @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  departmentName String?
-  semesterId     String
-  semester       Semester             @relation(fields: [semesterId], references: [id])
-  semesterNumber Int
-
-  approvalStatus          CourseApprovalStatus @default(DRAFT)
-  approvedByRole          String?
-  approvedByUsername      String?
-  approvedByDisplay       String?
-  approvedAt              DateTime?
-  revisionRequestedByRole String?
-  revisionNotes           String?
-  revisionRequestedAt     DateTime?
-
-  // Credit fields (L-T-P-S)
-  lectureCredits          Int     @default(0)
-  tutorialCredits         Int     @default(0)
-  practicalCredits        Int     @default(0)
-  skillCredits            Int     @default(0)
-  totalCredits            Int
-
-  // Derived field
-  hasLaboratoryComponent  Boolean @default(false)
-
-  // SEE Assessment
-  seeMaxMarks             Int     @default(0)
-  seeMinMarks             Int     @default(0)
-  seeWeightage            Int     @default(0)
-
-  // CIE Assessment
-  maxNoOfCies             Int     @default(0)
-  minNoOfCies             Int     @default(0)
-  cieMaxMarks             Int     @default(0)
-  cieMinMarks             Int     @default(0)
-  cieWeightage            Int     @default(0)
-
-  // Other Assessment
-  noOfAssignments         Int     @default(0)
-  assignmentMaxMarks      Int     @default(0)
-  labMaxMarks             Int     @default(0)
-  labMinMarks             Int     @default(0)
-  labWeightage            Int     @default(0)
-  cumulativeMaxMarks      Int     @default(0)
-  cumulativeMinMarks      Int     @default(0)
-
-  // Relations
-  assignments    CourseAssignment[]
-  registrations  CourseRegistration[]
-  marks          Mark[]
-  attendances    Attendance[]
-
-  @@unique([id, departmentId])
-  @@index([code])
-  @@index([departmentId, semesterId])
-  @@index([departmentId, semesterId, cycle, approvalStatus])
-  @@index([departmentId, semesterId, semesterNumber])
-}
-
-model CourseAssignment {
-  id             String         @id @default(uuid())
-  departmentId   String
-  department     Department     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  course         Course         @relation(fields: [courseId, departmentId], references: [id, departmentId], onDelete: Restrict)
-  courseId       String
-  faculty        Faculty        @relation(fields: [facultyId, departmentId], references: [id, departmentId], onDelete: Restrict)
-  facultyId      String
-  section        Section        @relation(fields: [sectionId, departmentId], references: [id, departmentId], onDelete: Restrict)
-  sectionId      String
-  batch          Batch?         @relation(fields: [batchId], references: [id])
-  batchId        String?
-  assignmentType AssignmentType
-  semester       Int
-  academicYear   String
-  freezes        Freeze[]
-
-  @@unique([departmentId, courseId, facultyId, sectionId, batchId, assignmentType, semester, academicYear])
-  @@index([sectionId, semester])
-  @@index([departmentId, sectionId, semester])
-  @@index([departmentId, courseId, semester])
-  @@index([courseId, semester, academicYear])
-  @@index([facultyId, semester, academicYear])
-  @@index([batchId])
-}
-
-model CourseRegistration {
-  id           String  @id @default(uuid())
-  student      Student @relation(fields: [studentId], references: [id])
-  studentId    String
-  course       Course  @relation(fields: [courseId], references: [id])
-  courseId     String
-  semester     Int
-  academicYear String
-  hasDropped   Boolean @default(false)
-
-  @@unique([studentId, courseId, semester, academicYear])
-  @@index([studentId])
-  @@index([courseId])
-}
-
-model Attendance {
-  id                String            @id @default(uuid())
-  student           Student           @relation(fields: [studentId], references: [id])
-  studentId         String
-  course            Course            @relation(fields: [courseId], references: [id])
-  courseId          String
-  total             Int
-  present           Int
-  absent            Int
-  condonationStatus CondonationStatus @default(NOT_REQUESTED)
-  percentage        Float
-
-  @@unique([studentId, courseId])
-  @@index([courseId])
-}
-
-model Mark {
-  id        String            @id @default(uuid())
-  student   Student           @relation(fields: [studentId], references: [id])
-  studentId String
-  course    Course            @relation(fields: [courseId], references: [id])
-  courseId  String
-  cie1      Float?
-  cie2      Float?
-  cie3      Float?
-  aat1      Float?
-  aat2      Float?
-  lab1      Float?
-  lab2      Float?
-  labTotal  Float?
-  cieTotal  Float?
-  status    EligibilityStatus
-
-  @@unique([studentId, courseId])
-  @@index([courseId])
-}
-
-model Coe {
-  id       String @id @default(uuid())
-  user     User   @relation(fields: [userId], references: [id])
-  userId   String @unique
-}
-
-model Freeze {
-  id                 String           @id @default(uuid())
-  courseAssignment   CourseAssignment @relation(fields: [courseAssignmentId], references: [id])
-  courseAssignmentId String           @unique
-  cie1Frozen         Boolean          @default(false)
-  cie2Frozen         Boolean          @default(false)
-  cie3Frozen         Boolean          @default(false)
-  cie1Deadline       DateTime?
-  cie2Deadline       DateTime?
-  cie3Deadline       DateTime?
-  facultyFrozen      Boolean          @default(false)
-  hodFrozen          Boolean          @default(false)
-  adminFrozen        Boolean          @default(false)
-  facultyFrozenAt    DateTime?
-  hodFrozenAt        DateTime?
-  adminFrozenAt      DateTime?
-  frozenByFaculty    User?            @relation("FrozenByFaculty", fields: [frozenByFacultyId], references: [id])
-  frozenByFacultyId  String?
-  frozenByHod        User?            @relation("FrozenByHod", fields: [frozenByHodId], references: [id])
-  frozenByHodId      String?
-  frozenByAdmin      User?            @relation("FrozenByAdmin", fields: [frozenByAdminId], references: [id])
-  frozenByAdminId    String?
-  finalFrozen        Boolean          @default(false)
-  finalDeadline      DateTime?
-  frozenAt           DateTime?
-  User               User?            @relation(fields: [userId], references: [id])
-  userId             String?
-}
-
-model Admission {
-  id              String          @id @default(uuid())
-  applicationId   String          @unique
-  modeOfAdmission String
-  status          AdmissionStatus @default(PENDING)
-
-  semesterId      String
-  semester        Semester        @relation(fields: [semesterId], references: [id])
-
-  departmentId                 String
-  department                   Department @relation(fields: [departmentId], references: [id])
-
-  firstName                    String?
-  middleName                   String?
-  lastName                     String?
-  categoryClaimed              Category
-  categoryAllotted             Category
-  quota                        Quota
-  entranceExamRank             String?
-  originalAdmissionOrderNumber String?
-  originalAdmissionOrderDate   DateTime?
-  feePayable                   Float?
-  feePaid                      Float?
-  hostel                       Boolean?
-  hostelRoomNumber             String?
-
-  // These are hidden from the applicant form, generated/assigned later
-  tempUsn                      String?   @unique
-  studentId                    String?   @unique
-  student                      Student?  @relation(fields: [studentId], references: [id])
-  uniqueId                     String?   @unique
-
-  nameAsPer10th          String?
-  dob                    DateTime?
-  bloodGroup             String?
-  gender                 String?
-  primaryPhoneNumber     String?
-  secondaryPhoneNumber   String?
-  emergencyContactNumber String?
-  primaryEmail           String?   @unique
-  secondaryEmail         String?
-
-  // Current Address
-  currentAddress         String?
-  currentCity            String?
-  currentArea            String?
-  currentDistrict        String?
-  currentState           String?
-  currentCountry         String?
-  currentPincode         String?
-
-  // Permanent Address
-  permanentAddress       String?
-  permanentCity          String?
-  permanentArea          String?
-  permanentDistrict      String?
-  permanentState         String?
-  permanentCountry       String?
-  permanentPincode       String?
-
-  placeOfBirth           String?
-  stateOfBirth           String?
-  religion               String?
-  caste                  String?
-  subCaste               String?
-  motherTongue           String?
-  nri                    Boolean?
-  nationality            String?
-  disability             Boolean?
-  disabilityType         String?
-  economicallyBackward   Boolean?
-  aadharNumber           String?   @unique
-
-  // 10th Grade
-  class10thSchoolName       String?
-  class10thSchoolType       String?
-  class10thSchoolCity       String?
-  class10thSchoolState      String?
-  class10thSchoolCode       String?
-  class10thYearOfPassing    String?
-  class10thAggregateScore   Float?
-  class10thAggregateTotal   Float?
-  class10thMediumOfTeaching String?
-
-  // 12th Grade
-  class12thInstituteName    String?
-  class12thInstituteType    String?
-  class12thInstituteCity    String?
-  class12thInstituteState   String?
-  class12thInstituteCode    String?
-  class12thYearOfPassing    String?
-  class12thBranch           String?
-  class12thAggregateScore   Float?
-  class12thAggregateTotal   Float?
-  class12thMediumOfTeaching String?
-
-  fatherName               String?
-  fatherEmail              String?
-  fatherNumber             String?
-  fatherPermanentAddress   String?
-  fatherOccupation         String?
-
-  motherName               String?
-  motherEmail              String?
-  motherNumber             String?
-  motherPermanentAddress   String?
-  motherOccupation         String?
-
-  guardianName             String?
-  guardianEmail            String?
-  guardianNumber           String?
-  guardianPermanentAddress String?
-  guardianOccupation       String?
-
-  photo                           String?
-  casteCertificate                String?
-  disabilityCertificate           String?
-  economicallyBackwardCertificate String?
-  aadharCard                      String?
-  class10thMarksPdf               String?
-  class12thMarksPdf               String?
-  transferCertificate             String?
-  studyCertificate                String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([semesterId])
-  @@index([departmentId])
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
 }

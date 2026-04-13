@@ -19,7 +19,7 @@ const SignInPage = async ({
     notFound();
   }
 
-  if (data.role === "student" || data.role === "applicant") {
+  if (data.role === "applicant") {
     return <UsernameSignIn role={data.role} />;
   } else {
     return <EmailSignIn />;
