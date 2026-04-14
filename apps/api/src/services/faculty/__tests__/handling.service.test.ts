@@ -61,6 +61,87 @@ type StudentRecord = {
   }>;
 };
 
+type ContainsFilter = {
+  contains?: string;
+};
+
+type AssignmentWhere = {
+  AND?: AssignmentWhere[];
+  OR?: AssignmentWhere[];
+  facultyId?: string;
+  assignmentType?: AssignmentType;
+  semester?: number;
+  academicYear?: string;
+  batchId?: string | { not?: string | null } | null;
+  batch?: {
+    name?: ContainsFilter;
+  };
+  course?: {
+    approvalStatus?: string;
+    code?: ContainsFilter;
+    name?: ContainsFilter;
+    semesterId?: string;
+    semester?: {
+      academicTermId?: string;
+      programType?: "UG" | "PG";
+    };
+  };
+  section?: {
+    name?: ContainsFilter;
+    semesterId?: string;
+  };
+  sectionId?: string;
+};
+
+type StudentWhere = {
+  AND?: StudentWhere[];
+  OR?: StudentWhere[];
+  studentSections?: {
+    some?: {
+      academicYear?: string;
+      sectionId?: string;
+      semester?: number;
+    };
+  };
+  batches?: {
+    some?: {
+      id?: string;
+    };
+  };
+  usn?: ContainsFilter;
+  user?: {
+    email?: ContainsFilter;
+    name?: ContainsFilter;
+  };
+};
+
+type DbFindUniqueArgs = {
+  where: {
+    id?: string;
+    userId?: string;
+  };
+};
+
+type DbAssignmentArgs = {
+  where?: AssignmentWhere;
+  skip?: number;
+  take?: number;
+};
+
+type DbStudentArgs = {
+  where?: StudentWhere;
+  skip?: number;
+  take?: number;
+};
+
+type DbStudentSectionCountArgs = {
+  where: {
+    academicYear?: string;
+    sectionId?: string;
+    semester?: number;
+  };
+};
+
 const facultyByUserId: Record<string, string> = {
   "user-1": "faculty-1",
   "user-2": "faculty-2",
@@ -70,7 +151,7 @@ let assignments: AssignmentRecord[] = [];
 let students: StudentRecord[] = [];
 let lastAssignmentWhere: unknown = null;
 
-const paginate = <T,>(items: T[], skip: number, take: number): T[] => {
+const paginate = <T>(items: T[], skip: number, take: number): T[] => {
   return items.slice(skip, skip + take);
 };
 
@@ -80,20 +161,20 @@ const includesText = (value: string, text: string): boolean => {
 
 const assignmentMatchesWhere = (
   assignment: AssignmentRecord,
-  whereInput: any
+  whereInput: AssignmentWhere | null | undefined
 ): boolean => {
   if (!whereInput) {
     return true;
   }
 
   if (Array.isArray(whereInput.AND)) {
-    return whereInput.AND.every((condition: any) =>
+    return whereInput.AND.every((condition) =>
       assignmentMatchesWhere(assignment, condition)
     );
   }
 
   if (Array.isArray(whereInput.OR)) {
-    return whereInput.OR.some((condition: any) =>
+    return whereInput.OR.some((condition) =>
       assignmentMatchesWhere(assignment, condition)
     );
   }
@@ -116,7 +197,16 @@ const assignmentMatchesWhere = (
     return assignment.academicYear === condition.academicYear;
   }
 
-  if (condition.batchId?.not !== undefined) {
+  const batchIdFilter = condition.batchId;
+  if (typeof batchIdFilter === "string") {
+    return assignment.batchId === batchIdFilter;
+  }
+
+  if (
+    typeof batchIdFilter === "object" &&
+    batchIdFilter !== null &&
+    batchIdFilter.not !== undefined
+  ) {
     return assignment.batchId !== null;
   }
 
@@ -125,19 +215,32 @@ const assignmentMatchesWhere = (
   }
 
   if (condition.course?.semesterId) {
-    return assignment.course.id === assignment.course.id && assignment.sectionId === assignment.sectionId && assignment.course.semesterId === condition.course.semesterId;
+    return (
+      assignment.course.id === assignment.course.id &&
+      assignment.sectionId === assignment.sectionId &&
+      assignment.course.semesterId === condition.course.semesterId
+    );
   }
 
   if (condition.course?.semester?.academicTermId) {
-    return assignment.course.semester?.academicTermId === condition.course.semester.academicTermId;
+    return (
+      assignment.course.semester?.academicTermId ===
+      condition.course.semester.academicTermId
+    );
   }
 
   if (condition.course?.semester?.programType) {
-    return assignment.course.semester?.programType === condition.course.semester.programType;
+    return (
+      assignment.course.semester?.programType ===
+      condition.course.semester.programType
+    );
   }
 
   if (condition.section?.semesterId) {
-    return assignment.sectionId === assignment.sectionId && assignment.course.semesterId === condition.section.semesterId;
+    return (
+      assignment.sectionId === assignment.sectionId &&
+      assignment.course.semesterId === condition.section.semesterId
+    );
   }
 
   if (condition.sectionId) {
@@ -145,7 +248,10 @@ const assignmentMatchesWhere = (
   }
 
   if (condition.section?.name?.contains) {
-    return includesText(assignment.section.name, condition.section.name.contains);
+    return includesText(
+      assignment.section.name,
+      condition.section.name.contains
+    );
   }
 
   if (condition.batchId) {
@@ -171,17 +277,24 @@ const assignmentMatchesWhere = (
   return true;
 };
 
-const studentMatchesWhere = (student: StudentRecord, where: any): boolean => {
+const studentMatchesWhere = (
+  student: StudentRecord,
+  where: StudentWhere | null | undefined
+): boolean => {
   if (!where) {
     return true;
   }
 
   if (Array.isArray(where.AND)) {
-    return where.AND.every((condition: any) => studentMatchesWhere(student, condition));
+    return where.AND.every((condition) =>
+      studentMatchesWhere(student, condition)
+    );
   }
 
   if (Array.isArray(where.OR)) {
-    return where.OR.some((condition: any) => studentMatchesWhere(student, condition));
+    return where.OR.some((condition) =>
+      studentMatchesWhere(student, condition)
+    );
   }
 
   if (where.studentSections?.some) {
@@ -197,8 +310,9 @@ const studentMatchesWhere = (student: StudentRecord, where: any): boolean => {
     }
   }
 
-  if (where.batches?.some?.id) {
-    if (!student.batches.some((batch) => batch.id === where.batches.some.id)) {
+  const targetBatchId = where.batches?.some?.id;
+  if (targetBatchId) {
+    if (!student.batches.some((batch) => batch.id === targetBatchId)) {
       return false;
     }
   }
@@ -220,21 +334,28 @@ const studentMatchesWhere = (student: StudentRecord, where: any): boolean => {
 
 const dbMock = {
   faculty: {
-    findUnique: async ({ where }: any) => {
+    findUnique: async ({ where }: DbFindUniqueArgs) => {
+      if (!where.userId) {
+        return null;
+      }
+
       const facultyId = facultyByUserId[where.userId];
       return facultyId ? { id: facultyId } : null;
     },
   },
   courseAssignment: {
-    count: async ({ where }: any) => {
+    count: async ({ where }: DbAssignmentArgs) => {
       lastAssignmentWhere = where;
-      return assignments.filter((item) => assignmentMatchesWhere(item, where)).length;
+      return assignments.filter((item) => assignmentMatchesWhere(item, where))
+        .length;
     },
-    findMany: async ({ where, skip = 0, take = 10 }: any) => {
-      const filtered = assignments.filter((item) => assignmentMatchesWhere(item, where));
+    findMany: async ({ where, skip = 0, take = 10 }: DbAssignmentArgs) => {
+      const filtered = assignments.filter((item) =>
+        assignmentMatchesWhere(item, where)
+      );
       return paginate(filtered, skip, take);
     },
-    findUnique: async ({ where }: any) => {
+    findUnique: async ({ where }: DbFindUniqueArgs) => {
       const assignment = assignments.find((item) => item.id === where.id);
       if (!assignment) {
         return null;
@@ -275,7 +396,7 @@ const dbMock = {
     },
   },
   studentSection: {
-    count: async ({ where }: any) => {
+    count: async ({ where }: DbStudentSectionCountArgs) => {
       return students.filter((student) =>
         student.studentSections.some(
           (entry) =>
@@ -287,23 +408,30 @@ const dbMock = {
     },
   },
   section: {
-    findUnique: async ({ where }: any) => {
-      const fromAssignment = assignments.find((item) => item.sectionId === where.id);
+    findUnique: async ({ where }: DbFindUniqueArgs) => {
+      const fromAssignment = assignments.find(
+        (item) => item.sectionId === where.id
+      );
       return fromAssignment ? { name: fromAssignment.section.name } : null;
     },
   },
   batch: {
-    findUnique: async ({ where }: any) => {
-      const fromAssignment = assignments.find((item) => item.batchId === where.id);
+    findUnique: async ({ where }: DbFindUniqueArgs) => {
+      const fromAssignment = assignments.find(
+        (item) => item.batchId === where.id
+      );
       return fromAssignment?.batch ? { name: fromAssignment.batch.name } : null;
     },
   },
   student: {
-    count: async ({ where }: any) => {
-      return students.filter((student) => studentMatchesWhere(student, where)).length;
+    count: async ({ where }: DbStudentArgs) => {
+      return students.filter((student) => studentMatchesWhere(student, where))
+        .length;
     },
-    findMany: async ({ where, skip = 0, take = 10 }: any) => {
-      const filtered = students.filter((student) => studentMatchesWhere(student, where));
+    findMany: async ({ where, skip = 0, take = 10 }: DbStudentArgs) => {
+      const filtered = students.filter((student) =>
+        studentMatchesWhere(student, where)
+      );
       return paginate(filtered, skip, take).map((student) => ({
         id: student.id,
         usn: student.usn,
@@ -500,7 +628,7 @@ describe("FacultyHandlingService", () => {
   });
 
   it("lists only approved THEORY assignments", async () => {
-    const { FacultyHandlingService } = await import("./handling.service");
+    const { FacultyHandlingService } = await import("../handling.service");
 
     const response = await FacultyHandlingService.getHandlingAssignments(
       "user-1",
@@ -518,7 +646,7 @@ describe("FacultyHandlingService", () => {
   });
 
   it("lists only approved LAB assignments", async () => {
-    const { FacultyHandlingService } = await import("./handling.service");
+    const { FacultyHandlingService } = await import("../handling.service");
 
     const response = await FacultyHandlingService.getHandlingAssignments(
       "user-1",
@@ -537,7 +665,7 @@ describe("FacultyHandlingService", () => {
   });
 
   it("rejects cross-faculty student access", async () => {
-    const { FacultyHandlingService } = await import("./handling.service");
+    const { FacultyHandlingService } = await import("../handling.service");
 
     await expect(
       FacultyHandlingService.getStudentsByAssignment(
@@ -546,11 +674,13 @@ describe("FacultyHandlingService", () => {
         "THEORY",
         {}
       )
-    ).rejects.toThrow("Forbidden: assignment does not belong to current faculty");
+    ).rejects.toThrow(
+      "Forbidden: assignment does not belong to current faculty"
+    );
   });
 
   it("returns paginated students for assignment drill-down", async () => {
-    const { FacultyHandlingService } = await import("./handling.service");
+    const { FacultyHandlingService } = await import("../handling.service");
 
     const response = await FacultyHandlingService.getStudentsByAssignment(
       "user-1",
@@ -575,7 +705,7 @@ describe("FacultyHandlingService", () => {
   });
 
   it("applies search and term filters in assignment query", async () => {
-    const { FacultyHandlingService } = await import("./handling.service");
+    const { FacultyHandlingService } = await import("../handling.service");
 
     await FacultyHandlingService.getHandlingAssignments("user-1", "THEORY", {
       search: "algo",
@@ -587,14 +717,16 @@ describe("FacultyHandlingService", () => {
       limit: 10,
     });
 
-    const where = lastAssignmentWhere as { AND?: Array<Record<string, unknown>> };
+    const where = lastAssignmentWhere as {
+      AND?: Array<Record<string, unknown>>;
+    };
     expect(Array.isArray(where?.AND)).toBe(true);
-    expect(where.AND?.some((condition) => condition.facultyId === "faculty-1")).toBe(
-      true
-    );
-    expect(where.AND?.some((condition) => condition.assignmentType === "THEORY")).toBe(
-      true
-    );
+    expect(
+      where.AND?.some((condition) => condition.facultyId === "faculty-1")
+    ).toBe(true);
+    expect(
+      where.AND?.some((condition) => condition.assignmentType === "THEORY")
+    ).toBe(true);
     expect(
       where.AND?.some(
         (condition) =>
@@ -615,15 +747,13 @@ describe("FacultyHandlingService", () => {
       where.AND?.some(
         (condition) =>
           Array.isArray(condition.OR) &&
-          condition.OR.some(
-            (entry: any) => entry.course?.code?.contains === "algo"
-          )
+          condition.OR.some((entry) => entry.course?.code?.contains === "algo")
       )
     ).toBe(true);
   });
 
   it("enforces the LAB batch invariant when fetching students", async () => {
-    const { FacultyHandlingService } = await import("./handling.service");
+    const { FacultyHandlingService } = await import("../handling.service");
 
     await expect(
       FacultyHandlingService.getStudentsByAssignment(
