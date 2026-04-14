@@ -5,10 +5,11 @@ import {
   PaginatedPayload,
 } from "@/lib/api-client";
 import { dayjs } from "@webcampus/common/dayjs";
-import { BaseResponse } from "@webcampus/types/api";
 import {
+  BaseResponse,
   CreateOrOpenFacultyAttendanceSessionDTO,
   CreateOrOpenFacultyAttendanceSessionPayloadDTO,
+  DeleteFacultyAttendanceSessionDTO,
   FacultyAttendanceFilterOptionsDTO,
   FacultyAttendanceSessionDetailDTO,
   FacultyAttendanceSessionDTO,
@@ -17,7 +18,8 @@ import {
 } from "@webcampus/types/api";
 import { ListFacultyAttendanceSessionsFilters } from "./faculty-attendance-types";
 
-export type CreateOrOpenSessionPayload = CreateOrOpenFacultyAttendanceSessionPayloadDTO;
+export type CreateOrOpenSessionPayload =
+  CreateOrOpenFacultyAttendanceSessionPayloadDTO;
 
 export type SessionStudentsQuery = {
   courseId: string;
@@ -36,20 +38,20 @@ const toPositiveInt = (value: number | undefined, fallback: number) => {
   return Math.trunc(value);
 };
 
-export const getFacultyAttendanceFilterOptions = async (): Promise<FacultyAttendanceFilterOptionsDTO> => {
-  const response =
-    await apiClient.get<BaseResponse<FacultyAttendanceFilterOptionsDTO>>(
-      "/faculty/attendance/session/filter-options"
-    );
+export const getFacultyAttendanceFilterOptions =
+  async (): Promise<FacultyAttendanceFilterOptionsDTO> => {
+    const response = await apiClient.get<
+      BaseResponse<FacultyAttendanceFilterOptionsDTO>
+    >("/faculty/attendance/session/filter-options");
 
-  if (response.data.status !== "success" || !response.data.data) {
-    throw new Error(
-      response.data.message || "Failed to fetch attendance filter options"
-    );
-  }
+    if (response.data.status !== "success" || !response.data.data) {
+      throw new Error(
+        response.data.message || "Failed to fetch attendance filter options"
+      );
+    }
 
-  return response.data.data;
-};
+    return response.data.data;
+  };
 
 export const createOrOpenFacultyAttendanceSession = async (
   payload: CreateOrOpenSessionPayload
@@ -99,7 +101,9 @@ export const listFacultyAttendanceSessions = async (
     });
 
     if (response.data.status !== "success") {
-      throw new Error(response.data.message || "Failed to fetch attendance sessions");
+      throw new Error(
+        response.data.message || "Failed to fetch attendance sessions"
+      );
     }
 
     return {
@@ -114,7 +118,9 @@ export const listFacultyAttendanceSessions = async (
       },
     };
   } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Failed to fetch attendance sessions"));
+    throw new Error(
+      getApiErrorMessage(error, "Failed to fetch attendance sessions")
+    );
   }
 };
 
@@ -122,23 +128,26 @@ export const getFacultyAttendanceSessionStudents = async (
   query: SessionStudentsQuery
 ): Promise<FacultyAttendanceSessionStudentsDTO> => {
   try {
-    const response = await apiClient.get<BaseResponse<FacultyAttendanceSessionStudentsDTO>>(
-      "/faculty/attendance/session/students",
-      {
-        params: {
-          courseId: query.courseId,
-          sectionId: query.sectionId,
-        },
-      }
-    );
+    const response = await apiClient.get<
+      BaseResponse<FacultyAttendanceSessionStudentsDTO>
+    >("/faculty/attendance/session/students", {
+      params: {
+        courseId: query.courseId,
+        sectionId: query.sectionId,
+      },
+    });
 
     if (response.data.status !== "success" || !response.data.data) {
-      throw new Error(response.data.message || "Failed to fetch session students");
+      throw new Error(
+        response.data.message || "Failed to fetch session students"
+      );
     }
 
     return response.data.data;
   } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Failed to fetch session students"));
+    throw new Error(
+      getApiErrorMessage(error, "Failed to fetch session students")
+    );
   }
 };
 
@@ -146,21 +155,46 @@ export const getFacultyAttendanceSessionDetail = async (
   query: SessionDetailQuery
 ): Promise<FacultyAttendanceSessionDetailDTO> => {
   try {
-    const response = await apiClient.get<BaseResponse<FacultyAttendanceSessionDetailDTO>>(
-      "/faculty/attendance/session/detail",
-      {
-        params: {
-          sessionId: query.sessionId,
-        },
-      }
-    );
+    const response = await apiClient.get<
+      BaseResponse<FacultyAttendanceSessionDetailDTO>
+    >("/faculty/attendance/session/detail", {
+      params: {
+        sessionId: query.sessionId,
+      },
+    });
 
     if (response.data.status !== "success" || !response.data.data) {
-      throw new Error(response.data.message || "Failed to fetch session detail");
+      throw new Error(
+        response.data.message || "Failed to fetch session detail"
+      );
     }
 
     return response.data.data;
   } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Failed to fetch session detail"));
+    throw new Error(
+      getApiErrorMessage(error, "Failed to fetch session detail")
+    );
+  }
+};
+
+export const deleteFacultyAttendanceSession = async (
+  sessionId: string
+): Promise<DeleteFacultyAttendanceSessionDTO> => {
+  try {
+    const response = await apiClient.delete<
+      BaseResponse<DeleteFacultyAttendanceSessionDTO>
+    >(`/faculty/attendance/session/${sessionId}`);
+
+    if (response.data.status !== "success" || !response.data.data) {
+      throw new Error(
+        response.data.message || "Failed to delete attendance session"
+      );
+    }
+
+    return response.data.data;
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error, "Failed to delete attendance session")
+    );
   }
 };

@@ -4,6 +4,7 @@ import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import {
   CreateOrOpenFacultyAttendanceSessionType,
+  DeleteFacultyAttendanceSessionParamsType,
   FacultyAttendanceSessionDetailQueryType,
   FacultyAttendanceSessionStudentsQueryType,
   ListFacultyAttendanceSessionsQueryType,
@@ -121,7 +122,9 @@ export class FacultyAttendanceSessionController {
   static async getFilterOptions(req: Request, res: Response): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
-      const response = await FacultyAttendanceSessionService.getFilterOptions(user.id);
+      const response = await FacultyAttendanceSessionService.getFilterOptions(
+        user.id
+      );
 
       if (response.status !== "success") {
         throw new Error(response.message);
@@ -157,10 +160,11 @@ export class FacultyAttendanceSessionController {
     try {
       const user = await resolveSessionUser(req);
       const payload = req.body as CreateOrOpenFacultyAttendanceSessionType;
-      const response = await FacultyAttendanceSessionService.createOrOpenSession(
-        user.id,
-        payload
-      );
+      const response =
+        await FacultyAttendanceSessionService.createOrOpenSession(
+          user.id,
+          payload
+        );
 
       if (response.status !== "success") {
         throw new Error(response.message);
@@ -217,6 +221,45 @@ export class FacultyAttendanceSessionController {
         error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
 
       logger.error("Error listing faculty attendance sessions", {
+        error,
+        path: req.path,
+      });
+
+      sendResponse({
+        res,
+        status: "error",
+        message: errorMessage,
+        statusCode: getStatusCodeForError(errorMessage),
+        error,
+      });
+    }
+  }
+
+  static async deleteSession(req: Request, res: Response): Promise<void> {
+    try {
+      const user = await resolveSessionUser(req);
+      const params = req.params as DeleteFacultyAttendanceSessionParamsType;
+      const response = await FacultyAttendanceSessionService.deleteSession(
+        user.id,
+        params
+      );
+
+      if (response.status !== "success") {
+        throw new Error(response.message);
+      }
+
+      sendResponse({
+        res,
+        status: "success",
+        message: response.message,
+        data: response.data,
+        statusCode: 200,
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+
+      logger.error("Error deleting faculty attendance session", {
         error,
         path: req.path,
       });

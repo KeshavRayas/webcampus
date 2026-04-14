@@ -1,4 +1,5 @@
 import { dayjs } from "@webcampus/common/dayjs";
+import { FacultyAttendanceSessionDTO } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { Calendar } from "@webcampus/ui/components/calendar";
 import {
@@ -9,11 +10,20 @@ import {
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
 import { Label } from "@webcampus/ui/components/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@webcampus/ui/components/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@webcampus/ui/components/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@webcampus/ui/components/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@webcampus/ui/components/select";
 import { Skeleton } from "@webcampus/ui/components/skeleton";
 import { cn } from "@webcampus/ui/lib/utils";
-import { FacultyAttendanceSessionDTO } from "@webcampus/types/api";
 import { CalendarIcon } from "lucide-react";
 
 type CourseOption = {
@@ -51,6 +61,7 @@ type ManageSessionsModalProps = {
   isError: boolean;
   errorMessage: string | null;
   openingSessionId: string | null;
+  deletingSessionId: string | null;
   page: number;
   totalPages: number;
   isFetching: boolean;
@@ -78,6 +89,7 @@ export const ManageSessionsModal = ({
   isError,
   errorMessage,
   openingSessionId,
+  deletingSessionId,
   page,
   totalPages,
   isFetching,
@@ -97,7 +109,7 @@ export const ManageSessionsModal = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+        <div className="bg-muted/20 space-y-4 rounded-lg border p-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="session-filter-date">Date</Label>
@@ -118,7 +130,11 @@ export const ManageSessionsModal = ({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={filters.sessionDate} onSelect={onDateChange} />
+                  <Calendar
+                    mode="single"
+                    selected={filters.sessionDate}
+                    onSelect={onDateChange}
+                  />
                 </PopoverContent>
               </Popover>
             </div>
@@ -147,7 +163,10 @@ export const ManageSessionsModal = ({
                 </SelectTrigger>
                 <SelectContent>
                   {sections.map((section) => (
-                    <SelectItem key={`${section.id}:${section.courseId}`} value={section.id}>
+                    <SelectItem
+                      key={`${section.id}:${section.courseId}`}
+                      value={section.id}
+                    >
                       {section.name}
                     </SelectItem>
                   ))}
@@ -157,7 +176,9 @@ export const ManageSessionsModal = ({
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Button type="button" onClick={onApplyFilters}>Apply Filters</Button>
+            <Button type="button" onClick={onApplyFilters}>
+              Apply Filters
+            </Button>
             <Button type="button" variant="outline" onClick={onClearFilters}>
               Clear Filters
             </Button>
@@ -165,7 +186,7 @@ export const ManageSessionsModal = ({
         </div>
 
         {isError ? (
-          <div className="text-destructive rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm">
+          <div className="text-destructive border-destructive/20 bg-destructive/5 rounded-lg border p-4 text-sm">
             {errorMessage ?? "Failed to load sessions"}
           </div>
         ) : isLoading ? (
@@ -185,14 +206,23 @@ export const ManageSessionsModal = ({
                 key={session.id}
                 className={cn(
                   "space-y-3 rounded-lg border p-4",
-                  activeSessionId === session.id && "border-primary bg-primary/5"
+                  activeSessionId === session.id &&
+                    "border-primary bg-primary/5"
                 )}
               >
                 <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
-                  <p className="font-medium">{session.courseCode} - {session.courseName}</p>
-                  <p className="text-muted-foreground md:text-right">Section {session.sectionName}</p>
-                  <p className="text-muted-foreground">{dayjs(session.sessionDate).format("MMM D, YYYY")}</p>
-                  <p className="text-muted-foreground md:text-right">{session.timingLabel}</p>
+                  <p className="font-medium">
+                    {session.courseCode} - {session.courseName}
+                  </p>
+                  <p className="text-muted-foreground md:text-right">
+                    Section {session.sectionName}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {dayjs(session.sessionDate).format("MMM D, YYYY")}
+                  </p>
+                  <p className="text-muted-foreground md:text-right">
+                    {session.timingLabel}
+                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -217,8 +247,11 @@ export const ManageSessionsModal = ({
                     size="sm"
                     variant="destructive"
                     onClick={() => onDeleteSession(session.id)}
+                    disabled={deletingSessionId === session.id}
                   >
-                    Delete
+                    {deletingSessionId === session.id
+                      ? "Deleting..."
+                      : "Delete"}
                   </Button>
                 </div>
               </div>

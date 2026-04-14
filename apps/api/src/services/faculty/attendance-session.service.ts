@@ -1,7 +1,9 @@
+import { AttendanceAggregationService } from "@webcampus/api/src/services/faculty/attendance-aggregation.service";
 import { logger } from "@webcampus/common/logger";
 import { db, type Prisma } from "@webcampus/db";
 import {
   CreateOrOpenFacultyAttendanceSessionType,
+  DeleteFacultyAttendanceSessionParamsType,
   FacultyAttendanceSessionDetailQueryType,
   FacultyAttendanceSessionStudentsQueryType,
   ListFacultyAttendanceSessionsQueryType,
@@ -10,13 +12,13 @@ import {
   AttendanceRecordStatusDTO,
   BaseResponse,
   CreateOrOpenFacultyAttendanceSessionDTO,
+  DeleteFacultyAttendanceSessionDTO,
   FacultyAttendanceFilterOptionsDTO,
   FacultyAttendanceSessionDetailDTO,
   FacultyAttendanceSessionDTO,
   FacultyAttendanceSessionStudentsDTO,
   PaginatedResponse,
 } from "@webcampus/types/api";
-import { AttendanceAggregationService } from "@webcampus/api/src/services/faculty/attendance-aggregation.service";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
@@ -122,26 +124,24 @@ const hasTimeOverlap = (
   return start < existingEnd && end > existingStart;
 };
 
-const toSessionDto = (
-  session: {
-    id: string;
-    courseId: string;
-    sectionId: string;
-    sessionDate: Date;
-    timingCode: string;
-    timingLabel: string;
-    timingStartTime: string;
-    timingEndTime: string;
-    createdAt: Date;
-    Course: {
-      code: string;
-      name: string;
-    };
-    Section: {
-      name: string;
-    };
-  }
-): FacultyAttendanceSessionDTO => {
+const toSessionDto = (session: {
+  id: string;
+  courseId: string;
+  sectionId: string;
+  sessionDate: Date;
+  timingCode: string;
+  timingLabel: string;
+  timingStartTime: string;
+  timingEndTime: string;
+  createdAt: Date;
+  Course: {
+    code: string;
+    name: string;
+  };
+  Section: {
+    name: string;
+  };
+}): FacultyAttendanceSessionDTO => {
   return {
     id: session.id,
     courseId: session.courseId,
@@ -216,7 +216,9 @@ const getTimingWindow = (
   payload: CreateOrOpenFacultyAttendanceSessionType
 ): TimingWindow => {
   if (payload.timingMode === "FIXED") {
-    const slot = payload.timingCode ? FIXED_TIMING_WINDOWS[payload.timingCode] : null;
+    const slot = payload.timingCode
+      ? FIXED_TIMING_WINDOWS[payload.timingCode]
+      : null;
     if (!slot) {
       throw new Error("Invalid fixed timing slot");
     }
@@ -273,7 +275,9 @@ export class FacultyAttendanceSessionService {
     });
 
     if (!assignment) {
-      throw new Error("Forbidden: course-section is not assigned to this faculty");
+      throw new Error(
+        "Forbidden: course-section is not assigned to this faculty"
+      );
     }
 
     return {
@@ -333,7 +337,9 @@ export class FacultyAttendanceSessionService {
         },
       };
     } catch (error) {
-      logger.error("Error fetching faculty attendance session students", { error });
+      logger.error("Error fetching faculty attendance session students", {
+        error,
+      });
       throw new Error("Failed to retrieve session students");
     }
   }
@@ -369,7 +375,10 @@ export class FacultyAttendanceSessionService {
         },
       });
 
-      const coursesMap = new Map<string, { id: string; code: string; name: string }>();
+      const coursesMap = new Map<
+        string,
+        { id: string; code: string; name: string }
+      >();
       const sectionsMap = new Map<
         string,
         { id: string; name: string; courseId: string }
@@ -393,7 +402,9 @@ export class FacultyAttendanceSessionService {
         },
       };
     } catch (error) {
-      logger.error("Error fetching faculty attendance filter options", { error });
+      logger.error("Error fetching faculty attendance filter options", {
+        error,
+      });
       throw new Error("Failed to retrieve attendance filter options");
     }
   }
@@ -445,7 +456,9 @@ export class FacultyAttendanceSessionService {
       }
 
       if (session.facultyId !== facultyId) {
-        throw new Error("Forbidden: attendance session is not owned by this faculty");
+        throw new Error(
+          "Forbidden: attendance session is not owned by this faculty"
+        );
       }
 
       return {
@@ -513,7 +526,8 @@ export class FacultyAttendanceSessionService {
       if (existingSession && existingSession.facultyId !== facultyId) {
         return {
           status: "error",
-          message: "A session already exists for this slot and is not owned by you",
+          message:
+            "A session already exists for this slot and is not owned by you",
           error: "Session ownership mismatch",
         };
       }
@@ -604,12 +618,16 @@ export class FacultyAttendanceSessionService {
           throw new Error("No students found in the selected section");
         }
 
-        const enrolledStudentIdSet = new Set(enrolledStudents.map((student) => student.studentId));
+        const enrolledStudentIdSet = new Set(
+          enrolledStudents.map((student) => student.studentId)
+        );
         const explicitStatuses = payload.studentStatuses ?? [];
 
         for (const item of explicitStatuses) {
           if (!enrolledStudentIdSet.has(item.studentId)) {
-            throw new Error("One or more students do not belong to the selected section");
+            throw new Error(
+              "One or more students do not belong to the selected section"
+            );
           }
         }
 
@@ -620,8 +638,9 @@ export class FacultyAttendanceSessionService {
         const normalizedStatuses = enrolledStudents.map((student) => ({
           studentId: student.studentId,
           status:
-            (explicitStatusMap.get(student.studentId) as AttendanceRecordStatusDTO | undefined) ??
-            "PRESENT",
+            (explicitStatusMap.get(student.studentId) as
+              | AttendanceRecordStatusDTO
+              | undefined) ?? "PRESENT",
         }));
 
         await tx.attendanceRecord.createMany({
@@ -710,6 +729,78 @@ export class FacultyAttendanceSessionService {
     }
   }
 
+  static async deleteSession(
+    userId: string,
+    params: DeleteFacultyAttendanceSessionParamsType
+  ): Promise<BaseResponse<DeleteFacultyAttendanceSessionDTO>> {
+    try {
+      const facultyId = await this.getFacultyIdByUserId(userId);
+
+      const deletedSummary = await db.$transaction(async (tx) => {
+        const session = await tx.classSession.findUnique({
+          where: {
+            id: params.sessionId,
+          },
+          include: {
+            AttendanceRecord: {
+              select: {
+                studentId: true,
+              },
+            },
+          },
+        });
+
+        if (!session) {
+          throw new Error("Attendance session not found");
+        }
+
+        if (session.facultyId !== facultyId) {
+          throw new Error(
+            "Forbidden: attendance session is not owned by this faculty"
+          );
+        }
+
+        const affectedStudentIds = Array.from(
+          new Set(session.AttendanceRecord.map((record) => record.studentId))
+        );
+
+        await tx.classSession.delete({
+          where: {
+            id: session.id,
+          },
+        });
+
+        for (const studentId of affectedStudentIds) {
+          await AttendanceAggregationService.aggregateAttendanceForStudentCourse(
+            studentId,
+            session.courseId,
+            tx
+          );
+        }
+
+        return {
+          sessionId: session.id,
+          courseId: session.courseId,
+          affectedStudentCount: affectedStudentIds.length,
+        };
+      });
+
+      return {
+        status: "success",
+        message: "Attendance session deleted successfully",
+        data: deletedSummary,
+      };
+    } catch (error) {
+      logger.error("Error deleting faculty attendance session", {
+        error,
+      });
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Failed to delete attendance session");
+    }
+  }
+
   static async listSessions(
     userId: string,
     query: ListFacultyAttendanceSessionsQueryType
@@ -769,14 +860,19 @@ export class FacultyAttendanceSessionService {
 
         items = sessions.map(toSessionDto);
       } catch (includeError) {
-        logger.error("Attendance sessions include resolution failed; retrying with scalar fallback", {
-          includeError,
-          includeErrorMessage:
-            includeError instanceof Error ? includeError.message : "Unknown include error",
-          facultyId,
-          page,
-          limit,
-        });
+        logger.error(
+          "Attendance sessions include resolution failed; retrying with scalar fallback",
+          {
+            includeError,
+            includeErrorMessage:
+              includeError instanceof Error
+                ? includeError.message
+                : "Unknown include error",
+            facultyId,
+            page,
+            limit,
+          }
+        );
 
         const scalarSessions = await db.classSession.findMany({
           where,
@@ -843,7 +939,9 @@ export class FacultyAttendanceSessionService {
         ]);
 
         const courseMap = new Map(courses.map((course) => [course.id, course]));
-        const sectionMap = new Map(sections.map((section) => [section.id, section]));
+        const sectionMap = new Map(
+          sections.map((section) => [section.id, section])
+        );
 
         items = scalarSessions.map((session) =>
           toSessionDtoFromScalars(

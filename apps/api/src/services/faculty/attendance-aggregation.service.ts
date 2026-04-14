@@ -2,6 +2,8 @@ import { logger } from "@webcampus/common/logger";
 import { db, type Prisma } from "@webcampus/db";
 import { BaseResponse } from "@webcampus/types/api";
 
+type DbLike = Prisma.TransactionClient | typeof db;
+
 export interface AttendanceAggregateResult {
   total: number;
   present: number;
@@ -21,41 +23,53 @@ export class AttendanceAggregationService {
   static async aggregateAttendanceForStudentCourse(
     studentId: string,
     courseId: string,
-    tx: typeof db = db
+    tx: DbLike = db
   ): Promise<BaseResponse<AttendanceAggregateResult>> {
     try {
-      // Step 1: Find all ClassSessions for this course
-      const sessions = await tx.classSession.findMany({
-        where: {
-          courseId,
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      const sessionIds = sessions.map((s) => s.id);
-
-      // Step 2: Count attendance records for this student in this course
-      const attendanceRecords = await tx.attendanceRecord.findMany({
-        where: {
-          studentId,
-          sessionId: {
-            in: sessionIds,
+      const [total, present] = await Promise.all([
+        tx.attendanceRecord.count({
+          where: {
+            studentId,
+            ClassSession: {
+              courseId,
+            },
           },
-        },
-        select: {
-          status: true,
-        },
-      });
+        }),
+        tx.attendanceRecord.count({
+          where: {
+            studentId,
+            status: "PRESENT",
+            ClassSession: {
+              courseId,
+            },
+          },
+        }),
+      ]);
 
-      // Step 3: Calculate totals
-      const total = attendanceRecords.length;
-      const present = attendanceRecords.filter((r) => r.status === "PRESENT").length;
       const absent = total - present;
       const percentage = total > 0 ? (present / total) * 100 : 0;
 
-      // Step 4: Get existing condonation status if attendance exists
+      if (total === 0) {
+        await tx.attendance.deleteMany({
+          where: {
+            studentId,
+            courseId,
+          },
+        });
+
+        return {
+          status: "success",
+          message: "Attendance aggregate removed because no records remain",
+          data: {
+            total: 0,
+            present: 0,
+            absent: 0,
+            percentage: 0,
+            condonationStatus: "NOT_REQUESTED",
+          },
+        };
+      }
+
       const existingAttendance = await tx.attendance.findUnique({
         where: {
           studentId_courseId: {
@@ -68,9 +82,9 @@ export class AttendanceAggregationService {
         },
       });
 
-      const condonationStatus = existingAttendance?.condonationStatus ?? "NOT_REQUESTED";
+      const condonationStatus =
+        existingAttendance?.condonationStatus ?? "NOT_REQUESTED";
 
-      // Step 5: Upsert the Attendance record
       await tx.attendance.upsert({
         where: {
           studentId_courseId: {
@@ -108,7 +122,11 @@ export class AttendanceAggregationService {
         },
       };
     } catch (error) {
-      logger.error("Error aggregating attendance:", { error, studentId, courseId });
+      logger.error("Error aggregating attendance:", {
+        error,
+        studentId,
+        courseId,
+      });
       throw new Error("Failed to aggregate attendance");
     }
   }
@@ -120,7 +138,7 @@ export class AttendanceAggregationService {
    */
   static async aggregateAttendanceForCourse(
     courseId: string,
-    tx: typeof db = db
+    tx: DbLike = db
   ): Promise<BaseResponse<{ processedCount: number }>> {
     try {
       // Find all unique students who have attendance records for this course
@@ -151,7 +169,10 @@ export class AttendanceAggregationService {
         },
       };
     } catch (error) {
-      logger.error("Error aggregating attendance for course:", { error, courseId });
+      logger.error("Error aggregating attendance for course:", {
+        error,
+        courseId,
+      });
       throw new Error("Failed to aggregate attendance for course");
     }
   }

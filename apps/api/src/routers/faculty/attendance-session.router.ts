@@ -2,6 +2,7 @@ import { FacultyAttendanceSessionController } from "@webcampus/api/src/controlle
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   CreateOrOpenFacultyAttendanceSessionSchema,
+  DeleteFacultyAttendanceSessionParamsSchema,
   FacultyAttendanceSessionDetailQuerySchema,
   FacultyAttendanceSessionStudentsQuerySchema,
   ListFacultyAttendanceSessionsQuerySchema,
@@ -44,6 +45,12 @@ router.get(
   "/",
   validateRequest(ListFacultyAttendanceSessionsQuerySchema, "query"),
   FacultyAttendanceSessionController.listSessions
+);
+
+router.delete(
+  "/:sessionId",
+  validateRequest(DeleteFacultyAttendanceSessionParamsSchema, "params"),
+  FacultyAttendanceSessionController.deleteSession
 );
 
 export default router;

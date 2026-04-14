@@ -4,12 +4,17 @@ import { getApiErrorMessage } from "@/lib/api-client";
 import { dayjs } from "@webcampus/common/dayjs";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
+import { Card, CardContent, CardHeader } from "@webcampus/ui/components/card";
 import { Checkbox } from "@webcampus/ui/components/checkbox";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@webcampus/ui/components/card";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@webcampus/ui/components/dialog";
+import { Skeleton } from "@webcampus/ui/components/skeleton";
 import {
   Table,
   TableBody,
@@ -18,7 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
-import { Skeleton } from "@webcampus/ui/components/skeleton";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { ATTENDANCE_TIME_SLOTS } from "./attendance-time-slots";
@@ -31,8 +35,9 @@ import {
 } from "./faculty-attendance-types";
 import {
   useCreateOrOpenFacultyAttendanceSession,
-  useFacultyAttendanceSessionDetail,
+  useDeleteFacultyAttendanceSession,
   useFacultyAttendanceFilterOptions,
+  useFacultyAttendanceSessionDetail,
   useFacultyAttendanceSessions,
 } from "./use-faculty-attendance";
 
@@ -72,9 +77,16 @@ const INITIAL_FORM_STATE: FacultyAttendanceFormState = {
 };
 
 const toMinutes = (value: string) => {
-  const [hours, minutes] = value.split(":").map(Number);
+  const parts = value.split(":").map(Number);
+  const hours = parts[0];
+  const minutes = parts[1];
 
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+  if (
+    hours === undefined ||
+    minutes === undefined ||
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes)
+  ) {
     return null;
   }
 
@@ -100,22 +112,32 @@ const hasTimeOverlap = (
 };
 
 export const FacultyAttendanceView = () => {
-  const [form, setForm] = useState<FacultyAttendanceFormState>(INITIAL_FORM_STATE);
-  const [studentChecklist, setStudentChecklist] = useState<AttendanceChecklistRow[]>([]);
+  const [form, setForm] =
+    useState<FacultyAttendanceFormState>(INITIAL_FORM_STATE);
+  const [studentChecklist, setStudentChecklist] = useState<
+    AttendanceChecklistRow[]
+  >([]);
   const [activeSessionId, setActiveSessionId] = useState<string>("");
   const [isSessionPanelVisible, setIsSessionPanelVisible] = useState(false);
   const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
-  const [submitAction, setSubmitAction] = useState<"OPEN" | "SAVE" | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(
+    null
+  );
+  const [deleteConfirmSessionId, setDeleteConfirmSessionId] = useState<
+    string | null
+  >(null);
+  const [submitAction, setSubmitAction] = useState<"OPEN" | "SAVE" | null>(
+    null
+  );
   const [isSessionsDialogOpen, setIsSessionsDialogOpen] = useState(false);
-  const [sessionModalFilters, setSessionModalFilters] = useState<AttendanceSessionModalFilters>(
-    EMPTY_SESSION_MODAL_FILTERS
-  );
-  const [appliedSessionFilters, setAppliedSessionFilters] = useState<AttendanceSessionQueryState>(
-    INITIAL_SESSION_QUERY_STATE
-  );
+  const [sessionModalFilters, setSessionModalFilters] =
+    useState<AttendanceSessionModalFilters>(EMPTY_SESSION_MODAL_FILTERS);
+  const [appliedSessionFilters, setAppliedSessionFilters] =
+    useState<AttendanceSessionQueryState>(INITIAL_SESSION_QUERY_STATE);
 
   const filterOptionsQuery = useFacultyAttendanceFilterOptions();
   const createOrOpenMutation = useCreateOrOpenFacultyAttendanceSession();
+  const deleteSessionMutation = useDeleteFacultyAttendanceSession();
   const sessionDetailQuery = useFacultyAttendanceSessionDetail(
     {
       sessionId: activeSessionId,
@@ -159,7 +181,11 @@ export const FacultyAttendanceView = () => {
       return null;
     }
 
-    return ATTENDANCE_TIME_SLOTS.find((slot) => slot.code === form.fixedTimingCode) ?? null;
+    return (
+      ATTENDANCE_TIME_SLOTS.find(
+        (slot) => slot.code === form.fixedTimingCode
+      ) ?? null
+    );
   }, [form.fixedTimingCode]);
 
   const hasValidTiming = useMemo(() => {
@@ -172,7 +198,12 @@ export const FacultyAttendanceView = () => {
     }
 
     return form.customStartTime < form.customEndTime;
-  }, [form.customEndTime, form.customStartTime, form.fixedTimingCode, form.timingMode]);
+  }, [
+    form.customEndTime,
+    form.customStartTime,
+    form.fixedTimingCode,
+    form.timingMode,
+  ]);
 
   const selectedTimingWindow = useMemo(() => {
     if (form.timingMode === "FIXED") {
@@ -196,17 +227,29 @@ export const FacultyAttendanceView = () => {
       endTime: form.customEndTime,
       label: `${form.customStartTime} - ${form.customEndTime}`,
     };
-  }, [form.customEndTime, form.customStartTime, form.timingMode, selectedFixedSlot]);
+  }, [
+    form.customEndTime,
+    form.customStartTime,
+    form.timingMode,
+    selectedFixedSlot,
+  ]);
 
   const overlapCheckQuery = useFacultyAttendanceSessions(
     {
-      sessionDate: form.sessionDate ? dayjs(form.sessionDate).format("YYYY-MM-DD") : undefined,
+      sessionDate: form.sessionDate
+        ? dayjs(form.sessionDate).format("YYYY-MM-DD")
+        : undefined,
       courseId: form.courseId || undefined,
       sectionId: form.sectionId || undefined,
       page: 1,
       limit: 200,
     },
-    Boolean(form.sessionDate && form.courseId && form.sectionId && selectedTimingWindow)
+    Boolean(
+      form.sessionDate &&
+        form.courseId &&
+        form.sectionId &&
+        selectedTimingWindow
+    )
   );
 
   const overlappingSession = useMemo(() => {
@@ -285,9 +328,7 @@ export const FacultyAttendanceView = () => {
     setStudentChecklist(sessionDetailQuery.data.students);
     setIsSessionPanelVisible(true);
     setOpeningSessionId(null);
-  }, [
-    sessionDetailQuery.data,
-  ]);
+  }, [sessionDetailQuery.data]);
 
   useEffect(() => {
     if (!sessionDetailQuery.isError || !activeSessionId) {
@@ -295,14 +336,18 @@ export const FacultyAttendanceView = () => {
     }
 
     toast.error(
-      getApiErrorMessage(sessionDetailQuery.error, "Failed to load attendance session detail")
+      getApiErrorMessage(
+        sessionDetailQuery.error,
+        "Failed to load attendance session detail"
+      )
     );
     resetActiveSessionContext();
   }, [activeSessionId, sessionDetailQuery.error, sessionDetailQuery.isError]);
 
   const totalStudents = studentChecklist.length;
   const presentCount = useMemo(
-    () => studentChecklist.filter((student) => student.status === "PRESENT").length,
+    () =>
+      studentChecklist.filter((student) => student.status === "PRESENT").length,
     [studentChecklist]
   );
   const absentCount = totalStudents - presentCount;
@@ -342,7 +387,13 @@ export const FacultyAttendanceView = () => {
     }
 
     return !overlapError;
-  }, [form.courseId, form.sectionId, form.sessionDate, hasValidTiming, overlapError]);
+  }, [
+    form.courseId,
+    form.sectionId,
+    form.sessionDate,
+    hasValidTiming,
+    overlapError,
+  ]);
 
   const canSaveAttendance = useMemo(() => {
     if (!isSessionPanelVisible) {
@@ -499,10 +550,13 @@ export const FacultyAttendanceView = () => {
         sessionDate: dayjs(form.sessionDate).format("YYYY-MM-DD"),
         timingMode: form.timingMode,
         timingCode:
-          form.timingMode === "FIXED" ? form.fixedTimingCode || undefined : undefined,
+          form.timingMode === "FIXED"
+            ? form.fixedTimingCode || undefined
+            : undefined,
         timingStartTime:
           form.timingMode === "CUSTOM" ? form.customStartTime : undefined,
-        timingEndTime: form.timingMode === "CUSTOM" ? form.customEndTime : undefined,
+        timingEndTime:
+          form.timingMode === "CUSTOM" ? form.customEndTime : undefined,
       });
 
       setActiveSessionId(response.session.id);
@@ -514,7 +568,9 @@ export const FacultyAttendanceView = () => {
           : "Existing session opened. You can now review and save attendance."
       );
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to create/open attendance session"));
+      toast.error(
+        getApiErrorMessage(error, "Failed to create/open attendance session")
+      );
     } finally {
       setSubmitAction(null);
     }
@@ -533,10 +589,13 @@ export const FacultyAttendanceView = () => {
         sessionDate: dayjs(form.sessionDate).format("YYYY-MM-DD"),
         timingMode: form.timingMode,
         timingCode:
-          form.timingMode === "FIXED" ? form.fixedTimingCode || undefined : undefined,
+          form.timingMode === "FIXED"
+            ? form.fixedTimingCode || undefined
+            : undefined,
         timingStartTime:
           form.timingMode === "CUSTOM" ? form.customStartTime : undefined,
-        timingEndTime: form.timingMode === "CUSTOM" ? form.customEndTime : undefined,
+        timingEndTime:
+          form.timingMode === "CUSTOM" ? form.customEndTime : undefined,
         studentStatuses: studentChecklist.map((student) => ({
           studentId: student.studentId,
           status: student.status,
@@ -563,13 +622,48 @@ export const FacultyAttendanceView = () => {
     setIsSessionsDialogOpen(false);
   };
 
-  const handleUpdateSessionFromModal = (sessionId: string) => {
+  const handleSelectRecentSession = (sessionId: string) => {
+    if (activeSessionId === sessionId && isSessionPanelVisible) {
+      resetActiveSessionContext();
+      return;
+    }
+
     handleSelectSessionFromModal(sessionId);
-    toast.info("Session loaded. You can adjust fields and start session to apply updates.");
   };
 
-  const handleDeleteSessionFromModal = (_sessionId: string) => {
-    toast.info("Delete is currently unavailable for attendance sessions.");
+  const handleUpdateSessionFromModal = (sessionId: string) => {
+    handleSelectSessionFromModal(sessionId);
+    toast.info(
+      "Session loaded. You can adjust fields and start session to apply updates."
+    );
+  };
+
+  const handleDeleteSessionFromModal = (sessionId: string) => {
+    setDeleteConfirmSessionId(sessionId);
+  };
+
+  const handleDeleteSessionConfirm = async () => {
+    if (!deleteConfirmSessionId) {
+      return;
+    }
+
+    try {
+      setDeletingSessionId(deleteConfirmSessionId);
+      await deleteSessionMutation.mutateAsync(deleteConfirmSessionId);
+
+      if (activeSessionId === deleteConfirmSessionId) {
+        resetActiveSessionContext();
+      }
+
+      setDeleteConfirmSessionId(null);
+      toast.success("Attendance session deleted successfully");
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Failed to delete attendance session")
+      );
+    } finally {
+      setDeletingSessionId(null);
+    }
   };
 
   return (
@@ -618,14 +712,16 @@ export const FacultyAttendanceView = () => {
         onStartSession={handleCreateOrOpenSession}
         onManageSessions={openSessionsDialog}
         canStartSession={canOpenSession}
-        isStartingSession={createOrOpenMutation.isPending && submitAction === "OPEN"}
+        isStartingSession={
+          createOrOpenMutation.isPending && submitAction === "OPEN"
+        }
         overlapError={overlapError}
       />
 
       <RecentSessions
         sessions={recentSessionsQuery.data?.items ?? []}
         activeSessionId={activeSessionId}
-        onSelectSession={handleSelectSessionFromModal}
+        onSelectSession={handleSelectRecentSession}
       />
 
       {isSessionPanelVisible ? (
@@ -652,7 +748,10 @@ export const FacultyAttendanceView = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setAllStudentsStatus("PRESENT")}
-                disabled={studentChecklist.length === 0 || createOrOpenMutation.isPending}
+                disabled={
+                  studentChecklist.length === 0 ||
+                  createOrOpenMutation.isPending
+                }
               >
                 Mark All Present
               </Button>
@@ -661,7 +760,10 @@ export const FacultyAttendanceView = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setAllStudentsStatus("ABSENT")}
-                disabled={studentChecklist.length === 0 || createOrOpenMutation.isPending}
+                disabled={
+                  studentChecklist.length === 0 ||
+                  createOrOpenMutation.isPending
+                }
               >
                 Mark All Absent
               </Button>
@@ -685,8 +787,12 @@ export const FacultyAttendanceView = () => {
                       <TableRow>
                         <TableHead>USN</TableHead>
                         <TableHead>Name</TableHead>
-                        <TableHead className="w-36 text-center">Present</TableHead>
-                        <TableHead className="w-36 text-center">Absent</TableHead>
+                        <TableHead className="w-36 text-center">
+                          Present
+                        </TableHead>
+                        <TableHead className="w-36 text-center">
+                          Absent
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -698,7 +804,10 @@ export const FacultyAttendanceView = () => {
                             <Checkbox
                               checked={student.status === "PRESENT"}
                               onCheckedChange={() =>
-                                updateStudentStatus(student.studentId, "PRESENT")
+                                updateStudentStatus(
+                                  student.studentId,
+                                  "PRESENT"
+                                )
                               }
                               aria-label={`Mark ${student.name} as present`}
                             />
@@ -722,7 +831,9 @@ export const FacultyAttendanceView = () => {
                   <Button
                     type="button"
                     onClick={handleSaveAttendance}
-                    disabled={!canSaveAttendance || createOrOpenMutation.isPending}
+                    disabled={
+                      !canSaveAttendance || createOrOpenMutation.isPending
+                    }
                   >
                     {createOrOpenMutation.isPending && submitAction === "SAVE"
                       ? "Saving..."
@@ -766,6 +877,7 @@ export const FacultyAttendanceView = () => {
             : null
         }
         openingSessionId={openingSessionId}
+        deletingSessionId={deletingSessionId}
         page={sessionPagination.page}
         totalPages={sessionPagination.totalPages}
         isFetching={sessionsQuery.isFetching}
@@ -775,6 +887,44 @@ export const FacultyAttendanceView = () => {
         onUpdateSession={handleUpdateSessionFromModal}
         onDeleteSession={handleDeleteSessionFromModal}
       />
+
+      <Dialog
+        open={Boolean(deleteConfirmSessionId)}
+        onOpenChange={(open) => {
+          if (!open && deletingSessionId === null) {
+            setDeleteConfirmSessionId(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Attendance Session</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this attendance session? This
+              action cannot be undone. Session attendance records will be
+              removed and totals will be recalculated.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmSessionId(null)}
+              disabled={deletingSessionId !== null}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteSessionConfirm}
+              disabled={deletingSessionId !== null}
+            >
+              {deletingSessionId === deleteConfirmSessionId
+                ? "Deleting..."
+                : "Confirm Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -4,9 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createOrOpenFacultyAttendanceSession,
   CreateOrOpenSessionPayload,
+  deleteFacultyAttendanceSession,
+  getFacultyAttendanceFilterOptions,
   getFacultyAttendanceSessionDetail,
   getFacultyAttendanceSessionStudents,
-  getFacultyAttendanceFilterOptions,
   listFacultyAttendanceSessions,
   SessionDetailQuery,
   SessionStudentsQuery,
@@ -67,5 +68,22 @@ export const useFacultyAttendanceSessionDetail = (
     queryKey: ["faculty-attendance", "session-detail", query],
     queryFn: () => getFacultyAttendanceSessionDetail(query),
     enabled,
+  });
+};
+
+export const useDeleteFacultyAttendanceSession = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sessionId: string) =>
+      deleteFacultyAttendanceSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["faculty-attendance", "sessions"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["faculty-attendance", "session-detail"],
+      });
+    },
   });
 };

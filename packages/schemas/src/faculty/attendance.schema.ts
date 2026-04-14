@@ -68,7 +68,9 @@ export const CreateOrOpenFacultyAttendanceSessionSchema = z
     timingCode: z.string().trim().optional(),
     timingStartTime: z.string().trim().optional(),
     timingEndTime: z.string().trim().optional(),
-    studentStatuses: z.array(FacultyAttendanceStudentStatusInputSchema).optional(),
+    studentStatuses: z
+      .array(FacultyAttendanceStudentStatusInputSchema)
+      .optional(),
   })
   .superRefine((value, ctx) => {
     if (value.timingMode === "FIXED") {
@@ -92,7 +94,10 @@ export const CreateOrOpenFacultyAttendanceSessionSchema = z
       return;
     }
 
-    if (!value.timingStartTime || !HHMM_TIME_REGEX.test(value.timingStartTime)) {
+    if (
+      !value.timingStartTime ||
+      !HHMM_TIME_REGEX.test(value.timingStartTime)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Custom start time must be in HH:mm format",
@@ -112,7 +117,9 @@ export const CreateOrOpenFacultyAttendanceSessionSchema = z
       const [startHour, startMinute] = value.timingStartTime
         .split(":")
         .map(Number) as [number, number];
-      const [endHour, endMinute] = value.timingEndTime.split(":").map(Number) as [number, number];
+      const [endHour, endMinute] = value.timingEndTime
+        .split(":")
+        .map(Number) as [number, number];
       const startTotalMinutes = startHour * 60 + startMinute;
       const endTotalMinutes = endHour * 60 + endMinute;
 
@@ -148,6 +155,10 @@ export const FacultyAttendanceSessionStudentsQuerySchema = z.object({
 });
 
 export const FacultyAttendanceSessionDetailQuerySchema = z.object({
+  sessionId: z.uuid("Invalid session ID"),
+});
+
+export const DeleteFacultyAttendanceSessionParamsSchema = z.object({
   sessionId: z.uuid("Invalid session ID"),
 });
 
@@ -247,6 +258,9 @@ export type FacultyAttendanceSessionStudentsQueryType = z.infer<
 >;
 export type FacultyAttendanceSessionDetailQueryType = z.infer<
   typeof FacultyAttendanceSessionDetailQuerySchema
+>;
+export type DeleteFacultyAttendanceSessionParamsType = z.infer<
+  typeof DeleteFacultyAttendanceSessionParamsSchema
 >;
 export type ListFacultyAttendanceSessionsQueryType = z.infer<
   typeof ListFacultyAttendanceSessionsQuerySchema

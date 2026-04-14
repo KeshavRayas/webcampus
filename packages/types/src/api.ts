@@ -166,3 +166,9 @@ export type CreateOrOpenFacultyAttendanceSessionDTO = {
   created: boolean;
   attendanceInitialization: FacultyAttendanceSessionInitializationSummaryDTO;
 };
+
+export type DeleteFacultyAttendanceSessionDTO = {
+  sessionId: string;
+  courseId: string;
+  affectedStudentCount: number;
+};
