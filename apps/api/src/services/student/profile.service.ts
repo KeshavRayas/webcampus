@@ -41,7 +41,9 @@ const mergeAddress = (
 };
 
 export class StudentProfileService {
-  static async getProfileByUserId(userId: string): Promise<BaseResponse<unknown>> {
+  static async getProfileByUserId(
+    userId: string
+  ): Promise<BaseResponse<unknown>> {
     try {
       const student = await db.student.findUnique({
         where: { userId },
@@ -158,7 +160,9 @@ export class StudentProfileService {
             category: admission?.caste ?? null,
             personalEmail: admission?.primaryEmail ?? null,
             alternatePhone:
-              admission?.secondaryPhoneNumber ?? admission?.emergencyContactNumber ?? null,
+              admission?.secondaryPhoneNumber ??
+              admission?.emergencyContactNumber ??
+              null,
             aadhaarNumber: admission?.aadharNumber ?? null,
             admissionQuota: admission?.quota ?? null,
             nationality: admission?.nationality ?? null,
@@ -196,7 +200,9 @@ export class StudentProfileService {
             academic: {
               academicYear: student.academicYear,
               departmentName: student.departmentName,
-              programme: student.programType ? `BE - ${student.programType}` : null,
+              programme: student.programType
+                ? `BE - ${student.programType}`
+                : null,
               semester: student.currentSemester,
               section: latestSection?.section?.name ?? null,
             },
@@ -208,9 +214,11 @@ export class StudentProfileService {
                   admission?.class10thAggregateScore != null &&
                   admission?.class10thAggregateTotal
                     ? Number(
-                        ((admission.class10thAggregateScore /
-                          admission.class10thAggregateTotal) *
-                          100).toFixed(2)
+                        (
+                          (admission.class10thAggregateScore /
+                            admission.class10thAggregateTotal) *
+                          100
+                        ).toFixed(2)
                       )
                     : null,
                 year: admission?.class10thYearOfPassing ?? null,
@@ -222,9 +230,11 @@ export class StudentProfileService {
                   admission?.class12thAggregateScore != null &&
                   admission?.class12thAggregateTotal
                     ? Number(
-                        ((admission.class12thAggregateScore /
-                          admission.class12thAggregateTotal) *
-                          100).toFixed(2)
+                        (
+                          (admission.class12thAggregateScore /
+                            admission.class12thAggregateTotal) *
+                          100
+                        ).toFixed(2)
                       )
                     : null,
                 year: admission?.class12thYearOfPassing ?? null,
@@ -234,9 +244,14 @@ export class StudentProfileService {
             documents: {
               aadhaarCard: admission?.aadharCard ?? null,
               photo: admission?.photo ?? null,
-              marksCards: admission?.class12thMarksPdf ?? admission?.class10thMarksPdf ?? null,
+              marksCards:
+                admission?.class12thMarksPdf ??
+                admission?.class10thMarksPdf ??
+                null,
               otherDocuments:
-                admission?.studyCertificate ?? admission?.transferCertificate ?? null,
+                admission?.studyCertificate ??
+                admission?.transferCertificate ??
+                null,
             },
           },
         },
@@ -280,21 +295,26 @@ export class StudentProfileService {
           payload.sameAsPermanentAddress && payload.permanentAddress
             ? payload.permanentAddress
             : payload.presentAddress;
-
+        const normalizedQuota =
+          payload.admissionQuota === "MERIT" ||
+          payload.admissionQuota === "MANAGEMENT" ||
+          payload.admissionQuota === "SPORTS" ||
+          payload.admissionQuota === "NRI" ||
+          payload.admissionQuota === "SNQ"
+            ? (payload.admissionQuota as
+                | "MERIT"
+                | "MANAGEMENT"
+                | "SPORTS"
+                | "NRI"
+                | "SNQ")
+            : undefined;
         const admissionUpdateData = {
           dob: payload.dob,
           gender: payload.gender,
           bloodGroup: payload.bloodGroup,
           modeOfAdmission: payload.aidedStatus ?? undefined,
           caste: payload.category,
-          quota:
-            payload.admissionQuota === "MERIT" ||
-            payload.admissionQuota === "MANAGEMENT" ||
-            payload.admissionQuota === "SPORTS" ||
-            payload.admissionQuota === "NRI" ||
-            payload.admissionQuota === "SNQ"
-              ? payload.admissionQuota
-              : undefined,
+          quota: normalizedQuota,
           primaryEmail: payload.personalEmail,
           secondaryEmail: payload.personalEmail,
           secondaryPhoneNumber: payload.alternatePhone,
@@ -365,7 +385,9 @@ export class StudentProfileService {
     }
   }
 
-  static async requestApprovalByUserId(userId: string): Promise<BaseResponse<unknown>> {
+  static async requestApprovalByUserId(
+    userId: string
+  ): Promise<BaseResponse<unknown>> {
     try {
       const student = await db.student.findUnique({
         where: { userId },

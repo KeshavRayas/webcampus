@@ -2,13 +2,14 @@ import { CourseRegistration } from "@webcampus/api/src/services/student/course-r
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
-import {
-  CreateCourseRegistrationType,
-} from "@webcampus/schemas/student";
+import { CreateCourseRegistrationType } from "@webcampus/schemas/student";
 import { Request, Response } from "express";
 
 export class CourseRegistrationController {
-  static async createMyRegistration(req: Request, res: Response): Promise<void> {
+  static async createMyRegistration(
+    req: Request,
+    res: Response
+  ): Promise<void> {
     try {
       const userId = req.requestContext?.userId;
       if (!userId) {
@@ -17,12 +18,16 @@ export class CourseRegistrationController {
           status: "error",
           message: ERRORS.UNAUTHORIZED,
           statusCode: 401,
+          error: ERRORS.UNAUTHORIZED,
         });
         return;
       }
 
       const request: CreateCourseRegistrationType = req.body;
-      const response = await CourseRegistration.createForStudent(userId, request);
+      const response = await CourseRegistration.createForStudent(
+        userId,
+        request
+      );
       if (response.status === "success") {
         sendResponse({
           res,
@@ -37,7 +42,8 @@ export class CourseRegistrationController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
@@ -53,6 +59,7 @@ export class CourseRegistrationController {
           status: "error",
           message: ERRORS.UNAUTHORIZED,
           statusCode: 401,
+          error: ERRORS.UNAUTHORIZED,
         });
         return;
       }
@@ -72,14 +79,18 @@ export class CourseRegistrationController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
     }
   }
 
-  static async getMyEligibleCourses(req: Request, res: Response): Promise<void> {
+  static async getMyEligibleCourses(
+    req: Request,
+    res: Response
+  ): Promise<void> {
     try {
       const userId = req.requestContext?.userId;
       if (!userId) {
@@ -87,12 +98,14 @@ export class CourseRegistrationController {
           res,
           status: "error",
           message: ERRORS.UNAUTHORIZED,
+          error: ERRORS.UNAUTHORIZED,
           statusCode: 401,
         });
         return;
       }
 
-      const response = await CourseRegistration.getEligibleCoursesForStudent(userId);
+      const response =
+        await CourseRegistration.getEligibleCoursesForStudent(userId);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -107,7 +120,8 @@ export class CourseRegistrationController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });

@@ -23,7 +23,9 @@ export class StudentProfileController {
     try {
       const user = await resolveSessionUser(req);
       const response = await StudentProfileService.getProfileByUserId(user.id);
-
+      if (response.status !== "success") {
+        throw new Error(response.message);
+      }
       sendResponse({
         res,
         status: "success",
@@ -59,7 +61,9 @@ export class StudentProfileController {
         user.id,
         req.body
       );
-
+      if (response.status !== "success") {
+        throw new Error(response.message);
+      }
       sendResponse({
         res,
         status: "success",
@@ -72,18 +76,26 @@ export class StudentProfileController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
     }
   }
 
-  static async requestProfileApproval(req: Request, res: Response): Promise<void> {
+  static async requestProfileApproval(
+    req: Request,
+    res: Response
+  ): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
-      const response = await StudentProfileService.requestApprovalByUserId(user.id);
-
+      const response = await StudentProfileService.requestApprovalByUserId(
+        user.id
+      );
+      if (response.status !== "success") {
+        throw new Error(response.message);
+      }
       sendResponse({
         res,
         status: "success",
@@ -96,7 +108,8 @@ export class StudentProfileController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
