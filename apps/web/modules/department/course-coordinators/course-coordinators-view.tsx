@@ -8,31 +8,28 @@ import { BaseResponse } from "@webcampus/types/api";
 import axios from "axios";
 import { Lock } from "lucide-react";
 import { useState } from "react";
-import { CourseDetailsCard } from "./course-details-card";
+import { CourseDetailsCard } from "../course-mapping/course-details-card";
 import {
-  CourseMappingFilters,
-  CourseMappingFiltersState,
-} from "./course-mapping-filters";
-import { CourseMappingGrid } from "./course-mapping-grid";
+  CourseCoordinatorFilters,
+  CourseCoordinatorFiltersState,
+} from "./course-coordinator-filters";
+import { ManageCoordinatorsCard } from "./manage-coordinators-card";
 
-export const CourseMappingView = () => {
+export const CourseCoordinatorsView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: session } = authClient.useSession();
 
   const [appliedFilters, setAppliedFilters] =
-    useState<CourseMappingFiltersState | null>(null);
+    useState<CourseCoordinatorFiltersState | null>(null);
   const [selectedCourse, setSelectedCourse] =
     useState<CourseResponseDTO | null>(null);
 
-  // Fetch department type for conditional rendering
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
-        {
-          withCredentials: true,
-        }
+        { withCredentials: true }
       );
       if (res.data.status === "success") return res.data.data;
       return { type: "", name: "" };
@@ -55,41 +52,29 @@ export const CourseMappingView = () => {
             </h5>
             <div className="text-sm">
               This course is part of a semester that is locked for
-              review/approval. Mappings cannot be altered.
+              review/approval. Coordinator assignments cannot be altered.
             </div>
           </div>
         </div>
       )}
 
-      <CourseMappingFilters
+      <CourseCoordinatorFilters
         deptInfo={deptInfo ?? null}
         onCourseSelect={setSelectedCourse}
         onAppliedFiltersChange={setAppliedFilters}
         appliedFilters={appliedFilters}
       />
 
-      {selectedCourse &&
-        appliedFilters?.semesterId &&
-        appliedFilters?.academicYear && (
-          <div className="flex w-full flex-col gap-6">
-            <CourseDetailsCard course={selectedCourse} />
+      {selectedCourse && appliedFilters?.semesterId && (
+        <div className="flex w-full flex-col gap-6">
+          <CourseDetailsCard course={selectedCourse} />
 
-            <div className="bg-card text-card-foreground w-full overflow-hidden rounded-xl border shadow-sm">
-              <div className="p-6">
-                <h3 className="mb-4 text-lg font-semibold">
-                  Faculty Assignments
-                </h3>
-                <CourseMappingGrid
-                  course={selectedCourse}
-                  semesterId={appliedFilters.semesterId}
-                  academicYear={appliedFilters.academicYear}
-                  cycle={appliedFilters.cycle}
-                  isLocked={isCourseLocked}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+          <ManageCoordinatorsCard
+            course={selectedCourse}
+            isLocked={isCourseLocked}
+          />
+        </div>
+      )}
     </div>
   );
 };

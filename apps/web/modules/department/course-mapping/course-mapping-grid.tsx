@@ -31,7 +31,6 @@ interface CourseMappingGridProps {
   semesterId: string;
   academicYear: string;
   cycle: string;
-  isBasicSciences: boolean;
   isLocked?: boolean;
 }
 
@@ -48,7 +47,6 @@ export const CourseMappingGrid = ({
   semesterId,
   academicYear,
   cycle,
-  isBasicSciences,
   isLocked = false,
 }: CourseMappingGridProps) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
@@ -116,9 +114,9 @@ export const CourseMappingGrid = ({
       faculty.map((f) => ({
         value: f.id,
         label: f.name,
-        sublabel: isBasicSciences ? f.departmentAbbreviation : undefined,
+        sublabel: f.departmentAbbreviation,
       })),
-    [faculty, isBasicSciences]
+    [faculty]
   );
 
   const [mappings, setMappings] = useState<SectionMappingState[]>([]);

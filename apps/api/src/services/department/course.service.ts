@@ -1,12 +1,12 @@
+import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import { logger } from "@webcampus/common/logger";
 import { Course, db, Prisma } from "@webcampus/db";
-import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import {
   CreateCourseDTO,
   UpdateCourseDTO,
 } from "@webcampus/schemas/department";
-import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 import { BaseResponse } from "@webcampus/types/api";
+import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 
 const MODE_LOCKED_VALUES = {
   INTEGRATED: {
@@ -194,12 +194,20 @@ export class CourseService {
         departmentName: resolvedDepartment.departmentName,
       });
       const {
-        departmentId: _departmentId,
-        departmentName,
+        departmentId: normalizedDepartmentId,
+        departmentName: normalizedDepartmentName,
         semesterId,
         cycle,
         ...courseData
       } = normalized;
+
+      if (
+        normalizedDepartmentId !== resolvedDepartment.departmentId ||
+        normalizedDepartmentName !== resolvedDepartment.departmentName
+      ) {
+        throw new Error("Forbidden: department scope mismatch");
+      }
+
       const derived = computeDerivedFields(normalized);
 
       const course = await db.course.create({
@@ -483,9 +491,7 @@ export class CourseService {
     semesterId?: string,
     cycle?: string,
     requestContext?: DepartmentRequestContext
-  ): Promise<
-    BaseResponse<MappedCourseWithDepartmentContext[]>
-  > {
+  ): Promise<BaseResponse<MappedCourseWithDepartmentContext[]>> {
     try {
       const resolvedDepartment = await this.resolveCourseDepartmentContext({
         source: "course.getByBranch",
@@ -688,6 +694,7 @@ export class CourseService {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static async getGroupedCourseSubmissions(_role: "admin" | "coe"): Promise<
     BaseResponse<
       Array<{
@@ -796,7 +803,8 @@ export class CourseService {
 
       const resolvedCoeUsername =
         approverDisplayUsername?.trim() || approverUsername?.trim() || "COE";
-      const approvedByDisplay = role === "admin" ? "Admin" : resolvedCoeUsername;
+      const approvedByDisplay =
+        role === "admin" ? "Admin" : resolvedCoeUsername;
 
       const result = await db.course.updateMany({
         where: {
@@ -814,7 +822,8 @@ export class CourseService {
         data: {
           approvalStatus: "APPROVED",
           approvedByRole: role,
-          approvedByUsername: role === "coe" ? resolvedCoeUsername : approverUsername ?? null,
+          approvedByUsername:
+            role === "coe" ? resolvedCoeUsername : (approverUsername ?? null),
           approvedByDisplay,
           approvedAt: new Date(),
         },
@@ -883,6 +892,205 @@ export class CourseService {
       }
 
       throw new Error("Failed to request revision for courses");
+    }
+  }
+
+  /**
+   * Fetch all coordinators assigned to a specific course.
+   */
+  static async getCoordinators(
+    courseId: string,
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<unknown[]>> {
+    try {
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.getCoordinators",
+        requestContext,
+      });
+
+      const course = await db.course.findFirst({
+        where: {
+          id: courseId,
+          department: {
+            is: { id: resolvedDepartment.departmentId },
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!course) {
+        throw new Error("Course not found");
+      }
+
+      const coordinators = await db.courseCoordinator.findMany({
+        where: { courseId },
+        include: {
+          faculty: {
+            select: {
+              id: true,
+              shortName: true,
+              departmentId: true,
+              user: {
+                select: { name: true },
+              },
+            },
+          },
+        },
+      });
+
+      return {
+        status: "success",
+        message: "Coordinators fetched successfully",
+        data: coordinators,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message === "Course not found") {
+        throw error;
+      }
+      logger.error("Failed to fetch coordinators", error);
+      throw new Error("Failed to fetch coordinators");
+    }
+  }
+
+  /**
+   * Replace all coordinators for a course with the given faculty IDs.
+   * Uses a transaction to atomically delete existing + create new entries.
+   */
+  static async updateCoordinators(
+    courseId: string,
+    facultyIds: string[],
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<{ count: number }>> {
+    try {
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.updateCoordinators",
+        requestContext,
+      });
+
+      const course = await db.course.findFirst({
+        where: {
+          id: courseId,
+          department: {
+            is: { id: resolvedDepartment.departmentId },
+          },
+        },
+        select: { id: true, approvalStatus: true },
+      });
+
+      if (!course) {
+        throw new Error("Course not found");
+      }
+
+      this._ensureCourseIsEditable(course.approvalStatus);
+
+      await db.$transaction(async (tx) => {
+        await tx.courseCoordinator.deleteMany({
+          where: { courseId },
+        });
+
+        if (facultyIds.length > 0) {
+          await tx.courseCoordinator.createMany({
+            data: facultyIds.map((facultyId) => ({
+              courseId,
+              facultyId,
+            })),
+          });
+        }
+      });
+
+      return {
+        status: "success",
+        message: `Successfully updated coordinators (${facultyIds.length} assigned)`,
+        data: { count: facultyIds.length },
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      logger.error("Failed to update coordinators", error);
+      throw new Error("Failed to update coordinators");
+    }
+  }
+
+  /**
+   * Get distinct faculty members currently mapped to a course via CourseAssignment.
+   * Used by the coordinator assignment UI to restrict the dropdown to only
+   * faculty who are already teaching the course.
+   */
+  static async getMappedFacultyForCourse(
+    courseId: string,
+    requestContext?: DepartmentRequestContext
+  ): Promise<
+    BaseResponse<{ id: string; name: string; departmentAbbreviation: string }[]>
+  > {
+    try {
+      const resolvedDepartment = await this.resolveCourseDepartmentContext({
+        source: "course.getMappedFacultyForCourse",
+        requestContext,
+      });
+
+      // Verify the course belongs to the requesting department
+      const course = await db.course.findFirst({
+        where: {
+          id: courseId,
+          department: {
+            is: { id: resolvedDepartment.departmentId },
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!course) {
+        throw new Error("Course not found");
+      }
+
+      const assignments = await db.courseAssignment.findMany({
+        where: { courseId },
+        select: {
+          facultyId: true,
+          faculty: {
+            select: {
+              id: true,
+              user: { select: { name: true } },
+              department: { select: { abbreviation: true } },
+            },
+          },
+        },
+      });
+
+      // Deduplicate by facultyId (a faculty may teach multiple sections/batches)
+      const seen = new Set<string>();
+      const uniqueFaculty: {
+        id: string;
+        name: string;
+        departmentAbbreviation: string;
+      }[] = [];
+
+      for (const assignment of assignments) {
+        if (!seen.has(assignment.facultyId)) {
+          seen.add(assignment.facultyId);
+          uniqueFaculty.push({
+            id: assignment.faculty.id,
+            name: assignment.faculty.user.name,
+            departmentAbbreviation: assignment.faculty.department.abbreviation,
+          });
+        }
+      }
+
+      // Sort alphabetically by name
+      uniqueFaculty.sort((a, b) => a.name.localeCompare(b.name));
+
+      return {
+        status: "success",
+        message: `Found ${uniqueFaculty.length} mapped faculty for course`,
+        data: uniqueFaculty,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message === "Course not found") {
+        throw error;
+      }
+      logger.error("Failed to fetch mapped faculty for course", error);
+      throw new Error("Failed to fetch mapped faculty for course");
     }
   }
 }

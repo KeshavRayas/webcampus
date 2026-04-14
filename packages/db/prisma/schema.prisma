@@ -275,6 +275,7 @@ model Faculty {
   staffType              StaffType?
   ClassSession           ClassSession[]
   teaches                CourseAssignment[]
+  coordinatedCourses     CourseCoordinator[]
   department             Department             @relation(fields: [departmentId], references: [id])
   user                   User                   @relation(fields: [userId], references: [id])
   experiences            FacultyExperience[]
@@ -379,6 +380,8 @@ model Course {
   revisionRequestedAt     DateTime?
   attendances             Attendance[]
   ClassSession            ClassSession[]
+  coordinators            CourseCoordinator[]
+  assessments             AssessmentTemplate[]
   department              Department           @relation(fields: [departmentId], references: [id])
   semester                Semester             @relation(fields: [semesterId], references: [id])
   assignments             CourseAssignment[]
@@ -405,7 +408,7 @@ model CourseAssignment {
   batch          Batch?         @relation(fields: [batchId], references: [id])
   course         Course         @relation(fields: [courseId, departmentId], references: [id, departmentId])
   department     Department     @relation(fields: [departmentId], references: [id])
-  faculty        Faculty        @relation(fields: [facultyId, departmentId], references: [id, departmentId])
+  faculty        Faculty        @relation(fields: [facultyId], references: [id])
   section        Section        @relation(fields: [sectionId, departmentId], references: [id, departmentId])
   freezes        Freeze?
 
@@ -652,6 +655,42 @@ model ClassSession {
   @@unique([courseId, sectionId, sessionDate, timingCode])
   @@index([courseId])
   @@index([sectionId])
+}
+
+model CourseCoordinator {
+  id        String  @id @default(uuid())
+  courseId  String
+  facultyId String
+
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  faculty Faculty @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, facultyId])
+  @@index([courseId])
+}
+
+model AssessmentTemplate {
+  id         String   @id @default(uuid())
+  courseId   String
+  semesterId String
+  title      String
+  totalMarks Int
+
+  questions AssessmentQuestion[]
+  course    Course              @relation(fields: [courseId], references: [id])
+}
+
+model AssessmentQuestion {
+  id           String @id @default(uuid())
+  assessmentId String
+  part         String
+  qNumber      String
+  marks        Int
+  co           String?
+  po           String?
+  bl           String?
+
+  assessment AssessmentTemplate @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
 }
 
 enum DepartmentScopedRole {

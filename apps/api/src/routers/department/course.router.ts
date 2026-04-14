@@ -6,6 +6,7 @@ import {
   CreateCourseSchema,
   DeleteCourseSchema,
   RequestRevisionForSemesterSchema,
+  UpdateCoordinatorsBodySchema,
   UpdateCourseSchema,
 } from "@webcampus/schemas/department";
 import { Router } from "express";
@@ -78,6 +79,40 @@ router.get(
     permissions: {},
   }),
   CourseController.getGroupedCourseSubmissions
+);
+
+router.get(
+  "/:id/coordinators",
+  protect({
+    role: "department",
+    permissions: {
+      courseCoordinator: ["read"],
+    },
+  }),
+  CourseController.getCoordinators
+);
+
+router.put(
+  "/:id/coordinators",
+  validateRequest(UpdateCoordinatorsBodySchema),
+  protect({
+    role: "department",
+    permissions: {
+      courseCoordinator: ["update"],
+    },
+  }),
+  CourseController.updateCoordinators
+);
+
+router.get(
+  "/:id/mapped-faculty",
+  protect({
+    role: "department",
+    permissions: {
+      courseCoordinator: ["read"],
+    },
+  }),
+  CourseController.getMappedFaculty
 );
 
 router.get(

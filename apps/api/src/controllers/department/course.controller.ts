@@ -1,13 +1,14 @@
 import { CourseService } from "@webcampus/api/src/services/department/course.service";
+import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
 import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
-import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
 import { UUIDType } from "@webcampus/schemas/common";
 import {
   CreateCourseDTO,
   DeleteCourseDTO,
+  UpdateCoordinatorsBodyDTO,
   UpdateCourseDTO,
 } from "@webcampus/schemas/department";
 import { Request, Response } from "express";
@@ -53,10 +54,13 @@ export class CourseController {
       const request: CreateCourseDTO = req.body;
       const departmentContext = await getDepartmentRequestContext(req);
       logger.debug("Creating Course", request);
-      const response = await CourseService.create({
-        ...request,
-        departmentId: departmentContext.departmentId,
-      }, departmentContext);
+      const response = await CourseService.create(
+        {
+          ...request,
+          departmentId: departmentContext.departmentId,
+        },
+        departmentContext
+      );
       if (response.status === "success") {
         sendResponse({
           res,
@@ -85,10 +89,13 @@ export class CourseController {
       const request: UpdateCourseDTO = req.body;
       const departmentContext = await getDepartmentRequestContext(req);
       logger.debug("Updating Course", request);
-      const response = await CourseService.update({
-        ...request,
-        departmentId: departmentContext.departmentId,
-      }, departmentContext);
+      const response = await CourseService.update(
+        {
+          ...request,
+          departmentId: departmentContext.departmentId,
+        },
+        departmentContext
+      );
       if (response.status === "success") {
         sendResponse({
           res,
@@ -373,6 +380,108 @@ export class CourseController {
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: CourseController.getApprovalErrorStatusCode(error),
+        error,
+      });
+    }
+  }
+
+  static async getCoordinators(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params as UUIDType;
+      const departmentContext = await getDepartmentRequestContext(req);
+      const response = await CourseService.getCoordinators(
+        id,
+        departmentContext
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      const statusCode = message === "Course not found" ? 404 : 500;
+
+      logger.error("Error Fetching Coordinators", error);
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode,
+        error,
+      });
+    }
+  }
+
+  static async updateCoordinators(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params as UUIDType;
+      const { facultyIds }: UpdateCoordinatorsBodyDTO = req.body;
+      const departmentContext = await getDepartmentRequestContext(req);
+
+      const response = await CourseService.updateCoordinators(
+        id,
+        facultyIds,
+        departmentContext
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Updating Coordinators", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: error instanceof Error ? 400 : 500,
+        error,
+      });
+    }
+  }
+
+  static async getMappedFaculty(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params as UUIDType;
+      const departmentContext = await getDepartmentRequestContext(req);
+      const response = await CourseService.getMappedFacultyForCourse(
+        id,
+        departmentContext
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      const statusCode = message === "Course not found" ? 404 : 500;
+
+      logger.error("Error Fetching Mapped Faculty", error);
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode,
         error,
       });
     }

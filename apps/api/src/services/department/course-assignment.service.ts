@@ -10,8 +10,9 @@ import type { DepartmentRequestContext } from "@webcampus/types/request-context"
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 
-const getCourseMappingStatus = (assignmentCount: number): "Mapped" | "Unmapped" =>
-  assignmentCount > 0 ? "Mapped" : "Unmapped";
+const getCourseMappingStatus = (
+  assignmentCount: number
+): "Mapped" | "Unmapped" => (assignmentCount > 0 ? "Mapped" : "Unmapped");
 
 type MappingContext = {
   departmentId?: string;
@@ -401,11 +402,14 @@ export class CourseAssignmentService {
           throw new Error("One or more faculty records are invalid");
         }
 
-        for (const faculty of facultyRecords) {
-          if (faculty.departmentId !== department.id) {
-            throw new Error(
-              `Faculty ${faculty.id} does not belong to your department`
-            );
+        // BASIC_SCIENCES can assign faculty from any department
+        if (department.type !== "BASIC_SCIENCES") {
+          for (const faculty of facultyRecords) {
+            if (faculty.departmentId !== department.id) {
+              throw new Error(
+                `Faculty ${faculty.id} does not belong to your department`
+              );
+            }
           }
         }
       }
@@ -548,9 +552,11 @@ export class CourseAssignmentService {
         context
       );
 
-      const whereClause: Prisma.FacultyWhereInput = {
-        departmentId: department.id,
-      };
+      // BASIC_SCIENCES can view and map faculty from all departments
+      const whereClause: Prisma.FacultyWhereInput =
+        department.type === "BASIC_SCIENCES"
+          ? {}
+          : { departmentId: department.id };
 
       const faculty = await db.faculty.findMany({
         where: whereClause,
