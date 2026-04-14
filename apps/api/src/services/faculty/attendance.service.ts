@@ -149,9 +149,9 @@ export class Attendance {
 
       const courseAssignment = existingAttendance.course.assignments[0];
       if (
-        courseAssignment?.freezes[0]?.facultyFrozen ||
-        courseAssignment?.freezes[0]?.hodFrozen ||
-        courseAssignment?.freezes[0]?.adminFrozen
+        courseAssignment?.freezes?.facultyFrozen ||
+        courseAssignment?.freezes?.hodFrozen ||
+        courseAssignment?.freezes?.adminFrozen
       ) {
         return {
           status: "error",
@@ -202,9 +202,9 @@ export class Attendance {
       }
       const courseAssignment = existingAttendance.course.assignments[0];
       if (
-        courseAssignment?.freezes[0]?.facultyFrozen ||
-        courseAssignment?.freezes[0]?.hodFrozen ||
-        courseAssignment?.freezes[0]?.adminFrozen
+        courseAssignment?.freezes?.facultyFrozen ||
+        courseAssignment?.freezes?.hodFrozen ||
+        courseAssignment?.freezes?.adminFrozen
       ) {
         return {
           error: "Attendance not found",

@@ -150,7 +150,7 @@ export class Mark {
       // Bro, I have followed the same in here and attendance as well,
 
       const courseAssignment = existingMark.course.assignments[0];
-      const freeze = courseAssignment?.freezes[0];
+      const freeze = courseAssignment?.freezes;
 
       if (freeze?.facultyFrozen || freeze?.hodFrozen || freeze?.adminFrozen) {
         return {
@@ -204,7 +204,7 @@ export class Mark {
       }
 
       const courseAssignment = existingMark.course.assignments[0];
-      const freeze = courseAssignment?.freezes[0];
+      const freeze = courseAssignment?.freezes;
 
       if (freeze?.hodFrozen || freeze?.adminFrozen) {
         return {
