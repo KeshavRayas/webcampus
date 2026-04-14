@@ -12,6 +12,7 @@
     "submit:mock-applicant": "tsx scripts/submit-mock-applicant.ts",
     "cleanup:mock-applicants": "tsx scripts/cleanup-mock-applicants.ts",
     "rewrite:admission-usn": "tsx scripts/rewrite-admission-usn.ts",
+    "backfill:current-student-emails": "tsx scripts/backfill-current-student-emails.ts",
     "check-types": "tsc --noEmit --pretty",
     "format:write": "prettier --write \"**/*.{ts,tsx,mdx}\" --cache",
     "format:check": "prettier --check \"**/*.{ts,tsx,mdx}\" --cache",
