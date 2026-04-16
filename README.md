@@ -31,7 +31,7 @@ Make sure Docker Desktop is installed and running on your system:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/HitishRaoP/webcampus.git
+git clone https://github.com/KeshavRayas/webcampus.git
 cd webcampus
 ```
 
