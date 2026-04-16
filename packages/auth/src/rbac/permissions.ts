@@ -17,6 +17,7 @@ const statement = {
   faculty: ["create", "read", "update", "delete"],
   admission: ["create", "read", "update", "delete", "port"],
   student: ["read", "delete"],
+  courseCoordinator: ["create", "read", "update"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -26,6 +27,7 @@ export const roles = {
     ...adminAc.statements,
     courses: ["create", "read", "update", "delete"],
     courseAssignment: ["create", "read"],
+    courseCoordinator: ["create", "read", "update"],
     section: ["read"],
     semester: ["create", "read", "delete", "update"],
     department: ["create", "read", "update", "delete"],
@@ -66,6 +68,7 @@ export const roles = {
     section: ["create", "read", "delete"],
     semester: ["read"],
     courseAssignment: ["create", "read"],
+    courseCoordinator: ["create", "read", "update"],
   }),
   admission_admin: ac.newRole({
     semester: ["read"],

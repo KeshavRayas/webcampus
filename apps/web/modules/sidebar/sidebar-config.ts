@@ -4,6 +4,7 @@ import {
   BookOpenText,
   Building,
   CalendarDays,
+  ClipboardList,
   Fingerprint,
   GraduationCap,
   LayoutDashboard,
@@ -109,6 +110,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
             { name: "Course Configuration", url: "/department/courses" },
             { name: "Course Mapping", url: "/department/course-mapping" },
             { name: "Approvals", url: "/department/course-approvals" },
+            {
+              name: "Appoint Coordinators",
+              url: "/department/course-coordinators",
+            },
           ],
         },
         {
@@ -132,9 +137,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Courses",
           url: "/student/courses",
           icon: BookCopy,
-          children: [
-            { name: "Course Registration", url: "/student/courses" },
-          ],
+          children: [{ name: "Course Registration", url: "/student/courses" }],
         },
         {
           name: "Attendance",
@@ -181,6 +184,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Marks",
           url: "/faculty/marks",
           icon: BookOpenText,
+        },
+        {
+          name: "Question Paper Setup",
+          url: "/faculty/question-paper-setup",
+          icon: ClipboardList,
         },
         {
           name: "Profile",
