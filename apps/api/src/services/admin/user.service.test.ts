@@ -18,7 +18,13 @@ let users: UserRecord[] = [];
 const dbMock = {
   user: {
     findMany: async () => users,
-    update: async ({ where, data }: any) => {
+    update: async ({
+      where,
+      data,
+    }: {
+      where: { id: string };
+      data: { username: string | null; displayUsername: string | null };
+    }) => {
       const target = users.find((user) => user.id === where.id);
       if (!target) {
         throw new Error(`User ${where.id as string} not found`);

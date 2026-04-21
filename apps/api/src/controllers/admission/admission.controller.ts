@@ -172,6 +172,8 @@ export class AdmissionController {
   }
 
   static async submit(req: Request, res: Response): Promise<void> {
+    const uploadedFileUrls = new Set<string>();
+
     try {
       // 1. FOOLPROOF WAY: Get session directly from Better Auth
       const session = await auth.api.getSession({
@@ -200,9 +202,12 @@ export class AdmissionController {
           const file = files[field][0];
           const fileName = generateFileName(file.originalname, prefix);
           const result = await uploadToS3(file.buffer, fileName, file.mimetype);
-          if (result.success && result.url) {
-            fileUrls[field] = result.url;
+          if (!result.success || !result.url) {
+            throw new Error(`Failed to upload ${field}`);
           }
+
+          fileUrls[field] = result.url;
+          uploadedFileUrls.add(result.url);
         }
       };
 
@@ -230,6 +235,20 @@ export class AdmissionController {
         });
       }
     } catch (error) {
+      if (uploadedFileUrls.size > 0) {
+        try {
+          const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+          await Promise.all(
+            Array.from(uploadedFileUrls).map((url) => deleteFromS3(url))
+          );
+        } catch (cleanupError) {
+          logger.warn("Failed to clean up uploaded admission files", {
+            cleanupError,
+            uploadedFileUrls: Array.from(uploadedFileUrls),
+          });
+        }
+      }
+
       logger.error("Error submitting application", error);
       sendResponse({
         res,

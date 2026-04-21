@@ -67,8 +67,7 @@ type ManageSessionsModalProps = {
   isFetching: boolean;
   onPrevPage: () => void;
   onNextPage: () => void;
-  onOpenSession: (sessionId: string) => void;
-  onUpdateSession: (sessionId: string) => void;
+  onSelectSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
 };
 
@@ -95,17 +94,19 @@ export const ManageSessionsModal = ({
   isFetching,
   onPrevPage,
   onNextPage,
-  onOpenSession,
-  onUpdateSession,
+  onSelectSession,
   onDeleteSession,
 }: ManageSessionsModalProps) => {
+  const isMutatingSession = Boolean(openingSessionId || deletingSessionId);
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] w-[96vw] max-w-6xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-[96vw] max-w-[96vw] overflow-y-auto sm:w-[94vw] sm:max-w-5xl lg:max-w-6xl">
         <DialogHeader>
-          <DialogTitle>Manage Sessions</DialogTitle>
+          <DialogTitle>Edit Attendance Sessions</DialogTitle>
           <DialogDescription>
-            Filter, open, and maintain attendance sessions from a single panel.
+            Filter sessions by date, course, and section, then choose a session to
+            edit attendance.
           </DialogDescription>
         </DialogHeader>
 
@@ -141,7 +142,10 @@ export const ManageSessionsModal = ({
 
             <div className="space-y-2">
               <Label htmlFor="session-filter-course">Course</Label>
-              <Select value={filters.courseId} onValueChange={onCourseChange}>
+              <Select
+                value={filters.courseId || undefined}
+                onValueChange={onCourseChange}
+              >
                 <SelectTrigger id="session-filter-course" className="w-full">
                   <SelectValue placeholder="All courses" />
                 </SelectTrigger>
@@ -157,7 +161,10 @@ export const ManageSessionsModal = ({
 
             <div className="space-y-2">
               <Label htmlFor="session-filter-section">Section</Label>
-              <Select value={filters.sectionId} onValueChange={onSectionChange}>
+              <Select
+                value={filters.sectionId || undefined}
+                onValueChange={onSectionChange}
+              >
                 <SelectTrigger id="session-filter-section" className="w-full">
                   <SelectValue placeholder="All sections" />
                 </SelectTrigger>
@@ -229,25 +236,17 @@ export const ManageSessionsModal = ({
                   <Button
                     type="button"
                     size="sm"
-                    onClick={() => onOpenSession(session.id)}
-                    disabled={openingSessionId === session.id}
+                    onClick={() => onSelectSession(session.id)}
+                    disabled={isMutatingSession}
                   >
-                    {openingSessionId === session.id ? "Opening..." : "Open"}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onUpdateSession(session.id)}
-                  >
-                    Update
+                    {openingSessionId === session.id ? "Opening..." : "Edit Session"}
                   </Button>
                   <Button
                     type="button"
                     size="sm"
                     variant="destructive"
                     onClick={() => onDeleteSession(session.id)}
-                    disabled={deletingSessionId === session.id}
+                    disabled={isMutatingSession}
                   >
                     {deletingSessionId === session.id
                       ? "Deleting..."
@@ -258,25 +257,25 @@ export const ManageSessionsModal = ({
             ))}
 
             <div className="flex items-center justify-end gap-3 pt-1">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onPrevPage}
-                disabled={page <= 1 || isFetching}
-              >
-                Previous
-              </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onPrevPage}
+                  disabled={page <= 1 || isFetching || isMutatingSession}
+                >
+                  Previous
+                </Button>
               <span className="text-muted-foreground text-sm">
                 Page {page} of {totalPages}
               </span>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onNextPage}
-                disabled={page >= totalPages || isFetching}
-              >
-                Next
-              </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onNextPage}
+                  disabled={page >= totalPages || isFetching || isMutatingSession}
+                >
+                  Next
+                </Button>
             </div>
           </div>
         )}

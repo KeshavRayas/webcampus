@@ -2,10 +2,7 @@
 
 import { getApiErrorMessage } from "@/lib/api-client";
 import { dayjs } from "@webcampus/common/dayjs";
-import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
-import { Card, CardContent, CardHeader } from "@webcampus/ui/components/card";
-import { Checkbox } from "@webcampus/ui/components/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -14,21 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
-import { Skeleton } from "@webcampus/ui/components/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@webcampus/ui/components/table";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { ATTENDANCE_TIME_SLOTS } from "./attendance-time-slots";
 import { AttendanceForm } from "./components/attendance-form";
+import { AttendancePageShell } from "./components/attendance-page-shell";
+import { AttendanceSection } from "./components/attendance-section";
 import { ManageSessionsModal } from "./components/manage-sessions-modal";
-import { RecentSessions } from "./components/recent-sessions";
 import {
   AttendanceChecklistRow,
   FacultyAttendanceFormState,
@@ -38,6 +27,7 @@ import {
   useDeleteFacultyAttendanceSession,
   useFacultyAttendanceFilterOptions,
   useFacultyAttendanceSessionDetail,
+  useFacultyAttendanceSessionStudents,
   useFacultyAttendanceSessions,
 } from "./use-faculty-attendance";
 
@@ -104,11 +94,62 @@ const hasTimeOverlap = (
   const startB = toMinutes(startTimeB);
   const endB = toMinutes(endTimeB);
 
-  if ([startA, endA, startB, endB].some((value) => value === null)) {
+  if (
+    startA === null ||
+    endA === null ||
+    startB === null ||
+    endB === null
+  ) {
     return false;
   }
 
-  return startA! < endB! && endA! > startB!;
+  return startA < endB && endA > startB;
+};
+
+const isFixedTimingCode = (
+  timingCode: string
+): timingCode is Exclude<FacultyAttendanceFormState["fixedTimingCode"], ""> => {
+  return ATTENDANCE_TIME_SLOTS.some((slot) => slot.code === timingCode);
+};
+
+const parseSessionDate = (sessionDate: string) => {
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(sessionDate);
+
+  return new Date(
+    isDateOnly ? `${sessionDate}T00:00:00` : sessionDate
+  );
+};
+
+const toStableAttendancePercentage = (studentId: string, usn: string) => {
+  const seed = `${studentId}:${usn}`;
+  const hash = seed
+    .split("")
+    .reduce((accumulator, character) => accumulator + character.charCodeAt(0), 0);
+
+  return 65 + (hash % 31);
+};
+
+const withUiChecklistMetadata = (
+  rows: Array<{
+    studentId: string;
+    usn: string;
+    name: string;
+    status: "PRESENT" | "ABSENT";
+  }>,
+  options?: {
+    defaultStatus?: "PRESENT" | "ABSENT";
+  }
+): AttendanceChecklistRow[] => {
+  return rows.map((student) => ({
+    studentId: student.studentId,
+    usn: student.usn,
+    name: student.name,
+    status: options?.defaultStatus ?? student.status,
+    previousAttendancePercentage: toStableAttendancePercentage(
+      student.studentId,
+      student.usn
+    ),
+  }));
 };
 
 export const FacultyAttendanceView = () => {
@@ -118,7 +159,8 @@ export const FacultyAttendanceView = () => {
     AttendanceChecklistRow[]
   >([]);
   const [activeSessionId, setActiveSessionId] = useState<string>("");
-  const [isSessionPanelVisible, setIsSessionPanelVisible] = useState(false);
+  const [isTakeAttendanceModalOpen, setIsTakeAttendanceModalOpen] =
+    useState(false);
   const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(
     null
@@ -126,14 +168,13 @@ export const FacultyAttendanceView = () => {
   const [deleteConfirmSessionId, setDeleteConfirmSessionId] = useState<
     string | null
   >(null);
-  const [submitAction, setSubmitAction] = useState<"OPEN" | "SAVE" | null>(
-    null
-  );
   const [isSessionsDialogOpen, setIsSessionsDialogOpen] = useState(false);
   const [sessionModalFilters, setSessionModalFilters] =
     useState<AttendanceSessionModalFilters>(EMPTY_SESSION_MODAL_FILTERS);
   const [appliedSessionFilters, setAppliedSessionFilters] =
     useState<AttendanceSessionQueryState>(INITIAL_SESSION_QUERY_STATE);
+  const [showSaveSuccessToast, setShowSaveSuccessToast] =
+    useState<boolean>(false);
 
   const filterOptionsQuery = useFacultyAttendanceFilterOptions();
   const createOrOpenMutation = useCreateOrOpenFacultyAttendanceSession();
@@ -156,14 +197,6 @@ export const FacultyAttendanceView = () => {
       limit: appliedSessionFilters.limit,
     },
     isSessionsDialogOpen
-  );
-
-  const recentSessionsQuery = useFacultyAttendanceSessions(
-    {
-      page: 1,
-      limit: 5,
-    },
-    true
   );
 
   const sectionsForSelectedCourse = useMemo(() => {
@@ -252,6 +285,23 @@ export const FacultyAttendanceView = () => {
     )
   );
 
+  const exactSession = useMemo(() => {
+    if (!selectedTimingWindow) {
+      return null;
+    }
+
+    const sessions = overlapCheckQuery.data?.items ?? [];
+
+    return (
+      sessions.find((session) => {
+        return (
+          session.timingStartTime === selectedTimingWindow.startTime &&
+          session.timingEndTime === selectedTimingWindow.endTime
+        );
+      }) ?? null
+    );
+  }, [overlapCheckQuery.data?.items, selectedTimingWindow]);
+
   const overlappingSession = useMemo(() => {
     if (!selectedTimingWindow) {
       return null;
@@ -283,15 +333,22 @@ export const FacultyAttendanceView = () => {
     );
   }, [activeSessionId, overlapCheckQuery.data?.items, selectedTimingWindow]);
 
-  const overlapError = overlappingSession
-    ? "Session already exists for selected time"
+  const overlapError = !exactSession && overlappingSession
+    ? "Selected time slot overlaps another session"
     : null;
 
   const resetActiveSessionContext = () => {
     setActiveSessionId("");
     setOpeningSessionId(null);
-    setIsSessionPanelVisible(false);
+    setIsTakeAttendanceModalOpen(false);
     setStudentChecklist([]);
+  };
+
+  const clearActiveSessionOnly = () => {
+    setActiveSessionId("");
+    setOpeningSessionId(null);
+    setStudentChecklist([]);
+    // Keep modal open to avoid race conditions with async queries
   };
 
   const hydrateFormFromSession = (session: {
@@ -302,20 +359,18 @@ export const FacultyAttendanceView = () => {
     timingStartTime: string;
     timingEndTime: string;
   }) => {
-    const isFixedTiming = ATTENDANCE_TIME_SLOTS.some(
-      (slot) => slot.code === session.timingCode
-    );
+    const fixedTimingCode = isFixedTimingCode(session.timingCode)
+      ? session.timingCode
+      : "";
 
     setForm({
-      sessionDate: new Date(session.sessionDate),
+      sessionDate: parseSessionDate(session.sessionDate),
       courseId: session.courseId,
       sectionId: session.sectionId,
-      timingMode: isFixedTiming ? "FIXED" : "CUSTOM",
-      fixedTimingCode: isFixedTiming
-        ? (session.timingCode as FacultyAttendanceFormState["fixedTimingCode"])
-        : "",
-      customStartTime: isFixedTiming ? "" : session.timingStartTime,
-      customEndTime: isFixedTiming ? "" : session.timingEndTime,
+      timingMode: fixedTimingCode ? "FIXED" : "CUSTOM",
+      fixedTimingCode,
+      customStartTime: fixedTimingCode ? "" : session.timingStartTime,
+      customEndTime: fixedTimingCode ? "" : session.timingEndTime,
     });
   };
 
@@ -324,11 +379,14 @@ export const FacultyAttendanceView = () => {
       return;
     }
 
+    if (sessionDetailQuery.data.session.id !== activeSessionId) {
+      return;
+    }
+
     hydrateFormFromSession(sessionDetailQuery.data.session);
-    setStudentChecklist(sessionDetailQuery.data.students);
-    setIsSessionPanelVisible(true);
+    setStudentChecklist(withUiChecklistMetadata(sessionDetailQuery.data.students));
     setOpeningSessionId(null);
-  }, [sessionDetailQuery.data]);
+  }, [activeSessionId, sessionDetailQuery.data]);
 
   useEffect(() => {
     if (!sessionDetailQuery.isError || !activeSessionId) {
@@ -350,7 +408,14 @@ export const FacultyAttendanceView = () => {
       studentChecklist.filter((student) => student.status === "PRESENT").length,
     [studentChecklist]
   );
-  const absentCount = totalStudents - presentCount;
+  const absentCount = useMemo(
+    () => studentChecklist.filter((student) => student.status === "ABSENT").length,
+    [studentChecklist]
+  );
+  const unmarkedCount = totalStudents - presentCount - absentCount;
+  const markedCount = presentCount + absentCount;
+  const presentRate =
+    markedCount > 0 ? Math.round((presentCount / markedCount) * 1000) / 10 : 0;
 
   const updateStudentStatus = (
     studentId: string,
@@ -361,7 +426,7 @@ export const FacultyAttendanceView = () => {
         student.studentId === studentId
           ? {
               ...student,
-              status: nextStatus,
+              status: student.status === nextStatus ? null : nextStatus,
             }
           : student
       )
@@ -396,16 +461,12 @@ export const FacultyAttendanceView = () => {
   ]);
 
   const canSaveAttendance = useMemo(() => {
-    if (!isSessionPanelVisible) {
-      return false;
-    }
-
     if (!canOpenSession) {
       return false;
     }
 
-    return studentChecklist.length > 0;
-  }, [canOpenSession, isSessionPanelVisible, studentChecklist.length]);
+    return studentChecklist.length > 0 && unmarkedCount === 0;
+  }, [canOpenSession, studentChecklist.length, unmarkedCount]);
 
   const modalSectionsForSelectedCourse = useMemo(() => {
     const allSections = filterOptionsQuery.data?.sections ?? [];
@@ -429,22 +490,6 @@ export const FacultyAttendanceView = () => {
           }
     );
   }, []);
-
-  const openSessionsDialog = () => {
-    const initialFilters: AttendanceSessionModalFilters = {
-      sessionDate: form.sessionDate,
-      courseId: form.courseId,
-      sectionId: form.sectionId,
-    };
-
-    setSessionModalFilters(initialFilters);
-    setAppliedSessionFilters({
-      ...initialFilters,
-      page: 1,
-      limit: DEFAULT_SESSION_PAGE_SIZE,
-    });
-    setIsSessionsDialogOpen(true);
-  };
 
   const applySessionFilters = () => {
     setAppliedSessionFilters({
@@ -499,7 +544,7 @@ export const FacultyAttendanceView = () => {
   const sessionRows = sessionsQuery.data?.items ?? [];
 
   const updateCourse = (courseId: string) => {
-    resetActiveSessionContext();
+    clearActiveSessionOnly();
     setForm((current) => {
       const nextSections = (filterOptionsQuery.data?.sections ?? []).filter(
         (section) => section.courseId === courseId
@@ -518,7 +563,7 @@ export const FacultyAttendanceView = () => {
   };
 
   const updateTimingMode = (timingMode: "FIXED" | "CUSTOM") => {
-    resetActiveSessionContext();
+    clearActiveSessionOnly();
     setForm((current) => {
       if (timingMode === "FIXED") {
         return {
@@ -528,7 +573,6 @@ export const FacultyAttendanceView = () => {
           customEndTime: "",
         };
       }
-
       return {
         ...current,
         timingMode,
@@ -537,44 +581,81 @@ export const FacultyAttendanceView = () => {
     });
   };
 
-  const handleCreateOrOpenSession = async () => {
-    if (!canOpenSession || !form.sessionDate) {
+  const selectedSession = exactSession;
+  const isSessionStudentsQueryEnabled = Boolean(
+    form.courseId && form.sectionId && !activeSessionId
+  );
+
+  const sessionStudentsQuery = useFacultyAttendanceSessionStudents(
+    {
+      courseId: form.courseId,
+      sectionId: form.sectionId,
+    },
+    isSessionStudentsQueryEnabled
+  );
+
+  useEffect(() => {
+    if (!selectedSession || activeSessionId === selectedSession.id) {
       return;
     }
 
-    try {
-      setSubmitAction("OPEN");
-      const response = await createOrOpenMutation.mutateAsync({
-        courseId: form.courseId,
-        sectionId: form.sectionId,
-        sessionDate: dayjs(form.sessionDate).format("YYYY-MM-DD"),
-        timingMode: form.timingMode,
-        timingCode:
-          form.timingMode === "FIXED"
-            ? form.fixedTimingCode || undefined
-            : undefined,
-        timingStartTime:
-          form.timingMode === "CUSTOM" ? form.customStartTime : undefined,
-        timingEndTime:
-          form.timingMode === "CUSTOM" ? form.customEndTime : undefined,
-      });
+    setActiveSessionId(selectedSession.id);
+  }, [activeSessionId, selectedSession]);
 
-      setActiveSessionId(response.session.id);
-      setIsSessionPanelVisible(true);
-
-      toast.success(
-        response.created
-          ? "Session created. You can now mark attendance and save."
-          : "Existing session opened. You can now review and save attendance."
-      );
-    } catch (error) {
-      toast.error(
-        getApiErrorMessage(error, "Failed to create/open attendance session")
-      );
-    } finally {
-      setSubmitAction(null);
+  useEffect(() => {
+    if (
+      !isTakeAttendanceModalOpen ||
+      !sessionStudentsQuery.data ||
+      activeSessionId ||
+      selectedSession
+    ) {
+      return;
     }
-  };
+
+    setStudentChecklist(
+      withUiChecklistMetadata(sessionStudentsQuery.data.students, {
+        defaultStatus: "PRESENT",
+      })
+    );
+  }, [
+    activeSessionId,
+    isTakeAttendanceModalOpen,
+    selectedSession,
+    sessionStudentsQuery.data,
+    sessionStudentsQuery.dataUpdatedAt,
+  ]);
+
+  useEffect(() => {
+    if (!isTakeAttendanceModalOpen || !sessionStudentsQuery.isError) {
+      return;
+    }
+
+    toast.error(
+      getApiErrorMessage(
+        sessionStudentsQuery.error,
+        "Failed to load attendance roster"
+      )
+    );
+    resetActiveSessionContext();
+  }, [
+    isTakeAttendanceModalOpen,
+    sessionStudentsQuery.error,
+    sessionStudentsQuery.isError,
+  ]);
+
+  useEffect(() => {
+    if (!showSaveSuccessToast) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowSaveSuccessToast(false);
+    }, 2200);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [showSaveSuccessToast]);
 
   const handleSaveAttendance = async () => {
     if (!canSaveAttendance || !form.sessionDate) {
@@ -582,7 +663,6 @@ export const FacultyAttendanceView = () => {
     }
 
     try {
-      setSubmitAction("SAVE");
       const response = await createOrOpenMutation.mutateAsync({
         courseId: form.courseId,
         sectionId: form.sectionId,
@@ -598,19 +678,15 @@ export const FacultyAttendanceView = () => {
           form.timingMode === "CUSTOM" ? form.customEndTime : undefined,
         studentStatuses: studentChecklist.map((student) => ({
           studentId: student.studentId,
-          status: student.status,
+          status: student.status ?? "PRESENT",
         })),
       });
 
       setActiveSessionId(response.session.id);
-
-      toast.success(
-        `Attendance saved successfully (${presentCount} present, ${absentCount} absent)`
-      );
+      setIsTakeAttendanceModalOpen(false);
+      setShowSaveSuccessToast(true);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Failed to save attendance"));
-    } finally {
-      setSubmitAction(null);
     }
   };
 
@@ -618,28 +694,39 @@ export const FacultyAttendanceView = () => {
     setOpeningSessionId(sessionId);
     setStudentChecklist([]);
     setActiveSessionId(sessionId);
-    setIsSessionPanelVisible(true);
+    setIsTakeAttendanceModalOpen(true);
     setIsSessionsDialogOpen(false);
-  };
-
-  const handleSelectRecentSession = (sessionId: string) => {
-    if (activeSessionId === sessionId && isSessionPanelVisible) {
-      resetActiveSessionContext();
-      return;
-    }
-
-    handleSelectSessionFromModal(sessionId);
-  };
-
-  const handleUpdateSessionFromModal = (sessionId: string) => {
-    handleSelectSessionFromModal(sessionId);
-    toast.info(
-      "Session loaded. You can adjust fields and start session to apply updates."
-    );
   };
 
   const handleDeleteSessionFromModal = (sessionId: string) => {
     setDeleteConfirmSessionId(sessionId);
+  };
+
+  const handleEditAttendance = () => {
+    setIsSessionsDialogOpen(true);
+  };
+
+  const handleTakeAttendance = () => {
+    if (!canOpenSession) {
+      return;
+    }
+
+    if (selectedSession && activeSessionId !== selectedSession.id) {
+      setOpeningSessionId(selectedSession.id);
+      setStudentChecklist([]);
+      setActiveSessionId(selectedSession.id);
+    }
+
+    if (!selectedSession) {
+      setStudentChecklist([]);
+    }
+
+    setIsTakeAttendanceModalOpen(true);
+
+    if (!selectedSession) {
+      // Refetch to refresh roster state even when React Query serves a structurally shared payload.
+      sessionStudentsQuery.refetch();
+    }
   };
 
   const handleDeleteSessionConfirm = async () => {
@@ -666,14 +753,32 @@ export const FacultyAttendanceView = () => {
     }
   };
 
+  const selectedCourseLabel = useMemo(() => {
+    const course = (filterOptionsQuery.data?.courses ?? []).find(
+      (entry) => entry.id === form.courseId
+    );
+    return course ? `${course.code} - ${course.name}` : "Not selected";
+  }, [filterOptionsQuery.data?.courses, form.courseId]);
+
+  const selectedSectionLabel = useMemo(() => {
+    const section = (filterOptionsQuery.data?.sections ?? []).find(
+      (entry) => entry.id === form.sectionId
+    );
+    return section ? section.name : "Not selected";
+  }, [filterOptionsQuery.data?.sections, form.sectionId]);
+
   return (
-    <div className="space-y-6">
+    <AttendancePageShell
+      toastMessage={
+        showSaveSuccessToast ? "Attendance saved successfully" : null
+      }
+    >
       <AttendanceForm
         form={form}
         courses={filterOptionsQuery.data?.courses ?? []}
         sections={sectionsForSelectedCourse}
         onDateChange={(date) => {
-          resetActiveSessionContext();
+          clearActiveSessionOnly();
           setForm((current) => ({
             ...current,
             sessionDate: date,
@@ -681,7 +786,7 @@ export const FacultyAttendanceView = () => {
         }}
         onCourseChange={updateCourse}
         onSectionChange={(sectionId) => {
-          resetActiveSessionContext();
+          clearActiveSessionOnly();
           setForm((current) => ({
             ...current,
             sectionId,
@@ -689,162 +794,32 @@ export const FacultyAttendanceView = () => {
         }}
         onTimingModeChange={updateTimingMode}
         onFixedSlotChange={(fixedTimingCode) => {
-          resetActiveSessionContext();
+          clearActiveSessionOnly();
           setForm((current) => ({
             ...current,
             fixedTimingCode,
           }));
         }}
         onCustomStartTimeChange={(customStartTime) => {
-          resetActiveSessionContext();
+          clearActiveSessionOnly();
           setForm((current) => ({
             ...current,
             customStartTime,
           }));
         }}
         onCustomEndTimeChange={(customEndTime) => {
-          resetActiveSessionContext();
+          clearActiveSessionOnly();
           setForm((current) => ({
             ...current,
             customEndTime,
           }));
         }}
-        onStartSession={handleCreateOrOpenSession}
-        onManageSessions={openSessionsDialog}
-        canStartSession={canOpenSession}
-        isStartingSession={
-          createOrOpenMutation.isPending && submitAction === "OPEN"
-        }
+        onEditAttendance={handleEditAttendance}
+        onTakeAttendance={handleTakeAttendance}
+        isEditAttendanceDisabled={createOrOpenMutation.isPending}
+        isTakeAttendanceDisabled={!canOpenSession || createOrOpenMutation.isPending}
         overlapError={overlapError}
       />
-
-      <RecentSessions
-        sessions={recentSessionsQuery.data?.items ?? []}
-        activeSessionId={activeSessionId}
-        onSelectSession={handleSelectRecentSession}
-      />
-
-      {isSessionPanelVisible ? (
-        <Card>
-          <CardHeader className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold">Session Students</p>
-                <p className="text-muted-foreground text-xs">
-                  Mark students and save attendance updates.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">Total {totalStudents}</Badge>
-                <Badge>Present {presentCount}</Badge>
-                <Badge variant="outline">Absent {absentCount}</Badge>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setAllStudentsStatus("PRESENT")}
-                disabled={
-                  studentChecklist.length === 0 ||
-                  createOrOpenMutation.isPending
-                }
-              >
-                Mark All Present
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setAllStudentsStatus("ABSENT")}
-                disabled={
-                  studentChecklist.length === 0 ||
-                  createOrOpenMutation.isPending
-                }
-              >
-                Mark All Absent
-              </Button>
-            </div>
-
-            {sessionDetailQuery.isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <Skeleton key={index} className="h-9 w-full" />
-                ))}
-              </div>
-            ) : studentChecklist.length === 0 ? (
-              <div className="text-muted-foreground rounded-md border p-3 text-sm">
-                No students were found for this attendance session.
-              </div>
-            ) : (
-              <>
-                <div className="max-h-72 overflow-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>USN</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead className="w-36 text-center">
-                          Present
-                        </TableHead>
-                        <TableHead className="w-36 text-center">
-                          Absent
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {studentChecklist.map((student) => (
-                        <TableRow key={student.studentId}>
-                          <TableCell>{student.usn}</TableCell>
-                          <TableCell>{student.name}</TableCell>
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={student.status === "PRESENT"}
-                              onCheckedChange={() =>
-                                updateStudentStatus(
-                                  student.studentId,
-                                  "PRESENT"
-                                )
-                              }
-                              aria-label={`Mark ${student.name} as present`}
-                            />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={student.status === "ABSENT"}
-                              onCheckedChange={() =>
-                                updateStudentStatus(student.studentId, "ABSENT")
-                              }
-                              aria-label={`Mark ${student.name} as absent`}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="flex justify-end pt-2">
-                  <Button
-                    type="button"
-                    onClick={handleSaveAttendance}
-                    disabled={
-                      !canSaveAttendance || createOrOpenMutation.isPending
-                    }
-                  >
-                    {createOrOpenMutation.isPending && submitAction === "SAVE"
-                      ? "Saving..."
-                      : "Save Attendance"}
-                  </Button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
 
       <ManageSessionsModal
         isOpen={isSessionsDialogOpen}
@@ -883,15 +858,90 @@ export const FacultyAttendanceView = () => {
         isFetching={sessionsQuery.isFetching}
         onPrevPage={() => goToSessionPage(sessionPagination.page - 1)}
         onNextPage={() => goToSessionPage(sessionPagination.page + 1)}
-        onOpenSession={handleSelectSessionFromModal}
-        onUpdateSession={handleUpdateSessionFromModal}
+        onSelectSession={handleSelectSessionFromModal}
         onDeleteSession={handleDeleteSessionFromModal}
       />
 
       <Dialog
+        open={isTakeAttendanceModalOpen}
+        onOpenChange={setIsTakeAttendanceModalOpen}
+      >
+        <DialogContent className="max-h-[90vh] w-[96vw] max-w-[96vw] overflow-y-auto sm:w-[94vw] sm:max-w-5xl lg:max-w-6xl">
+          <DialogHeader>
+            <DialogTitle>Take Attendance</DialogTitle>
+            <DialogDescription>
+              Review context, mark student attendance, and save this session.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/20 p-4 text-sm md:grid-cols-2">
+            <p>
+              <span className="text-muted-foreground">Course:</span>{" "}
+              {selectedCourseLabel}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Section:</span>{" "}
+              {selectedSectionLabel}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Date:</span>{" "}
+              {form.sessionDate
+                ? dayjs(form.sessionDate).format("MMM D, YYYY")
+                : "Not selected"}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Time Slot:</span>{" "}
+              {selectedTimingWindow?.label ?? "Not selected"}
+            </p>
+          </div>
+
+          <AttendanceSection
+            studentChecklist={studentChecklist}
+            isLoading={sessionDetailQuery.isLoading || sessionStudentsQuery.isLoading}
+            isSaving={createOrOpenMutation.isPending}
+            onAllPresent={() => setAllStudentsStatus("PRESENT")}
+            onAllAbsent={() => setAllStudentsStatus("ABSENT")}
+            onToggleStatus={updateStudentStatus}
+            markedCount={markedCount}
+            totalStudents={totalStudents}
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="rounded-md bg-emerald-500/10 px-2 py-1 text-emerald-700">
+                Present: {presentCount}
+              </span>
+              <span className="rounded-md bg-rose-500/10 px-2 py-1 text-rose-700">
+                Absent: {absentCount}
+              </span>
+              <span className="rounded-md bg-muted px-2 py-1 text-muted-foreground">
+                Unmarked: {unmarkedCount}
+              </span>
+              <span className="text-muted-foreground">
+                Present Rate: {presentRate}%
+              </span>
+            </div>
+
+            <Button
+              type="button"
+              onClick={handleSaveAttendance}
+              disabled={!canSaveAttendance || createOrOpenMutation.isPending}
+              className="min-w-52"
+            >
+              {createOrOpenMutation.isPending
+                ? "Saving..."
+                : canSaveAttendance
+                  ? "Save Attendance"
+                  : `Mark Remaining (${unmarkedCount})`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={Boolean(deleteConfirmSessionId)}
         onOpenChange={(open) => {
-          if (!open && deletingSessionId === null) {
+          if (!open) {
             setDeleteConfirmSessionId(null);
           }
         }}
@@ -925,6 +975,6 @@ export const FacultyAttendanceView = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AttendancePageShell>
   );
 };

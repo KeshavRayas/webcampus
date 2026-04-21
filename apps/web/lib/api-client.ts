@@ -120,7 +120,8 @@ export const stripDepartmentOwnershipFields = <
     departmentName?: unknown;
   },
 >(payload: T): Omit<T, "departmentId" | "departmentName"> => {
-  const { departmentId: _departmentId, departmentName: _departmentName, ...rest } =
-    payload;
+  const rest = { ...payload };
+  delete rest.departmentId;
+  delete rest.departmentName;
   return rest;
 };

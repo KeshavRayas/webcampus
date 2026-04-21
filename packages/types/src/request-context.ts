@@ -14,11 +14,9 @@ export type DepartmentRequestContext = RequestContext & {
   departmentName?: string;
 };
 
-declare global {
-  namespace Express {
-    interface Request {
-      requestContext?: RequestContext;
-    }
+declare module "express-serve-static-core" {
+  interface Request {
+    requestContext?: RequestContext;
   }
 }
 

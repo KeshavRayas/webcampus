@@ -8,6 +8,13 @@ export interface CascadingFilterOptions {
   departments?: Array<{ id: string }>;
 }
 
+type CascadingFilterState = {
+  academicTerm?: string;
+  semester?: string;
+  departmentId?: string;
+  departmentName?: string;
+};
+
 /**
  * Hook to handle cascading filter dependencies and auto-clear orphaned filter values.
  * When a parent filter value is deleted (no longer exists in current options),
@@ -17,14 +24,15 @@ export interface CascadingFilterOptions {
  * @param setFilters - State setter for filters
  * @param options - Available options for each filter
  */
-export function useCascadingFilterSync<T extends Record<string, string>>(
+export function useCascadingFilterSync<
+  T extends Record<string, string | undefined> & CascadingFilterState,
+>(
   filters: T,
   setFilters: (updater: T | ((prev: T) => T)) => void,
   options: CascadingFilterOptions
 ) {
   useEffect(() => {
-    const departmentFilterValue =
-      (filters as any).departmentId || (filters as any).departmentName;
+    const departmentFilterValue = filters.departmentId || filters.departmentName;
 
     // Check if selected academic term still exists
     if (
@@ -37,8 +45,8 @@ export function useCascadingFilterSync<T extends Record<string, string>>(
         academicTerm: "",
         semester: "",
         // Clear department if cascade deletion also affects it
-        ...((prev as any).departmentId ? { departmentId: "" } : {}),
-        ...((prev as any).departmentName ? { departmentName: "" } : {}),
+        ...(prev.departmentId ? { departmentId: "" } : {}),
+        ...(prev.departmentName ? { departmentName: "" } : {}),
       }));
       return;
     }
@@ -64,8 +72,8 @@ export function useCascadingFilterSync<T extends Record<string, string>>(
     ) {
       setFilters((prev) => ({
         ...prev,
-        ...((prev as any).departmentId ? { departmentId: "" } : {}),
-        ...((prev as any).departmentName ? { departmentName: "" } : {}),
+        ...(prev.departmentId ? { departmentId: "" } : {}),
+        ...(prev.departmentName ? { departmentName: "" } : {}),
       }));
       return;
     }

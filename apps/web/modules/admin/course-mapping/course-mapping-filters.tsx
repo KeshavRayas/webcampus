@@ -6,7 +6,6 @@ import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import {
-  CourseMappingStatusItemType,
   CourseMappingStatusResponseType,
   CourseResponseDTO,
 } from "@webcampus/schemas/department";

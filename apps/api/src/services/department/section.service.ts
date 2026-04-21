@@ -685,36 +685,42 @@ export class SectionService {
         orderBy: { abbreviation: "asc" },
       });
 
-      const counts = await Promise.all(
-        departments.map(async (department) => {
-          const unassignedCount = await db.student.count({
-            where: {
-              department: {
-                is: {
-                  id: department.id,
-                },
-              },
-              currentSemester: semesterNumber,
-              studentSections: {
-                none: {
-                  section: {
-                    semester: {
-                      academicTermId: termId,
+      const departmentNames = departments.map((department) => department.name);
+
+      const unassignedCounts =
+        departmentNames.length > 0
+          ? await db.student.groupBy({
+              by: ["departmentName"],
+              where: {
+                departmentName: { in: departmentNames },
+                currentSemester: semesterNumber,
+                studentSections: {
+                  none: {
+                    section: {
+                      semester: {
+                        academicTermId: termId,
+                      },
                     },
                   },
                 },
               },
-            },
-          });
+              _count: {
+                _all: true,
+              },
+            })
+          : [];
 
-          return {
-            departmentId: department.id,
-            departmentName: department.name,
-            abbreviation: department.abbreviation,
-            unassignedCount,
-          };
-        })
+      const unassignedCountByDepartmentName = new Map(
+        unassignedCounts.map((item) => [item.departmentName, item._count._all])
       );
+
+      const counts = departments.map((department) => ({
+        departmentId: department.id,
+        departmentName: department.name,
+        abbreviation: department.abbreviation,
+        unassignedCount:
+          unassignedCountByDepartmentName.get(department.name) ?? 0,
+      }));
 
       return {
         status: "success",

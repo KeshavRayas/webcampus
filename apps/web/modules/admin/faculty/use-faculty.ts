@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
 export const useUpdateFaculty = (departmentId: string) => {
+  void departmentId;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -50,6 +51,7 @@ export const useUpdateFaculty = (departmentId: string) => {
 };
 
 export const useDeleteFaculty = (departmentId: string) => {
+  void departmentId;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
@@ -97,6 +99,7 @@ export const useCreateHodAccount = (departmentId: string) => {
 };
 
 export const useReassignHodAccount = (departmentId: string) => {
+  void departmentId;
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, hodId }: { id: string; hodId: string }) => {

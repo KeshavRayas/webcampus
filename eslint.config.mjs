@@ -9,6 +9,9 @@ import playwright from "eslint-plugin-playwright";
 
 export default defineConfig([
   {
+    ignores: ["**/.next/**", "packages/db/generated/**"],
+  },
+  {
     ...playwright.configs['flat/recommended'],
     files: ['tests/**'],
     rules: {

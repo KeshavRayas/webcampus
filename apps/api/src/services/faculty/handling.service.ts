@@ -208,6 +208,12 @@ const buildPaginatedResponse = <T>(
   };
 };
 
+const toStudentSectionCountKey = (
+  sectionId: string,
+  semester: number,
+  academicYear: string
+) => `${sectionId}::${semester}::${academicYear}`;
+
 const matchesIdentifierOrName = (
   value: { id: string; name?: string | null } | null | undefined,
   filter: string
@@ -458,19 +464,64 @@ export class FacultyHandlingService {
         }),
       ]);
 
-      const items: FacultyHandlingAssignmentDTO[] = await Promise.all(
-        assignments.map(async (assignment) => {
-          let studentCount = assignment.batch?._count.students ?? 0;
+      const theoryCountFilters = Array.from(
+        new Map(
+          assignments
+            .filter((assignment) => assignment.assignmentType === "THEORY")
+            .map((assignment) => {
+              const key = toStudentSectionCountKey(
+                assignment.section.id,
+                assignment.semester,
+                assignment.academicYear
+              );
 
-          if (assignment.assignmentType === "THEORY") {
-            studentCount = await db.studentSection.count({
-              where: {
-                sectionId: assignment.section.id,
-                semester: assignment.semester,
-                academicYear: assignment.academicYear,
-              },
-            });
-          }
+              return [
+                key,
+                {
+                  sectionId: assignment.section.id,
+                  semester: assignment.semester,
+                  academicYear: assignment.academicYear,
+                },
+              ] as const;
+            })
+        ).values()
+      );
+
+      const theoryCounts = theoryCountFilters.length
+        ? await db.studentSection.groupBy({
+            by: ["sectionId", "semester", "academicYear"],
+            where: {
+              OR: theoryCountFilters,
+            },
+            _count: {
+              _all: true,
+            },
+          })
+        : [];
+
+      const theoryCountByKey = new Map(
+        theoryCounts.map((count) => [
+          toStudentSectionCountKey(
+            count.sectionId,
+            count.semester,
+            count.academicYear
+          ),
+          count._count._all,
+        ])
+      );
+
+      const items: FacultyHandlingAssignmentDTO[] = assignments.map(
+        (assignment) => {
+          const studentCount =
+            assignment.assignmentType === "THEORY"
+              ? (theoryCountByKey.get(
+                  toStudentSectionCountKey(
+                    assignment.section.id,
+                    assignment.semester,
+                    assignment.academicYear
+                  )
+                ) ?? 0)
+              : (assignment.batch?._count.students ?? 0);
 
           return {
             assignmentId: assignment.id,
@@ -483,7 +534,7 @@ export class FacultyHandlingService {
             assignmentType: assignment.assignmentType,
             studentCount,
           };
-        })
+        }
       );
 
       return {

@@ -51,9 +51,7 @@ const buildTempUsn = (yearSuffix: string, branchCode: string, serial: number): s
 };
 
 async function rewriteAdmissionAndStudentUsn(): Promise<void> {
-  const prisma = db as any;
-
-  const admissions = (await prisma.admission.findMany({
+  const admissions = (await db.admission.findMany({
     where: {
       OR: [{ tempUsn: { not: null } }, { studentId: { not: null } }],
     },
