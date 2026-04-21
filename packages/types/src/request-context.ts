@@ -14,9 +14,13 @@ export type DepartmentRequestContext = RequestContext & {
   departmentName?: string;
 };
 
-declare module "express-serve-static-core" {
-  interface Request {
-    requestContext?: RequestContext;
+/* eslint-disable @typescript-eslint/no-namespace */
+
+declare global {
+  namespace Express {
+    interface Request {
+      requestContext?: RequestContext;
+    }
   }
 }
 
