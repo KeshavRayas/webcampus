@@ -1,3 +1,5 @@
+// IMPORTANT: Import dayjs to handle date boundaries accurately
+import { dayjs } from "@webcampus/common/dayjs";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
@@ -5,8 +7,8 @@ import {
   AcademicTermResponseType,
   CreateAcademicTermType,
   CreateSemesterConfigType,
-  SemesterLifecycleStatusType,
   SemesterConfigResponseType,
+  SemesterLifecycleStatusType,
 } from "@webcampus/schemas/admin";
 import { UUIDType } from "@webcampus/schemas/common";
 import { BaseResponse } from "@webcampus/types/api";
@@ -17,21 +19,31 @@ export class SemesterService {
     endDate: Date,
     now: Date
   ): SemesterLifecycleStatusType {
-    if (startDate <= now && endDate >= now) return "ACTIVE";
-    if (endDate < now) return "ARCHIVED";
-    return "INACTIVE";
+    // Force day boundaries so time-of-day doesn't cause premature archiving
+    const start = dayjs(startDate).startOf("day");
+    const end = dayjs(endDate).endOf("day");
+    const today = dayjs(now);
+
+    if (today.isBefore(start)) return "INACTIVE"; // Future
+    if (today.isAfter(end)) return "ARCHIVED"; // Past
+    return "ACTIVE"; // Current
   }
 
   private static getTermStatus(
     semesterStatuses: SemesterLifecycleStatusType[]
   ): SemesterLifecycleStatusType {
+    // If no semesters are configured yet, the term is INACTIVE
+    if (semesterStatuses.length === 0) return "INACTIVE";
+
+    // If ANY semester is active, the whole term stays active
     if (semesterStatuses.includes("ACTIVE")) return "ACTIVE";
-    if (
-      semesterStatuses.length > 0 &&
-      semesterStatuses.every((status) => status === "ARCHIVED")
-    ) {
+
+    // ONLY if EVERY single semester is archived does the term become archived
+    if (semesterStatuses.every((status) => status === "ARCHIVED")) {
       return "ARCHIVED";
     }
+
+    // Catch-all (e.g., term has a mix of INACTIVE/Future and ARCHIVED/Past, but nothing active right now)
     return "INACTIVE";
   }
 
@@ -85,8 +97,12 @@ export class SemesterService {
           throw new Error("Academic Term not found");
         }
 
+        // Apply dayjs boundary check here too to remain consistent
+        const today = dayjs(now);
         const hasStartedSemester = existingTerm.Semester.some(
-          (semester) => semester.startDate <= now
+          (semester) =>
+            today.isAfter(dayjs(semester.startDate).startOf("day")) ||
+            today.isSame(dayjs(semester.startDate).startOf("day"))
         );
 
         if (hasStartedSemester) {

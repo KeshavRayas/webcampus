@@ -26,40 +26,51 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { mutate: deleteTerm, isPending: isDeleting } = useDeleteAcademicTerm();
-  const lifecycleStatus = term.status ?? (term.isCurrent ? "ACTIVE" : "INACTIVE");
+  const lifecycleStatus =
+    term.status ?? (term.isCurrent ? "ACTIVE" : "INACTIVE");
+
+  // Issue 5: Check if the term is archived
+  const isArchived = lifecycleStatus === "ARCHIVED";
 
   const handleDelete = () => {
     deleteTerm(term.id);
     setIsDeleteDialogOpen(false);
   };
 
-  // Compute active formats
-  const groupedSemesters: Record<string, number[]> = {};
+  // Issue 4: Compute both Configured and Active formats
+  const configuredSemesters: Record<string, number[]> = {};
+  const activeSemesters: Record<string, number[]> = {};
+
   if (term.Semester) {
     term.Semester.forEach((sem) => {
-      const list = groupedSemesters[sem.programType] ?? [];
-      list.push(sem.semesterNumber);
-      groupedSemesters[sem.programType] = list;
+      // Group all for 'Configured'
+      const configList = configuredSemesters[sem.programType] ?? [];
+      configList.push(sem.semesterNumber);
+      configuredSemesters[sem.programType] = configList;
+
+      // Group only active for 'Active' (Assuming your schema uses sem.status)
+      if (sem.status === "ACTIVE") {
+        const activeList = activeSemesters[sem.programType] ?? [];
+        activeList.push(sem.semesterNumber);
+        activeSemesters[sem.programType] = activeList;
+      }
     });
   }
 
-  const activeSummaries: string[] = [];
-  const ugSems = groupedSemesters["UG"] || [];
-  if (ugSems.length > 0) {
-    activeSummaries.push(
-      `UG (Sems: ${ugSems.sort((a, b) => a - b).join(", ")})`
-    );
-  }
-  const pgSems = groupedSemesters["PG"] || [];
-  if (pgSems.length > 0) {
-    activeSummaries.push(
-      `PG (Sems: ${pgSems.sort((a, b) => a - b).join(", ")})`
-    );
-  }
-  const activeSummaryString =
-    activeSummaries.length > 0
-      ? `Configured: ${activeSummaries.join(" | ")}`
-      : "No nested configurations yet.";
+  // Helper function to format the semester strings
+  const formatSummary = (record: Record<string, number[]>) => {
+    const summaries: string[] = [];
+    if (record["UG"] && record["UG"].length > 0) {
+      summaries.push(`UG: ${record["UG"].sort((a, b) => a - b).join(", ")}`);
+    }
+    if (record["PG"] && record["PG"].length > 0) {
+      summaries.push(`PG: ${record["PG"].sort((a, b) => a - b).join(", ")}`);
+    }
+    return summaries.join(" | ");
+  };
+
+  const configuredSummaryString = formatSummary(configuredSemesters) || "None";
+  const activeSummaryString = formatSummary(activeSemesters) || "None";
 
   return (
     <>
@@ -92,8 +103,16 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
                 {lifecycleStatus}
               </span>
             </div>
-            <CardDescription className="mt-1">
-              {activeSummaryString}
+            {/* Issue 4: Show both configured and active statuses below each other */}
+            <CardDescription className="mt-2 flex flex-col gap-1">
+              <span className="text-muted-foreground">
+                Configured: {configuredSummaryString}
+              </span>
+
+              {/* Highlight the active semester in Black Bold */}
+              <span className="font-bold text-black dark:text-white">
+                Active: {activeSummaryString}
+              </span>
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -113,6 +132,10 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
               variant="outline"
               size="sm"
               onClick={() => setIsExpanded(!isExpanded)}
+              disabled={isArchived} // Issue 5: Disable config if archived
+              title={
+                isArchived ? "Archived terms cannot be configured" : undefined
+              }
             >
               {isExpanded ? (
                 <>
