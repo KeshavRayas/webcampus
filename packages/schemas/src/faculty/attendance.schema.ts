@@ -61,6 +61,7 @@ export const CreateOrOpenFacultyAttendanceSessionSchema = z
   .object({
     courseId: z.uuid("Invalid course ID"),
     sectionId: z.uuid("Invalid section ID"),
+    batchId: z.uuid("Invalid batch ID").optional(),
     sessionDate: z.coerce.date({
       error: "Invalid session date",
     }),
@@ -152,6 +153,7 @@ export const CreateOrOpenFacultyAttendanceSessionSchema = z
 export const FacultyAttendanceSessionStudentsQuerySchema = z.object({
   courseId: z.uuid("Invalid course ID"),
   sectionId: z.uuid("Invalid section ID"),
+  batchId: z.uuid("Invalid batch ID").optional(),
 });
 
 export const FacultyAttendanceSessionDetailQuerySchema = z.object({
@@ -170,6 +172,7 @@ export const ListFacultyAttendanceSessionsQuerySchema = z.object({
     .optional(),
   courseId: z.uuid("Invalid course ID").optional(),
   sectionId: z.uuid("Invalid section ID").optional(),
+  batchId: z.uuid("Invalid batch ID").optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
@@ -187,6 +190,9 @@ export const FacultyAttendanceFilterOptionsResponseSchema = z.object({
       id: z.uuid("Invalid section ID"),
       name: z.string(),
       courseId: z.uuid("Invalid course ID"),
+      assignmentType: z.enum(["THEORY", "LAB"]).optional(),
+      batchId: z.uuid("Invalid batch ID").optional(),
+      labBatchNumber: z.number().int().positive().optional(),
     })
   ),
 });
@@ -195,6 +201,8 @@ export const FacultyAttendanceSessionResponseSchema = z.object({
   id: z.string(),
   courseId: z.uuid("Invalid course ID"),
   sectionId: z.uuid("Invalid section ID"),
+  batchId: z.uuid("Invalid batch ID").optional(),
+  labBatchNumber: z.number().int().positive().optional(),
   sessionDate: z.date(),
   timingCode: z.string(),
   timingLabel: z.string(),

@@ -24,6 +24,7 @@ export type CreateOrOpenSessionPayload =
 export type SessionStudentsQuery = {
   courseId: string;
   sectionId: string;
+  batchId?: string;
 };
 
 export type SessionDetailQuery = {
@@ -90,6 +91,10 @@ export const listFacultyAttendanceSessions = async (
       params.sectionId = filters.sectionId;
     }
 
+    if (filters.batchId) {
+      params.batchId = filters.batchId;
+    }
+
     if (filters.sessionDate) {
       params.sessionDate = dayjs(filters.sessionDate).format("YYYY-MM-DD");
     }
@@ -134,6 +139,7 @@ export const getFacultyAttendanceSessionStudents = async (
       params: {
         courseId: query.courseId,
         sectionId: query.sectionId,
+        batchId: query.batchId,
       },
     });
 

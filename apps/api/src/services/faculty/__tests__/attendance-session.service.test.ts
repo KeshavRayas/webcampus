@@ -406,6 +406,51 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
     aggregateAttendanceForStudentCourseCalls = [];
   });
 
+  it("includes lab batch metadata in attendance filter options", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dbMock.courseAssignment as any).findMany = async () => [
+      {
+        assignmentType: "THEORY",
+        batchId: null,
+        batch: null,
+        course: { id: "course-1", code: "CS301", name: "Algorithms" },
+        section: { id: "section-1", name: "A" },
+      },
+      {
+        assignmentType: "LAB",
+        batchId: "batch-1",
+        batch: { name: "Lab Batch 1" },
+        course: { id: "course-1", code: "CS301", name: "Algorithms" },
+        section: { id: "section-1", name: "A" },
+      },
+    ];
+
+    const { FacultyAttendanceSessionService } = await import(
+      "../attendance-session.service"
+    );
+
+    const response =
+      await FacultyAttendanceSessionService.getFilterOptions("user-1");
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+
+    expect(response.data.courses).toHaveLength(1);
+    expect(response.data.sections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "section-1",
+          courseId: "course-1",
+          assignmentType: "LAB",
+          batchId: "batch-1",
+          labBatchNumber: 1,
+        }),
+      ])
+    );
+  });
+
   it("lists existing sessions for the authenticated faculty", async () => {
     sessions.push({
       id: "session-list-1",

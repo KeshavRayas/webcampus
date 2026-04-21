@@ -1,32 +1,49 @@
 import { dayjs } from "@webcampus/common/dayjs";
 import { Button } from "@webcampus/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@webcampus/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@webcampus/ui/components/card";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@webcampus/ui/components/select";
-import { ToggleGroup, ToggleGroupItem } from "@webcampus/ui/components/toggle-group";
-import { Clock } from "lucide-react";
 import {
-  FacultyAttendanceFormState,
-} from "../faculty-attendance-types";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@webcampus/ui/components/select";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@webcampus/ui/components/toggle-group";
+import { Clock } from "lucide-react";
 import { ATTENDANCE_TIME_SLOTS } from "../attendance-time-slots";
+import { FacultyAttendanceFormState } from "../faculty-attendance-types";
 
 type CourseOption = {
   id: string;
   code: string;
   name: string;
+  label?: string;
 };
 
 type SectionOption = {
   id: string;
   name: string;
   courseId: string;
+  label?: string;
 };
 
 type AttendanceFormProps = {
   form: FacultyAttendanceFormState;
   courses: CourseOption[];
   sections: SectionOption[];
+  selectedCourseValue?: string;
+  selectedSectionValue?: string;
   onDateChange: (date: Date | undefined) => void;
   onCourseChange: (courseId: string) => void;
   onSectionChange: (sectionId: string) => void;
@@ -80,7 +97,11 @@ const formatCustomTimingLabel = (startTime: string, endTime: string) => {
   const startMinutes = toMinutes(startTime);
   const endMinutes = toMinutes(endTime);
 
-  if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+  if (
+    startMinutes === null ||
+    endMinutes === null ||
+    endMinutes <= startMinutes
+  ) {
     return null;
   }
 
@@ -93,6 +114,8 @@ export const AttendanceForm = ({
   form,
   courses,
   sections,
+  selectedCourseValue,
+  selectedSectionValue,
   onDateChange,
   onCourseChange,
   onSectionChange,
@@ -132,9 +155,11 @@ export const AttendanceForm = ({
   }) => (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <div className="relative h-11 overflow-hidden rounded-xl border border-input bg-background">
+      <div className="border-input bg-background relative h-11 overflow-hidden rounded-xl border">
         <div className="text-muted-foreground pointer-events-none flex h-full items-center justify-between px-4 text-sm">
-          <span className={value ? "text-foreground font-medium tabular-nums" : ""}>
+          <span
+            className={value ? "text-foreground font-medium tabular-nums" : ""}
+          >
             {value || "--:--"}
           </span>
           <Clock className="h-4 w-4" />
@@ -152,11 +177,12 @@ export const AttendanceForm = ({
   );
 
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
+    <Card className="border-primary/20 from-background via-background to-primary/5 bg-gradient-to-br">
       <CardHeader>
         <CardTitle>Session Context</CardTitle>
         <CardDescription>
-          Set date, course, section, and time slot before editing or taking attendance.
+          Set date, course, section, and time slot before editing or taking
+          attendance.
         </CardDescription>
       </CardHeader>
 
@@ -172,7 +198,11 @@ export const AttendanceForm = ({
             <Input
               id="attendance-session-date"
               type="date"
-              value={form.sessionDate ? dayjs(form.sessionDate).format("YYYY-MM-DD") : ""}
+              value={
+                form.sessionDate
+                  ? dayjs(form.sessionDate).format("YYYY-MM-DD")
+                  : ""
+              }
               onChange={(event) => {
                 const value = event.target.value;
                 onDateChange(value ? new Date(`${value}T00:00:00`) : undefined);
@@ -188,17 +218,20 @@ export const AttendanceForm = ({
             >
               Course
             </Label>
-            <Select value={form.courseId || undefined} onValueChange={onCourseChange}>
+            <Select
+              value={selectedCourseValue || form.courseId || undefined}
+              onValueChange={onCourseChange}
+            >
               <SelectTrigger
                 id="attendance-course"
-                className="h-11 rounded-xl border-white/10 bg-background/60"
+                className="bg-background/60 h-11 rounded-xl border-white/10"
               >
                 <SelectValue placeholder="Select course" />
               </SelectTrigger>
               <SelectContent>
                 {courses.map((course) => (
                   <SelectItem key={course.id} value={course.id}>
-                    {course.code} - {course.name}
+                    {course.label ?? `${course.code} - ${course.name}`}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -213,19 +246,22 @@ export const AttendanceForm = ({
               Section
             </Label>
             <Select
-              value={form.sectionId || undefined}
+              value={selectedSectionValue || form.sectionId || undefined}
               onValueChange={onSectionChange}
             >
               <SelectTrigger
                 id="attendance-section"
-                className="h-11 rounded-xl border-white/10 bg-background/60"
+                className="bg-background/60 h-11 rounded-xl border-white/10"
               >
                 <SelectValue placeholder="Select section" />
               </SelectTrigger>
               <SelectContent>
                 {sections.map((section) => (
-                  <SelectItem key={`${section.id}:${section.courseId}`} value={section.id}>
-                    {section.name}
+                  <SelectItem
+                    key={`${section.id}:${section.courseId}`}
+                    value={section.id}
+                  >
+                    {section.label ?? section.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -266,7 +302,9 @@ export const AttendanceForm = ({
 
             {form.timingMode === "FIXED" ? (
               <div className="space-y-2">
-                <Label id="attendance-time-slot-label">Predefined Time Slot</Label>
+                <Label id="attendance-time-slot-label">
+                  Predefined Time Slot
+                </Label>
                 <ToggleGroup
                   type="single"
                   value={form.fixedTimingCode || undefined}
@@ -283,7 +321,7 @@ export const AttendanceForm = ({
                       key={slot.code}
                       value={slot.code}
                       variant="outline"
-                      className="h-auto w-full justify-start rounded-xl border-border/60 bg-background/60 px-4 py-3 text-left text-sm leading-relaxed whitespace-normal transition-all duration-200 hover:border-primary/40 hover:bg-primary/5 data-[state=on]:border-primary/70 data-[state=on]:bg-primary/10 data-[state=on]:text-primary data-[state=on]:shadow-sm"
+                      className="border-border/60 bg-background/60 hover:border-primary/40 hover:bg-primary/5 data-[state=on]:border-primary/70 data-[state=on]:bg-primary/10 data-[state=on]:text-primary h-auto w-full justify-start whitespace-normal rounded-xl px-4 py-3 text-left text-sm leading-relaxed transition-all duration-200 data-[state=on]:shadow-sm"
                       aria-label={`Use predefined slot ${slot.label}`}
                     >
                       {slot.label}
@@ -309,9 +347,15 @@ export const AttendanceForm = ({
             )}
             {form.timingMode === "CUSTOM" &&
             isCustomTimingValid &&
-            formatCustomTimingLabel(form.customStartTime, form.customEndTime) ? (
+            formatCustomTimingLabel(
+              form.customStartTime,
+              form.customEndTime
+            ) ? (
               <p className="text-muted-foreground text-sm">
-                {formatCustomTimingLabel(form.customStartTime, form.customEndTime)}
+                {formatCustomTimingLabel(
+                  form.customStartTime,
+                  form.customEndTime
+                )}
               </p>
             ) : null}
             {customTimingError ? (
@@ -320,9 +364,11 @@ export const AttendanceForm = ({
           </fieldset>
         </div>
 
-        {overlapError ? <p className="text-destructive text-sm">{overlapError}</p> : null}
+        {overlapError ? (
+          <p className="text-destructive text-sm">{overlapError}</p>
+        ) : null}
 
-        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border/60 pt-4">
+        <div className="border-border/60 flex flex-wrap items-center justify-end gap-3 border-t pt-4">
           <Button
             type="button"
             variant="outline"

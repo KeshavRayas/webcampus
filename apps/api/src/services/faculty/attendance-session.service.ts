@@ -34,6 +34,24 @@ type TimingWindow = {
 type FacultyCourseSectionAssignmentContext = {
   semester: number;
   academicYear: string;
+  assignmentType: "THEORY" | "LAB";
+  batchId: string | null;
+};
+
+const toLabBatchNumber = (
+  batchName: string | null | undefined
+): number | undefined => {
+  if (!batchName) {
+    return undefined;
+  }
+
+  const match = batchName.match(/(\d+)/);
+  if (!match) {
+    return undefined;
+  }
+
+  const parsed = Number(match[1]);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 };
 
 const FIXED_TIMING_WINDOWS: Record<string, TimingWindow> = {
@@ -128,6 +146,7 @@ const toSessionDto = (session: {
   id: string;
   courseId: string;
   sectionId: string;
+  batchId: string | null;
   sessionDate: Date;
   timingCode: string;
   timingLabel: string;
@@ -141,11 +160,16 @@ const toSessionDto = (session: {
   Section: {
     name: string;
   };
+  Batch?: {
+    name: string;
+  } | null;
 }): FacultyAttendanceSessionDTO => {
   return {
     id: session.id,
     courseId: session.courseId,
     sectionId: session.sectionId,
+    batchId: session.batchId ?? undefined,
+    labBatchNumber: toLabBatchNumber(session.Batch?.name),
     sessionDate: session.sessionDate.toISOString(),
     timingCode: session.timingCode,
     timingLabel: session.timingLabel,
@@ -163,6 +187,7 @@ const toSessionDtoFromScalars = (
     id: string;
     courseId: string;
     sectionId: string;
+    batchId: string | null;
     sessionDate: Date;
     timingCode: string;
     timingLabel: string;
@@ -177,6 +202,7 @@ const toSessionDtoFromScalars = (
     id: session.id,
     courseId: session.courseId,
     sectionId: session.sectionId,
+    batchId: session.batchId ?? undefined,
     sessionDate: session.sessionDate.toISOString(),
     timingCode: session.timingCode,
     timingLabel: session.timingLabel,
@@ -255,14 +281,16 @@ export class FacultyAttendanceSessionService {
   private static async getFacultyCourseSectionContext(
     facultyId: string,
     courseId: string,
-    sectionId: string
+    sectionId: string,
+    batchId?: string
   ): Promise<FacultyCourseSectionAssignmentContext> {
     const assignment = await db.courseAssignment.findFirst({
       where: {
         facultyId,
         courseId,
         sectionId,
-        assignmentType: "THEORY",
+        assignmentType: batchId ? "LAB" : "THEORY",
+        ...(batchId ? { batchId } : {}),
         course: {
           approvalStatus: "APPROVED",
         },
@@ -271,6 +299,8 @@ export class FacultyAttendanceSessionService {
         id: true,
         semester: true,
         academicYear: true,
+        assignmentType: true,
+        batchId: true,
       },
     });
 
@@ -283,6 +313,8 @@ export class FacultyAttendanceSessionService {
     return {
       semester: assignment.semester,
       academicYear: assignment.academicYear,
+      assignmentType: assignment.assignmentType,
+      batchId: assignment.batchId,
     };
   }
 
@@ -295,7 +327,8 @@ export class FacultyAttendanceSessionService {
       const assignmentContext = await this.getFacultyCourseSectionContext(
         facultyId,
         query.courseId,
-        query.sectionId
+        query.sectionId,
+        query.batchId
       );
 
       const students = await db.studentSection.findMany({
@@ -303,6 +336,18 @@ export class FacultyAttendanceSessionService {
           sectionId: query.sectionId,
           semester: assignmentContext.semester,
           academicYear: assignmentContext.academicYear,
+          ...(assignmentContext.assignmentType === "LAB" &&
+          assignmentContext.batchId
+            ? {
+                student: {
+                  batches: {
+                    some: {
+                      id: assignmentContext.batchId,
+                    },
+                  },
+                },
+              }
+            : {}),
         },
         orderBy: {
           student: {
@@ -353,12 +398,21 @@ export class FacultyAttendanceSessionService {
       const assignments = await db.courseAssignment.findMany({
         where: {
           facultyId,
-          assignmentType: "THEORY",
+          assignmentType: {
+            in: ["THEORY", "LAB"],
+          },
           course: {
             approvalStatus: "APPROVED",
           },
         },
         select: {
+          assignmentType: true,
+          batchId: true,
+          batch: {
+            select: {
+              name: true,
+            },
+          },
           course: {
             select: {
               id: true,
@@ -381,16 +435,29 @@ export class FacultyAttendanceSessionService {
       >();
       const sectionsMap = new Map<
         string,
-        { id: string; name: string; courseId: string }
+        {
+          id: string;
+          name: string;
+          courseId: string;
+          assignmentType?: "THEORY" | "LAB";
+          batchId?: string;
+          labBatchNumber?: number;
+        }
       >();
 
       for (const assignment of assignments) {
         coursesMap.set(assignment.course.id, assignment.course);
-        sectionsMap.set(`${assignment.section.id}:${assignment.course.id}`, {
-          id: assignment.section.id,
-          name: assignment.section.name,
-          courseId: assignment.course.id,
-        });
+        sectionsMap.set(
+          `${assignment.section.id}:${assignment.course.id}:${assignment.batchId ?? "theory"}`,
+          {
+            id: assignment.section.id,
+            name: assignment.section.name,
+            courseId: assignment.course.id,
+            assignmentType: assignment.assignmentType,
+            batchId: assignment.batchId ?? undefined,
+            labBatchNumber: toLabBatchNumber(assignment.batch?.name),
+          }
+        );
       }
 
       return {
@@ -428,6 +495,11 @@ export class FacultyAttendanceSessionService {
             },
           },
           Section: {
+            select: {
+              name: true,
+            },
+          },
+          Batch: {
             select: {
               name: true,
             },
@@ -494,20 +566,19 @@ export class FacultyAttendanceSessionService {
       const assignmentContext = await this.getFacultyCourseSectionContext(
         facultyId,
         payload.courseId,
-        payload.sectionId
+        payload.sectionId,
+        payload.batchId
       );
 
       const sessionDate = toSessionDateUtc(payload.sessionDate);
       const timing = getTimingWindow(payload);
 
-      const existingSession = await db.classSession.findUnique({
+      const existingSessionCandidates = await db.classSession.findMany({
         where: {
-          courseId_sectionId_sessionDate_timingCode: {
-            courseId: payload.courseId,
-            sectionId: payload.sectionId,
-            sessionDate,
-            timingCode: timing.code,
-          },
+          courseId: payload.courseId,
+          sectionId: payload.sectionId,
+          batchId: payload.batchId ?? null,
+          sessionDate,
         },
         include: {
           Course: {
@@ -521,8 +592,17 @@ export class FacultyAttendanceSessionService {
               name: true,
             },
           },
+          Batch: {
+            select: {
+              name: true,
+            },
+          },
         },
       });
+      const existingSession =
+        existingSessionCandidates.find(
+          (session) => session.timingCode === timing.code
+        ) ?? null;
       if (existingSession && existingSession.facultyId !== facultyId) {
         return {
           status: "error",
@@ -582,6 +662,7 @@ export class FacultyAttendanceSessionService {
               courseId: payload.courseId,
               sectionId: payload.sectionId,
               facultyId,
+              batchId: payload.batchId ?? null,
               sessionDate,
               timingCode: timing.code,
               timingLabel: timing.label,
@@ -596,6 +677,11 @@ export class FacultyAttendanceSessionService {
                 },
               },
               Section: {
+                select: {
+                  name: true,
+                },
+              },
+              Batch: {
                 select: {
                   name: true,
                 },
@@ -822,6 +908,10 @@ export class FacultyAttendanceSessionService {
         where.sectionId = query.sectionId;
       }
 
+      if (query.batchId) {
+        where.batchId = query.batchId;
+      }
+
       if (query.sessionDate) {
         const dayStart = new Date(`${query.sessionDate}T00:00:00.000Z`);
         const nextDayStart = new Date(`${query.sessionDate}T00:00:00.000Z`);
@@ -855,6 +945,11 @@ export class FacultyAttendanceSessionService {
                 name: true,
               },
             },
+            Batch: {
+              select: {
+                name: true,
+              },
+            },
           },
         });
 
@@ -883,6 +978,7 @@ export class FacultyAttendanceSessionService {
             id: true,
             courseId: true,
             sectionId: true,
+            batchId: true,
             sessionDate: true,
             timingCode: true,
             timingLabel: true,

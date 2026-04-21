@@ -184,6 +184,7 @@ model Batch {
   name             String
   sectionId        String
   section          Section            @relation(fields: [sectionId], references: [id])
+  ClassSession     ClassSession[]
   CourseAssignment CourseAssignment[]
   students         Student[]          @relation("BatchStudents")
 
@@ -641,6 +642,7 @@ model ClassSession {
   courseId         String
   sectionId        String
   facultyId        String
+  batchId          String?
   sessionDate      DateTime
   createdAt        DateTime           @default(now())
   timingCode       String
@@ -648,13 +650,15 @@ model ClassSession {
   timingStartTime  String
   timingEndTime    String
   AttendanceRecord AttendanceRecord[]
+  Batch            Batch?             @relation(fields: [batchId], references: [id], onDelete: SetNull)
   Course           Course             @relation(fields: [courseId], references: [id])
   Faculty          Faculty            @relation(fields: [facultyId], references: [id])
   Section          Section            @relation(fields: [sectionId], references: [id])
 
-  @@unique([courseId, sectionId, sessionDate, timingCode])
+  @@unique([courseId, sectionId, sessionDate, timingCode, batchId])
   @@index([courseId])
   @@index([sectionId])
+  @@index([batchId])
 }
 
 model CourseCoordinator {

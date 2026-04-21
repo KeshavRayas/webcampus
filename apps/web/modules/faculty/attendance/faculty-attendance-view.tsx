@@ -27,14 +27,15 @@ import {
   useDeleteFacultyAttendanceSession,
   useFacultyAttendanceFilterOptions,
   useFacultyAttendanceSessionDetail,
-  useFacultyAttendanceSessionStudents,
   useFacultyAttendanceSessions,
+  useFacultyAttendanceSessionStudents,
 } from "./use-faculty-attendance";
 
 type AttendanceSessionModalFilters = {
   sessionDate: Date | undefined;
   courseId: string;
   sectionId: string;
+  batchId?: string;
 };
 
 type AttendanceSessionQueryState = AttendanceSessionModalFilters & {
@@ -48,6 +49,7 @@ const EMPTY_SESSION_MODAL_FILTERS: AttendanceSessionModalFilters = {
   sessionDate: undefined,
   courseId: "",
   sectionId: "",
+  batchId: undefined,
 };
 
 const INITIAL_SESSION_QUERY_STATE: AttendanceSessionQueryState = {
@@ -60,10 +62,45 @@ const INITIAL_FORM_STATE: FacultyAttendanceFormState = {
   sessionDate: undefined,
   courseId: "",
   sectionId: "",
+  batchId: undefined,
   timingMode: "FIXED",
   fixedTimingCode: "",
   customStartTime: "",
   customEndTime: "",
+};
+
+const COURSE_SELECTION_DELIMITER = "::";
+
+const toCourseSelectionKey = (courseId: string, batchId?: string) => {
+  return `${courseId}${COURSE_SELECTION_DELIMITER}${batchId ?? "theory"}`;
+};
+
+const parseCourseSelectionKey = (value: string) => {
+  const [courseId = "", rawBatchId] = value.split(COURSE_SELECTION_DELIMITER);
+  return {
+    courseId,
+    batchId: rawBatchId && rawBatchId !== "theory" ? rawBatchId : undefined,
+  };
+};
+
+const parseSectionSelectionKey = (value: string) => {
+  const [sectionId = "", rawBatchId] = value.split(COURSE_SELECTION_DELIMITER);
+  return {
+    sectionId,
+    batchId: rawBatchId && rawBatchId !== "theory" ? rawBatchId : undefined,
+  };
+};
+
+const formatCourseDropdownLabel = (
+  code: string,
+  name: string,
+  labBatchNumber?: number
+) => {
+  if (!labBatchNumber) {
+    return `${code} - ${name}`;
+  }
+
+  return `${code}-${name}(Lab Batch ${labBatchNumber})`;
 };
 
 const toMinutes = (value: string) => {
@@ -94,12 +131,7 @@ const hasTimeOverlap = (
   const startB = toMinutes(startTimeB);
   const endB = toMinutes(endTimeB);
 
-  if (
-    startA === null ||
-    endA === null ||
-    startB === null ||
-    endB === null
-  ) {
+  if (startA === null || endA === null || startB === null || endB === null) {
     return false;
   }
 
@@ -115,16 +147,17 @@ const isFixedTimingCode = (
 const parseSessionDate = (sessionDate: string) => {
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(sessionDate);
 
-  return new Date(
-    isDateOnly ? `${sessionDate}T00:00:00` : sessionDate
-  );
+  return new Date(isDateOnly ? `${sessionDate}T00:00:00` : sessionDate);
 };
 
 const toStableAttendancePercentage = (studentId: string, usn: string) => {
   const seed = `${studentId}:${usn}`;
   const hash = seed
     .split("")
-    .reduce((accumulator, character) => accumulator + character.charCodeAt(0), 0);
+    .reduce(
+      (accumulator, character) => accumulator + character.charCodeAt(0),
+      0
+    );
 
   return 65 + (hash % 31);
 };
@@ -155,6 +188,12 @@ const withUiChecklistMetadata = (
 export const FacultyAttendanceView = () => {
   const [form, setForm] =
     useState<FacultyAttendanceFormState>(INITIAL_FORM_STATE);
+  const [courseSelectionKey, setCourseSelectionKey] = useState<string>("");
+  const [sectionSelectionKey, setSectionSelectionKey] = useState<string>("");
+  const [modalCourseSelectionKey, setModalCourseSelectionKey] =
+    useState<string>("");
+  const [modalSectionSelectionKey, setModalSectionSelectionKey] =
+    useState<string>("");
   const [studentChecklist, setStudentChecklist] = useState<
     AttendanceChecklistRow[]
   >([]);
@@ -193,21 +232,85 @@ export const FacultyAttendanceView = () => {
         : undefined,
       courseId: appliedSessionFilters.courseId || undefined,
       sectionId: appliedSessionFilters.sectionId || undefined,
+      batchId: appliedSessionFilters.batchId,
       page: appliedSessionFilters.page,
       limit: appliedSessionFilters.limit,
     },
     isSessionsDialogOpen
   );
 
-  const sectionsForSelectedCourse = useMemo(() => {
-    const allSections = filterOptionsQuery.data?.sections ?? [];
+  const assignmentOptions = useMemo(() => {
+    const courses = filterOptionsQuery.data?.courses ?? [];
+    const sections = filterOptionsQuery.data?.sections ?? [];
+    const courseById = new Map(courses.map((course) => [course.id, course]));
 
-    if (!form.courseId) {
-      return allSections;
+    return sections
+      .map((section) => {
+        const course = courseById.get(section.courseId);
+        if (!course) {
+          return null;
+        }
+
+        const selectionKey = toCourseSelectionKey(course.id, section.batchId);
+        return {
+          selectionKey,
+          courseId: course.id,
+          sectionId: section.id,
+          batchId: section.batchId,
+          sectionName: section.name,
+          courseCode: course.code,
+          courseName: course.name,
+          labBatchNumber: section.labBatchNumber,
+          courseLabel: formatCourseDropdownLabel(
+            course.code,
+            course.name,
+            section.labBatchNumber
+          ),
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+  }, [filterOptionsQuery.data?.courses, filterOptionsQuery.data?.sections]);
+
+  const courseOptions = useMemo(() => {
+    const optionsByKey = new Map<
+      string,
+      { id: string; code: string; name: string; label: string }
+    >();
+
+    for (const assignment of assignmentOptions) {
+      optionsByKey.set(assignment.selectionKey, {
+        id: assignment.selectionKey,
+        code: assignment.courseCode,
+        name: assignment.courseName,
+        label: assignment.courseLabel,
+      });
     }
 
-    return allSections.filter((section) => section.courseId === form.courseId);
-  }, [filterOptionsQuery.data?.sections, form.courseId]);
+    return Array.from(optionsByKey.values());
+  }, [assignmentOptions]);
+
+  const sectionsForSelectedCourse = useMemo(() => {
+    const selectedCourse = parseCourseSelectionKey(courseSelectionKey);
+
+    const filteredAssignments = assignmentOptions.filter((assignment) => {
+      if (!selectedCourse.courseId) {
+        return true;
+      }
+
+      if (assignment.courseId !== selectedCourse.courseId) {
+        return false;
+      }
+
+      return (assignment.batchId ?? undefined) === selectedCourse.batchId;
+    });
+
+    return filteredAssignments.map((assignment) => ({
+      id: `${assignment.sectionId}${COURSE_SELECTION_DELIMITER}${assignment.batchId ?? "theory"}`,
+      name: assignment.sectionName,
+      courseId: assignment.courseId,
+      label: assignment.sectionName,
+    }));
+  }, [assignmentOptions, courseSelectionKey]);
 
   const selectedFixedSlot = useMemo(() => {
     if (!form.fixedTimingCode) {
@@ -274,6 +377,7 @@ export const FacultyAttendanceView = () => {
         : undefined,
       courseId: form.courseId || undefined,
       sectionId: form.sectionId || undefined,
+      batchId: form.batchId,
       page: 1,
       limit: 200,
     },
@@ -333,9 +437,10 @@ export const FacultyAttendanceView = () => {
     );
   }, [activeSessionId, overlapCheckQuery.data?.items, selectedTimingWindow]);
 
-  const overlapError = !exactSession && overlappingSession
-    ? "Selected time slot overlaps another session"
-    : null;
+  const overlapError =
+    !exactSession && overlappingSession
+      ? "Selected time slot overlaps another session"
+      : null;
 
   const resetActiveSessionContext = () => {
     setActiveSessionId("");
@@ -355,6 +460,7 @@ export const FacultyAttendanceView = () => {
     sessionDate: string;
     courseId: string;
     sectionId: string;
+    batchId?: string;
     timingCode: string;
     timingStartTime: string;
     timingEndTime: string;
@@ -367,11 +473,19 @@ export const FacultyAttendanceView = () => {
       sessionDate: parseSessionDate(session.sessionDate),
       courseId: session.courseId,
       sectionId: session.sectionId,
+      batchId: session.batchId,
       timingMode: fixedTimingCode ? "FIXED" : "CUSTOM",
       fixedTimingCode,
       customStartTime: fixedTimingCode ? "" : session.timingStartTime,
       customEndTime: fixedTimingCode ? "" : session.timingEndTime,
     });
+
+    setCourseSelectionKey(
+      toCourseSelectionKey(session.courseId, session.batchId)
+    );
+    setSectionSelectionKey(
+      `${session.sectionId}${COURSE_SELECTION_DELIMITER}${session.batchId ?? "theory"}`
+    );
   };
 
   useEffect(() => {
@@ -384,7 +498,9 @@ export const FacultyAttendanceView = () => {
     }
 
     hydrateFormFromSession(sessionDetailQuery.data.session);
-    setStudentChecklist(withUiChecklistMetadata(sessionDetailQuery.data.students));
+    setStudentChecklist(
+      withUiChecklistMetadata(sessionDetailQuery.data.students)
+    );
     setOpeningSessionId(null);
   }, [activeSessionId, sessionDetailQuery.data]);
 
@@ -409,7 +525,8 @@ export const FacultyAttendanceView = () => {
     [studentChecklist]
   );
   const absentCount = useMemo(
-    () => studentChecklist.filter((student) => student.status === "ABSENT").length,
+    () =>
+      studentChecklist.filter((student) => student.status === "ABSENT").length,
     [studentChecklist]
   );
   const unmarkedCount = totalStudents - presentCount - absentCount;
@@ -469,16 +586,27 @@ export const FacultyAttendanceView = () => {
   }, [canOpenSession, studentChecklist.length, unmarkedCount]);
 
   const modalSectionsForSelectedCourse = useMemo(() => {
-    const allSections = filterOptionsQuery.data?.sections ?? [];
+    const selectedCourse = parseCourseSelectionKey(modalCourseSelectionKey);
 
-    if (!sessionModalFilters.courseId) {
-      return allSections;
-    }
+    const filteredAssignments = assignmentOptions.filter((assignment) => {
+      if (!selectedCourse.courseId) {
+        return true;
+      }
 
-    return allSections.filter(
-      (section) => section.courseId === sessionModalFilters.courseId
-    );
-  }, [filterOptionsQuery.data?.sections, sessionModalFilters.courseId]);
+      if (assignment.courseId !== selectedCourse.courseId) {
+        return false;
+      }
+
+      return (assignment.batchId ?? undefined) === selectedCourse.batchId;
+    });
+
+    return filteredAssignments.map((assignment) => ({
+      id: `${assignment.sectionId}${COURSE_SELECTION_DELIMITER}${assignment.batchId ?? "theory"}`,
+      name: assignment.sectionName,
+      courseId: assignment.courseId,
+      label: assignment.sectionName,
+    }));
+  }, [assignmentOptions, modalCourseSelectionKey]);
 
   useEffect(() => {
     setForm((current) =>
@@ -502,24 +630,21 @@ export const FacultyAttendanceView = () => {
   const resetSessionFilters = () => {
     setSessionModalFilters(EMPTY_SESSION_MODAL_FILTERS);
     setAppliedSessionFilters(INITIAL_SESSION_QUERY_STATE);
+    setModalCourseSelectionKey("");
+    setModalSectionSelectionKey("");
   };
 
-  const handleSessionCourseChange = (courseId: string) => {
-    setSessionModalFilters((current) => {
-      const nextSections = (filterOptionsQuery.data?.sections ?? []).filter(
-        (section) => section.courseId === courseId
-      );
+  const handleSessionCourseChange = (selectionValue: string) => {
+    const parsed = parseCourseSelectionKey(selectionValue);
+    setModalCourseSelectionKey(selectionValue);
+    setModalSectionSelectionKey("");
 
-      const isCurrentSectionStillValid = nextSections.some(
-        (section) => section.id === current.sectionId
-      );
-
-      return {
-        ...current,
-        courseId,
-        sectionId: isCurrentSectionStillValid ? current.sectionId : "",
-      };
-    });
+    setSessionModalFilters((current) => ({
+      ...current,
+      courseId: parsed.courseId,
+      batchId: parsed.batchId,
+      sectionId: "",
+    }));
   };
 
   const goToSessionPage = (nextPage: number) => {
@@ -543,21 +668,18 @@ export const FacultyAttendanceView = () => {
 
   const sessionRows = sessionsQuery.data?.items ?? [];
 
-  const updateCourse = (courseId: string) => {
+  const updateCourse = (selectionValue: string) => {
+    const parsed = parseCourseSelectionKey(selectionValue);
     clearActiveSessionOnly();
+    setCourseSelectionKey(selectionValue);
+    setSectionSelectionKey("");
+
     setForm((current) => {
-      const nextSections = (filterOptionsQuery.data?.sections ?? []).filter(
-        (section) => section.courseId === courseId
-      );
-
-      const isCurrentSectionStillValid = nextSections.some(
-        (section) => section.id === current.sectionId
-      );
-
       return {
         ...current,
-        courseId,
-        sectionId: isCurrentSectionStillValid ? current.sectionId : "",
+        courseId: parsed.courseId,
+        batchId: parsed.batchId,
+        sectionId: "",
       };
     });
   };
@@ -590,6 +712,7 @@ export const FacultyAttendanceView = () => {
     {
       courseId: form.courseId,
       sectionId: form.sectionId,
+      batchId: form.batchId,
     },
     isSessionStudentsQueryEnabled
   );
@@ -666,6 +789,7 @@ export const FacultyAttendanceView = () => {
       const response = await createOrOpenMutation.mutateAsync({
         courseId: form.courseId,
         sectionId: form.sectionId,
+        batchId: form.batchId,
         sessionDate: dayjs(form.sessionDate).format("YYYY-MM-DD"),
         timingMode: form.timingMode,
         timingCode:
@@ -754,18 +878,23 @@ export const FacultyAttendanceView = () => {
   };
 
   const selectedCourseLabel = useMemo(() => {
-    const course = (filterOptionsQuery.data?.courses ?? []).find(
-      (entry) => entry.id === form.courseId
+    const course = assignmentOptions.find(
+      (entry) =>
+        entry.courseId === form.courseId &&
+        (entry.batchId ?? undefined) === (form.batchId ?? undefined)
     );
-    return course ? `${course.code} - ${course.name}` : "Not selected";
-  }, [filterOptionsQuery.data?.courses, form.courseId]);
+    return course ? course.courseLabel : "Not selected";
+  }, [assignmentOptions, form.batchId, form.courseId]);
 
   const selectedSectionLabel = useMemo(() => {
-    const section = (filterOptionsQuery.data?.sections ?? []).find(
-      (entry) => entry.id === form.sectionId
+    const section = assignmentOptions.find(
+      (entry) =>
+        entry.sectionId === form.sectionId &&
+        entry.courseId === form.courseId &&
+        (entry.batchId ?? undefined) === (form.batchId ?? undefined)
     );
-    return section ? section.name : "Not selected";
-  }, [filterOptionsQuery.data?.sections, form.sectionId]);
+    return section ? section.sectionName : "Not selected";
+  }, [assignmentOptions, form.batchId, form.courseId, form.sectionId]);
 
   return (
     <AttendancePageShell
@@ -775,8 +904,10 @@ export const FacultyAttendanceView = () => {
     >
       <AttendanceForm
         form={form}
-        courses={filterOptionsQuery.data?.courses ?? []}
+        courses={courseOptions}
         sections={sectionsForSelectedCourse}
+        selectedCourseValue={courseSelectionKey}
+        selectedSectionValue={sectionSelectionKey}
         onDateChange={(date) => {
           clearActiveSessionOnly();
           setForm((current) => ({
@@ -785,11 +916,14 @@ export const FacultyAttendanceView = () => {
           }));
         }}
         onCourseChange={updateCourse}
-        onSectionChange={(sectionId) => {
+        onSectionChange={(sectionSelection) => {
+          const parsed = parseSectionSelectionKey(sectionSelection);
           clearActiveSessionOnly();
+          setSectionSelectionKey(sectionSelection);
           setForm((current) => ({
             ...current,
-            sectionId,
+            sectionId: parsed.sectionId,
+            batchId: parsed.batchId,
           }));
         }}
         onTimingModeChange={updateTimingMode}
@@ -817,7 +951,9 @@ export const FacultyAttendanceView = () => {
         onEditAttendance={handleEditAttendance}
         onTakeAttendance={handleTakeAttendance}
         isEditAttendanceDisabled={createOrOpenMutation.isPending}
-        isTakeAttendanceDisabled={!canOpenSession || createOrOpenMutation.isPending}
+        isTakeAttendanceDisabled={
+          !canOpenSession || createOrOpenMutation.isPending
+        }
         overlapError={overlapError}
       />
 
@@ -825,6 +961,8 @@ export const FacultyAttendanceView = () => {
         isOpen={isSessionsDialogOpen}
         onOpenChange={setIsSessionsDialogOpen}
         filters={sessionModalFilters}
+        selectedCourseValue={modalCourseSelectionKey}
+        selectedSectionValue={modalSectionSelectionKey}
         onDateChange={(sessionDate) =>
           setSessionModalFilters((current) => ({
             ...current,
@@ -832,15 +970,18 @@ export const FacultyAttendanceView = () => {
           }))
         }
         onCourseChange={handleSessionCourseChange}
-        onSectionChange={(sectionId) =>
+        onSectionChange={(sectionSelection) => {
+          const parsed = parseSectionSelectionKey(sectionSelection);
+          setModalSectionSelectionKey(sectionSelection);
           setSessionModalFilters((current) => ({
             ...current,
-            sectionId,
-          }))
-        }
+            sectionId: parsed.sectionId,
+            batchId: parsed.batchId,
+          }));
+        }}
         onApplyFilters={applySessionFilters}
         onClearFilters={resetSessionFilters}
-        courses={filterOptionsQuery.data?.courses ?? []}
+        courses={courseOptions}
         sections={modalSectionsForSelectedCourse}
         sessions={sessionRows}
         activeSessionId={activeSessionId}
@@ -874,7 +1015,7 @@ export const FacultyAttendanceView = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/20 p-4 text-sm md:grid-cols-2">
+          <div className="bg-muted/20 grid grid-cols-1 gap-3 rounded-lg border p-4 text-sm md:grid-cols-2">
             <p>
               <span className="text-muted-foreground">Course:</span>{" "}
               {selectedCourseLabel}
@@ -897,7 +1038,9 @@ export const FacultyAttendanceView = () => {
 
           <AttendanceSection
             studentChecklist={studentChecklist}
-            isLoading={sessionDetailQuery.isLoading || sessionStudentsQuery.isLoading}
+            isLoading={
+              sessionDetailQuery.isLoading || sessionStudentsQuery.isLoading
+            }
             isSaving={createOrOpenMutation.isPending}
             onAllPresent={() => setAllStudentsStatus("PRESENT")}
             onAllAbsent={() => setAllStudentsStatus("ABSENT")}
@@ -914,7 +1057,7 @@ export const FacultyAttendanceView = () => {
               <span className="rounded-md bg-rose-500/10 px-2 py-1 text-rose-700">
                 Absent: {absentCount}
               </span>
-              <span className="rounded-md bg-muted px-2 py-1 text-muted-foreground">
+              <span className="bg-muted text-muted-foreground rounded-md px-2 py-1">
                 Unmarked: {unmarkedCount}
               </span>
               <span className="text-muted-foreground">

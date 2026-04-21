@@ -99,6 +99,9 @@ export type FacultyAttendanceSectionOptionDTO = {
   id: string;
   name: string;
   courseId: string;
+  assignmentType?: "THEORY" | "LAB";
+  batchId?: string;
+  labBatchNumber?: number;
 };
 
 export type FacultyAttendanceFilterOptionsDTO = {
@@ -110,6 +113,8 @@ export type FacultyAttendanceSessionDTO = {
   id: string;
   courseId: string;
   sectionId: string;
+  batchId?: string;
+  labBatchNumber?: number;
   sessionDate: string;
   timingCode: string;
   timingLabel: string;
@@ -131,6 +136,7 @@ export type FacultyAttendanceStudentStatusInputDTO = {
 export type CreateOrOpenFacultyAttendanceSessionPayloadDTO = {
   courseId: string;
   sectionId: string;
+  batchId?: string;
   sessionDate: string;
   timingMode: "FIXED" | "CUSTOM";
   timingCode?: string;
