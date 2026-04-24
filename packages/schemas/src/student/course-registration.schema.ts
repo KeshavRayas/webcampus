@@ -1,28 +1,60 @@
 import { z } from "zod";
 
-export const createCourseRegistrationSchema = z.object({
-  courseId: z.uuid("Invalid course ID"),
-  semester: z.number().int().positive("Semester must be a positive integer"),
-  academicYear: z.string().min(1, "Academic year is required"),
+export const registrationCourseSchema = z.object({
+  id: z.uuid("Invalid course ID"),
+  code: z.string(),
+  name: z.string(),
+  courseType: z.enum(["PC", "PE", "OE", "NCMC"]),
+  ltp: z.string(),
+  totalCredits: z.number().int().nonnegative(),
 });
 
-export const updateCourseRegistrationSchema = z.object({
-  hasDropped: z.boolean(),
+export const submitCourseRegistrationSchema = z.object({
+  courseIds: z.array(z.uuid("Invalid course ID")).min(1, "Select courses"),
 });
 
-export const CourseRegistrationResponseSchema =
-  createCourseRegistrationSchema.extend({
-    id: z.uuid("Invalid course registration ID"),
-    studentId: z.uuid("Invalid student ID"),
-    hasDropped: z.boolean().default(false),
-  });
+export const registrationHistoryItemSchema = z.object({
+  semesterId: z.uuid("Invalid semester ID"),
+  academicTermId: z.uuid("Invalid academic term ID"),
+  semesterLabel: z.string(),
+  academicTermLabel: z.string(),
+  courseCount: z.number().int().nonnegative(),
+  registrationDate: z.string(),
+});
 
-export type CreateCourseRegistrationType = z.infer<
-  typeof createCourseRegistrationSchema
+export const registrationDashboardSchema = z.object({
+  current: z.object({
+    semesterId: z.uuid("Invalid semester ID"),
+    academicTermId: z.uuid("Invalid academic term ID"),
+    semesterLabel: z.string(),
+    academicTermLabel: z.string(),
+    isWindowOpen: z.boolean(),
+    hasRegistered: z.boolean(),
+  }),
+  history: z.array(registrationHistoryItemSchema),
+});
+
+export const availableCurriculumSchema = z.object({
+  coreCourses: z.array(registrationCourseSchema),
+  professionalElectives: z.array(registrationCourseSchema),
+  openElectives: z.array(registrationCourseSchema),
+});
+
+export const submitCourseRegistrationResponseSchema = z.object({
+  count: z.number().int().nonnegative(),
+});
+
+export type RegistrationCourseType = z.infer<typeof registrationCourseSchema>;
+export type SubmitCourseRegistrationType = z.infer<
+  typeof submitCourseRegistrationSchema
 >;
-export type UpdateCourseRegistrationType = z.infer<
-  typeof updateCourseRegistrationSchema
+export type RegistrationHistoryItemType = z.infer<
+  typeof registrationHistoryItemSchema
 >;
-export type CourseRegistrationResponseType = z.infer<
-  typeof CourseRegistrationResponseSchema
+export type RegistrationDashboardType = z.infer<
+  typeof registrationDashboardSchema
+>;
+export type AvailableCurriculumType = z.infer<typeof availableCurriculumSchema>;
+export type SubmitCourseRegistrationResponseType = z.infer<
+  typeof submitCourseRegistrationResponseSchema
 >;

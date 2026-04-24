@@ -18,6 +18,7 @@ const statement = {
   admission: ["create", "read", "update", "delete", "port"],
   student: ["read", "delete"],
   courseCoordinator: ["create", "read", "update"],
+  registrationWindow: ["create", "read", "update"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -35,6 +36,7 @@ export const roles = {
     faculty: ["create", "read", "update", "delete"],
     admission: ["create", "read", "update", "delete", "port"],
     student: ["read", "delete"],
+    registrationWindow: ["create", "read", "update"],
   }),
   applicant: ac.newRole({
     admission: ["read", "update"],

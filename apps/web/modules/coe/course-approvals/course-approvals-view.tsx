@@ -3,10 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { frontendEnv } from "@webcampus/common/env";
+import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import axios from "axios";
 import { useState } from "react";
+import { getApprovalBadgeConfig } from "./course-approval-status";
 import { CourseReviewSheet } from "./course-review-sheet";
 
 export interface GroupedCourse {
@@ -17,6 +19,9 @@ export interface GroupedCourse {
   semesterId: string;
   semester: { semesterNumber: number };
   cycle: string;
+  approvalStatus: "PENDING" | "APPROVED";
+  hasAdminApproved: boolean;
+  hasCoeApproved: boolean;
   courseCount: number;
   courses: Array<{
     id: string;
@@ -25,6 +30,9 @@ export interface GroupedCourse {
     courseType: string;
     totalCredits: number;
     courseMode: string;
+    approvalStatus: "PENDING" | "APPROVED";
+    hasAdminApproved: boolean;
+    hasCoeApproved: boolean;
   }>;
 }
 
@@ -73,8 +81,25 @@ export const CourseApprovalsView = () => {
       },
     },
     {
+      id: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const badge = getApprovalBadgeConfig({
+          approvalStatus: row.original.approvalStatus,
+          hasAdminApproved: row.original.hasAdminApproved,
+          hasCoeApproved: row.original.hasCoeApproved,
+        });
+
+        return (
+          <Badge variant={badge.variant} className={badge.className}>
+            {badge.label}
+          </Badge>
+        );
+      },
+    },
+    {
       accessorKey: "courseCount",
-      header: "Pending Courses",
+      header: "Courses",
     },
     {
       id: "actions",
@@ -85,7 +110,7 @@ export const CourseApprovalsView = () => {
             size="sm"
             onClick={() => setSelectedGroup(row.original)}
           >
-            Review Submission
+            View Details
           </Button>
         );
       },
@@ -103,7 +128,7 @@ export const CourseApprovalsView = () => {
 
       {isLoading ? (
         <div className="text-muted-foreground p-8 text-center text-sm">
-          Loading pending submissions...
+          Loading course submissions...
         </div>
       ) : groups && groups.length > 0 ? (
         <div className="bg-card rounded-md border">
@@ -111,7 +136,7 @@ export const CourseApprovalsView = () => {
         </div>
       ) : (
         <div className="text-muted-foreground rounded-lg border p-12 text-center text-sm">
-          No pending course submissions to review.
+          No course submissions to review.
         </div>
       )}
 

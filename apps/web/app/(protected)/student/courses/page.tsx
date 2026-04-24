@@ -1,5 +1,5 @@
-import { CourseRegistrationView } from "@/modules/student/courses/course-registration-view";
+import { StudentCoursesTabs } from "@/modules/student/courses/student-courses-tabs";
 
 export default function StudentCourseRegistrationPage() {
-  return <CourseRegistrationView />;
+  return <StudentCoursesTabs />;
 }

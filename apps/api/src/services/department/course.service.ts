@@ -112,6 +112,28 @@ type MappedCourseWithDepartmentContext = CourseWithDepartmentContext & {
   isUnmapped: boolean;
 };
 
+interface CourseWithApprovalFlags extends Course {
+  hasAdminApproved: boolean;
+  hasCoeApproved: boolean;
+}
+
+interface GroupedCourseSubmission {
+  id: string;
+  departmentId: string;
+  departmentName: string;
+  departmentCode?: string;
+  semesterId: string;
+  semester: import("@webcampus/db").Semester & {
+    academicTerm: import("@webcampus/db").AcademicTerm;
+  };
+  cycle: string;
+  approvalStatus: "PENDING" | "APPROVED";
+  hasAdminApproved: boolean;
+  hasCoeApproved: boolean;
+  courseCount: number;
+  courses: CourseWithApprovalFlags[];
+}
+
 export class CourseService {
   private static _ensureCourseIsEditable(status?: string) {
     if (status === "PENDING" || status === "APPROVED") {
@@ -694,62 +716,30 @@ export class CourseService {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  static async getGroupedCourseSubmissions(_role: "admin" | "coe"): Promise<
-    BaseResponse<
-      Array<{
-        id: string;
-        departmentId: string;
-        departmentName: string;
-        departmentCode?: string;
-        semesterId: string;
-        semester: import("@webcampus/db").Semester & {
-          academicTerm: import("@webcampus/db").AcademicTerm;
-        };
-        cycle: string;
-        courseCount: number;
-        courses: Course[];
-      }>
-    >
-  > {
+  static async getGroupedCourseSubmissions(
+    role: "admin" | "coe"
+  ): Promise<BaseResponse<GroupedCourseSubmission[]>> {
     try {
       const pendingCourses = await db.course.findMany({
         where: {
-          approvalStatus: "PENDING",
+          approvalStatus: { in: ["PENDING", "APPROVED"] },
         },
         include: {
           department: { select: { id: true, code: true, name: true } },
           semester: {
             include: { academicTerm: true },
           },
-          assignments: {
-            include: {
-              faculty: { select: { shortName: true } },
-              batch: { select: { name: true } },
-            },
-          },
         },
         orderBy: { code: "asc" },
       });
 
-      const groupedMap = new Map<
-        string,
-        {
-          id: string;
-          departmentId: string;
-          departmentName: string;
-          departmentCode?: string;
-          semesterId: string;
-          semester: import("@webcampus/db").Semester & {
-            academicTerm: import("@webcampus/db").AcademicTerm;
-          };
-          cycle: string;
-          courseCount: number;
-          courses: Course[];
-        }
-      >();
+      const groupedMap = new Map<string, GroupedCourseSubmission>();
 
       for (const course of pendingCourses) {
+        const hasAdminApproved = course.approvedByRole === "admin";
+        const hasCoeApproved = course.approvedByRole === "coe";
+        const courseApprovalStatus =
+          course.approvalStatus === "APPROVED" ? "APPROVED" : "PENDING";
         const key = `${course.department.id}_${course.semesterId}_${course.cycle}`;
         if (!groupedMap.has(key)) {
           groupedMap.set(key, {
@@ -760,14 +750,26 @@ export class CourseService {
             semesterId: course.semesterId,
             semester: course.semester,
             cycle: course.cycle,
+            approvalStatus: courseApprovalStatus,
+            hasAdminApproved,
+            hasCoeApproved,
             courseCount: 0,
             courses: [],
           });
         }
         const group = groupedMap.get(key);
         if (group) {
+          if (courseApprovalStatus !== "APPROVED") {
+            group.approvalStatus = "PENDING";
+          }
+          group.hasAdminApproved = group.hasAdminApproved || hasAdminApproved;
+          group.hasCoeApproved = group.hasCoeApproved || hasCoeApproved;
           group.courseCount += 1;
-          group.courses.push(course);
+          group.courses.push({
+            ...course,
+            hasAdminApproved,
+            hasCoeApproved,
+          });
         }
       }
 
@@ -775,7 +777,7 @@ export class CourseService {
 
       return {
         status: "success",
-        message: "Fetched grouped course submissions",
+        message: `Fetched grouped course submissions for ${role}`,
         data: groupedArray,
       };
     } catch (error) {
@@ -820,6 +822,7 @@ export class CourseService {
             : {}),
         },
         data: {
+          // OR gate: either Admin OR COE approval fully approves the submission.
           approvalStatus: "APPROVED",
           approvedByRole: role,
           approvedByUsername:

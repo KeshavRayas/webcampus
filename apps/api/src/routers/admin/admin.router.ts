@@ -3,6 +3,8 @@ import CoeRouter from "@webcampus/api/src/routers/admin/coe.router";
 import AdminCourseAssignmentRouter from "@webcampus/api/src/routers/admin/course-assignment.router";
 import AdminCourseRouter from "@webcampus/api/src/routers/admin/course.router";
 import DepartmentRouter from "@webcampus/api/src/routers/admin/department.router";
+import RegistrationTrackingRouter from "@webcampus/api/src/routers/admin/registration-tracking.router";
+import RegistrationWindowRouter from "@webcampus/api/src/routers/admin/registration-window.router";
 import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
 import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
 import UserRouter from "@webcampus/api/src/routers/admin/user.router";
@@ -26,5 +28,9 @@ router.use("/student", StudentRouter);
 router.use("/course", AdminCourseRouter);
 
 router.use("/course-assignment", AdminCourseAssignmentRouter);
+
+router.use("/registration-windows", RegistrationWindowRouter);
+
+router.use("/registration-tracking", RegistrationTrackingRouter);
 
 export default router;

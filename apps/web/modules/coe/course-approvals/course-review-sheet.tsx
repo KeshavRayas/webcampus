@@ -14,6 +14,10 @@ import {
 import axios, { AxiosError } from "axios";
 import { useState } from "react";
 import { toast } from "react-toastify";
+import {
+  getApprovalBadgeConfig,
+  isSubmissionApproved,
+} from "./course-approval-status";
 import { GroupedCourse } from "./course-approvals-view";
 
 interface CourseReviewSheetProps {
@@ -31,6 +35,12 @@ export const CourseReviewSheet = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [revisionNotes, setRevisionNotes] = useState("");
   const [showRevisionInput, setShowRevisionInput] = useState(false);
+  const isApproved = isSubmissionApproved(group.approvalStatus);
+  const groupStatusBadge = getApprovalBadgeConfig({
+    approvalStatus: group.approvalStatus,
+    hasAdminApproved: group.hasAdminApproved,
+    hasCoeApproved: group.hasCoeApproved,
+  });
 
   const handleApprove = async () => {
     setIsSubmitting(true);
@@ -106,7 +116,15 @@ export const CourseReviewSheet = ({
     <Sheet open={true} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-xl">
         <SheetHeader className="border-b px-6 py-6">
-          <SheetTitle className="text-xl">Review Submission</SheetTitle>
+          <SheetTitle className="flex items-center gap-2 text-xl">
+            Review Submission
+            <Badge
+              variant={groupStatusBadge.variant}
+              className={groupStatusBadge.className}
+            >
+              {groupStatusBadge.label}
+            </Badge>
+          </SheetTitle>
           <SheetDescription asChild>
             <div className="mt-2 flex flex-col gap-1">
               <span className="text-foreground font-semibold">
@@ -122,42 +140,60 @@ export const CourseReviewSheet = ({
         </SheetHeader>
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
-          {group.courses.map((course) => (
-            <div
-              key={course.id}
-              className="bg-card hover:bg-accent/5 rounded-md border p-4 shadow-sm transition-colors"
-            >
-              <div className="mb-2 flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-medium leading-tight">
-                    {course.name}
-                  </h3>
-                  <p className="text-muted-foreground text-sm">{course.code}</p>
+          {group.courses.map((course) => {
+            const courseStatusBadge = getApprovalBadgeConfig({
+              approvalStatus: course.approvalStatus,
+              hasAdminApproved: course.hasAdminApproved,
+              hasCoeApproved: course.hasCoeApproved,
+            });
+
+            return (
+              <div
+                key={course.id}
+                className="bg-card hover:bg-accent/5 rounded-md border p-4 shadow-sm transition-colors"
+              >
+                <div className="mb-2 flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-medium leading-tight">
+                      {course.name}
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
+                      {course.code}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{course.courseType}</Badge>
+                    <Badge
+                      variant={courseStatusBadge.variant}
+                      className={courseStatusBadge.className}
+                    >
+                      {courseStatusBadge.label}
+                    </Badge>
+                  </div>
                 </div>
-                <Badge variant="outline">{course.courseType}</Badge>
+                <div className="mt-3 flex items-center gap-4 text-sm">
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wider">
+                      Credits
+                    </span>
+                    <span className="font-medium">{course.totalCredits}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wider">
+                      Mode
+                    </span>
+                    <span className="font-medium capitalize">
+                      {course.courseMode.toLowerCase().replace("_", " ")}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="mt-3 flex items-center gap-4 text-sm">
-                <div className="flex flex-col">
-                  <span className="text-muted-foreground text-xs uppercase tracking-wider">
-                    Credits
-                  </span>
-                  <span className="font-medium">{course.totalCredits}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-muted-foreground text-xs uppercase tracking-wider">
-                    Mode
-                  </span>
-                  <span className="font-medium capitalize">
-                    {course.courseMode.toLowerCase().replace("_", " ")}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <SheetFooter className="bg-muted/20 flex-col gap-4 border-t p-6 sm:flex-col">
-          {showRevisionInput ? (
+          {showRevisionInput && !isApproved ? (
             <div className="flex w-full flex-col gap-3">
               <textarea
                 placeholder="Explain why revisions are needed..."
@@ -178,7 +214,7 @@ export const CourseReviewSheet = ({
                 <Button
                   variant="destructive"
                   onClick={handleRequestRevision}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isApproved}
                 >
                   {isSubmitting ? "Submitting..." : "Send Revision Request"}
                 </Button>
@@ -190,15 +226,20 @@ export const CourseReviewSheet = ({
                 variant="outline"
                 className="border-destructive text-destructive hover:bg-destructive/10 flex-1"
                 onClick={() => setShowRevisionInput(true)}
+                disabled={isApproved || isSubmitting}
               >
                 Needs Revision
               </Button>
               <Button
                 className="flex-[2] bg-emerald-600 text-white hover:bg-emerald-700"
                 onClick={handleApprove}
-                disabled={isSubmitting}
+                disabled={isApproved || isSubmitting}
               >
-                {isSubmitting ? "Approving..." : "Approve All Courses"}
+                {isApproved
+                  ? "Already Approved"
+                  : isSubmitting
+                    ? "Approving..."
+                    : "Approve All Courses"}
               </Button>
             </div>
           )}

@@ -78,6 +78,14 @@ export const sidebarConfig: Record<Role, SidebarData> = {
             { name: "Course Configuration", url: "/admin/courses" },
             { name: "Course Mapping", url: "/admin/course-mapping" },
             { name: "Course Approvals", url: "/admin/course-approvals" },
+            {
+              name: "Registration Windows",
+              url: "/admin/registration-windows",
+            },
+            {
+              name: "Registration Tracking",
+              url: "/admin/registration-tracking",
+            },
           ],
         },
       ],
