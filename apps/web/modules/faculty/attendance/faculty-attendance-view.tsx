@@ -1,6 +1,7 @@
 "use client";
 
 import { getApiErrorMessage } from "@/lib/api-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { dayjs } from "@webcampus/common/dayjs";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -150,24 +151,13 @@ const parseSessionDate = (sessionDate: string) => {
   return new Date(isDateOnly ? `${sessionDate}T00:00:00` : sessionDate);
 };
 
-const toStableAttendancePercentage = (studentId: string, usn: string) => {
-  const seed = `${studentId}:${usn}`;
-  const hash = seed
-    .split("")
-    .reduce(
-      (accumulator, character) => accumulator + character.charCodeAt(0),
-      0
-    );
-
-  return 65 + (hash % 31);
-};
-
 const withUiChecklistMetadata = (
   rows: Array<{
     studentId: string;
     usn: string;
     name: string;
     status: "PRESENT" | "ABSENT";
+    previousAttendancePercentage?: number;
   }>,
   options?: {
     defaultStatus?: "PRESENT" | "ABSENT";
@@ -178,10 +168,7 @@ const withUiChecklistMetadata = (
     usn: student.usn,
     name: student.name,
     status: options?.defaultStatus ?? student.status,
-    previousAttendancePercentage: toStableAttendancePercentage(
-      student.studentId,
-      student.usn
-    ),
+    previousAttendancePercentage: student.previousAttendancePercentage ?? 0,
   }));
 };
 
@@ -218,6 +205,7 @@ export const FacultyAttendanceView = () => {
   const filterOptionsQuery = useFacultyAttendanceFilterOptions();
   const createOrOpenMutation = useCreateOrOpenFacultyAttendanceSession();
   const deleteSessionMutation = useDeleteFacultyAttendanceSession();
+  const queryClient = useQueryClient();
   const sessionDetailQuery = useFacultyAttendanceSessionDetail(
     {
       sessionId: activeSessionId,
@@ -489,20 +477,28 @@ export const FacultyAttendanceView = () => {
   };
 
   useEffect(() => {
-    if (!sessionDetailQuery.data) {
+    const data = sessionDetailQuery.data;
+    if (
+      !data ||
+      typeof data !== "object" ||
+      !("session" in data) ||
+      !("students" in data)
+    ) {
       return;
     }
 
-    if (sessionDetailQuery.data.session.id !== activeSessionId) {
+    if (data.session.id !== activeSessionId) {
       return;
     }
 
-    hydrateFormFromSession(sessionDetailQuery.data.session);
-    setStudentChecklist(
-      withUiChecklistMetadata(sessionDetailQuery.data.students)
-    );
+    hydrateFormFromSession(data.session);
+    setStudentChecklist(withUiChecklistMetadata(data.students));
     setOpeningSessionId(null);
-  }, [activeSessionId, sessionDetailQuery.data]);
+  }, [
+    activeSessionId,
+    sessionDetailQuery.data,
+    sessionDetailQuery.dataUpdatedAt,
+  ]);
 
   useEffect(() => {
     if (!sessionDetailQuery.isError || !activeSessionId) {
@@ -515,6 +511,7 @@ export const FacultyAttendanceView = () => {
         "Failed to load attendance session detail"
       )
     );
+    setOpeningSessionId(null);
     resetActiveSessionContext();
   }, [activeSessionId, sessionDetailQuery.error, sessionDetailQuery.isError]);
 
@@ -534,17 +531,11 @@ export const FacultyAttendanceView = () => {
   const presentRate =
     markedCount > 0 ? Math.round((presentCount / markedCount) * 1000) / 10 : 0;
 
-  const updateStudentStatus = (
-    studentId: string,
-    nextStatus: "PRESENT" | "ABSENT"
-  ) => {
+  const updateStudentStatus = (studentId: string, isPresent: boolean) => {
     setStudentChecklist((current) =>
       current.map((student) =>
         student.studentId === studentId
-          ? {
-              ...student,
-              status: student.status === nextStatus ? null : nextStatus,
-            }
+          ? { ...student, status: isPresent ? "PRESENT" : "ABSENT" }
           : student
       )
     );
@@ -814,12 +805,23 @@ export const FacultyAttendanceView = () => {
     }
   };
 
-  const handleSelectSessionFromModal = (sessionId: string) => {
+  const handleSelectSessionFromModal = async (sessionId: string) => {
     setOpeningSessionId(sessionId);
     setStudentChecklist([]);
     setActiveSessionId(sessionId);
     setIsTakeAttendanceModalOpen(true);
     setIsSessionsDialogOpen(false);
+
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: ["faculty-attendance", "session-detail"],
+      });
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to load session details"));
+      setOpeningSessionId(null);
+      setActiveSessionId("");
+      setIsTakeAttendanceModalOpen(false);
+    }
   };
 
   const handleDeleteSessionFromModal = (sessionId: string) => {
@@ -1045,7 +1047,6 @@ export const FacultyAttendanceView = () => {
             onAllPresent={() => setAllStudentsStatus("PRESENT")}
             onAllAbsent={() => setAllStudentsStatus("ABSENT")}
             onToggleStatus={updateStudentStatus}
-            markedCount={markedCount}
             totalStudents={totalStudents}
           />
 

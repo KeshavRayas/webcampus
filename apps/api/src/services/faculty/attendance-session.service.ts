@@ -369,16 +369,42 @@ export class FacultyAttendanceSessionService {
         },
       });
 
+      const studentIds = students.map((item) => item.student.id);
+
+      const attendanceRecords = await db.attendance.findMany({
+        where: {
+          studentId: { in: studentIds },
+          courseId: query.courseId,
+        },
+        select: {
+          studentId: true,
+          total: true,
+          present: true,
+          percentage: true,
+        },
+      });
+
+      const attendanceMap = new Map(
+        attendanceRecords.map((record) => [record.studentId, record])
+      );
+
       return {
         status: "success",
         message: "Session students retrieved successfully",
         data: {
-          students: students.map((item) => ({
-            studentId: item.student.id,
-            usn: item.student.usn,
-            name: item.student.user.name,
-            status: "PRESENT",
-          })),
+          students: students.map((item) => {
+            const attendance = attendanceMap.get(item.student.id);
+            return {
+              studentId: item.student.id,
+              usn: item.student.usn,
+              name: item.student.user.name,
+              status: "PRESENT",
+              previousAttendancePercentage:
+                attendance && attendance.total > 0
+                  ? Math.round(attendance.percentage)
+                  : undefined,
+            };
+          }),
         },
       };
     } catch (error) {
@@ -533,17 +559,45 @@ export class FacultyAttendanceSessionService {
         );
       }
 
+      const studentIds = session.AttendanceRecord.map(
+        (record) => record.studentId
+      );
+
+      const attendanceRecords = await db.attendance.findMany({
+        where: {
+          studentId: { in: studentIds },
+          courseId: session.courseId,
+        },
+        select: {
+          studentId: true,
+          total: true,
+          present: true,
+          percentage: true,
+        },
+      });
+
+      const attendanceMap = new Map(
+        attendanceRecords.map((record) => [record.studentId, record])
+      );
+
       return {
         status: "success",
         message: "Attendance session detail retrieved successfully",
         data: {
           session: toSessionDto(session),
-          students: session.AttendanceRecord.map((record) => ({
-            studentId: record.studentId,
-            usn: record.Student.usn,
-            name: record.Student.user.name,
-            status: record.status,
-          })).sort((left, right) => left.usn.localeCompare(right.usn)),
+          students: session.AttendanceRecord.map((record) => {
+            const attendance = attendanceMap.get(record.studentId);
+            return {
+              studentId: record.studentId,
+              usn: record.Student.usn,
+              name: record.Student.user.name,
+              status: record.status,
+              previousAttendancePercentage:
+                attendance && attendance.total > 0
+                  ? Math.round(attendance.percentage)
+                  : undefined,
+            };
+          }).sort((left, right) => left.usn.localeCompare(right.usn)),
         },
       };
     } catch (error) {

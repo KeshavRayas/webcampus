@@ -160,6 +160,10 @@ export const FacultyAttendanceSessionDetailQuerySchema = z.object({
   sessionId: z.uuid("Invalid session ID"),
 });
 
+export const EditFacultyAttendanceSessionPayloadSchema = z.object({
+  sessionId: z.uuid("Invalid session ID"),
+});
+
 export const DeleteFacultyAttendanceSessionParamsSchema = z.object({
   sessionId: z.uuid("Invalid session ID"),
 });
@@ -266,6 +270,9 @@ export type FacultyAttendanceSessionStudentsQueryType = z.infer<
 >;
 export type FacultyAttendanceSessionDetailQueryType = z.infer<
   typeof FacultyAttendanceSessionDetailQuerySchema
+>;
+export type EditFacultyAttendanceSessionPayloadType = z.infer<
+  typeof EditFacultyAttendanceSessionPayloadSchema
 >;
 export type DeleteFacultyAttendanceSessionParamsType = z.infer<
   typeof DeleteFacultyAttendanceSessionParamsSchema

@@ -21,8 +21,7 @@ type AttendanceSectionProps = {
   isSaving: boolean;
   onAllPresent: () => void;
   onAllAbsent: () => void;
-  onToggleStatus: (studentId: string, nextStatus: "PRESENT" | "ABSENT") => void;
-  markedCount: number;
+  onToggleStatus: (studentId: string, isPresent: boolean) => void;
   totalStudents: number;
   className?: string;
 };
@@ -34,15 +33,10 @@ export const AttendanceSection = ({
   onAllPresent,
   onAllAbsent,
   onToggleStatus,
-  markedCount,
   totalStudents,
   className,
 }: AttendanceSectionProps) => {
   const [searchTerm, setSearchTerm] = useState<string>("");
-
-  const progressPercentage =
-    totalStudents > 0 ? (markedCount / totalStudents) * 100 : 0;
-  const roundedProgressPercentage = Math.round(progressPercentage);
 
   const filteredStudents = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -61,31 +55,6 @@ export const AttendanceSection = ({
 
   return (
     <div className={cn("space-y-4", className)}>
-      <Card className="border-primary/20 bg-background/95 shadow-sm">
-        <CardHeader className="space-y-2 pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold">Progress</p>
-            <p className="text-muted-foreground text-xs">
-              {markedCount} / {totalStudents} marked ({roundedProgressPercentage}%)
-            </p>
-          </div>
-          <div
-            className="h-2.5 overflow-hidden rounded-full bg-muted"
-            role="progressbar"
-            aria-label="Attendance marked progress"
-            aria-valuemin={0}
-            aria-valuemax={totalStudents}
-            aria-valuenow={markedCount}
-          >
-            <div
-              className="h-full rounded-full bg-emerald-600 transition-all duration-500 ease-out"
-              style={{ width: `${progressPercentage}%` }}
-              aria-hidden="true"
-            />
-          </div>
-        </CardHeader>
-      </Card>
-
       <Card className="border-primary/20 bg-background/95 shadow-sm">
         <CardHeader className="space-y-3 pb-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -131,7 +100,7 @@ export const AttendanceSection = ({
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}
-                  className="h-16 animate-pulse rounded-lg border border-border/60 bg-muted/40"
+                  className="border-border/60 bg-muted/40 h-16 animate-pulse rounded-lg border"
                 />
               ))}
             </div>
@@ -142,15 +111,16 @@ export const AttendanceSection = ({
                 : "No students match your search."}
             </div>
           ) : (
-            <div className="max-h-[55vh] overflow-auto rounded-xl border border-border/70">
+            <div className="border-border/70 max-h-[55vh] overflow-auto rounded-xl border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-40">USN</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead className="w-36">Prev. Attendance %</TableHead>
-                    <TableHead className="w-24 text-center">Present</TableHead>
-                    <TableHead className="w-24 text-center">Absent</TableHead>
+                    <TableHead className="w-24 text-center">
+                      Attendance
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -161,51 +131,62 @@ export const AttendanceSection = ({
                         : student.status === "ABSENT"
                           ? "bg-rose-500/10"
                           : "";
-                    const previousAttendance = student.previousAttendancePercentage;
+                    const previousAttendance =
+                      student.previousAttendancePercentage;
+
+                    const attendanceBadge = (() => {
+                      if (previousAttendance === undefined) {
+                        return "N/A";
+                      }
+                      return `${previousAttendance}%`;
+                    })();
+
+                    const badgeColorClass = (() => {
+                      if (previousAttendance === undefined) {
+                        return "bg-muted text-muted-foreground";
+                      }
+                      if (previousAttendance >= 85) {
+                        return "bg-emerald-500/15 text-emerald-700";
+                      }
+                      if (previousAttendance >= 75) {
+                        return "bg-amber-500/15 text-amber-700";
+                      }
+                      return "bg-amber-500/15 text-rose-700";
+                    })();
 
                     return (
-                      <TableRow key={student.studentId} className={cn(rowToneClass)}>
+                      <TableRow
+                        key={student.studentId}
+                        className={cn(rowToneClass)}
+                      >
                         <TableCell className="font-mono text-xs tracking-wide">
                           {student.usn}
                         </TableCell>
                         <TableCell>
-                          <p className="font-medium leading-none">{student.name}</p>
+                          <p className="font-medium leading-none">
+                            {student.name}
+                          </p>
                         </TableCell>
                         <TableCell>
                           <Badge
                             variant="secondary"
-                            className={cn(
-                              previousAttendance >= 85
-                                ? "bg-emerald-500/15 text-emerald-700"
-                                : previousAttendance >= 75
-                                  ? "bg-amber-500/15 text-amber-700"
-                                  : "bg-rose-500/15 text-rose-700"
-                            )}
+                            className={cn(badgeColorClass)}
                           >
-                            {previousAttendance}%
+                            {attendanceBadge}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex justify-center">
                             <Checkbox
                               checked={student.status === "PRESENT"}
-                              onCheckedChange={() => {
-                                onToggleStatus(student.studentId, "PRESENT");
+                              onCheckedChange={(checked) => {
+                                onToggleStatus(
+                                  student.studentId,
+                                  checked === true
+                                );
                               }}
                               disabled={isSaving}
-                              aria-label={`Mark ${student.name} as present`}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
-                            <Checkbox
-                              checked={student.status === "ABSENT"}
-                              onCheckedChange={() => {
-                                onToggleStatus(student.studentId, "ABSENT");
-                              }}
-                              disabled={isSaving}
-                              aria-label={`Mark ${student.name} as absent`}
+                              aria-label={`Toggle attendance for ${student.name}`}
                             />
                           </div>
                         </TableCell>

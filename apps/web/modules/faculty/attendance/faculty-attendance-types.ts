@@ -29,5 +29,5 @@ export type AttendanceChecklistRow = {
   usn: string;
   name: string;
   status: AttendanceRecordStatusType | null;
-  previousAttendancePercentage: number;
+  previousAttendancePercentage?: number;
 };

@@ -156,6 +156,7 @@ export type FacultyAttendanceSessionStudentDTO = {
   usn: string;
   name: string;
   status: AttendanceRecordStatusDTO;
+  previousAttendancePercentage?: number;
 };
 
 export type FacultyAttendanceSessionStudentsDTO = {
