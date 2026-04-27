@@ -5,7 +5,10 @@ import {
   CreateAttendanceType,
   UpdateAttendanceType,
 } from "@webcampus/schemas/faculty";
-import { BaseResponse } from "@webcampus/types/api";
+import {
+  BaseResponse,
+  FacultyAttendanceDetailedReportDTO,
+} from "@webcampus/types/api";
 
 export class Attendance {
   static async create(
@@ -224,6 +227,168 @@ export class Attendance {
     } catch (error) {
       logger.error("Error deleting attendance:", { error });
       throw new Error("Failed to delete attendance");
+    }
+  }
+
+  static async getDetailedReport(
+    courseId: string,
+    sectionId: string,
+    batchId?: string
+  ): Promise<BaseResponse<FacultyAttendanceDetailedReportDTO>> {
+    try {
+      const sessionWhere: {
+        courseId: string;
+        sectionId: string;
+        batchId?: string;
+      } = {
+        courseId,
+        sectionId,
+      };
+      if (batchId) {
+        sessionWhere.batchId = batchId;
+      }
+
+      const sessions = await db.classSession.findMany({
+        where: sessionWhere,
+        orderBy: { sessionDate: "asc" },
+        select: {
+          id: true,
+          sessionDate: true,
+        },
+      });
+
+      const studentSections = await db.studentSection.findMany({
+        where: { sectionId },
+        orderBy: {
+          student: {
+            usn: "asc",
+          },
+        },
+        select: {
+          student: {
+            select: {
+              id: true,
+              usn: true,
+              user: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!sessions.length || !studentSections.length) {
+        return {
+          status: "success",
+          message: "Detailed report retrieved successfully",
+          data: {
+            sessions: sessions.map((s) => ({
+              id: s.id,
+              sessionDate: s.sessionDate.toISOString(),
+            })),
+            students: [],
+          },
+        };
+      }
+
+      const sessionIds = sessions.map((s) => s.id);
+      const studentIds = studentSections.map((ss) => ss.student.id);
+
+      const attendanceRecords = await db.attendanceRecord.findMany({
+        where: {
+          sessionId: { in: sessionIds },
+          studentId: { in: studentIds },
+        },
+        select: {
+          sessionId: true,
+          studentId: true,
+          status: true,
+        },
+      });
+
+      const attendances = await db.attendance.findMany({
+        where: {
+          studentId: { in: studentIds },
+          courseId,
+        },
+        select: {
+          studentId: true,
+          condonationStatus: true,
+        },
+      });
+
+      const attendanceMap = new Map(
+        attendances.map((a) => [a.studentId, a.condonationStatus])
+      );
+
+      const students: FacultyAttendanceDetailedReportDTO["students"] =
+        studentSections.map((ss) => {
+          const studentId = ss.student.id;
+          const recordMap = new Map<string, "PRESENT" | "ABSENT">();
+          attendanceRecords
+            .filter((r) => r.studentId === studentId)
+            .forEach((r) => {
+              recordMap.set(r.sessionId, r.status);
+            });
+
+          const sessionStatuses = sessions.map((s) => {
+            const status = recordMap.get(s.id);
+            return status || "ABSENT";
+          });
+
+          const presentSessions = sessionStatuses.filter(
+            (s) => s === "PRESENT"
+          ).length;
+          const absentSessions = sessionStatuses.filter(
+            (s) => s === "ABSENT"
+          ).length;
+          const totalSessions = sessions.length;
+          const percentage =
+            totalSessions > 0
+              ? Math.round((presentSessions / totalSessions) * 100 * 100) / 100
+              : 0;
+          const condonationStatus =
+            attendanceMap.get(studentId) || "NOT_REQUESTED";
+
+          let status: "Eligible" | "Not Eligible";
+          if (percentage >= 85) {
+            status = "Eligible";
+          } else if (percentage >= 75 && condonationStatus === "APPROVED") {
+            status = "Eligible";
+          } else {
+            status = "Not Eligible";
+          }
+
+          return {
+            studentId,
+            usn: ss.student.usn,
+            name: ss.student.user.name,
+            sessionStatuses,
+            condonationStatus,
+            totalSessions,
+            presentSessions,
+            absentSessions,
+            percentage,
+            status,
+          };
+        });
+
+      return {
+        status: "success",
+        message: "Detailed report retrieved successfully",
+        data: {
+          sessions: sessions.map((s) => ({
+            id: s.id,
+            sessionDate: s.sessionDate.toISOString(),
+          })),
+          students,
+        },
+      };
+    } catch (error) {
+      logger.error("Error retrieving detailed report:", { error });
+      throw new Error("Failed to retrieve detailed report");
     }
   }
 }

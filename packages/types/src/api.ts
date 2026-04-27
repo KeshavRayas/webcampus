@@ -126,6 +126,25 @@ export type FacultyAttendanceSessionDTO = {
   createdAt: string;
 };
 
+export type FacultyAttendanceDetailedReportDTO = {
+  sessions: {
+    id: string;
+    sessionDate: string;
+  }[];
+  students: {
+    studentId: string;
+    usn: string;
+    name: string;
+    sessionStatuses: ("PRESENT" | "ABSENT")[];
+    condonationStatus: "NOT_REQUESTED" | "PENDING" | "APPROVED" | "REJECTED";
+    totalSessions: number;
+    presentSessions: number;
+    absentSessions: number;
+    percentage: number;
+    status: "Eligible" | "Not Eligible";
+  }[];
+};
+
 export type AttendanceRecordStatusDTO = "PRESENT" | "ABSENT";
 
 export type FacultyAttendanceStudentStatusInputDTO = {

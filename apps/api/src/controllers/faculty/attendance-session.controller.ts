@@ -13,8 +13,12 @@ import type { Request, Response } from "express";
 import { FacultyAttendanceSessionService } from "../../services/faculty/attendance-session.service";
 
 const resolveSessionUser = async (req: Request) => {
+  console.log("resolveSessionUser: before getSession");
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(req.headers),
+  });
+  console.log("resolveSessionUser: after getSession", {
+    hasSession: !!session?.user,
   });
 
   if (!session?.user?.id) {
@@ -159,12 +163,24 @@ export class FacultyAttendanceSessionController {
   static async createOrOpenSession(req: Request, res: Response): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
+      logger.info("createOrOpenSession: user resolved", {
+        userId: user.id,
+        email: user.email,
+      });
       const payload = req.body as CreateOrOpenFacultyAttendanceSessionType;
+      logger.info("createOrOpenSession: payload", { payload });
       const response =
         await FacultyAttendanceSessionService.createOrOpenSession(
           user.id,
           payload
         );
+
+      logger.info("createOrOpenSession: response", {
+        status: response.status,
+        message: response.message,
+        created:
+          response.status === "success" ? response.data?.created : undefined,
+      });
 
       if (response.status !== "success") {
         throw new Error(response.message);
@@ -199,11 +215,21 @@ export class FacultyAttendanceSessionController {
   static async listSessions(req: Request, res: Response): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
+      logger.info("listSessions: user resolved", {
+        userId: user.id,
+        email: user.email,
+      });
       const query = req.query as ListFacultyAttendanceSessionsQueryType;
+      logger.info("listSessions: query params", { query });
       const response = await FacultyAttendanceSessionService.listSessions(
         user.id,
         query
       );
+
+      logger.info("listSessions: response status", {
+        status: response.status,
+        message: response.message,
+      });
 
       if (response.status !== "success") {
         throw new Error(response.message);

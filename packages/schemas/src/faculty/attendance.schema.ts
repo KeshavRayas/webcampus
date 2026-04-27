@@ -201,6 +201,12 @@ export const FacultyAttendanceFilterOptionsResponseSchema = z.object({
   ),
 });
 
+export const FacultyAttendanceDetailedReportQuerySchema = z.object({
+  courseId: z.uuid("Invalid course ID"),
+  sectionId: z.uuid("Invalid section ID"),
+  batchId: z.uuid("Invalid batch ID").optional(),
+});
+
 export const FacultyAttendanceSessionResponseSchema = z.object({
   id: z.string(),
   courseId: z.uuid("Invalid course ID"),
@@ -300,4 +306,8 @@ export type FacultyAttendanceSessionStudentsResponseType = z.infer<
 >;
 export type FacultyAttendanceSessionDetailResponseType = z.infer<
   typeof FacultyAttendanceSessionDetailResponseSchema
+>;
+
+export type FacultyAttendanceDetailedReportQuerySchemaType = z.infer<
+  typeof FacultyAttendanceDetailedReportQuerySchema
 >;

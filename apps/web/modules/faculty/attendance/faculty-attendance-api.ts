@@ -10,6 +10,7 @@ import {
   CreateOrOpenFacultyAttendanceSessionDTO,
   CreateOrOpenFacultyAttendanceSessionPayloadDTO,
   DeleteFacultyAttendanceSessionDTO,
+  FacultyAttendanceDetailedReportDTO,
   FacultyAttendanceFilterOptionsDTO,
   FacultyAttendanceSessionDetailDTO,
   FacultyAttendanceSessionDTO,
@@ -75,7 +76,8 @@ export const createOrOpenFacultyAttendanceSession = async (
 };
 
 export const listFacultyAttendanceSessions = async (
-  filters: ListFacultyAttendanceSessionsFilters
+  filters: ListFacultyAttendanceSessionsFilters,
+  signal?: AbortSignal
 ): Promise<PaginatedResponse<FacultyAttendanceSessionDTO>> => {
   try {
     const params: Record<string, string> = {
@@ -103,6 +105,7 @@ export const listFacultyAttendanceSessions = async (
       BaseResponse<PaginatedPayload<FacultyAttendanceSessionDTO>>
     >("/faculty/attendance/session", {
       params,
+      signal,
     });
 
     if (response.data.status !== "success") {
@@ -201,6 +204,47 @@ export const deleteFacultyAttendanceSession = async (
   } catch (error) {
     throw new Error(
       getApiErrorMessage(error, "Failed to delete attendance session")
+    );
+  }
+};
+
+export type DetailedReportFilters = {
+  courseId: string;
+  sectionId: string;
+  batchId?: string;
+};
+
+export const getFacultyAttendanceDetailedReport = async (
+  filters: DetailedReportFilters,
+  signal?: AbortSignal
+): Promise<FacultyAttendanceDetailedReportDTO> => {
+  try {
+    const params: Record<string, string> = {
+      courseId: filters.courseId,
+      sectionId: filters.sectionId,
+    };
+
+    if (filters.batchId) {
+      params.batchId = filters.batchId;
+    }
+
+    const response = await apiClient.get<
+      BaseResponse<FacultyAttendanceDetailedReportDTO>
+    >("/faculty/attendance/report/detailed", {
+      params,
+      signal,
+    });
+
+    if (response.data.status !== "success" || !response.data.data) {
+      throw new Error(
+        response.data.message || "Failed to fetch detailed report"
+      );
+    }
+
+    return response.data.data;
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error, "Failed to fetch detailed report")
     );
   }
 };

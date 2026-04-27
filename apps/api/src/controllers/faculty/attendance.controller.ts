@@ -2,7 +2,10 @@ import { Attendance } from "@webcampus/api/src/services/faculty/attendance.servi
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
-import { UpdateAttendanceType } from "@webcampus/schemas/faculty";
+import {
+  FacultyAttendanceDetailedReportQuerySchemaType,
+  UpdateAttendanceType,
+} from "@webcampus/schemas/faculty";
 import { Request, Response } from "express";
 
 export class AttendanceController {
@@ -155,6 +158,43 @@ export class AttendanceController {
       }
     } catch (error) {
       logger.error("Error deleting attendance:", { error });
+      sendResponse({
+        res,
+        status: "error",
+        message: ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 500,
+        error,
+      });
+    }
+  }
+
+  static async getDetailedReport(
+    req: Request<
+      unknown,
+      unknown,
+      unknown,
+      FacultyAttendanceDetailedReportQuerySchemaType
+    >,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { courseId, sectionId, batchId } = req.query;
+      const response = await Attendance.getDetailedReport(
+        courseId,
+        sectionId,
+        batchId
+      );
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          message: response.message,
+          data: response.data,
+          statusCode: 200,
+        });
+      }
+    } catch (error) {
+      logger.error("Error retrieving detailed report:", { error });
       sendResponse({
         res,
         status: "error",

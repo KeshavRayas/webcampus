@@ -27,7 +27,35 @@ export const useCreateOrOpenFacultyAttendanceSession = () => {
   return useMutation({
     mutationFn: (payload: CreateOrOpenSessionPayload) =>
       createOrOpenFacultyAttendanceSession(payload),
+    onMutate: async () => {
+      await queryClient.cancelQueries({
+        queryKey: ["faculty-attendance", "sessions"],
+      });
+      await queryClient.cancelQueries({
+        queryKey: ["faculty-attendance", "session-detail"],
+      });
+    },
     onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["faculty-attendance", "sessions"],
+        refetchType: "none",
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["faculty-attendance", "session-detail"],
+        refetchType: "none",
+      });
+      queryClient
+        .refetchQueries({
+          queryKey: ["faculty-attendance", "sessions"],
+        })
+        .catch(() => {});
+      queryClient
+        .refetchQueries({
+          queryKey: ["faculty-attendance", "session-detail"],
+        })
+        .catch(() => {});
+    },
+    onError: () => {
       queryClient.invalidateQueries({
         queryKey: ["faculty-attendance", "sessions"],
       });
@@ -40,12 +68,22 @@ export const useCreateOrOpenFacultyAttendanceSession = () => {
 
 export const useFacultyAttendanceSessions = (
   filters: ListFacultyAttendanceSessionsFilters,
-  enabled = true
+  enabled = true,
+  options?: {
+    queryKeySuffix?: readonly unknown[];
+    staleTime?: number;
+  }
 ) => {
   return useQuery({
-    queryKey: ["faculty-attendance", "sessions", filters],
-    queryFn: () => listFacultyAttendanceSessions(filters),
+    queryKey: [
+      "faculty-attendance",
+      "sessions",
+      ...(options?.queryKeySuffix ?? []),
+      filters,
+    ],
+    queryFn: ({ signal }) => listFacultyAttendanceSessions(filters, signal),
     enabled,
+    staleTime: options?.staleTime,
   });
 };
 

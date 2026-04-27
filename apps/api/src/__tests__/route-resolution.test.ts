@@ -1,6 +1,7 @@
 /// <reference types="bun" />
 
-import { beforeAll, afterAll, describe, expect, it, mock } from "bun:test";
+import http from "http";
+import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
 
 mock.module("dotenv", () => ({
   config: () => {},
@@ -26,17 +27,8 @@ mock.module("@webcampus/auth", () => ({
       signOut: async () => null,
     },
   },
-  toNodeHandler: (handler: any) => handler,
+  toNodeHandler: (handler: unknown) => handler,
 }));
-
-const mockResponse = {
-  status: 200,
-  headers: new Headers(),
-  text: async () => "",
-  json: async () => ({}),
-};
-
-import app from "../app.js";
 
 mock.module("@webcampus/auth", () => ({
   auth: {
@@ -46,11 +38,12 @@ mock.module("@webcampus/auth", () => ({
       signOut: async () => null,
     },
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   toNodeHandler: () => (req: any, res: any) => {
     res.statusCode = 404;
     res.end("Auth not available in test");
   },
-  fromNodeHeaders: (headers: any) => ({}),
+  fromNodeHeaders: () => ({}),
 }));
 
 mock.module("@webcampus/common/env", () => ({
@@ -81,12 +74,8 @@ mock.module("@webcampus/common/logger", () => ({
   },
 }));
 
-import http from "http";
-
 const BASE_URL = "http://localhost:3456";
 let server: http.Server;
-
-import http from "http";
 
 beforeAll(async () => {
   const { default: app } = await import("../app.js");
@@ -112,12 +101,15 @@ describe("Route Resolution Tests", () => {
     const id = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const response = await fetch(url, { ...options, signal: controller.signal });
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
       clearTimeout(id);
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearTimeout(id);
-      if (error.name === "AbortError") {
+      if (error instanceof Error && error.name === "AbortError") {
         throw new Error(`Request timeout after ${timeout}ms: ${url}`);
       }
       throw error;

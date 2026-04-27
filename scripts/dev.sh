@@ -1,6 +1,14 @@
 #!/bin/bash
 set -e
 
+cleanup() {
+  echo "Stopping dev processes..."
+  taskkill //F //IM node.exe 2>/dev/null || true
+  taskkill //F //IM bun.exe 2>/dev/null || true
+}
+
+trap cleanup INT TERM EXIT
+
 # Print banner
 bunx tsx scripts/banner.ts
 
@@ -21,4 +29,4 @@ bun run bootstrap
 
 
 # Start the Turborepo development server using Bun
-bunx turbo dev
+bunx turbo dev 

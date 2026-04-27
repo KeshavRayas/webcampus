@@ -23,7 +23,9 @@ import React from "react";
 export const UserButton = () => {
   const { data: session } = authClient.useSession();
   const router = useRouter();
-  const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${session?.user.name}&radius=50&backgroundColor=0052ff&textColor=ffffff&size=128`;
+  const userInitial = (session?.user.name ?? "")[0] ?? "";
+
+  const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${session?.user.name ?? "user"}&radius=50&backgroundColor=0052ff&textColor=ffffff&size=128`;
 
   const handleLogout = async () => {
     await authClient.signOut({
@@ -40,7 +42,9 @@ export const UserButton = () => {
       <DropdownMenuTrigger asChild>
         <Avatar>
           <AvatarImage src={avatarUrl} />
-          <AvatarFallback>{session?.user.name?.[0]}</AvatarFallback>
+          {session?.user ? (
+            <AvatarFallback>{userInitial}</AvatarFallback>
+          ) : null}
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-72" align="end">

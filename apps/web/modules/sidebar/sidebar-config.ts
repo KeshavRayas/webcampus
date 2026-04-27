@@ -151,6 +151,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Attendance",
           url: "/student/attendance",
           icon: Fingerprint,
+          children: [
+            { name: "View Attendance", url: "/student/attendance" },
+            { name: "Attendance Report", url: "/student/attendance/report" },
+          ],
         },
         {
           name: "CIE",
@@ -185,8 +189,12 @@ export const sidebarConfig: Record<Role, SidebarData> = {
         },
         {
           name: "Attendance",
-          url: "/faculty/attendance",
+          url: "/faculty/attendance/take",
           icon: Fingerprint,
+          children: [
+            { name: "Take/ Edit Attendance", url: "/faculty/attendance/take" },
+            { name: "Attendance Report", url: "/faculty/attendance/report" },
+          ],
         },
         {
           name: "Marks",

@@ -11,6 +11,10 @@ import { Router } from "express";
 
 const router: Router = Router();
 
+router.get("/test-hang", (req, res) => {
+  res.json({ ok: true, message: "test route works" });
+});
+
 router.use(
   protect({
     role: "faculty",

@@ -266,15 +266,22 @@ const getTimingWindow = (
 
 export class FacultyAttendanceSessionService {
   private static async getFacultyIdByUserId(userId: string): Promise<string> {
+    logger.info("getFacultyIdByUserId: looking up faculty for userId", {
+      userId,
+    });
     const faculty = await db.faculty.findUnique({
       where: { userId },
       select: { id: true },
     });
 
     if (!faculty) {
+      logger.error("getFacultyIdByUserId: faculty not found", { userId });
       throw new Error("Faculty profile not found");
     }
 
+    logger.info("getFacultyIdByUserId: found faculty", {
+      facultyId: faculty.id,
+    });
     return faculty.id;
   }
 
@@ -617,6 +624,8 @@ export class FacultyAttendanceSessionService {
   ): Promise<BaseResponse<CreateOrOpenFacultyAttendanceSessionDTO>> {
     try {
       const facultyId = await this.getFacultyIdByUserId(userId);
+      logger.info("createOrOpenSession: got facultyId", { facultyId, payload });
+
       const assignmentContext = await this.getFacultyCourseSectionContext(
         facultyId,
         payload.courseId,
@@ -626,6 +635,13 @@ export class FacultyAttendanceSessionService {
 
       const sessionDate = toSessionDateUtc(payload.sessionDate);
       const timing = getTimingWindow(payload);
+
+      logger.info("createOrOpenSession: searching for existing session", {
+        courseId: payload.courseId,
+        sectionId: payload.sectionId,
+        batchId: payload.batchId,
+        sessionDate,
+      });
 
       const existingSessionCandidates = await db.classSession.findMany({
         where: {
@@ -945,8 +961,14 @@ export class FacultyAttendanceSessionService {
     userId: string,
     query: ListFacultyAttendanceSessionsQueryType
   ): Promise<BaseResponse<PaginatedResponse<FacultyAttendanceSessionDTO>>> {
+    const startTime = Date.now();
     try {
       const facultyId = await this.getFacultyIdByUserId(userId);
+      logger.info("listSessions: got facultyId", {
+        facultyId,
+        durationMs: Date.now() - startTime,
+      });
+
       const page = toSafePositiveInt(query.page, DEFAULT_PAGE);
       const limit = toSafePositiveInt(query.limit, DEFAULT_LIMIT, MAX_LIMIT);
 
@@ -977,37 +999,63 @@ export class FacultyAttendanceSessionService {
         };
       }
 
+      logger.info("listSessions: fetching with where clause", {
+        where,
+        page,
+        limit,
+      });
+
+      const countStart = Date.now();
       const total = await db.classSession.count({ where });
+      logger.info("listSessions: count completed", {
+        durationMs: Date.now() - countStart,
+        total,
+      });
 
       let items: FacultyAttendanceSessionDTO[];
 
       try {
+        const fetchStart = Date.now();
+        // TEMPORARY: Using scalar-only select to diagnose hanging issue
+        // If this works quickly, problem is the include/relation JOINs
         const sessions = await db.classSession.findMany({
           where,
           orderBy: [{ sessionDate: "desc" }, { createdAt: "desc" }],
           skip: (page - 1) * limit,
           take: limit,
-          include: {
-            Course: {
-              select: {
-                code: true,
-                name: true,
-              },
-            },
-            Section: {
-              select: {
-                name: true,
-              },
-            },
-            Batch: {
-              select: {
-                name: true,
-              },
-            },
+          select: {
+            id: true,
+            courseId: true,
+            sectionId: true,
+            batchId: true,
+            sessionDate: true,
+            timingCode: true,
+            timingLabel: true,
+            timingStartTime: true,
+            timingEndTime: true,
+            createdAt: true,
           },
         });
 
-        items = sessions.map(toSessionDto);
+        items = sessions.map((s) => ({
+          id: s.id,
+          courseId: s.courseId,
+          sectionId: s.sectionId,
+          batchId: s.batchId ?? undefined,
+          sessionDate: s.sessionDate.toISOString(),
+          timingCode: s.timingCode,
+          timingLabel: s.timingLabel,
+          timingStartTime: s.timingStartTime,
+          timingEndTime: s.timingEndTime,
+          courseCode: "",
+          courseName: "",
+          sectionName: "",
+          createdAt: s.createdAt.toISOString(),
+        }));
+        logger.info("listSessions: main query completed (scalar)", {
+          durationMs: Date.now() - fetchStart,
+          itemCount: items.length,
+        });
       } catch (includeError) {
         logger.error(
           "Attendance sessions include resolution failed; retrying with scalar fallback",
@@ -1104,6 +1152,14 @@ export class FacultyAttendanceSessionService {
 
       const totalPages = Math.max(1, Math.ceil(total / limit));
 
+      logger.info("listSessions: completed", {
+        durationMs: Date.now() - startTime,
+        itemCount: items.length,
+        total,
+        page,
+        limit,
+      });
+
       return {
         status: "success",
         message: "Attendance sessions retrieved successfully",
@@ -1123,6 +1179,7 @@ export class FacultyAttendanceSessionService {
       logger.error("Error retrieving faculty attendance sessions", {
         error,
         errorMessage: error instanceof Error ? error.message : "Unknown error",
+        durationMs: Date.now() - startTime,
       });
       throw new Error("Failed to retrieve attendance sessions");
     }
