@@ -29,3 +29,74 @@ export type BaseMarkType = z.infer<typeof BaseMarkSchema>;
 export type CreateMarkType = z.infer<typeof CreateMarkSchema>;
 export type UpdateMarkType = z.infer<typeof UpdateMarkSchema>;
 export type MarkResponseType = z.infer<typeof MarkResponseSchema>;
+
+// Assessment Marks Entry Schemas
+export const StudentQuestionMarkSchema = z.object({
+  studentId: z.string().uuid("Invalid student ID"),
+  questionId: z.string().uuid("Invalid question ID"),
+  marksObtained: z.number().min(0, "Marks cannot be negative"),
+});
+
+export const StudentAssessmentStatusSchema = z.enum([
+  "PRESENT",
+  "ABSENT",
+  "MP",
+]);
+
+export const StudentAssessmentTotalSchema = z.object({
+  studentId: z.string().uuid("Invalid student ID"),
+  totalMarks: z.number().min(0, "Total marks cannot be negative"),
+  status: StudentAssessmentStatusSchema,
+});
+
+export const SaveAssessmentMarksSchema = z.object({
+  assessmentId: z.string().uuid("Invalid assessment ID"),
+  courseId: z.string().uuid("Invalid course ID"),
+  marks: z.array(StudentQuestionMarkSchema).optional(),
+  studentTotals: z
+    .array(StudentAssessmentTotalSchema)
+    .min(1, "At least one student total is required"),
+});
+
+export const StudentAssessmentDetailSchema = z.object({
+  studentId: z.string().uuid("Invalid student ID"),
+  usn: z.string(),
+  name: z.string(),
+  totalMarks: z.number().min(0),
+  status: z.string(),
+  questionMarks: z.record(z.string(), z.number()).optional(),
+});
+
+export const AssessmentWithStudentsSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  totalMarks: z.number(),
+  courseId: z.string().uuid(),
+  courseName: z.string(),
+  courseCode: z.string(),
+  questions: z.array(
+    z.object({
+      id: z.string().uuid(),
+      part: z.string(),
+      qNumber: z.string(),
+      marks: z.number(),
+      orGroupId: z.string().optional().nullable(),
+    })
+  ),
+  students: z.array(StudentAssessmentDetailSchema),
+});
+
+export type StudentQuestionMarkType = z.infer<typeof StudentQuestionMarkSchema>;
+export type SaveAssessmentMarksType = z.infer<typeof SaveAssessmentMarksSchema>;
+export type StudentAssessmentDetailType = z.infer<
+  typeof StudentAssessmentDetailSchema
+>;
+export type AssessmentWithStudentsType = z.infer<
+  typeof AssessmentWithStudentsSchema
+>;
+export type StudentAssessmentStatusType = z.infer<
+  typeof StudentAssessmentStatusSchema
+>;
+export type StudentAssessmentTotalType = z.infer<
+  typeof StudentAssessmentTotalSchema
+>;

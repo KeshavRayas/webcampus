@@ -13,6 +13,7 @@ interface CoordinatedCourse {
   code: string;
   name: string;
   semesterNumber: number;
+  semesterId: string;
 }
 
 interface QPSetupDialogProps {

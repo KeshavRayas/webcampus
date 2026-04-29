@@ -246,6 +246,7 @@ model Student {
   attendances       Attendance[]
   AttendanceRecord  AttendanceRecord[]
   registrations     CourseRegistration[]
+  assessments       StudentAssessment[]
   marks             Mark[]
   department        Department           @relation(fields: [departmentName], references: [name])
   user              User                 @relation(fields: [userId], references: [id])
@@ -409,6 +410,7 @@ model Course {
   assignments             CourseAssignment[]
   registrations           CourseRegistration[]
   marks                   Mark[]
+  studentAssessments      StudentAssessment[]
 
   @@unique([id, departmentId])
   @@index([code])
@@ -706,6 +708,7 @@ model AssessmentTemplate {
   totalMarks Int
 
   questions AssessmentQuestion[]
+  studentRecords StudentAssessment[]
   course    Course              @relation(fields: [courseId], references: [id])
 }
 
@@ -718,8 +721,38 @@ model AssessmentQuestion {
   co           String?
   po           String?
   bl           String?
+  orGroupId    String?
 
   assessment AssessmentTemplate @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  studentMarks StudentQuestionMark[]
+}
+
+model StudentAssessment {
+  id              String   @id @default(uuid())
+  studentId       String
+  assessmentId    String
+  courseId        String
+  totalMarks      Float
+  status          String   @default("PRESENT")
+
+  student       Student             @relation(fields: [studentId], references: [id])
+  assessment    AssessmentTemplate  @relation(fields: [assessmentId], references: [id])
+  course        Course              @relation(fields: [courseId], references: [id])
+  questionMarks StudentQuestionMark[]
+
+  @@unique([studentId, assessmentId])
+}
+
+model StudentQuestionMark {
+  id            String   @id @default(uuid())
+  recordId      String
+  questionId    String
+  marksObtained Float
+
+  record   StudentAssessment  @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  question AssessmentQuestion @relation(fields: [questionId], references: [id])
+
+  @@unique([recordId, questionId])
 }
 
 enum DepartmentScopedRole {

@@ -15,6 +15,7 @@ interface CoordinatedCourseDTO {
   practicalCredits: number;
   skillCredits: number;
   semesterNumber: number;
+  semesterId: string;
   programType: string;
   departmentName: string;
   departmentAbbreviation: string;
@@ -62,6 +63,7 @@ export class AssessmentService {
           tutorialCredits: true,
           practicalCredits: true,
           skillCredits: true,
+          semesterId: true,
           cieMaxMarks: true,
           maxNoOfCies: true,
           assessments: {
@@ -98,6 +100,7 @@ export class AssessmentService {
         practicalCredits: c.practicalCredits,
         skillCredits: c.skillCredits,
         semesterNumber: c.semester.semesterNumber,
+        semesterId: c.semesterId,
         programType: c.semester.programType,
         departmentName: c.department.name,
         departmentAbbreviation: c.department.abbreviation,
@@ -135,28 +138,56 @@ export class AssessmentService {
         throw new Error("Faculty profile not found");
       }
 
-      await db.assessmentTemplate.create({
-        data: {
+      const existingAssessment = await db.assessmentTemplate.findFirst({
+        where: {
           courseId: data.courseId,
-          semesterId: data.semesterId,
           title: data.title,
-          totalMarks: data.totalMarks,
-          questions: {
-            create: data.questions.map((q) => ({
-              part: q.part,
-              qNumber: q.qNumber,
-              marks: q.marks,
-              co: q.co || null,
-              po: q.po || null,
-              bl: q.bl || null,
-            })),
-          },
         },
       });
 
+      const formattedQuestions = data.questions.map((q) => ({
+        part: q.part,
+        qNumber: q.qNumber,
+        marks: q.marks,
+        co: q.co || null,
+        po: q.po || null,
+        bl: q.bl || null,
+        orGroupId: q.orGroupId || null,
+      }));
+
+      if (existingAssessment) {
+        await db.$transaction([
+          db.assessmentQuestion.deleteMany({
+            where: { assessmentId: existingAssessment.id },
+          }),
+          db.assessmentTemplate.update({
+            where: { id: existingAssessment.id },
+            data: {
+              semesterId: data.semesterId,
+              totalMarks: data.totalMarks,
+              questions: {
+                create: formattedQuestions,
+              },
+            },
+          }),
+        ]);
+      } else {
+        await db.assessmentTemplate.create({
+          data: {
+            courseId: data.courseId,
+            semesterId: data.semesterId,
+            title: data.title,
+            totalMarks: data.totalMarks,
+            questions: {
+              create: formattedQuestions,
+            },
+          },
+        });
+      }
+
       return {
         status: "success",
-        message: "Assessment template created successfully",
+        message: "Assessment template saved successfully",
         data: null,
       };
     } catch (error) {

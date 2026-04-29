@@ -8,6 +8,7 @@ import {
   CreateAssessmentType,
 } from "@webcampus/schemas/faculty";
 import type { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
+import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Form,
@@ -29,7 +30,7 @@ import { toast } from "react-toastify";
 interface QPSetupFormProps {
   course: {
     id: string;
-    semester?: { id: string };
+    semesterId: string;
   };
   onSuccess: () => void;
   onMarksChange: (marks: number) => void;
@@ -51,38 +52,218 @@ export const QPSetupForm = ({
     resolver: zodResolver(CreateAssessmentSchema),
     defaultValues: {
       courseId: course.id,
-      semesterId: course.semester?.id || "00000000-0000-0000-0000-000000000000",
+      semesterId: course.semesterId,
       title: "CIE 1",
       totalMarks: 0,
       questions: [],
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, replace } = useFieldArray({
     control: form.control,
     name: "questions",
   });
 
   const questionsWatch = form.watch("questions");
 
-  // Sum marks and update total both locally and to parent
+  const createOrGroupId = () =>
+    `group_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+
+  const buildPartQuestions = (
+    part: string,
+    qCount: number,
+    subQCount: number
+  ): CreateAssessmentType["questions"] => {
+    const generated: CreateAssessmentType["questions"] = [];
+
+    for (let i = 0; i < qCount; i++) {
+      const mainNumber = i + 1;
+      if (subQCount > 0) {
+        for (let j = 0; j < subQCount; j++) {
+          const letter = String.fromCharCode(97 + j);
+          generated.push({
+            part,
+            qNumber: `${mainNumber}${letter}`,
+            marks: 0,
+            co: "",
+            po: "",
+            bl: "",
+            orGroupId: undefined,
+          });
+        }
+      } else {
+        generated.push({
+          part,
+          qNumber: `${mainNumber}`,
+          marks: 0,
+          co: "",
+          po: "",
+          bl: "",
+          orGroupId: undefined,
+        });
+      }
+    }
+
+    return generated;
+  };
+
+  const computeTotalMarks = (questions: CreateAssessmentType["questions"]) => {
+    const partTotals = new Map<
+      string,
+      { standaloneSum: number; orGroupMaxes: Map<string, number> }
+    >();
+
+    questions.forEach((question) => {
+      const marks = Number(question.marks) || 0;
+      if (!partTotals.has(question.part)) {
+        partTotals.set(question.part, {
+          standaloneSum: 0,
+          orGroupMaxes: new Map<string, number>(),
+        });
+      }
+
+      const partTotalsEntry = partTotals.get(question.part)!;
+
+      if (question.orGroupId) {
+        const currentMax =
+          partTotalsEntry.orGroupMaxes.get(question.orGroupId) || 0;
+        partTotalsEntry.orGroupMaxes.set(
+          question.orGroupId,
+          Math.max(currentMax, marks)
+        );
+      } else {
+        partTotalsEntry.standaloneSum += marks;
+      }
+    });
+
+    let total = 0;
+    partTotals.forEach(({ standaloneSum, orGroupMaxes }) => {
+      const groupTotals = Array.from(orGroupMaxes.values());
+      const sumOfMaxes = groupTotals.reduce((sum, max) => sum + max, 0);
+      total += standaloneSum + sumOfMaxes;
+    });
+
+    return total;
+  };
+
+  const recalculateGlobalNumbering = (
+    questions: CreateAssessmentType["questions"],
+    partsList: string[]
+  ) => {
+    const updated = [...questions];
+    let globalMainNumber = 1;
+
+    partsList.forEach((part) => {
+      const partIndices = questions
+        .map((q, index) => (q.part === part ? index : -1))
+        .filter((index) => index !== -1);
+
+      if (partIndices.length === 0) return;
+
+      const assignedGlobalNumbers = new Map<string, number>();
+      const groupSizes = new Map<string, number>();
+
+      partIndices.forEach((index) => {
+        const question = questions[index]!;
+        const match = question.qNumber.match(/^(\d+)/);
+        const originalBase = match ? match[1] : question.qNumber;
+
+        const logicKey = question.orGroupId
+          ? `orgroup_${question.orGroupId}`
+          : `base_${originalBase}`;
+
+        if (!assignedGlobalNumbers.has(logicKey)) {
+          assignedGlobalNumbers.set(logicKey, globalMainNumber++);
+        }
+        groupSizes.set(logicKey, (groupSizes.get(logicKey) || 0) + 1);
+      });
+
+      const subCounters = new Map<string, number>();
+
+      partIndices.forEach((index) => {
+        const question = questions[index]!;
+        const match = question.qNumber.match(/^(\d+)/);
+        const originalBase = match ? match[1] : question.qNumber;
+
+        const logicKey = question.orGroupId
+          ? `orgroup_${question.orGroupId}`
+          : `base_${originalBase}`;
+
+        const mainNum = assignedGlobalNumbers.get(logicKey)!;
+        const totalInGroup = groupSizes.get(logicKey)!;
+
+        if (totalInGroup > 1) {
+          const nextCount = (subCounters.get(logicKey) || 0) + 1;
+          subCounters.set(logicKey, nextCount);
+          const letter = String.fromCharCode(96 + nextCount); // 1->a, 2->b...
+          updated[index] = {
+            ...question,
+            qNumber: `${mainNum}${letter}`,
+          };
+        } else {
+          updated[index] = {
+            ...question,
+            qNumber: `${mainNum}`,
+          };
+        }
+      });
+    });
+
+    return updated;
+  };
+
+  const getOrGroupOptions = (part: string) => {
+    const options = new Set<string>();
+    questionsWatch.forEach((question) => {
+      if (question.part === part && question.orGroupId) {
+        options.add(question.orGroupId);
+      }
+    });
+    return Array.from(options.values()).sort();
+  };
+
+  // Sum marks with OR logic and update total both locally and to parent
   useEffect(() => {
-    const total = questionsWatch.reduce(
-      (acc, q) => acc + (Number(q.marks) || 0),
-      0
-    );
+    const total = computeTotalMarks(questionsWatch);
     form.setValue("totalMarks", total);
     onMarksChange(total);
   }, [questionsWatch, form, onMarksChange]);
 
-  // Generator states for each part
-  const [parts] = useState(["Part A", "Part B", "Part C"]);
+  // Dynamic parts state
+  const [numberOfParts, setNumberOfParts] = useState(1);
+  const parts = Array.from(
+    { length: numberOfParts },
+    (_, i) => `Part ${i + 1}`
+  );
+
+  const handlePartsChange = (newCount: number) => {
+    const count = Math.max(1, Math.min(10, newCount));
+    const newParts = Array.from({ length: count }, (_, i) => `Part ${i + 1}`);
+    const validParts = new Set(newParts);
+
+    const currentQuestions = form.getValues("questions");
+    const filteredQuestions = currentQuestions.filter((q) =>
+      validParts.has(q.part)
+    );
+
+    if (filteredQuestions.length !== currentQuestions.length) {
+      const renumbered = recalculateGlobalNumbering(
+        filteredQuestions,
+        newParts
+      );
+      form.setValue("questions", renumbered, { shouldDirty: true });
+    } else {
+      // Even if no questions were removed, adding a part doesn't require renumbering existing ones
+      // because new parts are appended.
+    }
+
+    setNumberOfParts(count);
+  };
+
   type GeneratorState = { qCount: number; subQCount: number };
-  const [generators, setGenerators] = useState<Record<string, GeneratorState>>({
-    "Part A": { qCount: 1, subQCount: 0 },
-    "Part B": { qCount: 1, subQCount: 0 },
-    "Part C": { qCount: 1, subQCount: 0 },
-  });
+  const [generators, setGenerators] = useState<Record<string, GeneratorState>>(
+    {}
+  );
 
   const updateGenerator = (
     part: string,
@@ -99,52 +280,53 @@ export const QPSetupForm = ({
   };
 
   const handleGenerate = (part: string) => {
-    const { qCount, subQCount } = generators[part]!;
+    const { qCount, subQCount } = generators[part] || {
+      qCount: 1,
+      subQCount: 0,
+    };
     if (qCount <= 0) return;
 
-    // Find the highest main question number across ALL existing questions
-    let highestQNum = 0;
-    questionsWatch.forEach((q) => {
-      // Parse out the integer prefix, e.g. "1a" -> 1
-      const match = q.qNumber.match(/^(\d+)/);
-      if (match) {
-        const num = parseInt(match[1]!, 10);
-        if (num > highestQNum) {
-          highestQNum = num;
-        }
-      }
+    const generatedPartQuestions = buildPartQuestions(part, qCount, subQCount);
+    const currentQuestions = form.getValues("questions");
+    const questionsByPart = new Map<
+      string,
+      CreateAssessmentType["questions"]
+    >();
+
+    parts.forEach((currentPart) => {
+      const existing = currentQuestions.filter((q) => q.part === currentPart);
+      questionsByPart.set(currentPart, existing);
     });
 
-    let currentQNum = highestQNum + 1;
-    const newQuestions: CreateAssessmentType["questions"] = [];
+    questionsByPart.set(part, generatedPartQuestions);
 
-    for (let i = 0; i < qCount; i++) {
-      if (subQCount > 0) {
-        for (let j = 0; j < subQCount; j++) {
-          const letter = String.fromCharCode(97 + j); // 97 is 'a'
-          newQuestions.push({
-            part,
-            qNumber: `${currentQNum}${letter}`,
-            marks: 0,
-            co: "",
-            po: "",
-            bl: "",
-          });
-        }
-      } else {
-        newQuestions.push({
-          part,
-          qNumber: `${currentQNum}`,
-          marks: 0,
-          co: "",
-          po: "",
-          bl: "",
-        });
-      }
-      currentQNum++;
+    const nextQuestions = parts.flatMap(
+      (currentPart) => questionsByPart.get(currentPart) || []
+    );
+
+    const renumbered = recalculateGlobalNumbering(nextQuestions, parts);
+    replace(renumbered);
+  };
+
+  const handleRemove = (part: string, index: number) => {
+    const currentQuestions = form.getValues("questions");
+    const remaining = currentQuestions.filter((_, i) => i !== index);
+    const renumbered = recalculateGlobalNumbering(remaining, parts);
+    replace(renumbered);
+  };
+
+  const handleOrGroupChange = (index: number, value: string) => {
+    if (value === "__new__") {
+      const newGroupId = createOrGroupId();
+      form.setValue(`questions.${index}.orGroupId`, newGroupId, {
+        shouldDirty: true,
+      });
+      return;
     }
 
-    append(newQuestions);
+    form.setValue(`questions.${index}.orGroupId`, value || undefined, {
+      shouldDirty: true,
+    });
   };
 
   const mutation = useMutation({
@@ -168,12 +350,26 @@ export const QPSetupForm = ({
   });
 
   const onSubmit = (data: CreateAssessmentType) => {
-    mutation.mutate(data);
+    const totalMarks = computeTotalMarks(data.questions);
+    form.setValue("totalMarks", totalMarks);
+    onMarksChange(totalMarks);
+    mutation.mutate({
+      ...data,
+      totalMarks,
+    });
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form
+        onSubmit={form.handleSubmit(onSubmit, (errors) => {
+          console.error("Form Validation Errors:", errors);
+          toast.error(
+            "Please fix validation errors before saving. Check if marks are set for all questions."
+          );
+        })}
+        className="space-y-8"
+      >
         <FormField
           control={form.control}
           name="title"
@@ -187,6 +383,27 @@ export const QPSetupForm = ({
             </FormItem>
           )}
         />
+
+        <div className="flex items-center gap-4 border-b pb-6">
+          <div className="flex flex-col gap-2">
+            <FormLabel className="text-base">Number of Parts</FormLabel>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                className="w-24"
+                value={numberOfParts}
+                onChange={(e) =>
+                  handlePartsChange(parseInt(e.target.value) || 1)
+                }
+              />
+              <span className="text-muted-foreground text-sm">
+                Determines how many part sections to generate below.
+              </span>
+            </div>
+          </div>
+        </div>
 
         <div className="space-y-8">
           {parts.map((part) => {
@@ -205,7 +422,7 @@ export const QPSetupForm = ({
                       type="number"
                       min={1}
                       className="h-8 w-20"
-                      value={generators[part]?.qCount}
+                      value={generators[part]?.qCount ?? 1}
                       onChange={(e) =>
                         updateGenerator(
                           part,
@@ -221,7 +438,7 @@ export const QPSetupForm = ({
                       type="number"
                       min={0}
                       className="h-8 w-20"
-                      value={generators[part]?.subQCount}
+                      value={generators[part]?.subQCount ?? 0}
                       onChange={(e) =>
                         updateGenerator(
                           part,
@@ -239,7 +456,7 @@ export const QPSetupForm = ({
                       className="ml-2"
                       onClick={() => handleGenerate(part)}
                     >
-                      Add
+                      Generate
                     </Button>
                   </div>
                 </div>
@@ -254,115 +471,162 @@ export const QPSetupForm = ({
                           <th className="w-32 px-4 py-3">CO</th>
                           <th className="w-32 px-4 py-3">PO</th>
                           <th className="w-32 px-4 py-3">BL</th>
+                          <th className="w-40 px-4 py-3">OR</th>
                           <th className="w-16 px-4 py-3 text-right"></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {partIndices.map((index) => (
-                          <tr
-                            key={fields[index]!.id}
-                            className="hover:bg-muted/30 border-b last:border-0"
-                          >
-                            <td className="px-4 py-2">
-                              <FormField
-                                control={form.control}
-                                name={`questions.${index}.qNumber`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input className="h-8 w-16" {...field} />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <FormField
-                                control={form.control}
-                                name={`questions.${index}.marks`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        min={1}
-                                        className="h-8"
-                                        {...field}
-                                        onChange={(e) =>
-                                          field.onChange(
-                                            parseInt(e.target.value) || 0
-                                          )
-                                        }
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <FormField
-                                control={form.control}
-                                name={`questions.${index}.co`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        className="h-8 uppercase placeholder:normal-case"
-                                        placeholder="CO1"
-                                        {...field}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <FormField
-                                control={form.control}
-                                name={`questions.${index}.po`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        className="h-8 uppercase placeholder:normal-case"
-                                        placeholder="PO1"
-                                        {...field}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="px-4 py-2">
-                              <FormField
-                                control={form.control}
-                                name={`questions.${index}.bl`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        className="h-8 uppercase placeholder:normal-case"
-                                        placeholder="L1"
-                                        {...field}
-                                      />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                            </td>
-                            <td className="px-4 py-2 text-right">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive h-8 w-8 opacity-50 hover:opacity-100"
-                                onClick={() => remove(index)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
+                        {partIndices.map((index) => {
+                          const orGroupOptions = getOrGroupOptions(part);
+                          return (
+                            <tr
+                              key={fields[index]!.id}
+                              className="hover:bg-muted/30 border-b last:border-0"
+                            >
+                              <td className="px-4 py-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`questions.${index}.qNumber`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <div className="flex items-center gap-2">
+                                          <Input
+                                            className="h-8 w-16"
+                                            {...field}
+                                          />
+                                          {questionsWatch[index]?.orGroupId && (
+                                            <Badge variant="secondary">
+                                              OR Group:{" "}
+                                              {questionsWatch[index]?.orGroupId}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`questions.${index}.marks`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          type="number"
+                                          min={1}
+                                          className="h-8"
+                                          {...field}
+                                          onChange={(e) =>
+                                            field.onChange(
+                                              parseInt(e.target.value) || 0
+                                            )
+                                          }
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`questions.${index}.co`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          className="h-8 uppercase placeholder:normal-case"
+                                          placeholder="CO1"
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`questions.${index}.po`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          className="h-8 uppercase placeholder:normal-case"
+                                          placeholder="PO1"
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`questions.${index}.bl`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          className="h-8 uppercase placeholder:normal-case"
+                                          placeholder="L1"
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`questions.${index}.orGroupId`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <select
+                                          className="bg-background h-8 w-full rounded-md border px-2 text-xs"
+                                          value={field.value ?? ""}
+                                          onChange={(event) =>
+                                            handleOrGroupChange(
+                                              index,
+                                              event.target.value
+                                            )
+                                          }
+                                        >
+                                          <option value="">No OR Group</option>
+                                          {orGroupOptions.map((option) => (
+                                            <option key={option} value={option}>
+                                              Link {option}
+                                            </option>
+                                          ))}
+                                          <option value="__new__">
+                                            Create new OR group
+                                          </option>
+                                        </select>
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive h-8 w-8 opacity-50 hover:opacity-100"
+                                  onClick={() => handleRemove(part, index)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

@@ -1,8 +1,10 @@
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import {
+  AssessmentWithStudentsType,
   CreateMarkType,
   MarkResponseType,
+  SaveAssessmentMarksType,
   UpdateMarkType,
 } from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
@@ -228,6 +230,360 @@ export class Mark {
     } catch (error) {
       logger.error("Error deleting mark:", { error });
       throw new Error("Failed to delete mark");
+    }
+  }
+
+  /**
+   * Get marks dashboard: courses where faculty is coordinator + their assessments
+   */
+  static async getMarksDashboard(
+    userId: string
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
+      const assignments = await db.courseAssignment.findMany({
+        where: {
+          facultyId: faculty.id,
+        },
+        select: {
+          section: {
+            select: {
+              id: true,
+              name: true,
+              semesterId: true,
+            },
+          },
+          course: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              semester: {
+                select: {
+                  id: true,
+                  semesterNumber: true,
+                  academicTerm: {
+                    select: {
+                      id: true,
+                      type: true,
+                      year: true,
+                    },
+                  },
+                },
+              },
+              assessments: {
+                select: {
+                  id: true,
+                  title: true,
+                  totalMarks: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { course: { code: "asc" } },
+      });
+
+      return {
+        status: "success",
+        message: "Marks dashboard data retrieved successfully",
+        data: assignments,
+      };
+    } catch (error) {
+      logger.error("Error fetching marks dashboard", error);
+      if (error instanceof Error) throw error;
+      throw new Error("Failed to fetch marks dashboard");
+    }
+  }
+
+  /**
+   * Get assessment template with all registered students and their marks
+   */
+  static async getAssessmentTemplateWithMarks(
+    userId: string,
+    assessmentId: string,
+    sectionId?: string
+  ): Promise<BaseResponse<AssessmentWithStudentsType>> {
+    try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
+      const assessment = await db.assessmentTemplate.findUnique({
+        where: { id: assessmentId },
+        include: {
+          questions: {
+            orderBy: [{ part: "asc" }, { qNumber: "asc" }],
+          },
+          course: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+        },
+      });
+
+      if (!assessment) {
+        throw new Error("Assessment not found");
+      }
+
+      // Verify faculty is assigned to this course
+      const isAssigned = await db.courseAssignment.findFirst({
+        where: {
+          courseId: assessment.courseId,
+          facultyId: faculty.id,
+        },
+      });
+
+      if (!isAssigned) {
+        throw new Error("Unauthorized to view this assessment");
+      }
+
+      // Get students registered for this course, optionally filtered by section
+      const courseRegistrations = await db.courseRegistration.findMany({
+        where: {
+          courseId: assessment.courseId,
+          semesterId: assessment.semesterId,
+          ...(sectionId
+            ? {
+                student: {
+                  studentSections: {
+                    some: { sectionId },
+                  },
+                },
+              }
+            : {}),
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              usn: true,
+              user: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Get existing student assessments and marks
+      const existingAssessments = await db.studentAssessment.findMany({
+        where: {
+          assessmentId,
+        },
+        include: {
+          questionMarks: {
+            select: {
+              questionId: true,
+              marksObtained: true,
+            },
+          },
+        },
+      });
+
+      const assessmentMap = new Map(
+        existingAssessments.map((a) => [a.studentId, a])
+      );
+
+      const students = courseRegistrations.map((reg) => {
+        const studentAssess = assessmentMap.get(reg.student.id);
+        const questionMarks: Record<string, number> = {};
+        if (studentAssess?.questionMarks) {
+          studentAssess.questionMarks.forEach((qm) => {
+            questionMarks[qm.questionId] = qm.marksObtained;
+          });
+        }
+        return {
+          studentId: reg.student.id,
+          usn: reg.student.usn,
+          name: reg.student.user.name,
+          totalMarks: studentAssess?.totalMarks ?? 0,
+          status: studentAssess?.status ?? "PRESENT",
+          questionMarks,
+        };
+      });
+
+      const result: AssessmentWithStudentsType = {
+        id: assessment.id,
+        title: assessment.title,
+        totalMarks: assessment.totalMarks,
+        courseId: assessment.course.id,
+        courseName: assessment.course.name,
+        courseCode: assessment.course.code,
+        questions: assessment.questions.map((q) => ({
+          id: q.id,
+          part: q.part,
+          qNumber: q.qNumber,
+          marks: q.marks,
+          orGroupId: q.orGroupId,
+        })),
+        students,
+      };
+
+      return {
+        status: "success",
+        message: "Assessment with students retrieved successfully",
+        data: result,
+      };
+    } catch (error) {
+      logger.error("Error fetching assessment with marks", error);
+      if (error instanceof Error) throw error;
+      throw new Error("Failed to fetch assessment with marks");
+    }
+  }
+
+  /**
+   * Save assessment marks (question-by-question) for students
+   */
+  static async saveAssessmentMarks(
+    userId: string,
+    data: SaveAssessmentMarksType
+  ): Promise<BaseResponse<null>> {
+    try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
+      const assessment = await db.assessmentTemplate.findUnique({
+        where: { id: data.assessmentId },
+        include: {
+          questions: true,
+        },
+      });
+
+      if (!assessment) {
+        throw new Error("Assessment not found");
+      }
+
+      // Verify faculty is assigned to this course
+      const isAssigned = await db.courseAssignment.findFirst({
+        where: {
+          courseId: assessment.courseId,
+          facultyId: faculty.id,
+        },
+      });
+
+      if (!isAssigned) {
+        throw new Error("Unauthorized to save marks for this assessment");
+      }
+
+      const hasQuestions = assessment.questions.length > 0;
+      const marks = data.marks ?? [];
+
+      // Group question marks by student (only when QP exists)
+      const marksByStudent = new Map<string, typeof marks>();
+      if (hasQuestions && marks.length > 0) {
+        marks.forEach((mark) => {
+          if (!marksByStudent.has(mark.studentId)) {
+            marksByStudent.set(mark.studentId, []);
+          }
+          marksByStudent.get(mark.studentId)!.push(mark);
+        });
+      }
+
+      const totalsByStudent = new Map(
+        data.studentTotals.map((entry) => [entry.studentId, entry])
+      );
+
+      // Process each student's totals
+      for (const [studentId, totalEntry] of totalsByStudent.entries()) {
+        // Verify student is registered for this course
+        const registration = await db.courseRegistration.findFirst({
+          where: {
+            studentId,
+            courseId: assessment.courseId,
+            semesterId: assessment.semesterId,
+          },
+        });
+
+        if (!registration) {
+          logger.warn(`Student ${studentId} not registered for course`, {
+            courseId: assessment.courseId,
+          });
+          continue;
+        }
+
+        // Create or update StudentAssessment record
+        const studentAssess = await db.studentAssessment.upsert({
+          where: {
+            studentId_assessmentId: {
+              studentId,
+              assessmentId: data.assessmentId,
+            },
+          },
+          create: {
+            studentId,
+            assessmentId: data.assessmentId,
+            courseId: data.courseId,
+            totalMarks: totalEntry.totalMarks,
+            status: totalEntry.status,
+          },
+          update: {
+            totalMarks: totalEntry.totalMarks,
+            status: totalEntry.status,
+          },
+        });
+
+        // Upsert question marks only when QP exists
+        if (hasQuestions) {
+          const studentMarks = marksByStudent.get(studentId) ?? [];
+          for (const mark of studentMarks) {
+            await db.studentQuestionMark.upsert({
+              where: {
+                recordId_questionId: {
+                  recordId: studentAssess.id,
+                  questionId: mark.questionId,
+                },
+              },
+              create: {
+                recordId: studentAssess.id,
+                questionId: mark.questionId,
+                marksObtained: mark.marksObtained,
+              },
+              update: {
+                marksObtained: mark.marksObtained,
+              },
+            });
+          }
+        }
+      }
+
+      logger.info("Assessment marks saved successfully", {
+        assessmentId: data.assessmentId,
+      });
+
+      return {
+        status: "success",
+        message: "Assessment marks saved successfully",
+        data: null,
+      };
+    } catch (error) {
+      logger.error("Error saving assessment marks", error);
+      if (error instanceof Error) throw error;
+      throw new Error("Failed to save assessment marks");
     }
   }
 }

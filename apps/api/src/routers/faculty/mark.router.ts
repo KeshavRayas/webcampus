@@ -1,10 +1,38 @@
 import { MarkController } from "@webcampus/api/src/controllers/faculty/mark.controller";
-import { validateRequest } from "@webcampus/backend-utils/middlewares";
-import { CreateMarkSchema, UpdateMarkSchema } from "@webcampus/schemas/faculty";
+import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
+import {
+  CreateMarkSchema,
+  SaveAssessmentMarksSchema,
+  UpdateMarkSchema,
+} from "@webcampus/schemas/faculty";
 import { Router } from "express";
 
 const router: Router = Router();
 
+// All mark routes require faculty authentication
+router.use(
+  protect({
+    role: "faculty",
+    permissions: {},
+  })
+);
+
+// Assessment marks entry routes (must be declared BEFORE the generic /:id route
+// to prevent Express from matching "assessments" as a route parameter)
+router.get("/assessments/dashboard", MarkController.getMarksDashboard);
+
+router.get(
+  "/assessments/:assessmentId/marks",
+  MarkController.getAssessmentWithMarks
+);
+
+router.post(
+  "/assessments/save-marks",
+  validateRequest(SaveAssessmentMarksSchema),
+  MarkController.saveAssessmentMarks
+);
+
+// Basic mark CRUD routes
 router.post("/", validateRequest(CreateMarkSchema), MarkController.create);
 router.get("/", MarkController.getAll);
 router.get("/:id", MarkController.getById);

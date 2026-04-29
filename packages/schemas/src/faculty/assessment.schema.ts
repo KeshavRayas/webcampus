@@ -7,6 +7,7 @@ export const CreateAssessmentQuestionSchema = z.object({
   co: z.string().optional(),
   po: z.string().optional(),
   bl: z.string().optional(),
+  orGroupId: z.string().optional(),
 });
 
 export type CreateAssessmentQuestionType = z.infer<

@@ -1,9 +1,32 @@
 import { Mark } from "@webcampus/api/src/services/faculty/mark.service";
+import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { UpdateMarkType } from "@webcampus/schemas/faculty";
 import { Request, Response } from "express";
+
+const resolveSessionUser = async (req: Request) => {
+  const session = await auth.api.getSession({
+    headers: fromNodeHeaders(req.headers),
+  });
+
+  if (!session?.user?.id) {
+    throw new Error(ERRORS.UNAUTHENTICATED);
+  }
+
+  return session.user;
+};
+
+const getStatusCodeForError = (message: string): number => {
+  if (message === ERRORS.UNAUTHENTICATED || message === ERRORS.UNAUTHORIZED) {
+    return 401;
+  }
+  if (message.toLowerCase().includes("not found")) {
+    return 404;
+  }
+  return 400;
+};
 
 export class MarkController {
   static async create(req: Request, res: Response): Promise<void> {
@@ -160,6 +183,122 @@ export class MarkController {
         status: "error",
         message: ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 500,
+        error,
+      });
+    }
+  }
+
+  static async getMarksDashboard(req: Request, res: Response): Promise<void> {
+    try {
+      const user = await resolveSessionUser(req);
+
+      const response = await Mark.getMarksDashboard(user.id);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          message: response.message,
+          data: response.data,
+          statusCode: 200,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: 400,
+          error: response.error,
+        });
+      }
+    } catch (error) {
+      logger.error("Error retrieving marks dashboard:", { error });
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: getStatusCodeForError(message),
+        error,
+      });
+    }
+  }
+
+  static async getAssessmentWithMarks(
+    req: Request<{ assessmentId: string }>,
+    res: Response
+  ): Promise<void> {
+    try {
+      const user = await resolveSessionUser(req);
+
+      const sectionId = req.query.sectionId as string | undefined;
+      const response = await Mark.getAssessmentTemplateWithMarks(
+        user.id,
+        req.params.assessmentId,
+        sectionId
+      );
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          message: response.message,
+          data: response.data,
+          statusCode: 200,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: 400,
+          error: response.error,
+        });
+      }
+    } catch (error) {
+      logger.error("Error retrieving assessment with marks:", { error });
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: getStatusCodeForError(message),
+        error,
+      });
+    }
+  }
+
+  static async saveAssessmentMarks(req: Request, res: Response): Promise<void> {
+    try {
+      const user = await resolveSessionUser(req);
+
+      const response = await Mark.saveAssessmentMarks(user.id, req.body);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          message: response.message,
+          data: response.data,
+          statusCode: 200,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: 400,
+          error: response.error,
+        });
+      }
+    } catch (error) {
+      logger.error("Error saving assessment marks:", { error });
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: getStatusCodeForError(message),
         error,
       });
     }

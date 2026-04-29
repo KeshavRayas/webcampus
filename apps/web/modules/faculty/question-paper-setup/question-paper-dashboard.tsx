@@ -19,7 +19,7 @@ import {
 } from "@webcampus/ui/components/filter-builder";
 import axios from "axios";
 import { BookOpen, ClipboardList, GraduationCap, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 // Sheet imports removed as they were not used
 import { QPSetupDialog } from "./qp-setup-dialog";
 import { useFacultyAcademicTerms } from "./use-faculty-terms";
@@ -37,6 +37,7 @@ interface CoordinatedCourse {
   practicalCredits: number;
   skillCredits: number;
   semesterNumber: number;
+  semesterId: string;
   programType: string;
   departmentName: string;
   departmentAbbreviation: string;
@@ -73,10 +74,16 @@ export const QuestionPaperDashboard = () => {
 
   // Fetch academic terms
   const { data: rawTerms } = useFacultyAcademicTerms();
-  const terms = rawTerms ?? [];
+  const terms = useMemo(() => rawTerms ?? [], [rawTerms]);
 
-  const selectedDraftTerm = terms.find((t) => t.id === draftFilters.termId);
-  const nestedSemesters = selectedDraftTerm?.Semester ?? [];
+  const selectedDraftTerm = useMemo(
+    () => terms.find((t) => t.id === draftFilters.termId),
+    [terms, draftFilters.termId]
+  );
+  const nestedSemesters = useMemo(
+    () => selectedDraftTerm?.Semester ?? [],
+    [selectedDraftTerm]
+  );
 
   // Auto-select current term
   useEffect(() => {
