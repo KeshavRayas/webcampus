@@ -31,31 +31,25 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
-import { AdminAdmissionUserResponse } from "./admin-admission-users-columns";
-import {
-  useAdmissionUserDelete,
-  useAdmissionUserEdit,
-} from "./use-admission-users";
+import { CoeUserResponse } from "./coe-users-columns";
+import { useCoeUserDelete, useCoeUserEdit } from "./use-coe-users";
 
-const EditUserSchema = z.object({
+// Schema for Editing (Only name, username, and photo are editable)
+const EditCoeUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   username: z.string().min(1, "Username is required"),
   photo: z.any().optional(),
 });
 
-export const AdminAdmissionUsersActions = ({
-  user,
-}: {
-  user: AdminAdmissionUserResponse;
-}) => {
+export const CoeUsersActions = ({ user }: { user: CoeUserResponse }) => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
-  const { onDelete, isDeleting } = useAdmissionUserDelete();
-  const { onEdit, isEditing } = useAdmissionUserEdit();
+  const { onDelete, isDeleting } = useCoeUserDelete();
+  const { onEdit, isEditing } = useCoeUserEdit();
 
-  const form = useForm<z.infer<typeof EditUserSchema>>({
-    resolver: zodResolver(EditUserSchema),
+  const form = useForm<z.infer<typeof EditCoeUserSchema>>({
+    resolver: zodResolver(EditCoeUserSchema),
     defaultValues: {
       name: user.name,
       username: user.username,
@@ -63,11 +57,10 @@ export const AdminAdmissionUsersActions = ({
     },
   });
 
-  const onSubmitEdit = async (data: z.infer<typeof EditUserSchema>) => {
+  const onSubmitEdit = async (data: z.infer<typeof EditCoeUserSchema>) => {
     try {
       const formData = new FormData();
 
-      // Append text fields
       formData.append("name", data.name);
       formData.append("username", data.username);
 
@@ -76,7 +69,6 @@ export const AdminAdmissionUsersActions = ({
         formData.append("photo", data.photo);
       }
 
-      // Send the single FormData payload to the edit mutation
       await onEdit({
         id: user.id,
         formData,
@@ -84,7 +76,7 @@ export const AdminAdmissionUsersActions = ({
 
       setIsEditOpen(false);
     } catch {
-      toast.error("Failed to update user.");
+      toast.error("Failed to update COE user.");
     }
   };
 
@@ -115,10 +107,11 @@ export const AdminAdmissionUsersActions = ({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* --- EDIT MODAL --- */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Admission User</DialogTitle>
+            <DialogTitle>Edit COE User</DialogTitle>
           </DialogHeader>
 
           <Form {...form}>
@@ -194,13 +187,14 @@ export const AdminAdmissionUsersActions = ({
         </DialogContent>
       </Dialog>
 
+      {/* --- DELETE CONFIRMATION MODAL --- */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Admission User</DialogTitle>
+            <DialogTitle>Delete COE User</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {user.name} ({user.role})? This
-              action cannot be undone and will permanently remove their access.
+              Are you sure you want to delete {user.name}? This action cannot be
+              undone and will permanently remove their access.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

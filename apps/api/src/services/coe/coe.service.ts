@@ -12,12 +12,12 @@ export const coeService = {
           include: {
             course: true,
             faculty: {
-              include: { user: true }
+              include: { user: true },
             },
-            section: true
-          }
-        }
-      }
+            section: true,
+          },
+        },
+      },
     });
   },
 
@@ -30,10 +30,10 @@ export const coeService = {
         courseAssignment: {
           include: {
             course: true,
-            section: true
-          }
-        }
-      }
+            section: true,
+          },
+        },
+      },
     });
-  }
+  },
 };

@@ -2,7 +2,6 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@webcampus/ui/components/badge";
-import { format } from "date-fns";
 import React from "react";
 import { AdminAdmissionUsersActions } from "./admin-admission-users-actions";
 
@@ -12,7 +11,7 @@ export type AdminAdmissionUserResponse = {
   email: string;
   username: string;
   role: string;
-  createdAt: string;
+  photo?: string; // <-- Added photo to the type
 };
 
 export const AdminAdmissionUserColumns: ColumnDef<AdminAdmissionUserResponse>[] =
@@ -34,15 +33,7 @@ export const AdminAdmissionUserColumns: ColumnDef<AdminAdmissionUserResponse>[] 
         </Badge>
       ),
     },
-    {
-      accessorKey: "createdAt",
-      header: "Created At",
-      cell: ({ row }) => (
-        <span suppressHydrationWarning>
-          {format(new Date(row.original.createdAt), "PP")}
-        </span>
-      ),
-    },
+    // <-- Created At column completely removed here
     {
       id: "actions",
       cell: ({ row }) => <AdminAdmissionUsersActions user={row.original} />,

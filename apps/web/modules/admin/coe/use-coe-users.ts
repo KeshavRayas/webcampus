@@ -3,26 +3,31 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { CreateAdmissionUserSchema } from "@webcampus/schemas/admin";
 import axios, { AxiosError } from "axios";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
 
-export const useAdmissionUsers = () => {
+// Schema for Creating a COE User
+export const CreateCoeUserSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email address"),
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  photo: z.any().optional(),
+});
+
+export const useCoeUsers = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
-  const form = useForm<
-    z.infer<typeof CreateAdmissionUserSchema> & { photo?: unknown }
-  >({
-    resolver: zodResolver(CreateAdmissionUserSchema),
+  const form = useForm<z.infer<typeof CreateCoeUserSchema>>({
+    resolver: zodResolver(CreateCoeUserSchema),
     defaultValues: {
       name: "",
-      username: "",
       email: "",
-      password: "password",
-      role: "admission_reviewer",
+      username: "",
+      password: "password", // Default password
       photo: undefined,
     },
   });
@@ -30,39 +35,35 @@ export const useAdmissionUsers = () => {
   const { mutateAsync: create, isPending: isCreating } = useMutation({
     mutationFn: async (formData: FormData) => {
       const response = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users`,
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe`,
         formData,
         {
           withCredentials: true,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+          headers: { "Content-Type": "multipart/form-data" },
         }
       );
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-admission-users"] });
-      toast.success("Admission user created successfully");
+      queryClient.invalidateQueries({ queryKey: ["admin-coes"] });
+      toast.success("COE user created successfully");
       form.reset();
     },
     onError: (error: AxiosError<{ message?: string }>) => {
-      toast.error(error.response?.data?.message || "Failed to create user");
+      toast.error(error.response?.data?.message || "Failed to create COE user");
     },
   });
 
-  const onSubmit = async (data: Record<string, unknown>) => {
+  const onSubmit = async (data: z.infer<typeof CreateCoeUserSchema>) => {
     try {
       const formData = new FormData();
 
-      // Append all text fields
       Object.entries(data).forEach(([key, value]) => {
         if (key !== "photo" && value !== undefined && value !== null) {
           formData.append(key, String(value));
         }
       });
 
-      // Append file if it exists
       if (data.photo instanceof File) {
         formData.append("photo", data.photo);
       }
@@ -76,12 +77,11 @@ export const useAdmissionUsers = () => {
   return { form, onSubmit, isCreating };
 };
 
-export const useAdmissionUserEdit = () => {
+export const useCoeUserEdit = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const { mutateAsync: onEdit, isPending: isEditing } = useMutation({
-    // Changed this to accept FormData
     mutationFn: async ({
       id,
       formData,
@@ -90,47 +90,45 @@ export const useAdmissionUserEdit = () => {
       formData: FormData;
     }) => {
       const response = await axios.patch(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users/${id}`,
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe/${id}`,
         formData,
         {
           withCredentials: true,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+          headers: { "Content-Type": "multipart/form-data" },
         }
       );
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-admission-users"] });
-      toast.success("User updated successfully");
+      queryClient.invalidateQueries({ queryKey: ["admin-coes"] });
+      toast.success("COE user updated successfully");
     },
     onError: (error: AxiosError<{ message?: string }>) => {
-      toast.error(error.response?.data?.message || "Failed to update user");
+      toast.error(error.response?.data?.message || "Failed to update COE user");
     },
   });
 
   return { onEdit, isEditing };
 };
 
-export const useAdmissionUserDelete = () => {
+export const useCoeUserDelete = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const { mutateAsync: onDelete, isPending: isDeleting } = useMutation({
     mutationFn: async (id: string) => {
       const response = await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users/${id}`,
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe/${id}`,
         { withCredentials: true }
       );
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-admission-users"] });
-      toast.success("User deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["admin-coes"] });
+      toast.success("COE user deleted successfully");
     },
     onError: (error: AxiosError<{ message?: string }>) => {
-      toast.error(error.response?.data?.message || "Failed to delete user");
+      toast.error(error.response?.data?.message || "Failed to delete COE user");
     },
   });
 
