@@ -78,6 +78,7 @@ export const BaseFacultySchema = z
 export const CreateFacultySchema = FacultyAdminOnlySchema;
 
 export const UpdateFacultySchema = BaseFacultySchema.partial().extend({
+  name: z.string().trim().min(1, "Name is required").optional(),
   username: z.string().trim().min(1, "Username is required").optional(),
   displayUsername: z
     .string()
@@ -110,11 +111,14 @@ export const FacultyQualificationSchema = z.object({
     .max(2200),
 });
 
-export const CreateFacultyQualificationSchema = FacultyQualificationSchema.omit({
-  id: true,
-});
+export const CreateFacultyQualificationSchema = FacultyQualificationSchema.omit(
+  {
+    id: true,
+  }
+);
 
-export const UpdateFacultyQualificationSchema = FacultyQualificationSchema.partial();
+export const UpdateFacultyQualificationSchema =
+  FacultyQualificationSchema.partial();
 
 export const FacultyPublicationSchema = z.object({
   id: z.string().uuid().optional(),
@@ -132,7 +136,8 @@ export const CreateFacultyPublicationSchema = FacultyPublicationSchema.omit({
   id: true,
 });
 
-export const UpdateFacultyPublicationSchema = FacultyPublicationSchema.partial();
+export const UpdateFacultyPublicationSchema =
+  FacultyPublicationSchema.partial();
 
 export const FacultyExperienceSchema = z.object({
   id: z.string().uuid().optional(),
@@ -157,8 +162,12 @@ export const FacultyResponseSchema = BaseFacultySchema.extend({
 export type BaseFacultyType = z.infer<typeof BaseFacultySchema>;
 export type CreateFacultyType = z.infer<typeof CreateFacultySchema>;
 export type UpdateFacultyType = z.infer<typeof UpdateFacultySchema>;
-export type UpdateFacultyProfileType = z.infer<typeof UpdateFacultyProfileSchema>;
-export type FacultyQualificationType = z.infer<typeof FacultyQualificationSchema>;
+export type UpdateFacultyProfileType = z.infer<
+  typeof UpdateFacultyProfileSchema
+>;
+export type FacultyQualificationType = z.infer<
+  typeof FacultyQualificationSchema
+>;
 export type CreateFacultyQualificationType = z.infer<
   typeof CreateFacultyQualificationSchema
 >;

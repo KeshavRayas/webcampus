@@ -54,6 +54,9 @@ import {
 } from "./use-faculty";
 
 const editSchema = z.object({
+  // FIX: Subarno - Added name field to the edit schema
+  name: z.string().min(1, "Name is required"),
+
   designation: DesignationEnum,
   username: z.string().min(1, "Username is required"),
   displayUsername: z.string().min(1, "Display username is required"),
@@ -104,6 +107,7 @@ export const AdminFacultyActions = ({
   const editForm = useForm<EditFormOutput>({
     resolver: zodResolver(editSchema) as Resolver<EditFormOutput>,
     defaultValues: {
+      name: faculty.user.name || "",
       designation: faculty.designation as z.infer<typeof DesignationEnum>,
       username: faculty.user.username || "",
       displayUsername: faculty.user.displayUsername || faculty.user.name || "",
@@ -194,12 +198,12 @@ export const AdminFacultyActions = ({
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField
                   control={editForm.control}
-                  name="username"
+                  name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username</FormLabel>
+                      <FormLabel>Name</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="faculty.username" />
+                        <Input {...field} placeholder="Full Name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -211,9 +215,23 @@ export const AdminFacultyActions = ({
                   name="displayUsername"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Display Username</FormLabel>
+                      <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Display name" />
+                        <Input {...field} placeholder="Username" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Login ID</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Login ID" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -351,16 +369,25 @@ export const AdminFacultyActions = ({
 
               <FormItem>
                 <FormLabel>Update Faculty Image</FormLabel>
-                <FormControl>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] || null;
-                      setEditImageFile(file);
-                    }}
-                  />
-                </FormControl>
+                <div className="space-y-3">
+                  {faculty.user.image && !editImageFile && (
+                    <img
+                      src={faculty.user.image}
+                      alt="Current Faculty Image"
+                      className="h-16 w-16 rounded-md border object-cover"
+                    />
+                  )}
+                  <FormControl>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] || null;
+                        setEditImageFile(file);
+                      }}
+                    />
+                  </FormControl>
+                </div>
                 <FormMessage />
               </FormItem>
 

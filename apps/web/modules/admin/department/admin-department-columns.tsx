@@ -7,8 +7,10 @@ import { AdminDepartmentActions } from "./admin-department-actions";
 export type DepartmentTableItem = DepartmentResponseDTO & {
   email?: string;
   emailVerified?: boolean;
-  username?: string | null;
-  displayUsername?: string | null;
+  image?: string | null;
+  // FIX: Subarno - Removed username and displayUsername from the department table item type as they are no longer being sent from the API
+  // username?: string | null;
+  // displayUsername?: string | null;
 };
 
 export const adminDepartmentColumns: ColumnDef<DepartmentTableItem>[] = [
@@ -28,20 +30,21 @@ export const adminDepartmentColumns: ColumnDef<DepartmentTableItem>[] = [
     accessorKey: "email",
     header: "Email",
   },
-  {
-    accessorKey: "username",
-    header: "Username",
-  },
-  {
-    accessorKey: "displayUsername",
-    header: "Display Username",
-  },
+  // {
+  //   accessorKey: "username",
+  //   header: "Username",
+  // },
+  // {
+  //   accessorKey: "displayUsername",
+  //   header: "Display Username",
+  // },
   {
     accessorKey: "emailVerified",
     header: "Email Verified",
     meta: {
       enableCopy: false,
     },
+    cell: ({ row }) => (row.original.emailVerified ? "Verified" : "Pending"),
   },
   {
     id: "actions",

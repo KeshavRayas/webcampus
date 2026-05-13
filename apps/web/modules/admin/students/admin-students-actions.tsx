@@ -1,7 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import { AdminStudentResponseType } from "@webcampus/schemas/admin";
 import {
@@ -9,10 +8,8 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@webcampus/ui/components/avatar";
+import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
-import {
-  Badge,
-} from "@webcampus/ui/components/badge";
 import {
   Dialog,
   DialogContent,
@@ -127,7 +124,7 @@ const DataField = ({
   return (
     <div className="space-y-1">
       <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="font-medium break-words" suppressHydrationWarning>
+      <p className="break-words font-medium" suppressHydrationWarning>
         {displayValue}
       </p>
     </div>
@@ -274,7 +271,11 @@ export const AdminStudentActions = ({
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setIsDetailsOpen(true)}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setIsDetailsOpen(true)}
+      >
         <Eye className="mr-2 h-4 w-4" />
         View Details
       </Button>
@@ -310,7 +311,11 @@ export const AdminStudentActions = ({
                 <div className="bg-card flex w-full flex-col items-center gap-4 rounded-xl border p-6 lg:w-72">
                   <Avatar className="h-28 w-28 border">
                     <AvatarImage
-                      src={details.user.image || details.admission?.photo || undefined}
+                      src={
+                        details.user.image ||
+                        details.admission?.photo ||
+                        undefined
+                      }
                       alt={details.user.name || "Student"}
                     />
                     <AvatarFallback className="text-xl font-semibold">
@@ -322,7 +327,7 @@ export const AdminStudentActions = ({
                     <p className="text-lg font-semibold">
                       {details.user.name || student.name || "-"}
                     </p>
-                    <p className="text-muted-foreground text-sm break-all">
+                    <p className="text-muted-foreground break-all text-sm">
                       {details.user.email || student.email || "-"}
                     </p>
                     <p className="text-muted-foreground text-sm">
@@ -336,17 +341,28 @@ export const AdminStudentActions = ({
                       label="Name"
                       value={details.user.displayUsername || details.user.name}
                     />
-                    <DataField label="Department" value={details.departmentName} />
-                    <DataField label="Program Type" value={details.programType} />
+                    <DataField
+                      label="Department"
+                      value={details.departmentName}
+                    />
+                    <DataField
+                      label="Program Type"
+                      value={details.programType}
+                    />
                     <DataField
                       label="Current Semester"
                       value={details.currentSemester}
                     />
                     <DataField
                       label="Academic Term"
-                      value={details.academicTermLabel || details.academicTermYear}
+                      value={
+                        details.academicTermLabel || details.academicTermYear
+                      }
                     />
-                    <DataField label="Academic Year" value={details.academicYear} />
+                    <DataField
+                      label="Academic Year"
+                      value={details.academicYear}
+                    />
                     <div className="space-y-1">
                       <p className="text-muted-foreground text-sm">
                         Admission Status
@@ -360,18 +376,58 @@ export const AdminStudentActions = ({
 
                 <div className="space-y-6">
                   <section className="bg-card rounded-xl border p-6">
-                    <h4 className="mb-4 text-lg font-semibold">Account Details</h4>
+                    <h4 className="mb-4 text-lg font-semibold">
+                      Account Details
+                    </h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <DataField
                         label="Name"
-                        value={details.user.displayUsername || details.user.name}
+                        value={
+                          details.user.displayUsername || details.user.name
+                        }
                       />
                       <DataField label="Email" value={details.user.email} />
                     </div>
                   </section>
 
+                  {/* FIX: Subarno - Added a new section for personal and contact info from the admission snapshot */}
+
                   <section className="bg-card rounded-xl border p-6">
-                    <h4 className="mb-4 text-lg font-semibold">Admission Snapshot</h4>
+                    <h4 className="mb-4 text-lg font-semibold">
+                      Personal & Contact Info (Admissions)
+                    </h4>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                      <DataField
+                        label="First Name"
+                        value={details.admission?.firstName}
+                      />
+                      <DataField
+                        label="Middle Name"
+                        value={details.admission?.middleName}
+                      />
+                      <DataField
+                        label="Last Name"
+                        value={details.admission?.lastName}
+                      />
+                      <DataField
+                        label="Primary Phone"
+                        value={details.admission?.primaryPhoneNumber}
+                      />
+                      <DataField
+                        label="Secondary Phone"
+                        value={details.admission?.secondaryPhoneNumber}
+                      />
+                      <DataField
+                        label="Primary Email"
+                        value={details.admission?.primaryEmail}
+                      />
+                    </div>
+                  </section>
+
+                  <section className="bg-card rounded-xl border p-6">
+                    <h4 className="mb-4 text-lg font-semibold">
+                      Admission Snapshot
+                    </h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <DataField
                         label="Application ID"
@@ -409,13 +465,20 @@ export const AdminStudentActions = ({
                   </section>
 
                   <section className="bg-card rounded-xl border p-6">
-                    <h4 className="mb-4 text-lg font-semibold">Academic Context</h4>
+                    <h4 className="mb-4 text-lg font-semibold">
+                      Academic Context
+                    </h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <DataField
                         label="Academic Term"
-                        value={details.academicTermLabel || details.academicTermYear}
+                        value={
+                          details.academicTermLabel || details.academicTermYear
+                        }
                       />
-                      <DataField label="Program Type" value={details.programType} />
+                      <DataField
+                        label="Program Type"
+                        value={details.programType}
+                      />
                       <DataField
                         label="Semester"
                         value={
@@ -424,14 +487,20 @@ export const AdminStudentActions = ({
                             : null
                         }
                       />
-                      <DataField label="Semester ID" value={details.semesterId} />
+                      <DataField
+                        label="Semester ID"
+                        value={details.semesterId}
+                      />
                     </div>
                   </section>
 
                   <section className="bg-card rounded-xl border p-6">
                     <h4 className="mb-4 text-lg font-semibold">Address</h4>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <DataField label="Current Address" value={fullCurrentAddress} />
+                      <DataField
+                        label="Current Address"
+                        value={fullCurrentAddress}
+                      />
                       <DataField
                         label="Permanent Address"
                         value={fullPermanentAddress}
