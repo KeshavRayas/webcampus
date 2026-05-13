@@ -27,10 +27,7 @@ model User {
   Department            Department[]
   departmentMemberships DepartmentUser[]
   faculty               Faculty?
-  frozenAsAdmin         Freeze[]         @relation("FrozenByAdmin")
-  frozenAsFaculty       Freeze[]         @relation("FrozenByFaculty")
-  frozenAsHod           Freeze[]         @relation("FrozenByHod")
-  Freeze                Freeze[]
+
   hod                   Hod?
   Semester              Semester[]
   student               Student?
@@ -522,18 +519,12 @@ model Freeze {
   facultyFrozenAt    DateTime?
   hodFrozenAt        DateTime?
   adminFrozenAt      DateTime?
-  frozenByFacultyId  String?
-  frozenByHodId      String?
-  frozenByAdminId    String?
   finalFrozen        Boolean          @default(false)
   finalDeadline      DateTime?
-  frozenAt           DateTime?
-  userId             String?
+  frozenByRole       FreezeActorRole?
+  frozenByUsername   String?
+  frozenByDisplay    String?
   courseAssignment   CourseAssignment @relation(fields: [courseAssignmentId], references: [id])
-  frozenByAdmin      User?            @relation("FrozenByAdmin", fields: [frozenByAdminId], references: [id])
-  frozenByFaculty    User?            @relation("FrozenByFaculty", fields: [frozenByFacultyId], references: [id])
-  frozenByHod        User?            @relation("FrozenByHod", fields: [frozenByHodId], references: [id])
-  User               User?            @relation(fields: [userId], references: [id])
 }
 
 model Admission {
@@ -884,6 +875,12 @@ enum CourseApprovalStatus {
   PENDING
   APPROVED
   NEEDS_REVISION
+}
+
+enum FreezeActorRole {
+  FACULTY
+  HOD
+  ADMIN
 }
 
 enum AttendanceStatus {

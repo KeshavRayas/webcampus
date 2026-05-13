@@ -1,4 +1,5 @@
 import AdmissionUserRouter from "@webcampus/api/src/routers/admin/admission-user.router";
+import AttendanceWindowRouter from "@webcampus/api/src/routers/admin/attendance-window.router";
 import CoeRouter from "@webcampus/api/src/routers/admin/coe.router";
 import AdminCourseAssignmentRouter from "@webcampus/api/src/routers/admin/course-assignment.router";
 import AdminCourseRouter from "@webcampus/api/src/routers/admin/course.router";
@@ -32,5 +33,7 @@ router.use("/course-assignment", AdminCourseAssignmentRouter);
 router.use("/registration-windows", RegistrationWindowRouter);
 
 router.use("/registration-tracking", RegistrationTrackingRouter);
+
+router.use("/attendance-windows", AttendanceWindowRouter);
 
 export default router;

@@ -1,4 +1,8 @@
 import { AttendanceAggregationService } from "@webcampus/api/src/services/faculty/attendance-aggregation.service";
+import {
+  assertCanMutateAttendance,
+  resolveFreezeState,
+} from "@webcampus/api/src/services/faculty/freeze.service";
 import { logger } from "@webcampus/common/logger";
 import { db, type Prisma } from "@webcampus/db";
 import {
@@ -633,6 +637,22 @@ export class FacultyAttendanceSessionService {
         payload.batchId
       );
 
+      const freezeCheck = await db.courseAssignment.findFirst({
+        where: {
+          courseId: payload.courseId,
+          sectionId: payload.sectionId,
+          batchId: payload.batchId ?? null,
+          facultyId,
+        },
+        include: { freezes: true },
+      });
+      if (freezeCheck) {
+        assertCanMutateAttendance(
+          "faculty",
+          resolveFreezeState(freezeCheck.freezes)
+        );
+      }
+
       const sessionDate = toSessionDateUtc(payload.sessionDate);
       const timing = getTimingWindow(payload);
 
@@ -913,6 +933,22 @@ export class FacultyAttendanceSessionService {
         if (session.facultyId !== facultyId) {
           throw new Error(
             "Forbidden: attendance session is not owned by this faculty"
+          );
+        }
+
+        const freezeCheckDelete = await tx.courseAssignment.findFirst({
+          where: {
+            courseId: session.courseId,
+            sectionId: session.sectionId,
+            batchId: session.batchId,
+            facultyId,
+          },
+          include: { freezes: true },
+        });
+        if (freezeCheckDelete) {
+          assertCanMutateAttendance(
+            "faculty",
+            resolveFreezeState(freezeCheckDelete.freezes)
           );
         }
 

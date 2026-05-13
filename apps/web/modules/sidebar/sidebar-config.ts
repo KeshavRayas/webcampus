@@ -88,6 +88,17 @@ export const sidebarConfig: Record<Role, SidebarData> = {
             },
           ],
         },
+        {
+          name: "Academics",
+          url: "/admin/attendance-windows",
+          icon: GraduationCap,
+          children: [
+            {
+              name: "Attendance Windows",
+              url: "/admin/attendance-windows",
+            },
+          ],
+        },
       ],
     },
     navSecondary,
@@ -194,6 +205,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Take/ Edit Attendance", url: "/faculty/attendance/take" },
             { name: "Attendance Report", url: "/faculty/attendance/report" },
+            { name: "Attendance Freezing", url: "/faculty/attendance-windows" },
           ],
         },
         {
@@ -232,6 +244,17 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Courses",
           url: "/hod/courses",
           icon: GraduationCap,
+        },
+        {
+          name: "Attendance",
+          url: "/hod/attendance-windows",
+          icon: Fingerprint,
+          children: [
+            {
+              name: "Attendance Windows",
+              url: "/hod/attendance-windows",
+            },
+          ],
         },
         {
           name: "Reports",

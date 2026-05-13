@@ -37,6 +37,7 @@ export const roles = {
     admission: ["create", "read", "update", "delete", "port"],
     student: ["read", "delete"],
     registrationWindow: ["create", "read", "update"],
+    freeze: ["read", "lock"],
   }),
   applicant: ac.newRole({
     admission: ["read", "update"],
@@ -47,13 +48,17 @@ export const roles = {
   }),
   faculty: ac.newRole({
     attendance: ["create"],
+    freeze: ["read", "lock"],
+    semester: ["read"],
   }),
   coordinator: ac.newRole({
     attendance: ["create"],
   }),
   hod: ac.newRole({
     ...adminAc.statements,
+    semester: ["read"],
     courseAssignment: ["create"],
+    freeze: ["read", "lock"],
   }),
   coe: ac.newRole({
     freeze: ["read", "lock"],
@@ -71,6 +76,7 @@ export const roles = {
     semester: ["read"],
     courseAssignment: ["create", "read"],
     courseCoordinator: ["create", "read", "update"],
+    freeze: ["read", "lock"],
   }),
   admission_admin: ac.newRole({
     semester: ["read"],

@@ -22,6 +22,7 @@ coverage
 .vercel
 
 # Build Outputs
+trace/
 .next/
 out/
 build

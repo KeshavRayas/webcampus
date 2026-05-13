@@ -130,7 +130,7 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
             >
               <Label>{field.label}</Label>
               <Select
-                value={shouldHideAll ? value || undefined : value || allValue}
+                value={shouldHideAll ? value : value || allValue}
                 onValueChange={(nextValue) =>
                   onDraftChange(
                     filterKey,

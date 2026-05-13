@@ -1,3 +1,7 @@
+import {
+  assertCanMutateAttendance,
+  resolveFreezeState,
+} from "@webcampus/api/src/services/faculty/freeze.service";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import {
@@ -30,6 +34,23 @@ export class Attendance {
           message: "Attendance already exists for this student and course",
           error: "Attendance already exists for this student and course",
         };
+      }
+
+      const freezeCourse = await db.course.findUnique({
+        where: { id: data.courseId },
+        select: {
+          assignments: {
+            select: { freezes: true },
+            take: 1,
+          },
+        },
+      });
+      const freezeAssignment = freezeCourse?.assignments?.[0];
+      if (freezeAssignment) {
+        assertCanMutateAttendance(
+          "faculty",
+          resolveFreezeState(freezeAssignment.freezes)
+        );
       }
 
       const attendance = await db.attendance.create({
@@ -151,18 +172,17 @@ export class Attendance {
       }
 
       const courseAssignment = existingAttendance.course.assignments[0];
-      if (
-        courseAssignment?.freezes?.facultyFrozen ||
-        courseAssignment?.freezes?.hodFrozen ||
-        courseAssignment?.freezes?.adminFrozen
-      ) {
-        return {
-          status: "error",
-          message:
-            "Cannot update attendance as it has been frozen by faculty, HOD, or admin",
-          error:
-            "Cannot update attendance as it has been frozen by faculty, HOD, or admin",
-        };
+      if (courseAssignment?.freezes) {
+        try {
+          assertCanMutateAttendance(
+            "faculty",
+            resolveFreezeState(courseAssignment.freezes)
+          );
+        } catch (e) {
+          const msg =
+            e instanceof Error ? e.message : "Cannot update attendance";
+          return { status: "error", message: msg, error: msg };
+        }
       }
 
       const attendance = await db.attendance.update({
@@ -204,17 +224,17 @@ export class Attendance {
         };
       }
       const courseAssignment = existingAttendance.course.assignments[0];
-      if (
-        courseAssignment?.freezes?.facultyFrozen ||
-        courseAssignment?.freezes?.hodFrozen ||
-        courseAssignment?.freezes?.adminFrozen
-      ) {
-        return {
-          error: "Attendance not found",
-          status: "error",
-          message:
-            "Cannot delete attendance as it has been frozen by faculty, HOD, or admin",
-        };
+      if (courseAssignment?.freezes) {
+        try {
+          assertCanMutateAttendance(
+            "faculty",
+            resolveFreezeState(courseAssignment.freezes)
+          );
+        } catch (e) {
+          const msg =
+            e instanceof Error ? e.message : "Cannot delete attendance";
+          return { status: "error", message: msg, error: msg };
+        }
       }
       await db.attendance.delete({
         where: { id },
