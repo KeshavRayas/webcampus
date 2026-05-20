@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@webcampus/ui/components/button";
 import {
   FormControl,
   FormField,
@@ -16,11 +17,13 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
+import { Eye, EyeOff, Upload } from "lucide-react";
 import React from "react";
 import { useCreateDepartmentForm } from "./use-create-department-form";
 
 export const CreateDepartmentView = () => {
-  const { form, onSubmit, setLogoFile } = useCreateDepartmentForm();
+  const { form, onSubmit, logoFile, setLogoFile } = useCreateDepartmentForm();
+  const [showPassword, setShowPassword] = React.useState(false);
 
   return (
     <DialogForm
@@ -34,7 +37,7 @@ export const CreateDepartmentView = () => {
         name="name"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Name</FormLabel>
+            <FormLabel>Name *</FormLabel>
             <FormControl>
               <Input {...field} type="text" placeholder="Department Name" />
             </FormControl>
@@ -42,8 +45,10 @@ export const CreateDepartmentView = () => {
           </FormItem>
         )}
       />
-
-      <FormField
+      // FIX: Subarno - Removed username field from the create department form
+      as it's no longer being sent to the API and is generated silently in the
+      background based on the department name
+      {/* <FormField
         control={form.control}
         name="username"
         render={({ field }) => (
@@ -55,14 +60,13 @@ export const CreateDepartmentView = () => {
             <FormMessage />
           </FormItem>
         )}
-      />
-
+      /> */}
       <FormField
         control={form.control}
         name="code"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Code</FormLabel>
+            <FormLabel>Code *</FormLabel>
             <FormControl>
               <Input {...field} type="text" placeholder="e.g. CS" />
             </FormControl>
@@ -70,13 +74,12 @@ export const CreateDepartmentView = () => {
           </FormItem>
         )}
       />
-
       <FormField
         control={form.control}
         name="abbreviation"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Abbreviation</FormLabel>
+            <FormLabel>Abbreviation *</FormLabel>
             <FormControl>
               <Input {...field} type="text" placeholder="e.g. CSE" />
             </FormControl>
@@ -84,13 +87,12 @@ export const CreateDepartmentView = () => {
           </FormItem>
         )}
       />
-
       <FormField
         control={form.control}
         name="type"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Department Type</FormLabel>
+            <FormLabel>Department Type *</FormLabel>
             <Select onValueChange={field.onChange} value={field.value}>
               <FormControl>
                 <SelectTrigger>
@@ -107,13 +109,12 @@ export const CreateDepartmentView = () => {
           </FormItem>
         )}
       />
-
       <FormField
         control={form.control}
         name="email"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Email</FormLabel>
+            <FormLabel>Email *</FormLabel>
             <FormControl>
               <Input {...field} type="email" placeholder="Email" />
             </FormControl>
@@ -121,32 +122,66 @@ export const CreateDepartmentView = () => {
           </FormItem>
         )}
       />
-
       <FormField
         control={form.control}
         name="password"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Password</FormLabel>
+            <FormLabel>Password *</FormLabel>
             <FormControl>
-              <Input {...field} type="text" placeholder="Password" />
+              {/* FIX: Subarno - Added show/hide password functionality to the password field in the create department form for better UX, especially since the password is generated in the background and hidden from the user */}
+
+              <div className="relative">
+                <Input
+                  {...field}
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </FormControl>
             <FormMessage />
           </FormItem>
         )}
       />
-
       <FormItem>
         <FormLabel>Department Logo *</FormLabel>
         <FormControl>
-          <Input
-            type="file"
-            accept="image/*"
-            onChange={(event) => {
-              const file = event.target.files?.[0] || null;
-              setLogoFile(file);
-            }}
-          />
+          <div className="flex items-center gap-4">
+            <Input
+              id="logo-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                setLogoFile(file);
+              }}
+            />
+            <Button type="button" variant="outline" asChild>
+              <label htmlFor="logo-upload" className="cursor-pointer">
+                <Upload className="mr-2 h-4 w-4" />
+                Browse Logo...
+              </label>
+            </Button>
+            {logoFile && (
+              <span className="text-muted-foreground text-sm">
+                {logoFile.name}
+              </span>
+            )}
+          </div>
         </FormControl>
         <FormMessage />
       </FormItem>

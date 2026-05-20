@@ -10,4 +10,3 @@ export const getFinalLockedData = async (_req: Request, res: Response) => {
   const data = await coeService.getFinalLockedData();
   return res.json({ data });
 };
-

@@ -37,10 +37,12 @@ export const AdminSemesterConfigForm = ({
 
   const currentYear = new Date().getFullYear();
 
-  // Local state for the forms
   const [dates, setDates] = useState<
     Record<string, { startDate: Date | undefined; endDate: Date | undefined }>
   >({});
+
+  // Issue 3: Local state to track exact validation errors
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (existingSemesters && existingSemesters.length > 0) {
@@ -69,33 +71,65 @@ export const AdminSemesterConfigForm = ({
         [field]: value,
       },
     }));
+
+    // Clear the error for this specific semester once the user modifies it
+    if (errors[key]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[key];
+        return newErrors;
+      });
+    }
   };
 
   const handleSave = () => {
     if (!session?.user?.id) return;
 
     const payload: CreateSemesterConfigType[] = [];
+    const newErrors: Record<string, string> = {};
+    let hasErrors = false;
 
-    const addPayload = (programType: "UG" | "PG", nums: number[]) => {
+    const validateAndAdd = (programType: "UG" | "PG", nums: number[]) => {
       nums.forEach((num) => {
         const key = `${programType}-${num}`;
         const config = dates[key];
-        if (config?.startDate && config?.endDate) {
-          payload.push({
-            academicTermId: termId,
-            programType,
-            semesterNumber: num,
-            termType,
-            startDate: config.startDate,
-            endDate: config.endDate,
-            userId: session.user.id,
-          });
+
+        if (config) {
+          const { startDate, endDate } = config;
+
+          // Issue 3 Validation: Ensure both dates are provided if one is filled
+          if ((startDate && !endDate) || (!startDate && endDate)) {
+            newErrors[key] = "Both start and end dates must be provided.";
+            hasErrors = true;
+          }
+          // Issue 3 Validation: Ensure End Date is after Start Date
+          else if (startDate && endDate) {
+            if (dayjs(endDate).isBefore(dayjs(startDate))) {
+              newErrors[key] = "End date cannot be before start date.";
+              hasErrors = true;
+            } else {
+              payload.push({
+                academicTermId: termId,
+                programType,
+                semesterNumber: num,
+                termType,
+                startDate,
+                endDate,
+                userId: session.user.id,
+              });
+            }
+          }
         }
       });
     };
 
-    addPayload("UG", ugNumbers);
-    addPayload("PG", pgNumbers);
+    validateAndAdd("UG", ugNumbers);
+    validateAndAdd("PG", pgNumbers);
+
+    if (hasErrors) {
+      setErrors(newErrors);
+      return; // Abort saving if errors exist
+    }
 
     if (payload.length === 0) return;
     bulkUpsert(payload);
@@ -113,23 +147,32 @@ export const AdminSemesterConfigForm = ({
           {label}
         </label>
         <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant={"outline"}
-              className={cn(
-                "h-8 text-left text-sm font-normal",
-                !value && "text-muted-foreground"
-              )}
-            >
-              {value ? (
-                dayjs(value).format("MMM D, YYYY")
-              ) : (
-                <span>Pick date</span>
-              )}
-              <CalendarIcon className="ml-auto h-3 w-3 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          {/* Issue 2: Allow typing directly via native date input while keeping Popover UI */}
+          <div className="border-input focus-within:ring-ring flex items-center rounded-md border bg-transparent shadow-sm focus-within:ring-1">
+            <input
+              type="date"
+              className="placeholder:text-muted-foreground flex h-9 w-full bg-transparent px-3 py-1 text-sm outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:opacity-0"
+              value={value ? dayjs(value).format("YYYY-MM-DD") : ""}
+              onChange={(e) => {
+                if (e.target.value) {
+                  // dayjs handles the local time zone correctly when given YYYY-MM-DD
+                  handleDateChange(key, field, dayjs(e.target.value).toDate());
+                } else {
+                  handleDateChange(key, field, undefined);
+                }
+              }}
+            />
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 rounded-l-none hover:bg-transparent"
+              >
+                <CalendarIcon className="h-4 w-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+          </div>
+          <PopoverContent className="w-auto p-0" align="end">
             <Calendar
               mode="single"
               selected={value}
@@ -158,14 +201,21 @@ export const AdminSemesterConfigForm = ({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {ugNumbers.map((num) => {
             const key = `UG-${num}`;
+            const error = errors[key];
             return (
               <div
                 key={key}
-                className="bg-muted/20 space-y-3 rounded-md border p-3"
+                className={cn(
+                  "bg-muted/20 space-y-3 rounded-md border p-3 transition-colors",
+                  error && "border-red-500 bg-red-50 dark:bg-red-950/20" // Issue 3 Highlight
+                )}
               >
                 <p className="text-sm font-medium">Semester {num}</p>
                 {renderDateField(key, "startDate", "Start Date")}
                 {renderDateField(key, "endDate", "End Date")}
+                {error && (
+                  <p className="text-xs font-semibold text-red-500">{error}</p>
+                )}
               </div>
             );
           })}
@@ -177,14 +227,21 @@ export const AdminSemesterConfigForm = ({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {pgNumbers.map((num) => {
             const key = `PG-${num}`;
+            const error = errors[key];
             return (
               <div
                 key={key}
-                className="bg-muted/20 space-y-3 rounded-md border p-3"
+                className={cn(
+                  "bg-muted/20 space-y-3 rounded-md border p-3 transition-colors",
+                  error && "border-red-500 bg-red-50 dark:bg-red-950/20" // Issue 3 Highlight
+                )}
               >
                 <p className="text-sm font-medium">Semester {num}</p>
                 {renderDateField(key, "startDate", "Start Date")}
                 {renderDateField(key, "endDate", "End Date")}
+                {error && (
+                  <p className="text-xs font-semibold text-red-500">{error}</p>
+                )}
               </div>
             );
           })}

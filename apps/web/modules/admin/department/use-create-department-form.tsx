@@ -14,6 +14,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 
+// import { email } from "zod";
+
 export const useCreateDepartmentForm = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
@@ -26,9 +28,10 @@ export const useCreateDepartmentForm = () => {
       name: "",
       code: "",
       abbreviation: "",
+      type: "DEGREE_GRANTING", // Making sure to provide a default for type since it's now required
       email: "",
       password: "password",
-      username: "",
+      username: "", // Sent silently in the background, hidden from UI
       role: "department",
     },
   });
@@ -37,7 +40,9 @@ export const useCreateDepartmentForm = () => {
     mutationFn: async (data: CreateDepartmentDTO & CreateUserType) => {
       const formData = new FormData();
       Object.entries(data).forEach(([key, value]) => {
-        formData.append(key, String(value));
+        if (value !== undefined) {
+          formData.append(key, String(value));
+        }
       });
 
       if (logoFile) {
@@ -59,6 +64,7 @@ export const useCreateDepartmentForm = () => {
       toast.success(data.data.message);
       queryClient.invalidateQueries({ queryKey: ["department"] });
       setLogoFile(null);
+      form.reset();
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(error.response?.data.error);
