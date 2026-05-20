@@ -45,10 +45,7 @@ export const CreateDepartmentView = () => {
           </FormItem>
         )}
       />
-      // FIX: Subarno - Removed username field from the create department form
-      as it's no longer being sent to the API and is generated silently in the
-      background based on the department name
-      {/* <FormField
+      <FormField
         control={form.control}
         name="username"
         render={({ field }) => (
@@ -60,7 +57,7 @@ export const CreateDepartmentView = () => {
             <FormMessage />
           </FormItem>
         )}
-      /> */}
+      />
       <FormField
         control={form.control}
         name="code"
@@ -129,8 +126,6 @@ export const CreateDepartmentView = () => {
           <FormItem>
             <FormLabel>Password *</FormLabel>
             <FormControl>
-              {/* FIX: Subarno - Added show/hide password functionality to the password field in the create department form for better UX, especially since the password is generated in the background and hidden from the user */}
-
               <div className="relative">
                 <Input
                   {...field}
