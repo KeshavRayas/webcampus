@@ -12,15 +12,13 @@ import { Label } from "@webcampus/ui/components/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@webcampus/ui/components/toggle-group";
-import { Clock } from "lucide-react";
 import { ATTENDANCE_TIME_SLOTS } from "../attendance-time-slots";
 import { FacultyAttendanceFormState } from "../faculty-attendance-types";
 
@@ -44,6 +42,7 @@ type AttendanceFormProps = {
   sections: SectionOption[];
   selectedCourseValue?: string;
   selectedSectionValue?: string;
+  isLabBatch?: boolean;
   onDateChange: (date: Date | undefined) => void;
   onCourseChange: (courseId: string) => void;
   onSectionChange: (sectionId: string) => void;
@@ -53,17 +52,40 @@ type AttendanceFormProps = {
   ) => void;
   onCustomStartTimeChange: (value: string) => void;
   onCustomEndTimeChange: (value: string) => void;
-  onEditAttendance: () => void;
   onTakeAttendance: () => void;
-  isEditAttendanceDisabled?: boolean;
   isTakeAttendanceDisabled?: boolean;
   overlapError: string | null;
 };
 
+type UITimeSlot = {
+  code: string;
+  label: string;
+  startTime: string;
+  endTime: string;
+};
+
+// Automatically generate 2-hour lab slots by combining back-to-back regular slots
+const LAB_TIME_SLOTS = ATTENDANCE_TIME_SLOTS.reduce((acc, current, i, arr) => {
+  const next = arr[i + 1];
+  // If the current slot ends exactly when the next slot begins, combine them
+  if (next && current.endTime === next.startTime) {
+    acc.push({
+      code: `${current.startTime}-${next.endTime}`,
+      label: `${current.label.split(" - ")[0]} - ${next.label.split(" - ")[1]}`,
+      startTime: current.startTime,
+      endTime: next.endTime,
+    });
+  }
+  return acc;
+}, [] as UITimeSlot[]);
+
 const isFixedTimingCode = (
   value: string
 ): value is Exclude<FacultyAttendanceFormState["fixedTimingCode"], ""> => {
-  return ATTENDANCE_TIME_SLOTS.some((slot) => slot.code === value);
+  return (
+    ATTENDANCE_TIME_SLOTS.some((slot) => slot.code === value) ||
+    LAB_TIME_SLOTS.some((slot) => slot.code === value)
+  );
 };
 
 const toMinutes = (value: string) => {
@@ -116,6 +138,7 @@ export const AttendanceForm = ({
   sections,
   selectedCourseValue,
   selectedSectionValue,
+  isLabBatch = false,
   onDateChange,
   onCourseChange,
   onSectionChange,
@@ -123,9 +146,7 @@ export const AttendanceForm = ({
   onFixedSlotChange,
   onCustomStartTimeChange,
   onCustomEndTimeChange,
-  onEditAttendance,
   onTakeAttendance,
-  isEditAttendanceDisabled = false,
   isTakeAttendanceDisabled = false,
   overlapError,
 }: AttendanceFormProps) => {
@@ -142,6 +163,9 @@ export const AttendanceForm = ({
       ? "End time must be later than start time."
       : null;
 
+  // Determine which list of slots to show based on whether a lab batch is selected
+  const activeTimeSlots = isLabBatch ? LAB_TIME_SLOTS : ATTENDANCE_TIME_SLOTS;
+
   const TimeInputField = ({
     id,
     label,
@@ -155,34 +179,23 @@ export const AttendanceForm = ({
   }) => (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <div className="border-input bg-background relative h-11 overflow-hidden rounded-xl border">
-        <div className="text-muted-foreground pointer-events-none flex h-full items-center justify-between px-4 text-sm">
-          <span
-            className={value ? "text-foreground font-medium tabular-nums" : ""}
-          >
-            {value || "--:--"}
-          </span>
-          <Clock className="h-4 w-4" />
-        </div>
-        <Input
-          id={id}
-          type="time"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onClick={(event) => event.currentTarget.showPicker?.()}
-          className="absolute inset-0 h-full w-full cursor-pointer border-0 bg-transparent p-0 opacity-0 shadow-none focus-visible:ring-0"
-        />
-      </div>
+      <Input
+        id={id}
+        type="time"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onClick={(event) => event.currentTarget.showPicker?.()}
+        className="bg-background h-11 w-full cursor-pointer rounded-xl"
+      />
     </div>
   );
 
   return (
-    <Card className="border-primary/20 from-background via-background to-primary/5 bg-gradient-to-br">
+    <Card className="border-primary/20 from-background via-background to-primary/5 bg-linear-to-br">
       <CardHeader>
         <CardTitle>Session Context</CardTitle>
         <CardDescription>
-          Set date, course, section, and time slot before editing or taking
-          attendance.
+          Set date, course, section, and time slot to take attendance.
         </CardDescription>
       </CardHeader>
 
@@ -207,7 +220,8 @@ export const AttendanceForm = ({
                 const value = event.target.value;
                 onDateChange(value ? new Date(`${value}T00:00:00`) : undefined);
               }}
-              className="h-11 rounded-xl"
+              onClick={(event) => event.currentTarget.showPicker?.()}
+              className="block h-11 w-full cursor-pointer rounded-xl"
             />
           </div>
 
@@ -272,65 +286,45 @@ export const AttendanceForm = ({
             <legend className="text-muted-foreground text-xs uppercase tracking-wide">
               Time Slot
             </legend>
-            <ToggleGroup
-              type="single"
-              value={form.timingMode}
+
+            <Select
+              value={
+                form.timingMode === "CUSTOM"
+                  ? "CUSTOM"
+                  : form.fixedTimingCode || undefined
+              }
               onValueChange={(value) => {
-                if (value === "FIXED" || value === "CUSTOM") {
-                  onTimingModeChange(value);
+                if (value === "CUSTOM") {
+                  onTimingModeChange("CUSTOM");
+                } else if (isFixedTimingCode(value)) {
+                  onTimingModeChange("FIXED");
+                  onFixedSlotChange(value as never);
                 }
               }}
-              variant="outline"
-              className="w-full"
-              aria-label="Attendance time slot mode"
             >
-              <ToggleGroupItem
-                value="FIXED"
-                className="h-11 flex-1 rounded-l-xl text-sm"
-                aria-label="Use predefined time slot"
-              >
-                Predefined
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="CUSTOM"
-                className="h-11 flex-1 rounded-r-xl text-sm"
-                aria-label="Use custom time slot"
-              >
-                Custom
-              </ToggleGroupItem>
-            </ToggleGroup>
-
-            {form.timingMode === "FIXED" ? (
-              <div className="space-y-2">
-                <Label id="attendance-time-slot-label">
-                  Predefined Time Slot
-                </Label>
-                <ToggleGroup
-                  type="single"
-                  value={form.fixedTimingCode || undefined}
-                  onValueChange={(value) => {
-                    if (isFixedTimingCode(value)) {
-                      onFixedSlotChange(value);
-                    }
-                  }}
-                  aria-labelledby="attendance-time-slot-label"
-                  className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4"
-                >
-                  {ATTENDANCE_TIME_SLOTS.map((slot) => (
-                    <ToggleGroupItem
-                      key={slot.code}
-                      value={slot.code}
-                      variant="outline"
-                      className="border-border/60 bg-background/60 hover:border-primary/40 hover:bg-primary/5 data-[state=on]:border-primary/70 data-[state=on]:bg-primary/10 data-[state=on]:text-primary h-auto w-full justify-start whitespace-normal rounded-xl px-4 py-3 text-left text-sm leading-relaxed transition-all duration-200 data-[state=on]:shadow-sm"
-                      aria-label={`Use predefined slot ${slot.label}`}
-                    >
-                      {slot.label}
-                    </ToggleGroupItem>
+              <SelectTrigger className="bg-background/60 h-11 w-full rounded-xl border-white/10 md:w-1/3">
+                <SelectValue placeholder="Select Time Slot" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>
+                    {isLabBatch
+                      ? "Lab Time Slots (2 Hrs)"
+                      : "Regular Time Slots"}
+                  </SelectLabel>
+                  {activeTimeSlots.map((slot) => (
+                    <SelectItem key={slot.code} value={slot.code}>
+                      Regular: {slot.label}
+                    </SelectItem>
                   ))}
-                </ToggleGroup>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                </SelectGroup>
+                <SelectSeparator />
+                <SelectItem value="CUSTOM">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {form.timingMode === "CUSTOM" && (
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 md:w-2/3">
                 <TimeInputField
                   id="attendance-custom-start"
                   label="Start Time"
@@ -345,6 +339,7 @@ export const AttendanceForm = ({
                 />
               </div>
             )}
+
             {form.timingMode === "CUSTOM" &&
             isCustomTimingValid &&
             formatCustomTimingLabel(
@@ -369,14 +364,6 @@ export const AttendanceForm = ({
         ) : null}
 
         <div className="border-border/60 flex flex-wrap items-center justify-end gap-3 border-t pt-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onEditAttendance}
-            disabled={isEditAttendanceDisabled}
-          >
-            Edit Attendance
-          </Button>
           <Button
             type="button"
             onClick={onTakeAttendance}

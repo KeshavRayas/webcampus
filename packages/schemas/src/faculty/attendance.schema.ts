@@ -39,6 +39,7 @@ export const AttendanceResponseSchema = BaseAttendanceSchema.extend({
 const HHMM_TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export const FacultyFixedTimingCodeSchema = z.enum([
+  // Regular 1-hour slots
   "08:00-08:55",
   "08:55-09:50",
   "09:50-10:45",
@@ -47,6 +48,12 @@ export const FacultyFixedTimingCodeSchema = z.enum([
   "14:00-14:55",
   "14:55-15:50",
   "15:50-16:45",
+  // 2-hour Lab Batch slots
+  "08:00-09:50",
+  "08:55-10:45",
+  "11:15-13:05",
+  "14:00-15:50",
+  "14:55-16:45",
 ]);
 
 export const AttendanceSessionTimingModeSchema = z.enum(["FIXED", "CUSTOM"]);

@@ -827,11 +827,6 @@ export const FacultyAttendanceView = () => {
   const handleDeleteSessionFromModal = (sessionId: string) => {
     setDeleteConfirmSessionId(sessionId);
   };
-
-  const handleEditAttendance = () => {
-    setIsSessionsDialogOpen(true);
-  };
-
   const handleTakeAttendance = () => {
     if (!canOpenSession) {
       return;
@@ -910,6 +905,7 @@ export const FacultyAttendanceView = () => {
         sections={sectionsForSelectedCourse}
         selectedCourseValue={courseSelectionKey}
         selectedSectionValue={sectionSelectionKey}
+        isLabBatch={Boolean(form.batchId)} // Added property to detect lab batch
         onDateChange={(date) => {
           clearActiveSessionOnly();
           setForm((current) => ({
@@ -950,9 +946,7 @@ export const FacultyAttendanceView = () => {
             customEndTime,
           }));
         }}
-        onEditAttendance={handleEditAttendance}
         onTakeAttendance={handleTakeAttendance}
-        isEditAttendanceDisabled={createOrOpenMutation.isPending}
         isTakeAttendanceDisabled={
           !canOpenSession || createOrOpenMutation.isPending
         }

@@ -14,11 +14,12 @@ export interface AttendanceAggregateResult {
 
 export class AttendanceAggregationService {
   /**
-   * Aggregates attendance records for a student-course pair and upserts the Attendance record
+   * Aggregates attendance records for a student-course pair.
+   * Automatically discovers and processes both Theory (null) and Lab (batchId) records independently.
    * @param studentId UUID of the student
    * @param courseId UUID of the course
    * @param tx Prisma transaction client (optional, defaults to db)
-   * @returns BaseResponse with aggregated attendance data
+   * @returns BaseResponse with the last processed aggregate data
    */
   static async aggregateAttendanceForStudentCourse(
     studentId: string,
@@ -26,100 +27,115 @@ export class AttendanceAggregationService {
     tx: DbLike = db
   ): Promise<BaseResponse<AttendanceAggregateResult>> {
     try {
-      const [total, present] = await Promise.all([
-        tx.attendanceRecord.count({
-          where: {
-            studentId,
-            ClassSession: {
-              courseId,
-            },
-          },
-        }),
-        tx.attendanceRecord.count({
-          where: {
-            studentId,
-            status: "PRESENT",
-            ClassSession: {
-              courseId,
-            },
-          },
-        }),
+      // 1. Discover all batches (Theory = null, Lab = uuid) this student is part of
+      const existingAggregates = await tx.attendance.findMany({
+        where: { studentId, courseId },
+        select: { batchId: true },
+      });
+
+      const activeRecords = await tx.attendanceRecord.findMany({
+        where: { studentId, ClassSession: { courseId } },
+        select: { batchId: true },
+        distinct: ["batchId"],
+      });
+
+      const batchesToProcess = new Set([
+        ...existingAggregates.map((a) => a.batchId),
+        ...activeRecords.map((r) => r.batchId),
       ]);
 
-      const absent = total - present;
-      const percentage = total > 0 ? (present / total) * 100 : 0;
+      // Fallback to processing Theory (null) if no records exist at all
+      if (batchesToProcess.size === 0) {
+        batchesToProcess.add(null);
+      }
 
-      if (total === 0) {
-        await tx.attendance.deleteMany({
+      let lastResult: AttendanceAggregateResult = {
+        total: 0,
+        present: 0,
+        absent: 0,
+        percentage: 0,
+        condonationStatus: "NOT_REQUESTED",
+      };
+
+      // 2. Aggregate each batch independently
+      for (const batchId of batchesToProcess) {
+        const [total, present] = await Promise.all([
+          tx.attendanceRecord.count({
+            where: {
+              studentId,
+              batchId,
+              ClassSession: { courseId },
+            },
+          }),
+          tx.attendanceRecord.count({
+            where: {
+              studentId,
+              batchId,
+              status: "PRESENT",
+              ClassSession: { courseId },
+            },
+          }),
+        ]);
+
+        const absent = total - present;
+        const percentage = total > 0 ? (present / total) * 100 : 0;
+
+        // If a session was deleted and the batch is now empty, clean up the aggregate row
+        if (total === 0) {
+          await tx.attendance.deleteMany({
+            where: {
+              studentId,
+              courseId,
+              batchId,
+            },
+          });
+          continue;
+        }
+
+        // Using findFirst instead of upsert to safely bypass Prisma compound unique limits with null fields
+        const existingAttendance = await tx.attendance.findFirst({
           where: {
             studentId,
             courseId,
+            batchId,
+          },
+          select: {
+            id: true,
+            condonationStatus: true,
           },
         });
 
-        return {
-          status: "success",
-          message: "Attendance aggregate removed because no records remain",
-          data: {
-            total: 0,
-            present: 0,
-            absent: 0,
-            percentage: 0,
-            condonationStatus: "NOT_REQUESTED",
-          },
-        };
+        const condonationStatus =
+          existingAttendance?.condonationStatus ?? "NOT_REQUESTED";
+
+        if (existingAttendance) {
+          await tx.attendance.update({
+            where: { id: existingAttendance.id },
+            data: { total, present, absent, percentage },
+          });
+        } else {
+          await tx.attendance.create({
+            data: {
+              id: crypto.randomUUID(),
+              studentId,
+              courseId,
+              batchId,
+              total,
+              present,
+              absent,
+              percentage,
+              condonationStatus,
+            },
+          });
+        }
+
+        lastResult = { total, present, absent, percentage, condonationStatus };
       }
-
-      const existingAttendance = await tx.attendance.findUnique({
-        where: {
-          studentId_courseId: {
-            studentId,
-            courseId,
-          },
-        },
-        select: {
-          condonationStatus: true,
-        },
-      });
-
-      const condonationStatus =
-        existingAttendance?.condonationStatus ?? "NOT_REQUESTED";
-
-      await tx.attendance.upsert({
-        where: {
-          studentId_courseId: {
-            studentId,
-            courseId,
-          },
-        },
-        create: {
-          id: crypto.randomUUID(),
-          studentId,
-          courseId,
-          total,
-          present,
-          absent,
-          percentage,
-          condonationStatus,
-        },
-        update: {
-          total,
-          present,
-          absent,
-          percentage,
-        },
-      });
 
       return {
         status: "success",
         message: "Attendance aggregated successfully",
-        data: {
-          total,
-          present,
-          absent,
-          percentage,
-          condonationStatus,
-        },
+        data: lastResult,
       };
     } catch (error) {
       logger.error("Error aggregating attendance:", {
@@ -141,20 +157,28 @@ export class AttendanceAggregationService {
     tx: DbLike = db
   ): Promise<BaseResponse<{ processedCount: number }>> {
     try {
-      // Find all unique students who have attendance records for this course
+      // Find all unique students who have active records
       const recordsWithStudents = await tx.attendanceRecord.findMany({
         where: {
-          ClassSession: {
-            courseId,
-          },
+          ClassSession: { courseId },
         },
-        select: {
-          studentId: true,
-        },
+        select: { studentId: true },
         distinct: ["studentId"],
       });
 
-      const studentIds = recordsWithStudents.map((r) => r.studentId);
+      // Find all unique students who have existing aggregates (in case they need deletion)
+      const aggregateStudents = await tx.attendance.findMany({
+        where: { courseId },
+        select: { studentId: true },
+        distinct: ["studentId"],
+      });
+
+      const studentIds = Array.from(
+        new Set([
+          ...recordsWithStudents.map((r) => r.studentId),
+          ...aggregateStudents.map((a) => a.studentId),
+        ])
+      );
 
       // Aggregate for each student
       for (const studentId of studentIds) {

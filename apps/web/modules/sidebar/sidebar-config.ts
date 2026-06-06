@@ -203,7 +203,8 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/faculty/attendance/take",
           icon: Fingerprint,
           children: [
-            { name: "Take/ Edit Attendance", url: "/faculty/attendance/take" },
+            { name: "Take Attendance", url: "/faculty/attendance/take" },
+            { name: "Edit Attendance", url: "/faculty/attendance/edit" },
             { name: "Attendance Report", url: "/faculty/attendance/report" },
             { name: "Attendance Freezing", url: "/faculty/attendance-windows" },
           ],

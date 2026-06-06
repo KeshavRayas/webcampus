@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,15 +25,19 @@ import {
   useFacultyAttendanceSessions,
 } from "./use-faculty-attendance";
 
-const EMPTY_FILTERS: AttendanceReportFilters = {
+// Extend filters locally to support the upcoming backend batchId schema changes
+type ExtendedFilters = AttendanceReportFilters & { batchId?: string };
+
+const EMPTY_FILTERS: ExtendedFilters = {
   academicTermId: "",
   programType: "",
   semesterId: "",
   courseId: "",
   sectionId: "",
+  batchId: undefined,
 };
 
-const hasRequiredFilters = (filters: AttendanceReportFilters) =>
+const hasRequiredFilters = (filters: ExtendedFilters) =>
   Boolean(
     filters.academicTermId &&
       filters.programType &&
@@ -41,14 +46,62 @@ const hasRequiredFilters = (filters: AttendanceReportFilters) =>
       filters.sectionId
   );
 
+const COURSE_SELECTION_DELIMITER = "::";
+
+const toCourseSelectionKey = (courseId: string, batchId?: string) => {
+  return `${courseId}${COURSE_SELECTION_DELIMITER}${batchId ?? "theory"}`;
+};
+
+const parseCourseSelectionKey = (value: string) => {
+  const [courseId = "", rawBatchId] = value.split(COURSE_SELECTION_DELIMITER);
+  return {
+    courseId,
+    batchId: rawBatchId && rawBatchId !== "theory" ? rawBatchId : undefined,
+  };
+};
+
+const parseSectionSelectionKey = (value: string) => {
+  const [sectionId = "", rawBatchId] = value.split(COURSE_SELECTION_DELIMITER);
+  return {
+    sectionId,
+    batchId: rawBatchId && rawBatchId !== "theory" ? rawBatchId : undefined,
+  };
+};
+
+const formatCourseDropdownLabel = (
+  code: string,
+  name: string,
+  labBatchNumber?: number
+) => {
+  if (!labBatchNumber) return `${code} - ${name}`;
+  return `${code}-${name}(Lab Batch ${labBatchNumber})`;
+};
+
+// Helper for CSV Generation
+const downloadCSV = (filename: string, rows: string[][]) => {
+  const csvContent = rows
+    .map((e) => e.map((cell) => `"${cell}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 export const AttendanceReportView = () => {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<TabType>("status");
   const [draftFilters, setDraftFilters] =
-    useState<AttendanceReportFilters>(EMPTY_FILTERS);
+    useState<ExtendedFilters>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] =
-    useState<AttendanceReportFilters>(EMPTY_FILTERS);
+    useState<ExtendedFilters>(EMPTY_FILTERS);
+
   const [hasRunReport, setHasRunReport] = useState(false);
   const [filtersChangedAfterRun, setFiltersChangedAfterRun] = useState(false);
   const [runToken, setRunToken] = useState(0);
@@ -89,13 +142,68 @@ export const AttendanceReportView = () => {
     );
   }, [semestersForTerm, draftFilters.programType]);
 
-  const courses = attendanceFilterOptions?.courses ?? [];
-  const sections = attendanceFilterOptions?.sections ?? [];
+  // --- LAB BATCH PARSING LOGIC ---
+  const assignmentOptions = useMemo(() => {
+    const courses = attendanceFilterOptions?.courses ?? [];
+    const sections = attendanceFilterOptions?.sections ?? [];
+    const courseById = new Map(courses.map((course) => [course.id, course]));
 
-  const filteredSections = useMemo(() => {
-    if (!draftFilters.courseId) return sections;
-    return sections.filter((s) => s.courseId === draftFilters.courseId);
-  }, [sections, draftFilters.courseId]);
+    return sections
+      .map((section) => {
+        const course = courseById.get(section.courseId);
+        if (!course) return null;
+
+        const selectionKey = toCourseSelectionKey(course.id, section.batchId);
+        return {
+          selectionKey,
+          courseId: course.id,
+          sectionId: section.id,
+          batchId: section.batchId,
+          sectionName: section.name,
+          courseCode: course.code,
+          courseName: course.name,
+          labBatchNumber: section.labBatchNumber,
+          courseLabel: formatCourseDropdownLabel(
+            course.code,
+            course.name,
+            section.labBatchNumber
+          ),
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+  }, [attendanceFilterOptions]);
+
+  const courseOptions = useMemo(() => {
+    const optionsByKey = new Map<
+      string,
+      { id: string; name: string; label: string; code: string }
+    >();
+    for (const assignment of assignmentOptions) {
+      optionsByKey.set(assignment.selectionKey, {
+        id: assignment.selectionKey,
+        name: assignment.courseName,
+        label: assignment.courseLabel,
+        code: assignment.courseCode,
+      });
+    }
+    return Array.from(optionsByKey.values());
+  }, [assignmentOptions]);
+
+  const sectionsForSelectedCourse = useMemo(() => {
+    const selectedCourse = parseCourseSelectionKey(draftFilters.courseId);
+    const filteredAssignments = assignmentOptions.filter((assignment) => {
+      if (!selectedCourse.courseId) return true;
+      if (assignment.courseId !== selectedCourse.courseId) return false;
+      return (assignment.batchId ?? undefined) === selectedCourse.batchId;
+    });
+
+    return filteredAssignments.map((assignment) => ({
+      id: `${assignment.sectionId}${COURSE_SELECTION_DELIMITER}${assignment.batchId ?? "theory"}`,
+      name: assignment.sectionName,
+      courseId: assignment.courseId,
+    }));
+  }, [assignmentOptions, draftFilters.courseId]);
+  // -------------------------------
 
   const hasRequiredDraftFilters = useMemo(
     () => hasRequiredFilters(draftFilters),
@@ -132,22 +240,24 @@ export const AttendanceReportView = () => {
     cancelAndClearReportQueries();
   }, [cancelAndClearReportQueries, cancelDetailedReportRequest]);
 
+  // NOTE: When backend schema is updated, ensure `batchId` is passed into this hook if supported
   const {
     data: sessionsData,
     isError: isErrorSessions,
     error: errorSessions,
   } = useFacultyAttendanceSessions(
     {
-      courseId: appliedFilters.courseId || undefined,
-      sectionId: appliedFilters.sectionId || undefined,
+      courseId:
+        parseCourseSelectionKey(appliedFilters.courseId).courseId || undefined,
+      sectionId:
+        parseSectionSelectionKey(appliedFilters.sectionId).sectionId ||
+        undefined,
+      // batchId: parseCourseSelectionKey(appliedFilters.courseId).batchId,
       page: 1,
       limit: 10,
     },
     shouldShowReportResults,
-    {
-      queryKeySuffix: ["report", runToken],
-      staleTime: 0,
-    }
+    { queryKeySuffix: ["report", runToken], staleTime: 0 }
   );
 
   useEffect(() => {
@@ -166,19 +276,14 @@ export const AttendanceReportView = () => {
             }),
           };
         } catch (err) {
-          console.error(
-            `Failed to fetch detail for session ${session.id}:`,
-            err
-          );
+          console.log(err);
           return { id: session.id, detail: null };
         }
       })
     ).then((results) => {
       const detailsMap: Record<string, FacultyAttendanceSessionDetailDTO> = {};
       for (const result of results) {
-        if (result.detail) {
-          detailsMap[result.id] = result.detail;
-        }
+        if (result.detail) detailsMap[result.id] = result.detail;
       }
       setSessionDetailsMap(detailsMap);
     });
@@ -215,36 +320,29 @@ export const AttendanceReportView = () => {
 
     getFacultyAttendanceDetailedReport(
       {
-        courseId: appliedFilters.courseId,
-        sectionId: appliedFilters.sectionId,
+        courseId: parseCourseSelectionKey(appliedFilters.courseId).courseId,
+        sectionId: parseSectionSelectionKey(appliedFilters.sectionId).sectionId,
+        // batchId: parseCourseSelectionKey(appliedFilters.courseId).batchId, // Uncomment when backend supports it
       },
       controller.signal
     )
       .then((data) => {
-        if (!controller.signal.aborted) {
-          setDetailedReportData(data);
-        }
+        if (!controller.signal.aborted) setDetailedReportData(data);
       })
       .catch((err) => {
-        if (controller.signal.aborted) {
+        if (
+          controller.signal.aborted ||
+          err?.name === "CanceledError" ||
+          err?.name === "AbortError"
+        )
           return;
-        }
-
-        if (err?.name === "CanceledError" || err?.name === "AbortError") {
-          return;
-        }
-
         toast.error(err.message || "Failed to load detailed report");
         setDetailedReportData(undefined);
       })
       .finally(() => {
-        if (!controller.signal.aborted) {
-          setIsLoadingDetailed(false);
-        }
-
-        if (detailedReportAbortRef.current === controller) {
+        if (!controller.signal.aborted) setIsLoadingDetailed(false);
+        if (detailedReportAbortRef.current === controller)
           detailedReportAbortRef.current = null;
-        }
       });
   }, [
     activeTab,
@@ -254,24 +352,12 @@ export const AttendanceReportView = () => {
     shouldShowReportResults,
   ]);
 
-  useEffect(() => {
-    return () => {
-      cancelDetailedReportRequest();
-      void queryClient.cancelQueries({
-        queryKey: ["faculty-attendance", "sessions", "report"],
-      });
-      queryClient.removeQueries({
-        queryKey: ["faculty-attendance", "sessions", "report"],
-      });
-    };
-  }, [cancelDetailedReportRequest, queryClient]);
-
   const statusReportData = useMemo<SessionWithCounts[]>(() => {
     if (!shouldShowReportResults || !sessionsData?.items) return [];
 
     return sessionsData.items.map((session) => {
       const detail = sessionDetailsMap[session.id];
-      if (!detail) {
+      if (!detail)
         return {
           ...session,
           totalStudents: 0,
@@ -279,7 +365,6 @@ export const AttendanceReportView = () => {
           absentCount: 0,
           percentage: 0,
         } as SessionWithCounts;
-      }
 
       const totalStudents = detail.students.length;
       const presentCount = detail.students.filter(
@@ -315,17 +400,13 @@ export const AttendanceReportView = () => {
       (student) => student.percentage >= from && student.percentage <= to
     );
 
-    return {
-      ...detailedReportData,
-      students: filteredStudents,
-    };
+    return { ...detailedReportData, students: filteredStudents };
   }, [detailedReportData, percentageFrom, percentageTo]);
 
   const updateDraftFilter = useCallback(
-    (key: keyof AttendanceReportFilters, value: string) => {
+    (key: keyof ExtendedFilters, value: string) => {
       setDraftFilters((current) => {
         const updated = { ...current, [key]: value };
-
         if (key === "academicTermId") {
           updated.programType = "";
           updated.semesterId = "";
@@ -341,14 +422,10 @@ export const AttendanceReportView = () => {
         } else if (key === "courseId") {
           updated.sectionId = "";
         }
-
         return updated;
       });
 
-      if (hasRunReport) {
-        setFiltersChangedAfterRun(true);
-      }
-
+      if (hasRunReport) setFiltersChangedAfterRun(true);
       clearReportState();
     },
     [clearReportState, hasRunReport]
@@ -372,19 +449,131 @@ export const AttendanceReportView = () => {
     clearReportState();
   }, [clearReportState]);
 
+  // --- HEADER METADATA GENERATOR ---
+  const getHeaderMetadata = useCallback(() => {
+    const term =
+      academicTerms.find((t) => t.id === draftFilters.academicTermId)?.year ||
+      "N/A";
+    const progType = draftFilters.programType || "N/A";
+    const sem =
+      filteredSemesters.find((s) => s.id === draftFilters.semesterId)
+        ?.semesterNumber || "N/A";
+    const course =
+      courseOptions.find((c) => c.id === draftFilters.courseId)?.label || "N/A";
+    const section =
+      sectionsForSelectedCourse.find((s) => s.id === draftFilters.sectionId)
+        ?.name || "N/A";
+
+    // Safely cast to any to avoid DTO strictness issues if facultyName isn't technically in the interface
+    const facultyName =
+      (sessionsData?.items?.[0] as any)?.facultyName || "Faculty Member";
+
+    return [
+      `Academic Term: ${term}`,
+      `Program Type: ${progType}`,
+      `Semester: ${sem}`,
+      `Course: ${course}`,
+      `Section: ${section}`,
+      `Faculty Name: ${facultyName}`,
+    ];
+  }, [
+    academicTerms,
+    draftFilters,
+    filteredSemesters,
+    courseOptions,
+    sectionsForSelectedCourse,
+    sessionsData,
+  ]);
+
+  // --- DETAILED REPORTS ---
   const handleDownloadPDF = useCallback(() => {
     if (!detailedReportData || !detailedReportData.students.length) return;
-
     const doc = new jsPDF({ orientation: "landscape" });
-
-    const courseInfo = `${draftFilters.courseId ? "Course" : "Section"} Report`;
+    const metadata = getHeaderMetadata();
 
     doc.setFontSize(16);
     doc.text("Attendance Detailed Report", 14, 15);
-
     doc.setFontSize(10);
-    doc.text(courseInfo, 14, 25);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 32);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 22);
+
+    // Print Header Metadata
+    let yPos = 30;
+    metadata.forEach((text, index) => {
+      // Split into two columns for layout
+      const xPos = index % 2 === 0 ? 14 : 140;
+      doc.text(text, xPos, yPos);
+      if (index % 2 !== 0) yPos += 6;
+    });
+
+    const headers = [
+      "USN",
+      "Student Name",
+      ...detailedReportData.sessions.map((s) =>
+        new Date(s.sessionDate).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })
+      ),
+      "Total",
+      "Cond.",
+      "Present",
+      "Absent",
+      "%",
+      "Status",
+    ];
+
+    const rows = detailedReportData.students.map((student) => [
+      student.usn,
+      student.name,
+      ...student.sessionStatuses.map((status) =>
+        status === "PRESENT" ? "P" : "A"
+      ),
+      student.totalSessions.toString(),
+      student.condonationStatus,
+      student.presentSessions.toString(),
+      student.absentSessions.toString(),
+      `${student.percentage}%`,
+      student.status,
+    ]);
+
+    autoTable(doc, {
+      head: [headers],
+      body: rows,
+      startY: yPos + 4,
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        fontStyle: "bold",
+      },
+      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 35 } },
+      didParseCell: function (data) {
+        if (
+          data.section === "body" &&
+          data.column.index >= 2 &&
+          data.column.index < 2 + detailedReportData.sessions.length
+        ) {
+          const val = data.cell.raw as string;
+          data.cell.styles.textColor =
+            val === "P" ? [39, 174, 96] : [192, 57, 43];
+        }
+        if (
+          data.section === "body" &&
+          data.column.index === headers.length - 1
+        ) {
+          data.cell.styles.textColor =
+            data.cell.raw === "Eligible" ? [39, 174, 96] : [192, 57, 43];
+          if (data.cell.raw === "Eligible") data.cell.styles.fontStyle = "bold";
+        }
+      },
+    });
+
+    doc.save("attendance-detailed-report.pdf");
+  }, [detailedReportData, getHeaderMetadata]);
+
+  const handleDownloadExcel = useCallback(() => {
+    if (!detailedReportData || !detailedReportData.students.length) return;
+    const metadata = getHeaderMetadata();
 
     const headers = [
       "USN",
@@ -417,69 +606,46 @@ export const AttendanceReportView = () => {
       student.status,
     ]);
 
-    autoTable(doc, {
-      head: [headers],
-      body: rows,
-      startY: 38,
-      styles: {
-        fontSize: 7,
-        cellPadding: 2,
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontStyle: "bold",
-      },
-      columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 35 },
-      },
-      didParseCell: function (data) {
-        if (
-          data.section === "body" &&
-          data.column.index >= 2 &&
-          data.column.index < 2 + detailedReportData.sessions.length
-        ) {
-          const value = data.cell.raw as string;
-          if (value === "P") {
-            data.cell.styles.textColor = [39, 174, 96];
-          } else if (value === "A") {
-            data.cell.styles.textColor = [192, 57, 43];
-          }
-        }
+    // Prepend metadata rows to Excel
+    const csvRows = [
+      ["Attendance Detailed Report"],
+      [`Generated: ${new Date().toLocaleDateString()}`],
+      [], // Empty row
+      ...metadata.map((m) => [m]), // Add metadata parameters
+      [],
+      headers,
+      ...rows,
+    ];
 
-        if (
-          data.section === "body" &&
-          data.column.index === headers.length - 1
-        ) {
-          const value = data.cell.raw as string;
-          if (value === "Eligible") {
-            data.cell.styles.textColor = [39, 174, 96];
-            data.cell.styles.fontStyle = "bold";
-          } else {
-            data.cell.styles.textColor = [192, 57, 43];
-          }
-        }
-      },
-    });
+    downloadCSV("attendance-detailed-report.csv", csvRows);
+  }, [detailedReportData, getHeaderMetadata]);
 
-    doc.save("attendance-detailed-report.pdf");
-  }, [detailedReportData, draftFilters]);
-
+  // --- PERCENTAGE REPORTS ---
   const handleDownloadPercentagePDF = useCallback(() => {
     if (!percentageReportData || !percentageReportData.students.length) return;
-
     const doc = new jsPDF({ orientation: "landscape" });
+    const metadata = getHeaderMetadata();
 
     doc.setFontSize(16);
     doc.text("Attendance Percentage Report", 14, 15);
-
     doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 25);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 22);
+
+    let yPos = 30;
     if (percentageFrom || percentageTo) {
-      const filterText = `Filter: ${percentageFrom || "0"}% - ${percentageTo || "100"}%`;
-      doc.text(filterText, 14, 32);
+      doc.text(
+        `Filter: ${percentageFrom || "0"}% - ${percentageTo || "100"}%`,
+        14,
+        yPos
+      );
+      yPos += 6;
     }
+
+    metadata.forEach((text, index) => {
+      const xPos = index % 2 === 0 ? 14 : 140;
+      doc.text(text, xPos, yPos);
+      if (index % 2 !== 0) yPos += 6;
+    });
 
     const headers = [
       "USN",
@@ -491,7 +657,6 @@ export const AttendanceReportView = () => {
       "Percentage",
       "Status",
     ];
-
     const rows = percentageReportData.students.map((student) => [
       student.usn,
       student.name,
@@ -506,46 +671,72 @@ export const AttendanceReportView = () => {
     autoTable(doc, {
       head: [headers],
       body: rows,
-      startY: percentageFrom || percentageTo ? 38 : 32,
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-      },
+      startY: yPos + 4,
+      styles: { fontSize: 9, cellPadding: 3 },
       headStyles: {
         fillColor: [41, 128, 185],
         textColor: 255,
         fontStyle: "bold",
       },
-      columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 35 },
-      },
+      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 35 } },
       didParseCell: function (data) {
         if (
           data.section === "body" &&
           data.column.index === headers.length - 1
         ) {
-          const value = data.cell.raw as string;
-          if (value === "Eligible") {
-            data.cell.styles.textColor = [39, 174, 96];
-            data.cell.styles.fontStyle = "bold";
-          } else {
-            data.cell.styles.textColor = [192, 57, 43];
-          }
+          data.cell.styles.textColor =
+            data.cell.raw === "Eligible" ? [39, 174, 96] : [192, 57, 43];
+          if (data.cell.raw === "Eligible") data.cell.styles.fontStyle = "bold";
         }
       },
     });
 
     doc.save("attendance-percentage-report.pdf");
-  }, [percentageReportData, percentageFrom, percentageTo]);
+  }, [percentageReportData, percentageFrom, percentageTo, getHeaderMetadata]);
+
+  const handleDownloadPercentageExcel = useCallback(() => {
+    if (!percentageReportData || !percentageReportData.students.length) return;
+    const metadata = getHeaderMetadata();
+
+    const headers = [
+      "USN",
+      "Student Name",
+      "Total Sessions",
+      "Condonation",
+      "Present Sessions",
+      "Absent Sessions",
+      "Percentage",
+      "Status",
+    ];
+    const rows = percentageReportData.students.map((student) => [
+      student.usn,
+      student.name,
+      student.totalSessions.toString(),
+      student.condonationStatus === "APPROVED" ? "Condoned" : "Not Condoned",
+      student.presentSessions.toString(),
+      student.absentSessions.toString(),
+      `${student.percentage}%`,
+      student.status,
+    ]);
+
+    const csvRows = [
+      ["Attendance Percentage Report"],
+      [`Generated: ${new Date().toLocaleDateString()}`],
+      [`Filter: ${percentageFrom || "0"}% - ${percentageTo || "100"}%`],
+      [],
+      ...metadata.map((m) => [m]),
+      [],
+      headers,
+      ...rows,
+    ];
+
+    downloadCSV("attendance-percentage-report.csv", csvRows);
+  }, [percentageReportData, percentageFrom, percentageTo, getHeaderMetadata]);
 
   const handlePercentageFilterChange = useCallback(
     (key: "percentageFrom" | "percentageTo", value: string) => {
-      if (key === "percentageFrom") {
-        setPercentageFrom(value);
-      } else {
-        setPercentageTo(value);
-      }
+      if (key === "percentageFrom") setPercentageFrom(value);
+      else setPercentageTo(value);
     },
     []
   );
@@ -559,8 +750,8 @@ export const AttendanceReportView = () => {
         onDraftChange={updateDraftFilter}
         academicTerms={academicTerms}
         semesters={filteredSemesters}
-        courses={courses}
-        sections={filteredSections}
+        courses={courseOptions}
+        sections={sectionsForSelectedCourse}
         hasRequiredFilters={hasRequiredDraftFilters}
         hasRunReport={hasRunReport}
         filtersChangedAfterRun={filtersChangedAfterRun}
@@ -573,6 +764,8 @@ export const AttendanceReportView = () => {
         detailedReportData={detailedReportData}
         isLoadingDetailed={isLoadingDetailed}
         onDownloadDetailedPDF={handleDownloadPDF}
+        onDownloadDetailedExcel={handleDownloadExcel}
+        onDownloadPercentageExcel={handleDownloadPercentageExcel}
         percentageReportData={percentageReportData}
         percentageFrom={percentageFrom}
         percentageTo={percentageTo}

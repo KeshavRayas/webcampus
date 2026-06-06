@@ -94,6 +94,7 @@ type AttendanceReportShellProps = {
   detailedReportData?: DetailedReportData;
   isLoadingDetailed?: boolean;
   onDownloadDetailedPDF?: () => void;
+  onDownloadDetailedExcel?: () => void; // New Prop
   percentageReportData?: DetailedReportData;
   percentageFrom?: string;
   percentageTo?: string;
@@ -102,6 +103,7 @@ type AttendanceReportShellProps = {
     value: string
   ) => void;
   onDownloadPercentagePDF?: () => void;
+  onDownloadPercentageExcel?: () => void; // New Prop
 };
 
 export const AttendanceReportShell = ({
@@ -125,11 +127,13 @@ export const AttendanceReportShell = ({
   detailedReportData,
   isLoadingDetailed,
   onDownloadDetailedPDF,
+  onDownloadDetailedExcel,
   percentageReportData,
   percentageFrom,
   percentageTo,
   onPercentageFilterChange,
   onDownloadPercentagePDF,
+  onDownloadPercentageExcel,
 }: AttendanceReportShellProps) => {
   const getStatusEmptyMessage = () => {
     if (!hasRequiredFilters) {
@@ -327,7 +331,50 @@ export const AttendanceReportShell = ({
             allValue={DEFAULT_FILTER_ALL_VALUE}
             className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"
           />
-          <div className="mt-4 flex justify-end">
+
+          {/* Action Row - Includes Percentage Filters inline if active */}
+          <div className="mt-6 flex flex-col items-end justify-between gap-4 md:flex-row md:items-end">
+            <div className="w-full md:w-auto">
+              {activeTab === "percentage" && (
+                <div className="md:w-75 grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="percentageFrom">Percentage From (%)</Label>
+                    <Input
+                      id="percentageFrom"
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="0"
+                      value={percentageFrom ?? ""}
+                      onChange={(e) =>
+                        onPercentageFilterChange?.(
+                          "percentageFrom",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="percentageTo">Percentage To (%)</Label>
+                    <Input
+                      id="percentageTo"
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="100"
+                      value={percentageTo ?? ""}
+                      onChange={(e) =>
+                        onPercentageFilterChange?.(
+                          "percentageTo",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             <FilterActions
               onApply={onGetReport}
               onReset={onResetFilters}
@@ -337,39 +384,6 @@ export const AttendanceReportShell = ({
               isResetDisabled={!hasRequiredFilters}
             />
           </div>
-
-          {activeTab === "percentage" && (
-            <div className="mt-4 grid grid-cols-2 gap-4 md:max-w-xs md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="percentageFrom">Percentage From (%)</Label>
-                <Input
-                  id="percentageFrom"
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="0"
-                  value={percentageFrom ?? ""}
-                  onChange={(e) =>
-                    onPercentageFilterChange?.("percentageFrom", e.target.value)
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="percentageTo">Percentage To (%)</Label>
-                <Input
-                  id="percentageTo"
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="100"
-                  value={percentageTo ?? ""}
-                  onChange={(e) =>
-                    onPercentageFilterChange?.("percentageTo", e.target.value)
-                  }
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {activeTab === "status" && (
@@ -446,7 +460,16 @@ export const AttendanceReportShell = ({
           <div className="space-y-4">
             {detailedReportData && detailedReportData.students.length > 0 ? (
               <>
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onDownloadDetailedExcel}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Excel
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -461,36 +484,36 @@ export const AttendanceReportShell = ({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="bg-background sticky left-0 z-10 min-w-[100px]">
+                        <TableHead className="bg-background min-w-25 sticky left-0 z-10">
                           USN
                         </TableHead>
-                        <TableHead className="bg-background sticky left-[100px] z-10 min-w-[150px]">
+                        <TableHead className="bg-background left-25 min-w-37.5 sticky z-10">
                           Student Name
                         </TableHead>
                         {detailedReportData.sessions.map((session) => (
                           <TableHead
                             key={session.id}
-                            className="min-w-[80px] whitespace-nowrap text-center"
+                            className="min-w-20 whitespace-nowrap text-center"
                           >
                             {dayjs(session.sessionDate).format("MMM D")}
                           </TableHead>
                         ))}
-                        <TableHead className="min-w-[80px] text-center">
+                        <TableHead className="min-w-20 text-center">
                           Total Session
                         </TableHead>
-                        <TableHead className="min-w-[100px] text-center">
+                        <TableHead className="min-w-25 text-center">
                           Condonation
                         </TableHead>
-                        <TableHead className="min-w-[80px] text-center">
+                        <TableHead className="min-w-20 text-center">
                           Present
                         </TableHead>
-                        <TableHead className="min-w-[80px] text-center">
+                        <TableHead className="min-w-20 text-center">
                           Absent
                         </TableHead>
-                        <TableHead className="min-w-[80px] text-center">
+                        <TableHead className="min-w-20 text-center">
                           Percentage %
                         </TableHead>
-                        <TableHead className="min-w-[100px] text-center">
+                        <TableHead className="min-w-25 text-center">
                           Status
                         </TableHead>
                       </TableRow>
@@ -506,7 +529,7 @@ export const AttendanceReportShell = ({
                             <TableCell className="bg-background sticky left-0 z-10 font-mono text-sm">
                               {student.usn}
                             </TableCell>
-                            <TableCell className="bg-background sticky left-[100px] z-10 font-medium">
+                            <TableCell className="bg-background left-25 sticky z-10 font-medium">
                               {student.name}
                             </TableCell>
                             {student.sessionStatuses.map(
@@ -514,10 +537,10 @@ export const AttendanceReportShell = ({
                                 <TableCell
                                   key={idx}
                                   className={cn(
-                                    "text-center",
+                                    "text-center font-medium",
                                     sessionStatus === "PRESENT"
-                                      ? "text-green-600"
-                                      : "text-red-600"
+                                      ? "text-emerald-600 dark:text-emerald-500"
+                                      : "text-rose-600 dark:text-rose-500"
                                   )}
                                 >
                                   {sessionStatus === "PRESENT" ? "P" : "A"}
@@ -545,10 +568,10 @@ export const AttendanceReportShell = ({
                                 )}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-center font-medium text-green-600">
+                            <TableCell className="text-center font-medium text-emerald-600 dark:text-emerald-500">
                               {student.presentSessions}
                             </TableCell>
-                            <TableCell className="text-center font-medium text-red-600">
+                            <TableCell className="text-center font-medium text-rose-600 dark:text-rose-500">
                               {student.absentSessions}
                             </TableCell>
                             <TableCell className="text-center font-medium">
@@ -562,7 +585,8 @@ export const AttendanceReportShell = ({
                                     : "destructive"
                                 }
                                 className={cn(
-                                  status === "Eligible" && "bg-green-500"
+                                  status === "Eligible" &&
+                                    "border-transparent bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
                                 )}
                               >
                                 {status}
@@ -576,12 +600,12 @@ export const AttendanceReportShell = ({
                 </div>
               </>
             ) : isLoadingDetailed ? (
-              <div className="text-muted-foreground flex min-h-[200px] items-center justify-center gap-2">
+              <div className="text-muted-foreground min-h-50 flex items-center justify-center gap-2">
                 <Loader2 className="h-5 w-5 animate-spin" />
                 Loading detailed report...
               </div>
             ) : (
-              <div className="text-muted-foreground flex min-h-[200px] items-center justify-center">
+              <div className="text-muted-foreground min-h-50 flex items-center justify-center">
                 {getDetailedEmptyMessage()}
               </div>
             )}
@@ -593,7 +617,16 @@ export const AttendanceReportShell = ({
             {percentageReportData &&
             percentageReportData.students.length > 0 ? (
               <>
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onDownloadPercentageExcel}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Excel
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -608,28 +641,28 @@ export const AttendanceReportShell = ({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="bg-background sticky left-0 z-10 min-w-[100px]">
+                        <TableHead className="bg-background min-w-25 sticky left-0 z-10">
                           USN
                         </TableHead>
-                        <TableHead className="bg-background sticky left-[100px] z-10 min-w-[150px]">
+                        <TableHead className="bg-background left-25 min-w-37.5 sticky z-10">
                           Student Name
                         </TableHead>
-                        <TableHead className="min-w-[100px] text-center">
+                        <TableHead className="min-w-25 text-center">
                           Total Sessions
                         </TableHead>
-                        <TableHead className="min-w-[120px] text-center">
+                        <TableHead className="min-w-30 text-center">
                           Condonation
                         </TableHead>
-                        <TableHead className="min-w-[100px] text-center">
+                        <TableHead className="min-w-25 text-center">
                           Present Sessions
                         </TableHead>
-                        <TableHead className="min-w-[100px] text-center">
+                        <TableHead className="min-w-25 text-center">
                           Absent Sessions
                         </TableHead>
-                        <TableHead className="min-w-[100px] text-center">
+                        <TableHead className="min-w-25 text-center">
                           % Percentage
                         </TableHead>
-                        <TableHead className="min-w-[100px] text-center">
+                        <TableHead className="min-w-25 text-center">
                           Status
                         </TableHead>
                       </TableRow>
@@ -649,7 +682,7 @@ export const AttendanceReportShell = ({
                             <TableCell className="bg-background sticky left-0 z-10 font-mono text-sm">
                               {student.usn}
                             </TableCell>
-                            <TableCell className="bg-background sticky left-[100px] z-10 font-medium">
+                            <TableCell className="bg-background left-25 sticky z-10 font-medium">
                               {student.name}
                             </TableCell>
                             <TableCell className="text-center font-medium">
@@ -667,10 +700,10 @@ export const AttendanceReportShell = ({
                                 {condonationLabel}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-center font-medium text-green-600">
+                            <TableCell className="text-center font-medium text-emerald-600 dark:text-emerald-500">
                               {student.presentSessions}
                             </TableCell>
-                            <TableCell className="text-center font-medium text-red-600">
+                            <TableCell className="text-center font-medium text-rose-600 dark:text-rose-500">
                               {student.absentSessions}
                             </TableCell>
                             <TableCell className="text-center font-medium">
@@ -684,7 +717,8 @@ export const AttendanceReportShell = ({
                                     : "destructive"
                                 }
                                 className={cn(
-                                  status === "Eligible" && "bg-green-500"
+                                  status === "Eligible" &&
+                                    "border-transparent bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
                                 )}
                               >
                                 {status}
@@ -699,7 +733,7 @@ export const AttendanceReportShell = ({
               </>
             ) : !percentageReportData ||
               percentageReportData.students.length === 0 ? (
-              <div className="text-muted-foreground flex min-h-[200px] items-center justify-center">
+              <div className="text-muted-foreground min-h-50 flex items-center justify-center">
                 {getPercentageEmptyMessage()}
               </div>
             ) : null}
