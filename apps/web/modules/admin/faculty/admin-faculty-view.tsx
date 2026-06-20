@@ -30,6 +30,7 @@ import {
 } from "@webcampus/ui/components/select";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
 import axios from "axios";
+import { X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import {
   AdminFacultyResponse,
@@ -121,7 +122,7 @@ export const AdminFacultyView = () => {
     });
   }, [faculty, selectedDepartmentId]);
 
-  const { form, onSubmit, setImageFile } =
+  const { form, onSubmit, setImageFile, previewUrl } =
     useCreateAdminFacultyForm(selectedDepartmentId);
 
   const columns = useMemo(
@@ -388,14 +389,36 @@ export const AdminFacultyView = () => {
               <FormItem>
                 <FormLabel>Faculty Image *</FormLabel>
                 <FormControl>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] || null;
-                      setImageFile(file);
-                    }}
-                  />
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-4">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] || null;
+                          setImageFile(file);
+                        }}
+                      />
+                      {previewUrl && (
+                        <div className="border-border group relative mt-2 h-24 w-24 rounded-md border">
+                          <img
+                            src={previewUrl}
+                            alt="Faculty preview"
+                            className="h-full w-full rounded-md object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-100 shadow-sm hover:opacity-90"
+                            onClick={() => setImageFile(null)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>

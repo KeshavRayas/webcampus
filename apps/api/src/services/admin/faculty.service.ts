@@ -165,6 +165,7 @@ export class AdminFacultyService {
               email: true,
               username: true,
               displayUsername: true,
+              image: true,
             },
           },
           department: {

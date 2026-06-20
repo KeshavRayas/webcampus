@@ -134,7 +134,8 @@ export class AdmissionService {
 
     for (const applicationId of missingApplicationIds) {
       // Username is normalized to lowercase for Better Auth credential lookup compatibility.
-      const normalizedUsername = AdmissionService.normalizeApplicationId(applicationId);
+      const normalizedUsername =
+        AdmissionService.normalizeApplicationId(applicationId);
       const userService = new UserService({
         request: {
           email:
@@ -284,12 +285,20 @@ export class AdmissionService {
       }
 
       if (!existingApplicantUser) {
+        const applicantFullName = [
+          data.firstName,
+          data.middleName,
+          data.lastName,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
         // We generate a dummy email and name since the applicant has not filled it out yet.
         // Username is normalized to lowercase for Better Auth compatibility.
         const userService = new UserService({
           request: {
             email: applicantEmail,
-            name: `Applicant ${applicationId}`,
+            name: applicantFullName,
             username: AdmissionService.normalizeApplicationId(applicationId),
             password: "password", // Dummy password
             role: "applicant",
@@ -312,6 +321,9 @@ export class AdmissionService {
       const admission = await db.admission.create({
         data: {
           applicationId,
+          firstName: data.firstName,
+          middleName: data.middleName,
+          lastName: data.lastName,
           modeOfAdmission: data.modeOfAdmission,
           semesterId: data.semesterId,
           departmentId: data.departmentId,
@@ -620,7 +632,10 @@ export class AdmissionService {
       logger.info("Department found", { name: department.name });
 
       // Validate aadharNumber uniqueness: allow if same record or if aadhar doesn't exist elsewhere
-      if (data.aadharNumber && data.aadharNumber !== existingAdmission.aadharNumber) {
+      if (
+        data.aadharNumber &&
+        data.aadharNumber !== existingAdmission.aadharNumber
+      ) {
         const existingAadhar = await db.admission.findUnique({
           where: { aadharNumber: data.aadharNumber },
         });
@@ -924,12 +939,12 @@ export class AdmissionService {
           admission.lastName ?? ""
         ).slice(0, 1);
 
-        const counts =
-          studentEmailCollisionCountsByDepartmentId.get(admission.departmentId) ??
-          {
-            firstNameCounts: new Map<string, number>(),
-            firstNameLastInitialCounts: new Map<string, number>(),
-          };
+        const counts = studentEmailCollisionCountsByDepartmentId.get(
+          admission.departmentId
+        ) ?? {
+          firstNameCounts: new Map<string, number>(),
+          firstNameLastInitialCounts: new Map<string, number>(),
+        };
 
         counts.firstNameCounts.set(
           firstNameKey,
@@ -950,7 +965,10 @@ export class AdmissionService {
         );
       }
 
-      const studentEmailLocalPartsByDepartmentId = new Map<string, Set<string>>();
+      const studentEmailLocalPartsByDepartmentId = new Map<
+        string,
+        Set<string>
+      >();
       const academicYearSuffix = getStudentEmailYearSuffix(
         semester.academicTerm.year
       );
@@ -1025,14 +1043,14 @@ export class AdmissionService {
             }
 
             const firstNameKey = normalizeStudentEmailToken(firstName);
-            const lastInitial = normalizeStudentEmailToken(lastName ?? "").slice(
-              0,
-              1
-            );
+            const lastInitial = normalizeStudentEmailToken(
+              lastName ?? ""
+            ).slice(0, 1);
 
             const collisionCounts =
-              studentEmailCollisionCountsByDepartmentId.get(admission.departmentId) ??
-              {
+              studentEmailCollisionCountsByDepartmentId.get(
+                admission.departmentId
+              ) ?? {
                 firstNameCounts: new Map<string, number>(),
                 firstNameLastInitialCounts: new Map<string, number>(),
               };
@@ -1077,10 +1095,12 @@ export class AdmissionService {
               firstNameCount:
                 collisionCounts.firstNameCounts.get(firstNameKey) ?? 0,
               firstNameLastInitialCount: lastInitial
-                ? collisionCounts.firstNameLastInitialCounts.get(
+                ? (collisionCounts.firstNameLastInitialCounts.get(
                     `${firstNameKey}:${lastInitial}`
-                  ) ?? 0
-                : collisionCounts.firstNameLastInitialCounts.get(firstNameKey) ?? 0,
+                  ) ?? 0)
+                : (collisionCounts.firstNameLastInitialCounts.get(
+                    firstNameKey
+                  ) ?? 0),
               occupiedLocalParts,
             });
 
@@ -1237,4 +1257,3 @@ export class AdmissionService {
     }
   }
 }
-

@@ -21,6 +21,9 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
     resolver: zodResolver(CreateAdmissionShellSchema),
     defaultValues: {
       applicationId: "",
+      firstName: "",
+      middleName: "",
+      lastName: "",
       modeOfAdmission: "KCET", // Default value
       semesterId: semesterId,
       departmentId: "",
@@ -37,6 +40,9 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
     if (isSubmitSuccessful) {
       form.reset({
         applicationId: "",
+        firstName: "",
+        middleName: "",
+        lastName: "",
         modeOfAdmission: "KCET",
         semesterId,
         departmentId: "",

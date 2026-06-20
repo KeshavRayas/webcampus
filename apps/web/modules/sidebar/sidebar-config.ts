@@ -344,7 +344,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     navMain: {
       items: [
         {
-          name: "Dashboard",
+          name: "Add Admissions",
           url: "/admission",
           icon: LayoutDashboard,
         },
@@ -361,7 +361,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     navMain: {
       items: [
         {
-          name: "Dashboard",
+          name: "Add Admissions",
           url: "/admission",
           icon: LayoutDashboard,
         },
