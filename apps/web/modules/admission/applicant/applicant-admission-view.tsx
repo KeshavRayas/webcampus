@@ -182,19 +182,6 @@ export const ApplicantAdmissionView = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
-            <div className="space-y-2 md:col-span-5">
-              <Label htmlFor="firstName">First Name *</Label>
-              <Input id="firstName" name="firstName" required />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="middleName">Middle Name</Label>
-              <Input id="middleName" name="middleName" />
-            </div>
-            <div className="space-y-2 md:col-span-5">
-              <Label htmlFor="lastName">Last Name *</Label>
-              <Input id="lastName" name="lastName" required />
-            </div>
-
             <div className="space-y-2 md:col-span-3">
               <Label>Branch</Label>
               <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
@@ -408,7 +395,7 @@ export const ApplicantAdmissionView = () => {
 
             {/* Current Address */}
             <div className="md:col-span-2 lg:col-span-3">
-              <h4 className="mt-4 mb-2 text-lg font-semibold">
+              <h4 className="mb-2 mt-4 text-lg font-semibold">
                 Current Address
               </h4>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -464,7 +451,7 @@ export const ApplicantAdmissionView = () => {
                   />
                   <label
                     htmlFor="same-address"
-                    className="cursor-pointer text-sm leading-none font-medium"
+                    className="cursor-pointer text-sm font-medium leading-none"
                   >
                     Same as Current Address
                   </label>

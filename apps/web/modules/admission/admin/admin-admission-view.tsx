@@ -12,6 +12,14 @@ import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@webcampus/ui/components/command";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import {
   Dialog,
@@ -34,16 +42,13 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import { Label } from "@webcampus/ui/components/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@webcampus/ui/components/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@webcampus/ui/components/popover";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
-import { Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
@@ -54,8 +59,27 @@ import {
 import { useCreateAdmissionShellForm } from "./use-create-admission-shell-form";
 import { usePortStudents } from "./use-port-students";
 
-const ADMISSION_MODES = ["KCET", "COMEDK", "Management", "SNQ Quota", "Other"];
-const ADMISSION_STATUSES = ["PENDING", "SUBMITTED", "APPROVED", "REJECTED"];
+const ADMISSION_MODES = [
+  "KCET",
+  "COMEDK",
+  "Management",
+  "SNQ Quota",
+  "Other",
+] as const;
+const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
+const ADMISSION_QUOTAS = [
+  "MERIT",
+  "MANAGEMENT",
+  "SPORTS",
+  "NRI",
+  "SNQ",
+] as const;
+const ADMISSION_STATUSES = [
+  "PENDING",
+  "SUBMITTED",
+  "APPROVED",
+  "REJECTED",
+] as const;
 const ALL_FILTERS_VALUE = "__all__";
 
 type AdmissionFilters = {
@@ -98,16 +122,15 @@ export const AdminAdmissionView = ({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [draftFilters, setDraftFilters] = useState<AdmissionFilters>(() =>
-    showFilters
-      ? getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
-      : EMPTY_FILTERS
+  const initialFilters = getFiltersFromSearchParams(
+    searchParams,
+    EMPTY_FILTERS
   );
-  const [appliedFilters, setAppliedFilters] = useState<AdmissionFilters>(() =>
-    showFilters
-      ? getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
-      : EMPTY_FILTERS
-  );
+
+  const [draftFilters, setDraftFilters] =
+    useState<AdmissionFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] =
+    useState<AdmissionFilters>(initialFilters);
   const [isPortPreviewOpen, setIsPortPreviewOpen] = useState(false);
 
   useEffect(() => {
@@ -326,78 +349,18 @@ export const AdminAdmissionView = ({
   return (
     <div className="space-y-8">
       <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
-        {showFilters ? (
-          <div className="space-y-4">
-            <FilterBuilder
-              fields={admissionFilterFields}
-              draftFilters={draftFilters}
-              onDraftChange={updateDraftFilter}
-              allValue={ALL_FILTERS_VALUE}
-              className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-6"
-            />
+        <div className="space-y-4">
+          <FilterBuilder
+            fields={admissionFilterFields}
+            draftFilters={draftFilters}
+            onDraftChange={updateDraftFilter}
+            allValue={ALL_FILTERS_VALUE}
+            className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-6"
+          />
 
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <FilterActions onApply={applyFilters} onReset={resetFilters} />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="w-60 space-y-2">
-              <Label>Academic Term</Label>
-              <Select
-                value={draftFilters.academicTerm || ALL_FILTERS_VALUE}
-                onValueChange={(value) => {
-                  const academicTerm = value === ALL_FILTERS_VALUE ? "" : value;
-                  setDraftFilters((prev) => ({
-                    ...prev,
-                    academicTerm,
-                    semester: "",
-                  }));
-                  setAppliedFilters({
-                    ...EMPTY_FILTERS,
-                    academicTerm,
-                    semester: "",
-                  });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select term" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_FILTERS_VALUE}>All terms</SelectItem>
-                  {terms.map((term) => (
-                    <SelectItem key={term.id} value={term.id}>
-                      {term.type} {term.year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-60 space-y-2">
-              <Label>Admission Semester</Label>
-              <Select
-                value={draftFilters.semester || ALL_FILTERS_VALUE}
-                disabled={!draftFilters.academicTerm}
-                onValueChange={(value) => {
-                  const semester = value === ALL_FILTERS_VALUE ? "" : value;
-                  setDraftFilters((prev) => ({ ...prev, semester }));
-                  setAppliedFilters((prev) => ({ ...prev, semester }));
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select semester" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_FILTERS_VALUE}>
-                    All semesters
-                  </SelectItem>
-                  {nestedSemesters.map((semester) => (
-                    <SelectItem key={semester.id} value={semester.id}>
-                      {semester.programType} - Semester{" "}
-                      {semester.semesterNumber}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
             {!hideAddForm && canCreate && (
               <DialogForm
                 trigger={
@@ -422,30 +385,100 @@ export const AdminAdmissionView = ({
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="First Name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="middleName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Middle Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Middle Name"
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Last Name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
                   name="modeOfAdmission"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Mode of Admission *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select admission mode" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {ADMISSION_MODES.map((mode) => (
-                            <SelectItem key={mode} value={mode}>
-                              {mode}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={`w-full justify-between ${!field.value ? "text-muted-foreground" : ""}`}
+                            >
+                              {field.value
+                                ? ADMISSION_MODES.find(
+                                    (mode) => mode === field.value
+                                  )
+                                : "Select admission mode"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <Command>
+                            <CommandInput placeholder="Search mode..." />
+                            <CommandList>
+                              <CommandEmpty>No mode found.</CommandEmpty>
+                              <CommandGroup>
+                                {ADMISSION_MODES.map((mode) => (
+                                  <CommandItem
+                                    value={mode}
+                                    key={mode}
+                                    onSelect={() => {
+                                      form.setValue("modeOfAdmission", mode);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${mode === field.value ? "opacity-100" : "opacity-0"}`}
+                                    />
+                                    {mode}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -455,53 +488,50 @@ export const AdminAdmissionView = ({
                   control={form.control}
                   name="departmentId"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Department / Branch *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select branch" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {admissionDepartments?.map((dept) => (
-                            <SelectItem key={dept.id} value={dept.id}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="categoryClaimed"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category Claimed *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {["GENERAL", "OBC", "SC", "ST"].map((cat) => (
-                            <SelectItem key={cat} value={cat}>
-                              {cat}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={`w-full justify-between ${!field.value ? "text-muted-foreground" : ""}`}
+                            >
+                              {field.value
+                                ? admissionDepartments.find(
+                                    (dept) => dept.id === field.value
+                                  )?.name
+                                : "Select branch"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <Command>
+                            <CommandInput placeholder="Search branch..." />
+                            <CommandList>
+                              <CommandEmpty>No branch found.</CommandEmpty>
+                              <CommandGroup>
+                                {admissionDepartments.map((dept) => (
+                                  <CommandItem
+                                    value={dept.name}
+                                    key={dept.id}
+                                    onSelect={() => {
+                                      form.setValue("departmentId", dept.id);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${dept.id === field.value ? "opacity-100" : "opacity-0"}`}
+                                    />
+                                    {dept.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -511,25 +541,46 @@ export const AdminAdmissionView = ({
                   control={form.control}
                   name="categoryAllotted"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Category Allotted *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {["GENERAL", "OBC", "SC", "ST"].map((cat) => (
-                            <SelectItem key={cat} value={cat}>
-                              {cat}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={`w-full justify-between ${!field.value ? "text-muted-foreground" : ""}`}
+                            >
+                              {field.value || "Select category"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <Command>
+                            <CommandInput placeholder="Search category..." />
+                            <CommandList>
+                              <CommandEmpty>No category found.</CommandEmpty>
+                              <CommandGroup>
+                                {ADMISSION_CATEGORIES.map((cat) => (
+                                  <CommandItem
+                                    value={cat}
+                                    key={cat}
+                                    onSelect={() => {
+                                      form.setValue("categoryAllotted", cat);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${cat === field.value ? "opacity-100" : "opacity-0"}`}
+                                    />
+                                    {cat}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -539,27 +590,46 @@ export const AdminAdmissionView = ({
                   control={form.control}
                   name="quota"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Quota *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select quota" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {["MERIT", "MANAGEMENT", "SPORTS", "NRI", "SNQ"].map(
-                            (q) => (
-                              <SelectItem key={q} value={q}>
-                                {q}
-                              </SelectItem>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={`w-full justify-between ${!field.value ? "text-muted-foreground" : ""}`}
+                            >
+                              {field.value || "Select quota"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <Command>
+                            <CommandInput placeholder="Search quota..." />
+                            <CommandList>
+                              <CommandEmpty>No quota found.</CommandEmpty>
+                              <CommandGroup>
+                                {ADMISSION_QUOTAS.map((q) => (
+                                  <CommandItem
+                                    value={q}
+                                    key={q}
+                                    onSelect={() => {
+                                      form.setValue("quota", q);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${q === field.value ? "opacity-100" : "opacity-0"}`}
+                                    />
+                                    {q}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -567,17 +637,14 @@ export const AdminAdmissionView = ({
               </DialogForm>
             )}
           </div>
-        )}
+        </div>
 
-        {!showFilters &&
-          !hideAddForm &&
-          canCreate &&
-          !draftFilters.semester && (
-            <p className="text-muted-foreground text-sm">
-              Select an admission semester above before creating a new admission
-              shell.
-            </p>
-          )}
+        {!hideAddForm && canCreate && !draftFilters.semester && (
+          <p className="text-muted-foreground text-sm">
+            Select an admission semester above before creating a new admission
+            shell.
+          </p>
+        )}
 
         <div className="flex items-center justify-between gap-3">
           <div>
