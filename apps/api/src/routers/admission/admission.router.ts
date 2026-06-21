@@ -128,6 +128,7 @@ router.put(
   upload.fields([
     { name: "class10thMarksPdf", maxCount: 1 },
     { name: "class12thMarksPdf", maxCount: 1 },
+    { name: "diplomaMarksPdf", maxCount: 1 },
     { name: "casteCertificate", maxCount: 1 },
     { name: "photo", maxCount: 1 },
     { name: "disabilityCertificate", maxCount: 1 },

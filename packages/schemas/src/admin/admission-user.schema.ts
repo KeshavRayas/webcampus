@@ -8,4 +8,9 @@ export const CreateAdmissionUserSchema = z.object({
   role: z.enum(["admission_admin", "admission_reviewer"]),
 });
 
+export const UpdateAdmissionUserSchema = CreateAdmissionUserSchema.omit({
+  password: true,
+});
+
 export type CreateAdmissionUserType = z.infer<typeof CreateAdmissionUserSchema>;
+export type UpdateAdmissionUserType = z.infer<typeof UpdateAdmissionUserSchema>;

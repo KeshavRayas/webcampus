@@ -7,6 +7,7 @@ import { Button } from "@webcampus/ui/components/button";
 import { Checkbox } from "@webcampus/ui/components/checkbox";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
+import { Progress } from "@webcampus/ui/components/progress";
 import {
   Select,
   SelectContent,
@@ -14,8 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
+import { Tabs, TabsList, TabsTrigger } from "@webcampus/ui/components/tabs";
 import axios, { isAxiosError } from "axios";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 
 type ApplicantAdmissionData = {
@@ -28,10 +30,48 @@ type ApplicantAdmissionData = {
   quota?: string;
 };
 
+type StepKey = "admission" | "personal" | "education" | "parent" | "review";
+
+const STEP_ORDER: StepKey[] = [
+  "admission",
+  "personal",
+  "education",
+  "parent",
+  "review",
+];
+
+const STEP_LABELS: Record<StepKey, string> = {
+  admission: "Admission Details",
+  personal: "Personal Information",
+  education: "Education Details",
+  parent: "Parent / Guardian Details",
+  review: "Review",
+};
+
 export const ApplicantAdmissionView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSameAddress, setIsSameAddress] = useState(false);
+  const [activeStep, setActiveStep] = useState<StepKey>("admission");
+  const [hostelEnabled, setHostelEnabled] = useState(false);
+  const [nriEnabled, setNriEnabled] = useState(false);
+  const [disabilityEnabled, setDisabilityEnabled] = useState(false);
+  const [economicallyBackwardEnabled, setEconomicallyBackwardEnabled] =
+    useState(false);
+  const [class12Enabled, setClass12Enabled] = useState(true);
+  const [diplomaEnabled, setDiplomaEnabled] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, string>>(
+    {}
+  );
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const filePreviewRef = useRef<string | null>(null);
+  const sectionRefs = useRef<Record<StepKey, HTMLDivElement | null>>({
+    admission: null,
+    personal: null,
+    education: null,
+    parent: null,
+    review: null,
+  });
 
   // Fetch the applicant's existing shell
   const {
@@ -54,10 +94,23 @@ export const ApplicantAdmissionView = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!class12Enabled && !diplomaEnabled) {
+      toast.error("Please fill either Class 12 / PUC or Diploma details.");
+      return;
+    }
     setIsSubmitting(true);
 
     // We must use FormData because we are sending files alongside text!
     const formData = new FormData(e.currentTarget);
+    formData.set("hostel", hostelEnabled ? "true" : "false");
+    formData.set("nri", nriEnabled ? "true" : "false");
+    formData.set("disability", disabilityEnabled ? "true" : "false");
+    formData.set(
+      "economicallyBackward",
+      economicallyBackwardEnabled ? "true" : "false"
+    );
+    formData.set("hasClass12", class12Enabled ? "true" : "false");
+    formData.set("hasDiploma", diplomaEnabled ? "true" : "false");
 
     try {
       await axios.put(
@@ -81,6 +134,129 @@ export const ApplicantAdmissionView = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const activeIndex = STEP_ORDER.indexOf(activeStep);
+  const progressValue = ((activeIndex + 1) / STEP_ORDER.length) * 100;
+
+  const clearPreview = () => {
+    if (filePreviewRef.current) {
+      URL.revokeObjectURL(filePreviewRef.current);
+      filePreviewRef.current = null;
+    }
+    setPhotoPreview(null);
+  };
+
+  const handleFileSelect = (name: string, file: File | null) => {
+    setSelectedFiles((current) => ({
+      ...current,
+      [name]: file?.name || "",
+    }));
+
+    if (name === "photo") {
+      clearPreview();
+      if (file) {
+        const nextPreview = URL.createObjectURL(file);
+        filePreviewRef.current = nextPreview;
+        setPhotoPreview(nextPreview);
+      }
+    }
+  };
+
+  const saveAndNext = (step: StepKey) => {
+    const nextIndex = STEP_ORDER.indexOf(step) + 1;
+    const nextStep = STEP_ORDER[
+      Math.min(nextIndex, STEP_ORDER.length - 1)
+    ] as StepKey;
+    setActiveStep(nextStep);
+  };
+
+  const goBack = (step: StepKey) => {
+    const nextIndex = STEP_ORDER.indexOf(step) - 1;
+    const previousStep = STEP_ORDER[Math.max(nextIndex, 0)] as StepKey;
+    setActiveStep(previousStep);
+  };
+
+  const handleReviewStep = () => {
+    if (!class12Enabled && !diplomaEnabled) {
+      toast.error("Please fill either Class 12 / PUC or Diploma details.");
+      return;
+    }
+    setActiveStep("review");
+  };
+
+  useEffect(() => {
+    return () => {
+      if (filePreviewRef.current) {
+        URL.revokeObjectURL(filePreviewRef.current);
+      }
+    };
+  }, []);
+
+  const FilePicker = ({
+    name,
+    label,
+    accept,
+    required = false,
+    helperText,
+    disabled = false,
+    showPreview = false,
+  }: {
+    name: string;
+    label: string;
+    accept: string;
+    required?: boolean;
+    helperText?: string;
+    disabled?: boolean;
+    showPreview?: boolean;
+  }) => {
+    const selectedName = selectedFiles[name] || "";
+    const inputId = `${name}-input`;
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={inputId}>
+          {label}
+          {required ? " *" : ""}
+        </Label>
+        <div className="bg-background flex flex-wrap items-center gap-3 rounded-md border p-3">
+          <Input
+            id={inputId}
+            name={name}
+            type="file"
+            accept={accept}
+            required={required}
+            disabled={disabled}
+            onChange={(event) =>
+              handleFileSelect(name, event.target.files?.[0] || null)
+            }
+            className="sr-only"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => document.getElementById(inputId)?.click()}
+            disabled={disabled}
+          >
+            {selectedName ? "Change File" : "Choose File"}
+          </Button>
+          <span className="text-muted-foreground min-w-0 flex-1 truncate text-sm">
+            {selectedName || "No file chosen"}
+          </span>
+        </div>
+        {showPreview && photoPreview ? (
+          <div className="mt-2">
+            <img
+              src={photoPreview}
+              alt="Uploaded preview"
+              className="h-24 w-24 rounded-lg border object-cover"
+            />
+          </div>
+        ) : null}
+        {helperText ? (
+          <p className="text-muted-foreground text-xs">{helperText}</p>
+        ) : null}
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -163,18 +339,53 @@ export const ApplicantAdmissionView = () => {
 
   return (
     <div className="bg-card rounded-lg border p-6 shadow-sm">
-      <div className="mb-6">
-        <h3 className="text-lg font-medium">Complete Your Application</h3>
-        <p className="text-muted-foreground text-sm">
-          Application ID:{" "}
-          <span className="font-bold">{admission.applicationId}</span> | Mode:{" "}
-          <span className="font-bold">{admission.modeOfAdmission}</span>
-        </p>
+      <div className="mb-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-medium">Complete Your Application</h3>
+          <p className="text-muted-foreground text-sm">
+            Application ID:{" "}
+            <span className="font-bold">{admission.applicationId}</span> | Mode:{" "}
+            <span className="font-bold">{admission.modeOfAdmission}</span>
+          </p>
+        </div>
+
+        <Tabs
+          value={activeStep}
+          onValueChange={(value) => setActiveStep(value as StepKey)}
+          className="space-y-4"
+        >
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 p-1 md:grid-cols-5">
+            {STEP_ORDER.map((step) => (
+              <TabsTrigger
+                key={step}
+                value={step}
+                className="text-xs md:text-sm"
+              >
+                {STEP_LABELS[step]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        <div className="space-y-2">
+          <div className="text-muted-foreground flex items-center justify-between text-xs">
+            <span>Progress</span>
+            <span>{Math.round(progressValue)}%</span>
+          </div>
+          <Progress value={progressValue} />
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-10">
         {/* ADMISSION DETAILS */}
-        <div className="space-y-6">
+        <div
+          ref={(node) => {
+            sectionRefs.current.admission = node;
+          }}
+          className={
+            activeStep === "admission" ? "space-y-6" : "hidden space-y-6"
+          }
+        >
           <div className="border-b pb-2">
             <h3 className="text-xl font-semibold tracking-tight">
               1. Admission Details
@@ -262,16 +473,27 @@ export const ApplicantAdmissionView = () => {
               <Input id="feePaid" name="feePaid" type="number" required />
             </div>
             <div className="space-y-2 md:col-span-3">
-              <Label htmlFor="hostel">Hostel Required *</Label>
-              <Select name="hostel" required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Staying in Hostel?" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Yes</SelectItem>
-                  <SelectItem value="false">No</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="hostel-toggle">Hostel Required *</Label>
+              <input
+                type="hidden"
+                name="hostel"
+                value={hostelEnabled ? "true" : "false"}
+              />
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                <Checkbox
+                  id="hostel-toggle"
+                  checked={hostelEnabled}
+                  onCheckedChange={(checked) =>
+                    setHostelEnabled(Boolean(checked))
+                  }
+                />
+                <Label
+                  htmlFor="hostel-toggle"
+                  className="cursor-pointer text-sm font-medium"
+                >
+                  Staying in hostel
+                </Label>
+              </div>
             </div>
             <div className="space-y-2 md:col-span-3">
               <Label htmlFor="hostelRoomNumber">Hostel Room Number</Label>
@@ -279,13 +501,26 @@ export const ApplicantAdmissionView = () => {
                 id="hostelRoomNumber"
                 name="hostelRoomNumber"
                 type="number"
+                disabled={!hostelEnabled}
               />
             </div>
+          </div>
+          <div className="flex justify-end">
+            <Button type="button" onClick={() => saveAndNext("admission")}>
+              Save and Continue
+            </Button>
           </div>
         </div>
 
         {/* PERSONAL INFORMATION */}
-        <div className="space-y-6">
+        <div
+          ref={(node) => {
+            sectionRefs.current.personal = node;
+          }}
+          className={
+            activeStep === "personal" ? "space-y-6" : "hidden space-y-6"
+          }
+        >
           <div className="border-b pb-2">
             <h3 className="text-xl font-semibold tracking-tight">
               2. Personal Information
@@ -341,14 +576,12 @@ export const ApplicantAdmissionView = () => {
             </div>
 
             <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <Label htmlFor="photo">Passport Size Photo (Image) *</Label>
-              <Input
-                id="photo"
+              <FilePicker
                 name="photo"
-                type="file"
+                label="Passport Size Photo (Image)"
                 accept="image/*"
-                className="file:bg-primary file:text-primary-foreground file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2"
                 required
+                showPreview
               />
             </div>
 
@@ -408,7 +641,7 @@ export const ApplicantAdmissionView = () => {
 
             {/* Current Address */}
             <div className="md:col-span-2 lg:col-span-3">
-              <h4 className="mt-4 mb-2 text-lg font-semibold">
+              <h4 className="mb-2 mt-4 text-lg font-semibold">
                 Current Address
               </h4>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -464,7 +697,7 @@ export const ApplicantAdmissionView = () => {
                   />
                   <label
                     htmlFor="same-address"
-                    className="cursor-pointer text-sm leading-none font-medium"
+                    className="cursor-pointer text-sm font-medium leading-none"
                   >
                     Same as Current Address
                   </label>
@@ -545,13 +778,10 @@ export const ApplicantAdmissionView = () => {
               <Input id="subCaste" name="subCaste" />
             </div>
             <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <Label htmlFor="casteCertificate">Caste Certificate (PDF)</Label>
-              <Input
-                id="casteCertificate"
+              <FilePicker
                 name="casteCertificate"
-                type="file"
+                label="Caste Certificate (PDF)"
                 accept="application/pdf"
-                className="file:bg-primary file:text-primary-foreground file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2"
               />
             </div>
 
@@ -565,43 +795,63 @@ export const ApplicantAdmissionView = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="nri">NRI Citizen *</Label>
-              <Select name="nri" required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Yes</SelectItem>
-                  <SelectItem value="false">No</SelectItem>
-                </SelectContent>
-              </Select>
+              <input
+                type="hidden"
+                name="nri"
+                value={nriEnabled ? "true" : "false"}
+              />
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                <Checkbox
+                  id="nri-toggle"
+                  checked={nriEnabled}
+                  onCheckedChange={(checked) => setNriEnabled(Boolean(checked))}
+                />
+                <Label
+                  htmlFor="nri-toggle"
+                  className="cursor-pointer text-sm font-medium"
+                >
+                  Has NRI status
+                </Label>
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="disability">Disability Status *</Label>
-              <Select name="disability" required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Yes</SelectItem>
-                  <SelectItem value="false">No</SelectItem>
-                </SelectContent>
-              </Select>
+              <input
+                type="hidden"
+                name="disability"
+                value={disabilityEnabled ? "true" : "false"}
+              />
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                <Checkbox
+                  id="disability-toggle"
+                  checked={disabilityEnabled}
+                  onCheckedChange={(checked) =>
+                    setDisabilityEnabled(Boolean(checked))
+                  }
+                />
+                <Label
+                  htmlFor="disability-toggle"
+                  className="cursor-pointer text-sm font-medium"
+                >
+                  Has disability
+                </Label>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="disabilityType">Disability Details </Label>
-              <Input id="disabilityType" name="disabilityType" />
+              <Input
+                id="disabilityType"
+                name="disabilityType"
+                disabled={!disabilityEnabled}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="disabilityCertificate">
-                Disability Certificate (PDF){" "}
-              </Label>
-              <Input
-                id="disabilityCertificate"
+              <FilePicker
                 name="disabilityCertificate"
-                type="file"
+                label="Disability Certificate"
                 accept="application/pdf"
-                className="file:bg-primary file:text-primary-foreground file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2"
+                disabled={!disabilityEnabled}
               />
             </div>
 
@@ -609,26 +859,33 @@ export const ApplicantAdmissionView = () => {
               <Label htmlFor="economicallyBackward">
                 Economically Backward Status *
               </Label>
-              <Select name="economicallyBackward" required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">Yes</SelectItem>
-                  <SelectItem value="false">No</SelectItem>
-                </SelectContent>
-              </Select>
+              <input
+                type="hidden"
+                name="economicallyBackward"
+                value={economicallyBackwardEnabled ? "true" : "false"}
+              />
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                <Checkbox
+                  id="economicallyBackward-toggle"
+                  checked={economicallyBackwardEnabled}
+                  onCheckedChange={(checked) =>
+                    setEconomicallyBackwardEnabled(Boolean(checked))
+                  }
+                />
+                <Label
+                  htmlFor="economicallyBackward-toggle"
+                  className="cursor-pointer text-sm font-medium"
+                >
+                  Economically backward
+                </Label>
+              </div>
             </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-2">
-              <Label htmlFor="economicallyBackwardCertificate">
-                Economically Backward Status Certificate (PDF){" "}
-              </Label>
-              <Input
-                id="economicallyBackwardCertificate"
+              <FilePicker
                 name="economicallyBackwardCertificate"
-                type="file"
+                label="Economically Backward Status Certificate"
                 accept="application/pdf"
-                className="file:bg-primary file:text-primary-foreground file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2"
+                disabled={!economicallyBackwardEnabled}
               />
             </div>
 
@@ -645,21 +902,37 @@ export const ApplicantAdmissionView = () => {
               />
             </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-2">
-              <Label htmlFor="aadharCard">Aadhar Card Proof (PDF) *</Label>
-              <Input
-                id="aadharCard"
+              <FilePicker
                 name="aadharCard"
-                type="file"
+                label="Aadhar Card Proof"
                 accept="application/pdf"
-                className="file:bg-primary file:text-primary-foreground file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2"
                 required
               />
             </div>
           </div>
+          <div className="flex flex-wrap justify-between gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => goBack("personal")}
+            >
+              Back
+            </Button>
+            <Button type="button" onClick={() => saveAndNext("personal")}>
+              Save and Continue
+            </Button>
+          </div>
         </div>
 
         {/* EDUCATION DETAILS */}
-        <div className="space-y-6">
+        <div
+          ref={(node) => {
+            sectionRefs.current.education = node;
+          }}
+          className={
+            activeStep === "education" ? "space-y-6" : "hidden space-y-6"
+          }
+        >
           <div className="border-b pb-2">
             <h3 className="text-xl font-semibold tracking-tight">
               3. Education Details
@@ -774,181 +1047,351 @@ export const ApplicantAdmissionView = () => {
               />
             </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-2">
-              <Label htmlFor="class10thMarksPdf">10th Marks Card (PDF) *</Label>
-              <Input
-                id="class10thMarksPdf"
+              <FilePicker
                 name="class10thMarksPdf"
-                type="file"
+                label="10th Marks Card (PDF)"
                 accept="application/pdf"
                 required
-                className="file:bg-primary file:text-primary-foreground file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2"
               />
             </div>
 
-            {/* Class 12 */}
-            <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2 lg:col-span-3">
-              Class XII / PUC Details
-            </h4>
-
-            <div className="space-y-2 md:col-span-2 lg:col-span-2">
-              <Label htmlFor="class12thInstituteName">Institute Name *</Label>
-              <Input
-                id="class12thInstituteName"
-                name="class12thInstituteName"
-                required
+            <div className="space-y-3 border-t pt-6 md:col-span-2 lg:col-span-3">
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                  <Checkbox
+                    id="class12-toggle"
+                    checked={class12Enabled}
+                    onCheckedChange={(checked) =>
+                      setClass12Enabled(Boolean(checked))
+                    }
+                  />
+                  <Label
+                    htmlFor="class12-toggle"
+                    className="cursor-pointer text-sm font-medium"
+                  >
+                    Class 12 / PUC
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                  <Checkbox
+                    id="diploma-toggle"
+                    checked={diplomaEnabled}
+                    onCheckedChange={(checked) =>
+                      setDiplomaEnabled(Boolean(checked))
+                    }
+                  />
+                  <Label
+                    htmlFor="diploma-toggle"
+                    className="cursor-pointer text-sm font-medium"
+                  >
+                    Diploma
+                  </Label>
+                </div>
+              </div>
+              <input
+                type="hidden"
+                name="hasClass12"
+                value={class12Enabled ? "true" : "false"}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="class12thInstituteType">Institute Type *</Label>
-              <Select name="class12thInstituteType" required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[
-                    "CBSE",
-                    "CISCE/ISC",
-                    "State Boards",
-                    "IB",
-                    "NIOS",
-                    "CAIE",
-                    "IBOSE",
-                    "Other",
-                  ].map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="class12thInstituteCity">Institute City *</Label>
-              <Input
-                id="class12thInstituteCity"
-                name="class12thInstituteCity"
-                required
+              <input
+                type="hidden"
+                name="hasDiploma"
+                value={diplomaEnabled ? "true" : "false"}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="class12thInstituteState">Institute State *</Label>
-              <Input
-                id="class12thInstituteState"
-                name="class12thInstituteState"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="class12thInstituteCode">Institute Code *</Label>
-              <Input
-                id="class12thInstituteCode"
-                name="class12thInstituteCode"
-                required
-              />
+              <p className="text-muted-foreground text-sm">
+                Choose at least one. You may complete both if applicable.
+              </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="class12thYearOfPassing">Year of passing *</Label>
-              <Input
-                id="class12thYearOfPassing"
-                name="class12thYearOfPassing"
-                type="text"
-                inputMode="numeric"
-                pattern="\d{4}"
-                maxLength={4}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="class12thBranch">Branch *</Label>
-              <Input
-                id="class12thBranch"
-                name="class12thBranch"
-                placeholder="PCM"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="class12thMediumOfTeaching">
-                Medium of Instruction *
-              </Label>
-              <Input
-                id="class12thMediumOfTeaching"
-                name="class12thMediumOfTeaching"
-                required
-              />
-            </div>
+            <fieldset className="contents" disabled={!class12Enabled}>
+              <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2 lg:col-span-3">
+                Class XII / PUC Details
+              </h4>
 
-            <div className="space-y-2">
-              <Label htmlFor="class12thAggregateScore">
-                Total Marks Obtained *
-              </Label>
-              <Input
-                id="class12thAggregateScore"
-                name="class12thAggregateScore"
-                type="number"
-                step="1"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="class12thAggregateTotal">Total Marks *</Label>
-              <Input
-                id="class12thAggregateTotal"
-                name="class12thAggregateTotal"
-                type="number"
-                step="1"
-                required
-              />
-            </div>
+              <div className="space-y-2 md:col-span-2 lg:col-span-2">
+                <Label htmlFor="class12thInstituteName">Institute Name *</Label>
+                <Input
+                  id="class12thInstituteName"
+                  name="class12thInstituteName"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="class12thInstituteType">Institute Type *</Label>
+                <Select name="class12thInstituteType" required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[
+                      "CBSE",
+                      "CISCE/ISC",
+                      "State Boards",
+                      "IB",
+                      "NIOS",
+                      "CAIE",
+                      "IBOSE",
+                      "Other",
+                    ].map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <Label htmlFor="class12thMarksPdf">12th Marks Card (PDF) *</Label>
-              <Input
-                id="class12thMarksPdf"
-                name="class12thMarksPdf"
-                type="file"
-                accept="application/pdf"
-                required
-                className="file:bg-primary file:text-primary-foreground file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2"
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="class12thInstituteCity">Institute City *</Label>
+                <Input
+                  id="class12thInstituteCity"
+                  name="class12thInstituteCity"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="class12thInstituteState">
+                  Institute State *
+                </Label>
+                <Input
+                  id="class12thInstituteState"
+                  name="class12thInstituteState"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="class12thInstituteCode">Institute Code *</Label>
+                <Input
+                  id="class12thInstituteCode"
+                  name="class12thInstituteCode"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="class12thYearOfPassing">
+                  Year of passing *
+                </Label>
+                <Input
+                  id="class12thYearOfPassing"
+                  name="class12thYearOfPassing"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\d{4}"
+                  maxLength={4}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="class12thBranch">Branch *</Label>
+                <Input
+                  id="class12thBranch"
+                  name="class12thBranch"
+                  placeholder="PCM"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="class12thMediumOfTeaching">
+                  Medium of Instruction *
+                </Label>
+                <Input
+                  id="class12thMediumOfTeaching"
+                  name="class12thMediumOfTeaching"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="class12thAggregateScore">
+                  Total Marks Obtained *
+                </Label>
+                <Input
+                  id="class12thAggregateScore"
+                  name="class12thAggregateScore"
+                  type="number"
+                  step="1"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="class12thAggregateTotal">Total Marks *</Label>
+                <Input
+                  id="class12thAggregateTotal"
+                  name="class12thAggregateTotal"
+                  type="number"
+                  step="1"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                <FilePicker
+                  name="class12thMarksPdf"
+                  label="12th Marks Card (PDF)"
+                  accept="application/pdf"
+                  disabled={!class12Enabled}
+                  required={class12Enabled}
+                />
+              </div>
+            </fieldset>
+
+            <fieldset className="contents" disabled={!diplomaEnabled}>
+              <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2 lg:col-span-3">
+                Diploma Details
+              </h4>
+              <div className="space-y-2 md:col-span-2 lg:col-span-2">
+                <Label htmlFor="diplomaInstituteName">Institute Name *</Label>
+                <Input
+                  id="diplomaInstituteName"
+                  name="diplomaInstituteName"
+                  required={diplomaEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="diplomaInstituteType">Institute Type *</Label>
+                <Select name="diplomaInstituteType" required={diplomaEnabled}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["DTE", "State Board", "Autonomous", "Other"].map(
+                      (type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="diplomaInstituteCity">Institute City *</Label>
+                <Input
+                  id="diplomaInstituteCity"
+                  name="diplomaInstituteCity"
+                  required={diplomaEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="diplomaInstituteState">Institute State *</Label>
+                <Input
+                  id="diplomaInstituteState"
+                  name="diplomaInstituteState"
+                  required={diplomaEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="diplomaInstituteCode">Institute Code *</Label>
+                <Input
+                  id="diplomaInstituteCode"
+                  name="diplomaInstituteCode"
+                  required={diplomaEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="diplomaBranch">Branch *</Label>
+                <Input
+                  id="diplomaBranch"
+                  name="diplomaBranch"
+                  required={diplomaEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="diplomaYearOfPassing">Year of Passing *</Label>
+                <Input
+                  id="diplomaYearOfPassing"
+                  name="diplomaYearOfPassing"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\d{4}"
+                  maxLength={4}
+                  required={diplomaEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="diplomaMediumOfTeaching">
+                  Medium of Instruction *
+                </Label>
+                <Input
+                  id="diplomaMediumOfTeaching"
+                  name="diplomaMediumOfTeaching"
+                  required={diplomaEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="diplomaAggregateScore">
+                  Total Marks Obtained *
+                </Label>
+                <Input
+                  id="diplomaAggregateScore"
+                  name="diplomaAggregateScore"
+                  type="number"
+                  step="1"
+                  required={diplomaEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="diplomaAggregateTotal">Total Marks *</Label>
+                <Input
+                  id="diplomaAggregateTotal"
+                  name="diplomaAggregateTotal"
+                  type="number"
+                  step="1"
+                  required={diplomaEnabled}
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                <FilePicker
+                  name="diplomaMarksPdf"
+                  label="Diploma Marks Card (PDF)"
+                  accept="application/pdf"
+                  required={diplomaEnabled}
+                />
+              </div>
+            </fieldset>
 
             {/* Additional Documents */}
             <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2 lg:col-span-3">
               Additional Documents
             </h4>
             <div className="space-y-2 md:col-span-1 lg:col-span-1">
-              <Label htmlFor="studyCertificate">
-                Study Certificate (PDF) *
-              </Label>
-              <Input
-                id="studyCertificate"
+              <FilePicker
                 name="studyCertificate"
-                type="file"
+                label="Study Certificate (PDF)"
                 accept="application/pdf"
-                className="file:bg-primary file:text-primary-foreground file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2"
                 required
               />
             </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-1">
-              <Label htmlFor="transferCertificate">
-                Transfer Certificate (PDF)
-              </Label>
-              <Input
-                id="transferCertificate"
+              <FilePicker
                 name="transferCertificate"
-                type="file"
+                label="Transfer Certificate (PDF)"
                 accept="application/pdf"
-                className="file:bg-primary file:text-primary-foreground file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2"
               />
             </div>
+          </div>
+          <div className="flex flex-wrap justify-between gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => goBack("education")}
+            >
+              Back
+            </Button>
+            <Button type="button" onClick={() => saveAndNext("education")}>
+              Save and Continue
+            </Button>
           </div>
         </div>
 
         {/* PARENT DETAILS */}
-        <div className="space-y-6">
+        <div
+          ref={(node) => {
+            sectionRefs.current.parent = node;
+          }}
+          className={activeStep === "parent" ? "space-y-6" : "hidden space-y-6"}
+        >
           <div className="border-b pb-2">
             <h3 className="text-xl font-semibold tracking-tight">
               4. Parent / Guardian Details
@@ -1069,17 +1512,79 @@ export const ApplicantAdmissionView = () => {
               </div>
             </div>
           </div>
+
+          <div className="flex flex-wrap justify-between gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => goBack("parent")}
+            >
+              Back
+            </Button>
+            <Button type="button" onClick={handleReviewStep}>
+              Review Application
+            </Button>
+          </div>
         </div>
 
-        <div className="border-t pt-6">
-          <Button
-            type="submit"
-            size="lg"
-            className="w-full px-8 md:w-auto"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Uploading Documents..." : "Submit Application"}
-          </Button>
+        {/* REVIEW */}
+        <div
+          ref={(node) => {
+            sectionRefs.current.review = node;
+          }}
+          className={activeStep === "review" ? "space-y-6" : "hidden space-y-6"}
+        >
+          <div className="border-b pb-2">
+            <h3 className="text-xl font-semibold tracking-tight">
+              5. Review Application
+            </h3>
+          </div>
+
+          <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
+            <p className="text-muted-foreground text-sm">
+              Review the details you entered in each section before submitting
+              your application. You can go back to any section using the tabs
+              above.
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="bg-background rounded-md border p-3">
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                  Application
+                </p>
+                <p className="font-medium">{admission.applicationId}</p>
+                <p className="text-muted-foreground text-sm">
+                  {admission.modeOfAdmission}
+                </p>
+              </div>
+              <div className="bg-background rounded-md border p-3">
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                  Selected files
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  Photo, mark sheets, and certificates added in earlier steps
+                  will be attached when you submit.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-between gap-3 border-t pt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => goBack("review")}
+            >
+              Back
+            </Button>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full px-8 md:w-auto"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Uploading Documents..." : "Submit Application"}
+            </Button>
+          </div>
         </div>
       </form>
     </div>

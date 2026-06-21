@@ -1,38 +1,16 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { frontendEnv } from "@webcampus/common/env";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@webcampus/ui/components/alert-dialog";
-import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
-import axios, { AxiosError } from "axios";
-import { Trash2 } from "lucide-react";
-import { useState } from "react";
-import { toast } from "react-toastify";
+import axios from "axios";
+import { CoeActions } from "./coe-actions";
 import { CoeForm } from "./coe-form";
-
-interface CoeUser {
-  id: string;
-  name: string;
-  username: string;
-  email: string;
-}
+import { CoeUser } from "./coe-types";
 
 export const CoeView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const queryClient = useQueryClient();
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data: coes, isLoading } = useQuery<CoeUser[]>({
     queryKey: ["admin-coes"],
@@ -44,30 +22,6 @@ export const CoeView = () => {
     },
   });
 
-  const handleDelete = async (id: string) => {
-    try {
-      const res = await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe/${id}`,
-        {
-          withCredentials: true,
-        }
-      );
-
-      if (res.data.status === "success") {
-        toast.success("COE user deleted successfully");
-        queryClient.invalidateQueries({ queryKey: ["admin-coes"] });
-      }
-    } catch (error) {
-      const message =
-        error instanceof AxiosError
-          ? error.response?.data?.message
-          : "Failed to delete COE user";
-      toast.error(message || "Failed to delete COE user");
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
   const columns: ColumnDef<CoeUser>[] = [
     {
       accessorKey: "name",
@@ -76,6 +30,7 @@ export const CoeView = () => {
     {
       accessorKey: "username",
       header: "Username",
+      cell: ({ row }) => row.original.username || "-",
     },
     {
       accessorKey: "email",
@@ -83,44 +38,7 @@ export const CoeView = () => {
     },
     {
       id: "actions",
-      cell: ({ row }) => {
-        const id = row.original.id;
-        return (
-          <AlertDialog
-            open={deletingId === id}
-            onOpenChange={(o) => !o && setDeletingId(null)}
-          >
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                onClick={() => setDeletingId(id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete COE User</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this COE user? This action
-                  cannot be undone and will permanently remove their access.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => handleDelete(id)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        );
-      },
+      cell: ({ row }) => <CoeActions user={row.original} />,
     },
   ];
 

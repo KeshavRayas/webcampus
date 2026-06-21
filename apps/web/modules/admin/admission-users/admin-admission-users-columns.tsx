@@ -10,7 +10,8 @@ export type AdminAdmissionUserResponse = {
   id: string;
   name: string;
   email: string;
-  username: string;
+  username: string | null;
+  image?: string | null;
   role: string;
   createdAt: string;
 };

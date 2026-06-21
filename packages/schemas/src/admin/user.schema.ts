@@ -41,6 +41,12 @@ export const createUserSchema = z.object({
   role: z.string(),
 });
 
+export const UpdateAdminUserSchema = createUserSchema.pick({
+  name: true,
+  email: true,
+  username: true,
+});
+
 export const UpdateUserProfileSchema = z.object({
   username: z.string().min(1, "Username is required"),
   displayUsername: z.string().min(1, "Display username is required"),
@@ -55,6 +61,7 @@ export const BackfillUserProfileFieldsSchema = z.object({
 });
 
 export type CreateUserType = z.infer<typeof createUserSchema>;
+export type UpdateAdminUserType = z.infer<typeof UpdateAdminUserSchema>;
 export type CreateUserDTO = z.infer<typeof CreateUserSchema>;
 export type UserResponseType = z.infer<typeof UserResponseSchema>;
 export type BaseUserDTO = z.infer<typeof BaseUserSchema>;

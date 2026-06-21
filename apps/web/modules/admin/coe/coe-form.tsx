@@ -7,6 +7,7 @@ import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -21,21 +22,25 @@ import {
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
 import axios, { AxiosError } from "axios";
-import { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import * as z from "zod";
+import { UserPhotoUpload } from "../shared/user-photo-upload";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
   username: z.string().min(1, "Username is required"),
 });
 
 export const CoeForm = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
@@ -49,14 +54,63 @@ export const CoeForm = () => {
     },
   });
 
+  const replacePhotoPreview = (file: File | null) => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+
+    if (!file) {
+      setPhotoPreview(null);
+      return;
+    }
+
+    const nextPreviewUrl = URL.createObjectURL(file);
+    previewUrlRef.current = nextPreviewUrl;
+    setPhotoPreview(nextPreviewUrl);
+  };
+
+  const resetFormState = () => {
+    form.reset();
+    setPhotoFile(null);
+    replacePhotoPreview(null);
+  };
+
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setPhotoFile(file);
+    replacePhotoPreview(file);
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+
+    if (!open) {
+      resetFormState();
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
+      const formData = new FormData();
+      formData.append("name", values.name);
+      formData.append("email", values.email);
+      formData.append("password", values.password);
+      formData.append("username", values.username);
+
+      if (photoFile) {
+        formData.append("photo", photoFile);
+      }
+
       const res = await axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/coe`,
-        values,
+        formData,
         {
           withCredentials: true,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         }
       );
 
@@ -64,7 +118,7 @@ export const CoeForm = () => {
         toast.success("COE user created successfully");
         queryClient.invalidateQueries({ queryKey: ["admin-coes"] });
         setIsOpen(false);
-        form.reset();
+        resetFormState();
       }
     } catch (error: unknown) {
       if (error instanceof AxiosError) {
@@ -80,12 +134,20 @@ export const CoeForm = () => {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>Add COE User</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Create COE User</DialogTitle>
         </DialogHeader>
@@ -143,11 +205,20 @@ export const CoeForm = () => {
                 </FormItem>
               )}
             />
-            <div className="flex justify-end space-x-2">
+
+            <UserPhotoUpload
+              label="Profile Photo"
+              personName={form.watch("name") || "COE User"}
+              previewUrl={photoPreview}
+              selectedFileName={photoFile?.name || null}
+              onChange={handlePhotoChange}
+            />
+
+            <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsOpen(false)}
+                onClick={() => handleOpenChange(false)}
                 disabled={isSubmitting}
               >
                 Cancel
@@ -155,7 +226,7 @@ export const CoeForm = () => {
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Creating..." : "Create"}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </Form>
       </DialogContent>

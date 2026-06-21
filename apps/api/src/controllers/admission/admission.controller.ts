@@ -214,6 +214,7 @@ export class AdmissionController {
       await Promise.all([
         handleUpload("class10thMarksPdf", "10th_marks_"),
         handleUpload("class12thMarksPdf", "12th_marks_"),
+        handleUpload("diplomaMarksPdf", "diploma_marks_"),
         handleUpload("casteCertificate", "caste_cert_"),
         handleUpload("photo", "photo_"),
       ]);

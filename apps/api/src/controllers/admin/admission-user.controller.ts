@@ -12,9 +12,31 @@ export class AdminAdmissionUserController {
     try {
       const response = await AdminAdmissionUserService.create(
         req.body,
-        req.headers
+        req.headers,
+        req.file
       );
       return res.status(201).json(response);
+    } catch (error) {
+      const response: ErrorResponseBody = {
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Internal server error",
+        error: String(error),
+      };
+      return res.status(400).json(response);
+    }
+  }
+
+  static async update(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const response = await AdminAdmissionUserService.update(
+        id,
+        req.body,
+        req.headers,
+        req.file
+      );
+      return res.status(200).json(response);
     } catch (error) {
       const response: ErrorResponseBody = {
         status: "error",

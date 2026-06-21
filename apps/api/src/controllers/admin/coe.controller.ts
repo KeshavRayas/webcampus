@@ -10,6 +10,7 @@ export class CoeController {
       const response = await CoeService.create({
         ...req.body,
         headers: req.headers,
+        photoFile: req.file,
       });
 
       if (response.status === "success") {
@@ -34,6 +35,46 @@ export class CoeController {
       } else {
         logger.error(
           `Error creating COE: ${ERRORS.INTERNAL_SERVER_ERROR}`,
+          error
+        );
+        sendResponse({
+          res,
+          status: "error",
+          message: ERRORS.INTERNAL_SERVER_ERROR,
+          statusCode: 500,
+          error,
+        });
+      }
+    }
+  }
+
+  static async updateCoe(req: Request, res: Response): Promise<void> {
+    try {
+      const id = req.params.id as string;
+      const response = await CoeService.update(id, req.body, req.file);
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        logger.error(`Error updating COE: ${error.message}`, error);
+        sendResponse({
+          res,
+          status: "error",
+          message: error.message,
+          statusCode: error.message.includes("exists") ? 409 : 400,
+          error,
+        });
+      } else {
+        logger.error(
+          `Error updating COE: ${ERRORS.INTERNAL_SERVER_ERROR}`,
           error
         );
         sendResponse({

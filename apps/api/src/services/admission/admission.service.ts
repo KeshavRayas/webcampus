@@ -134,7 +134,8 @@ export class AdmissionService {
 
     for (const applicationId of missingApplicationIds) {
       // Username is normalized to lowercase for Better Auth credential lookup compatibility.
-      const normalizedUsername = AdmissionService.normalizeApplicationId(applicationId);
+      const normalizedUsername =
+        AdmissionService.normalizeApplicationId(applicationId);
       const userService = new UserService({
         request: {
           email:
@@ -463,6 +464,7 @@ export class AdmissionService {
         admission.photo,
         admission.class10thMarksPdf,
         admission.class12thMarksPdf,
+        admission.diplomaMarksPdf,
         admission.casteCertificate,
         admission.disabilityCertificate,
         admission.economicallyBackwardCertificate,
@@ -620,7 +622,10 @@ export class AdmissionService {
       logger.info("Department found", { name: department.name });
 
       // Validate aadharNumber uniqueness: allow if same record or if aadhar doesn't exist elsewhere
-      if (data.aadharNumber && data.aadharNumber !== existingAdmission.aadharNumber) {
+      if (
+        data.aadharNumber &&
+        data.aadharNumber !== existingAdmission.aadharNumber
+      ) {
         const existingAadhar = await db.admission.findUnique({
           where: { aadharNumber: data.aadharNumber },
         });
@@ -712,6 +717,8 @@ export class AdmissionService {
             : null,
           class10thMediumOfTeaching: data.class10thMediumOfTeaching,
 
+          hasClass12: data.hasClass12 === "true",
+          hasDiploma: data.hasDiploma === "true",
           class12thInstituteName: data.class12thInstituteName,
           class12thInstituteType: data.class12thInstituteType,
           class12thInstituteCity: data.class12thInstituteCity,
@@ -726,6 +733,21 @@ export class AdmissionService {
             ? parseFloat(data.class12thAggregateTotal)
             : null,
           class12thMediumOfTeaching: data.class12thMediumOfTeaching,
+
+          diplomaInstituteName: data.diplomaInstituteName ?? null,
+          diplomaInstituteType: data.diplomaInstituteType ?? null,
+          diplomaInstituteCity: data.diplomaInstituteCity ?? null,
+          diplomaInstituteState: data.diplomaInstituteState ?? null,
+          diplomaInstituteCode: data.diplomaInstituteCode ?? null,
+          diplomaYearOfPassing: data.diplomaYearOfPassing ?? null,
+          diplomaBranch: data.diplomaBranch ?? null,
+          diplomaMediumOfTeaching: data.diplomaMediumOfTeaching ?? null,
+          diplomaAggregateScore: data.diplomaAggregateScore
+            ? parseFloat(data.diplomaAggregateScore)
+            : null,
+          diplomaAggregateTotal: data.diplomaAggregateTotal
+            ? parseFloat(data.diplomaAggregateTotal)
+            : null,
 
           // Parent Details
           fatherName: data.fatherName,
@@ -752,6 +774,9 @@ export class AdmissionService {
           }),
           ...(fileUrls.class12thMarksPdf && {
             class12thMarksPdf: fileUrls.class12thMarksPdf,
+          }),
+          ...(fileUrls.diplomaMarksPdf && {
+            diplomaMarksPdf: fileUrls.diplomaMarksPdf,
           }),
           ...(fileUrls.casteCertificate && {
             casteCertificate: fileUrls.casteCertificate,
@@ -924,12 +949,12 @@ export class AdmissionService {
           admission.lastName ?? ""
         ).slice(0, 1);
 
-        const counts =
-          studentEmailCollisionCountsByDepartmentId.get(admission.departmentId) ??
-          {
-            firstNameCounts: new Map<string, number>(),
-            firstNameLastInitialCounts: new Map<string, number>(),
-          };
+        const counts = studentEmailCollisionCountsByDepartmentId.get(
+          admission.departmentId
+        ) ?? {
+          firstNameCounts: new Map<string, number>(),
+          firstNameLastInitialCounts: new Map<string, number>(),
+        };
 
         counts.firstNameCounts.set(
           firstNameKey,
@@ -950,7 +975,10 @@ export class AdmissionService {
         );
       }
 
-      const studentEmailLocalPartsByDepartmentId = new Map<string, Set<string>>();
+      const studentEmailLocalPartsByDepartmentId = new Map<
+        string,
+        Set<string>
+      >();
       const academicYearSuffix = getStudentEmailYearSuffix(
         semester.academicTerm.year
       );
@@ -1025,14 +1053,14 @@ export class AdmissionService {
             }
 
             const firstNameKey = normalizeStudentEmailToken(firstName);
-            const lastInitial = normalizeStudentEmailToken(lastName ?? "").slice(
-              0,
-              1
-            );
+            const lastInitial = normalizeStudentEmailToken(
+              lastName ?? ""
+            ).slice(0, 1);
 
             const collisionCounts =
-              studentEmailCollisionCountsByDepartmentId.get(admission.departmentId) ??
-              {
+              studentEmailCollisionCountsByDepartmentId.get(
+                admission.departmentId
+              ) ?? {
                 firstNameCounts: new Map<string, number>(),
                 firstNameLastInitialCounts: new Map<string, number>(),
               };
@@ -1077,10 +1105,12 @@ export class AdmissionService {
               firstNameCount:
                 collisionCounts.firstNameCounts.get(firstNameKey) ?? 0,
               firstNameLastInitialCount: lastInitial
-                ? collisionCounts.firstNameLastInitialCounts.get(
+                ? (collisionCounts.firstNameLastInitialCounts.get(
                     `${firstNameKey}:${lastInitial}`
-                  ) ?? 0
-                : collisionCounts.firstNameLastInitialCounts.get(firstNameKey) ?? 0,
+                  ) ?? 0)
+                : (collisionCounts.firstNameLastInitialCounts.get(
+                    firstNameKey
+                  ) ?? 0),
               occupiedLocalParts,
             });
 
@@ -1237,4 +1267,3 @@ export class AdmissionService {
     }
   }
 }
-
