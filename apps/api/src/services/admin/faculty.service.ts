@@ -4,7 +4,10 @@ import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import { CreateUserType } from "@webcampus/schemas/admin";
-import { CreateFacultyType, UpdateFacultyType } from "@webcampus/schemas/faculty";
+import {
+  CreateFacultyType,
+  UpdateFacultyType,
+} from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
 
 export class AdminFacultyService {
@@ -109,10 +112,13 @@ export class AdminFacultyService {
           const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
           await deleteFromS3(uploadedImageUrl);
         } catch (cleanupError) {
-          logger.warn("Failed to clean up uploaded faculty image after create failure", {
-            uploadedImageUrl,
-            cleanupError,
-          });
+          logger.warn(
+            "Failed to clean up uploaded faculty image after create failure",
+            {
+              uploadedImageUrl,
+              cleanupError,
+            }
+          );
         }
       }
 
@@ -125,10 +131,13 @@ export class AdminFacultyService {
             },
           });
         } catch (cleanupError) {
-          logger.warn("Failed to clean up auth user after faculty create failure", {
-            createdAuthUserId,
-            cleanupError,
-          });
+          logger.warn(
+            "Failed to clean up auth user after faculty create failure",
+            {
+              createdAuthUserId,
+              cleanupError,
+            }
+          );
         }
       }
 
@@ -143,9 +152,7 @@ export class AdminFacultyService {
     }
   }
 
-  static async getAll(
-    departmentId?: string
-  ): Promise<BaseResponse<unknown>> {
+  static async getAll(departmentId?: string): Promise<BaseResponse<unknown>> {
     try {
       await UserService.backfillMissingProfileFields();
 
@@ -158,6 +165,7 @@ export class AdminFacultyService {
               email: true,
               username: true,
               displayUsername: true,
+              image: true,
             },
           },
           department: {
@@ -238,7 +246,14 @@ export class AdminFacultyService {
         });
       }
 
-      const nextUserData: { username?: string; displayUsername?: string } = {};
+      const nextUserData: {
+        name?: string;
+        username?: string;
+        displayUsername?: string;
+      } = {};
+      if (data.name !== undefined) {
+        nextUserData.name = data.name;
+      }
       if (data.username !== undefined) {
         nextUserData.username = data.username;
       }
@@ -254,6 +269,7 @@ export class AdminFacultyService {
       }
 
       const facultyData = { ...data } as Record<string, unknown>;
+      delete facultyData.name;
       delete facultyData.username;
       delete facultyData.displayUsername;
 

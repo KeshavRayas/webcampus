@@ -393,19 +393,6 @@ export const ApplicantAdmissionView = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
-            <div className="space-y-2 md:col-span-5">
-              <Label htmlFor="firstName">First Name *</Label>
-              <Input id="firstName" name="firstName" required />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="middleName">Middle Name</Label>
-              <Input id="middleName" name="middleName" />
-            </div>
-            <div className="space-y-2 md:col-span-5">
-              <Label htmlFor="lastName">Last Name *</Label>
-              <Input id="lastName" name="lastName" required />
-            </div>
-
             <div className="space-y-2 md:col-span-3">
               <Label>Branch</Label>
               <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">

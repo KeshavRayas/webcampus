@@ -1,5 +1,5 @@
 ALTER TABLE "ClassSession"
-ADD COLUMN "batchId" UUID;
+ADD COLUMN "batchId" TEXT;
 
 CREATE INDEX "ClassSession_batchId_idx" ON "ClassSession"("batchId");
 

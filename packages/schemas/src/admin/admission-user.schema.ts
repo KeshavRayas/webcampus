@@ -6,6 +6,7 @@ export const CreateAdmissionUserSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["admission_admin", "admission_reviewer"]),
+  photo: z.any().optional(),
 });
 
 export const UpdateAdmissionUserSchema = CreateAdmissionUserSchema.omit({

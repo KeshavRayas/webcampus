@@ -32,6 +32,10 @@ router.put(
   CoeController.updateCoe
 );
 router.get("/", CoeController.getCoes);
+
+// NEW: Added Patch route for editing COE users
+router.patch("/:id", upload.single("photo"), CoeController.updateCoe);
+
 router.delete("/:id", CoeController.deleteCoe);
 
 export default router;

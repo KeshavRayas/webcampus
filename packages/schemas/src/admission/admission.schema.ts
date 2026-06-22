@@ -12,6 +12,9 @@ export const QuotaSchema = z.enum([
 
 export const CreateAdmissionShellSchema = z.object({
   applicationId: z.string().min(1, "Application ID is required"),
+  firstName: z.string().min(1, "First Name is required"),
+  middleName: z.string().optional(),
+  lastName: z.string().min(1, "Last Name is required"),
   modeOfAdmission: z.string().min(1, "Mode of Admission is required"),
   semesterId: z.string().uuid("Invalid Semester ID"),
   departmentId: z.string().uuid("Invalid Department ID"),
@@ -47,7 +50,7 @@ export const GetAdmissionsQuerySchema = z
     applicationId: optionalQueryString(z.string()),
     status: optionalQueryString(AdmissionStatusSchema),
     mode: optionalQueryString(z.string()),
-    semester: optionalQueryString(z.uuid("Invalid semester")),
+    semester: optionalQueryString(z.string().uuid("Invalid semester")),
     createdFrom: optionalQueryString(
       z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
         message: "Invalid created from date",

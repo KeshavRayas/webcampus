@@ -41,7 +41,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@webcampus/ui/components/tabs";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Upload } from "lucide-react";
 import React, { useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -54,9 +54,14 @@ import {
 } from "./use-faculty";
 
 const editSchema = z.object({
-  designation: DesignationEnum,
-  username: z.string().min(1, "Username is required"),
-  displayUsername: z.string().min(1, "Display username is required"),
+  // FIX: Subarno - Added name field to the edit schema
+  name: z.string().min(1, "Name is required"),
+  //Login Id changed to email
+  email: z.string().email("Invalid email address"),
+  //made optional for username column
+  designation: DesignationEnum.optional(),
+  username: z.string().min(1, "Username is required").optional(),
+  displayUsername: z.string().min(1, "Display username is required").optional(),
   employeeId: z.string().optional(),
   staffType: StaffTypeEnum.optional(),
   dob: z.coerce.date().optional(),
@@ -104,6 +109,8 @@ export const AdminFacultyActions = ({
   const editForm = useForm<EditFormOutput>({
     resolver: zodResolver(editSchema) as Resolver<EditFormOutput>,
     defaultValues: {
+      name: faculty.user.name || "",
+      email: faculty.user.email || "",
       designation: faculty.designation as z.infer<typeof DesignationEnum>,
       username: faculty.user.username || "",
       displayUsername: faculty.user.displayUsername || faculty.user.name || "",
@@ -182,7 +189,7 @@ export const AdminFacultyActions = ({
 
       {/* EDIT DIALOG */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="md:grids-cols-2 max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Edit Faculty</DialogTitle>
           </DialogHeader>
@@ -194,26 +201,40 @@ export const AdminFacultyActions = ({
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField
                   control={editForm.control}
-                  name="username"
+                  name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username</FormLabel>
+                      <FormLabel>Name</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="faculty.username" />
+                        <Input {...field} placeholder="Full Name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <FormField
+                {/* <FormField
                   control={editForm.control}
                   name="displayUsername"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Display Username</FormLabel>
+                      <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Display name" />
+                        <Input {...field} placeholder="Username" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                /> */}
+
+                <FormField
+                  control={editForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Email" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -351,16 +372,43 @@ export const AdminFacultyActions = ({
 
               <FormItem>
                 <FormLabel>Update Faculty Image</FormLabel>
-                <FormControl>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] || null;
-                      setEditImageFile(file);
-                    }}
-                  />
-                </FormControl>
+                <div className="space-y-3">
+                  {faculty?.user?.image && !editImageFile && (
+                    <img
+                      src={faculty.user.image}
+                      alt="Current Faculty Image"
+                      className="h-16 w-16 rounded-md border object-cover"
+                    />
+                  )}
+                  <FormControl>
+                    <div className="flex flex-col gap-4">
+                      <Input
+                        id="edit-faculty-image-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] || null;
+                          setEditImageFile(file);
+                        }}
+                      />
+                      <Button type="button" variant="outline" asChild>
+                        <label
+                          htmlFor="edit-faculty-image-upload"
+                          className="cursor-pointer"
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Browse New Image...
+                        </label>
+                      </Button>
+                      {editImageFile && (
+                        <span className="text-muted-foreground text-sm">
+                          {editImageFile.name}
+                        </span>
+                      )}
+                    </div>
+                  </FormControl>
+                </div>
                 <FormMessage />
               </FormItem>
 

@@ -157,6 +157,7 @@ export const AdminAdmissionUsersActions = ({
             onClick={() => setIsDeleteOpen(true)}
             className="cursor-pointer text-red-600 focus:text-red-600"
           >
+            <Trash className="mr-2 h-4 w-4" />
             Delete User
           </DropdownMenuItem>
         </DropdownMenuContent>

@@ -168,10 +168,14 @@ export const AdminStudentsView = () => {
   // Build department options from the fetched departments
   const departmentOptions = useMemo(
     () =>
-      departments.map((dept) => ({
-        label: dept.name,
-        value: dept.id,
-      })),
+      departments
+        .filter(
+          (dept) => dept.type !== "BASIC_SCIENCES" && dept.name !== "First Year"
+        )
+        .map((dept) => ({
+          label: dept.name,
+          value: dept.id,
+        })),
     [departments]
   );
 

@@ -1,4 +1,8 @@
 import { AttendanceAggregationService } from "@webcampus/api/src/services/faculty/attendance-aggregation.service";
+import {
+  assertCanMutateAttendance,
+  resolveFreezeState,
+} from "@webcampus/api/src/services/faculty/freeze.service";
 import { logger } from "@webcampus/common/logger";
 import { db, type Prisma } from "@webcampus/db";
 import {
@@ -103,6 +107,38 @@ const FIXED_TIMING_WINDOWS: Record<string, TimingWindow> = {
     endTime: "16:45",
     label: "03:50 PM - 04:45 PM",
   },
+
+  // DYNAMIC LAB BATCHES SUPPORT (2-hour combinations)
+  "08:00-09:50": {
+    code: "08:00-09:50",
+    startTime: "08:00",
+    endTime: "09:50",
+    label: "08:00 AM - 09:50 AM",
+  },
+  "08:55-10:45": {
+    code: "08:55-10:45",
+    startTime: "08:55",
+    endTime: "10:45",
+    label: "08:55 AM - 10:45 AM",
+  },
+  "11:15-13:05": {
+    code: "11:15-13:05",
+    startTime: "11:15",
+    endTime: "13:05",
+    label: "11:15 AM - 01:05 PM",
+  },
+  "14:00-15:50": {
+    code: "14:00-15:50",
+    startTime: "14:00",
+    endTime: "15:50",
+    label: "02:00 PM - 03:50 PM",
+  },
+  "14:55-16:45": {
+    code: "14:55-16:45",
+    startTime: "14:55",
+    endTime: "16:45",
+    label: "02:55 PM - 04:45 PM",
+  },
 };
 
 const toSessionDateUtc = (sessionDate: Date): Date => {
@@ -139,6 +175,7 @@ const hasTimeOverlap = (
   const existingStart = toMinutes(existingStartTime);
   const existingEnd = toMinutes(existingEndTime);
 
+  // TRUE overlap occurs if start is strictly before existing end AND end is strictly after existing start.
   return start < existingEnd && end > existingStart;
 };
 
@@ -275,13 +312,8 @@ export class FacultyAttendanceSessionService {
     });
 
     if (!faculty) {
-      logger.error("getFacultyIdByUserId: faculty not found", { userId });
       throw new Error("Faculty profile not found");
     }
-
-    logger.info("getFacultyIdByUserId: found faculty", {
-      facultyId: faculty.id,
-    });
     return faculty.id;
   }
 
@@ -347,30 +379,18 @@ export class FacultyAttendanceSessionService {
           assignmentContext.batchId
             ? {
                 student: {
-                  batches: {
-                    some: {
-                      id: assignmentContext.batchId,
-                    },
-                  },
+                  batches: { some: { id: assignmentContext.batchId } },
                 },
               }
             : {}),
         },
-        orderBy: {
-          student: {
-            usn: "asc",
-          },
-        },
+        orderBy: { student: { usn: "asc" } },
         select: {
           student: {
             select: {
               id: true,
               usn: true,
-              user: {
-                select: {
-                  name: true,
-                },
-              },
+              user: { select: { name: true } },
             },
           },
         },
@@ -382,6 +402,7 @@ export class FacultyAttendanceSessionService {
         where: {
           studentId: { in: studentIds },
           courseId: query.courseId,
+          batchId: assignmentContext.batchId ?? null, // Ensure lab vs theory split
         },
         select: {
           studentId: true,
@@ -415,9 +436,7 @@ export class FacultyAttendanceSessionService {
         },
       };
     } catch (error) {
-      logger.error("Error fetching faculty attendance session students", {
-        error,
-      });
+      logger.error("Error", { error });
       throw new Error("Failed to retrieve session students");
     }
   }
@@ -431,34 +450,15 @@ export class FacultyAttendanceSessionService {
       const assignments = await db.courseAssignment.findMany({
         where: {
           facultyId,
-          assignmentType: {
-            in: ["THEORY", "LAB"],
-          },
-          course: {
-            approvalStatus: "APPROVED",
-          },
+          assignmentType: { in: ["THEORY", "LAB"] },
+          course: { approvalStatus: "APPROVED" },
         },
         select: {
           assignmentType: true,
           batchId: true,
-          batch: {
-            select: {
-              name: true,
-            },
-          },
-          course: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-            },
-          },
-          section: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
+          batch: { select: { name: true } },
+          course: { select: { id: true, code: true, name: true } },
+          section: { select: { id: true, name: true } },
         },
       });
 
@@ -502,9 +502,7 @@ export class FacultyAttendanceSessionService {
         },
       };
     } catch (error) {
-      logger.error("Error fetching faculty attendance filter options", {
-        error,
-      });
+      logger.error("Error", { error });
       throw new Error("Failed to retrieve attendance filter options");
     }
   }
@@ -517,63 +515,35 @@ export class FacultyAttendanceSessionService {
       const facultyId = await this.getFacultyIdByUserId(userId);
 
       const session = await db.classSession.findUnique({
-        where: {
-          id: query.sessionId,
-        },
+        where: { id: query.sessionId },
         include: {
-          Course: {
-            select: {
-              code: true,
-              name: true,
-            },
-          },
-          Section: {
-            select: {
-              name: true,
-            },
-          },
-          Batch: {
-            select: {
-              name: true,
-            },
-          },
+          Course: { select: { code: true, name: true } },
+          Section: { select: { name: true } },
+          Batch: { select: { name: true } },
           AttendanceRecord: {
             select: {
               studentId: true,
               status: true,
               Student: {
-                select: {
-                  usn: true,
-                  user: {
-                    select: {
-                      name: true,
-                    },
-                  },
-                },
+                select: { usn: true, user: { select: { name: true } } },
               },
             },
           },
         },
       });
 
-      if (!session) {
-        throw new Error("Attendance session not found");
-      }
-
-      if (session.facultyId !== facultyId) {
-        throw new Error(
-          "Forbidden: attendance session is not owned by this faculty"
-        );
-      }
+      if (!session) throw new Error("Attendance session not found");
+      if (session.facultyId !== facultyId)
+        throw new Error("Forbidden: session not owned by faculty");
 
       const studentIds = session.AttendanceRecord.map(
         (record) => record.studentId
       );
-
       const attendanceRecords = await db.attendance.findMany({
         where: {
           studentId: { in: studentIds },
           courseId: session.courseId,
+          batchId: session.batchId ?? null, // Ensure lab vs theory split
         },
         select: {
           studentId: true,
@@ -608,12 +578,7 @@ export class FacultyAttendanceSessionService {
         },
       };
     } catch (error) {
-      logger.error("Error retrieving faculty attendance session detail", {
-        error,
-      });
-      if (error instanceof Error) {
-        throw error;
-      }
+      if (error instanceof Error) throw error;
       throw new Error("Failed to retrieve attendance session detail");
     }
   }
@@ -624,8 +589,6 @@ export class FacultyAttendanceSessionService {
   ): Promise<BaseResponse<CreateOrOpenFacultyAttendanceSessionDTO>> {
     try {
       const facultyId = await this.getFacultyIdByUserId(userId);
-      logger.info("createOrOpenSession: got facultyId", { facultyId, payload });
-
       const assignmentContext = await this.getFacultyCourseSectionContext(
         facultyId,
         payload.courseId,
@@ -633,94 +596,92 @@ export class FacultyAttendanceSessionService {
         payload.batchId
       );
 
+      const freezeCheck = await db.courseAssignment.findFirst({
+        where: {
+          courseId: payload.courseId,
+          sectionId: payload.sectionId,
+          batchId: payload.batchId ?? null,
+          facultyId,
+        },
+        include: { freezes: true },
+      });
+      if (freezeCheck)
+        assertCanMutateAttendance(
+          "faculty",
+          resolveFreezeState(freezeCheck.freezes)
+        );
+
       const sessionDate = toSessionDateUtc(payload.sessionDate);
       const timing = getTimingWindow(payload);
 
-      logger.info("createOrOpenSession: searching for existing session", {
-        courseId: payload.courseId,
-        sectionId: payload.sectionId,
-        batchId: payload.batchId,
-        sessionDate,
-      });
-
-      const existingSessionCandidates = await db.classSession.findMany({
+      // 1. Is this specific exact session already open?
+      const existingSession = await db.classSession.findFirst({
         where: {
           courseId: payload.courseId,
           sectionId: payload.sectionId,
           batchId: payload.batchId ?? null,
           sessionDate,
+          timingCode: timing.code,
         },
         include: {
-          Course: {
-            select: {
-              code: true,
-              name: true,
-            },
-          },
-          Section: {
-            select: {
-              name: true,
-            },
-          },
-          Batch: {
-            select: {
-              name: true,
-            },
-          },
+          Course: { select: { code: true, name: true } },
+          Section: { select: { name: true } },
+          Batch: { select: { name: true } },
         },
       });
-      const existingSession =
-        existingSessionCandidates.find(
-          (session) => session.timingCode === timing.code
-        ) ?? null;
-      if (existingSession && existingSession.facultyId !== facultyId) {
-        return {
-          status: "error",
-          message:
-            "A session already exists for this slot and is not owned by you",
-          error: "Session ownership mismatch",
-        };
-      }
 
+      // Validating overlaps ONLY if this is a brand new session creation
       if (!existingSession) {
-        const overlappingSession = await db.classSession.findFirst({
+        // 2. Fetch ALL sessions for this day that either share the same Faculty or the same Section
+        const potentialOverlaps = await db.classSession.findMany({
           where: {
             sessionDate,
             OR: [
-              {
-                facultyId,
-              },
-              {
-                sectionId: payload.sectionId,
-              },
+              { facultyId }, // To check Faculty Overlap
+              { sectionId: payload.sectionId }, // To check Section Overlap
             ],
-            timingStartTime: {
-              lt: timing.endTime,
-            },
-            timingEndTime: {
-              gt: timing.startTime,
-            },
           },
           select: {
+            facultyId: true,
+            sectionId: true,
             timingLabel: true,
             timingStartTime: true,
             timingEndTime: true,
           },
         });
 
-        if (
-          overlappingSession &&
-          hasTimeOverlap(
-            timing.startTime,
-            timing.endTime,
-            overlappingSession.timingStartTime,
-            overlappingSession.timingEndTime
-          )
-        ) {
-          throw new Error(
-            `Session time overlaps with an existing session (${overlappingSession.timingLabel})`
-          );
+        // 3. Evaluate overlapping time constraints
+        for (const overlapSession of potentialOverlaps) {
+          if (
+            hasTimeOverlap(
+              timing.startTime,
+              timing.endTime,
+              overlapSession.timingStartTime,
+              overlapSession.timingEndTime
+            )
+          ) {
+            // Overlap Rule 1: Same Section, Different Faculty
+            if (
+              overlapSession.sectionId === payload.sectionId &&
+              overlapSession.facultyId !== facultyId
+            ) {
+              throw new Error(
+                `Section Overlap: Another faculty member is already conducting a session for this section at ${overlapSession.timingLabel}.`
+              );
+            }
+
+            // Overlap Rule 2: Same Faculty, Different Section (or same section but time intersects weirdly)
+            if (overlapSession.facultyId === facultyId) {
+              throw new Error(
+                `Faculty Overlap: You are already conducting a session at ${overlapSession.timingLabel}. You cannot take multiple classes at once.`
+              );
+            }
+          }
         }
+      } else if (existingSession.facultyId !== facultyId) {
+        throw new Error(
+          "A session already exists for this exact slot and is not owned by you."
+        );
       }
 
       const operationResult = await db.$transaction(async (tx) => {
@@ -740,22 +701,9 @@ export class FacultyAttendanceSessionService {
               timingEndTime: timing.endTime,
             },
             include: {
-              Course: {
-                select: {
-                  code: true,
-                  name: true,
-                },
-              },
-              Section: {
-                select: {
-                  name: true,
-                },
-              },
-              Batch: {
-                select: {
-                  name: true,
-                },
-              },
+              Course: { select: { code: true, name: true } },
+              Section: { select: { name: true } },
+              Batch: { select: { name: true } },
             },
           }));
 
@@ -764,15 +712,15 @@ export class FacultyAttendanceSessionService {
             sectionId: payload.sectionId,
             semester: assignmentContext.semester,
             academicYear: assignmentContext.academicYear,
+            ...(payload.batchId
+              ? { student: { batches: { some: { id: payload.batchId } } } }
+              : {}),
           },
-          select: {
-            studentId: true,
-          },
+          select: { studentId: true },
         });
 
-        if (enrolledStudents.length === 0) {
-          throw new Error("No students found in the selected section");
-        }
+        if (enrolledStudents.length === 0)
+          throw new Error("No students found in the selected section/batch");
 
         const enrolledStudentIdSet = new Set(
           enrolledStudents.map((student) => student.studentId)
@@ -782,7 +730,7 @@ export class FacultyAttendanceSessionService {
         for (const item of explicitStatuses) {
           if (!enrolledStudentIdSet.has(item.studentId)) {
             throw new Error(
-              "One or more students do not belong to the selected section"
+              "One or more students do not belong to the selected section/batch"
             );
           }
         }
@@ -790,7 +738,6 @@ export class FacultyAttendanceSessionService {
         const explicitStatusMap = new Map(
           explicitStatuses.map((item) => [item.studentId, item.status] as const)
         );
-
         const normalizedStatuses = enrolledStudents.map((student) => ({
           studentId: student.studentId,
           status:
@@ -804,6 +751,7 @@ export class FacultyAttendanceSessionService {
             id: crypto.randomUUID(),
             sessionId: targetSession.id,
             studentId: statusItem.studentId,
+            batchId: targetSession.batchId, // NEW SCHEMA REQUIREMENT
             status: statusItem.status,
           })),
           skipDuplicates: true,
@@ -812,25 +760,20 @@ export class FacultyAttendanceSessionService {
         for (const [studentId, status] of explicitStatusMap.entries()) {
           await tx.attendanceRecord.upsert({
             where: {
-              sessionId_studentId: {
-                sessionId: targetSession.id,
-                studentId,
-              },
+              sessionId_studentId: { sessionId: targetSession.id, studentId },
             },
             create: {
               id: crypto.randomUUID(),
               sessionId: targetSession.id,
               studentId,
+              batchId: targetSession.batchId, // NEW SCHEMA REQUIREMENT
               status,
             },
-            update: {
-              status,
-              markedAt: new Date(),
-            },
+            update: { status, markedAt: new Date() },
           });
         }
 
-        // Aggregate attendance for all students in this course
+        // Aggregate attendance logic for BOTH theory and lab
         await AttendanceAggregationService.aggregateAttendanceForCourse(
           targetSession.courseId,
           tx
@@ -853,34 +796,19 @@ export class FacultyAttendanceSessionService {
         };
       });
 
-      if (operationResult.created) {
-        return {
-          status: "success",
-          message: "Attendance session created successfully",
-          data: {
-            session: toSessionDto(operationResult.session),
-            created: true,
-            attendanceInitialization: operationResult.attendanceInitialization,
-          },
-        };
-      }
-
       return {
         status: "success",
-        message: "Attendance session opened successfully",
+        message: operationResult.created
+          ? "Attendance session created successfully"
+          : "Attendance session updated successfully",
         data: {
           session: toSessionDto(operationResult.session),
-          created: false,
+          created: operationResult.created,
           attendanceInitialization: operationResult.attendanceInitialization,
         },
       };
     } catch (error) {
-      logger.error("Error creating or opening faculty attendance session", {
-        error,
-      });
-      if (error instanceof Error) {
-        throw error;
-      }
+      if (error instanceof Error) throw error;
       throw new Error("Failed to create attendance session");
     }
   }
@@ -894,25 +822,30 @@ export class FacultyAttendanceSessionService {
 
       const deletedSummary = await db.$transaction(async (tx) => {
         const session = await tx.classSession.findUnique({
-          where: {
-            id: params.sessionId,
-          },
-          include: {
-            AttendanceRecord: {
-              select: {
-                studentId: true,
-              },
-            },
-          },
+          where: { id: params.sessionId },
+          include: { AttendanceRecord: { select: { studentId: true } } },
         });
 
-        if (!session) {
-          throw new Error("Attendance session not found");
-        }
-
-        if (session.facultyId !== facultyId) {
+        if (!session) throw new Error("Attendance session not found");
+        if (session.facultyId !== facultyId)
           throw new Error(
             "Forbidden: attendance session is not owned by this faculty"
+          );
+
+        const freezeCheckDelete = await tx.courseAssignment.findFirst({
+          where: {
+            courseId: session.courseId,
+            sectionId: session.sectionId,
+            batchId: session.batchId,
+            facultyId,
+          },
+          include: { freezes: true },
+        });
+
+        if (freezeCheckDelete) {
+          assertCanMutateAttendance(
+            "faculty",
+            resolveFreezeState(freezeCheckDelete.freezes)
           );
         }
 
@@ -920,11 +853,7 @@ export class FacultyAttendanceSessionService {
           new Set(session.AttendanceRecord.map((record) => record.studentId))
         );
 
-        await tx.classSession.delete({
-          where: {
-            id: session.id,
-          },
-        });
+        await tx.classSession.delete({ where: { id: session.id } });
 
         for (const studentId of affectedStudentIds) {
           await AttendanceAggregationService.aggregateAttendanceForStudentCourse(
@@ -947,12 +876,7 @@ export class FacultyAttendanceSessionService {
         data: deletedSummary,
       };
     } catch (error) {
-      logger.error("Error deleting faculty attendance session", {
-        error,
-      });
-      if (error instanceof Error) {
-        throw error;
-      }
+      if (error instanceof Error) throw error;
       throw new Error("Failed to delete attendance session");
     }
   }
@@ -961,63 +885,27 @@ export class FacultyAttendanceSessionService {
     userId: string,
     query: ListFacultyAttendanceSessionsQueryType
   ): Promise<BaseResponse<PaginatedResponse<FacultyAttendanceSessionDTO>>> {
-    const startTime = Date.now();
     try {
       const facultyId = await this.getFacultyIdByUserId(userId);
-      logger.info("listSessions: got facultyId", {
-        facultyId,
-        durationMs: Date.now() - startTime,
-      });
-
       const page = toSafePositiveInt(query.page, DEFAULT_PAGE);
       const limit = toSafePositiveInt(query.limit, DEFAULT_LIMIT, MAX_LIMIT);
 
-      const where: Prisma.ClassSessionWhereInput = {
-        facultyId,
-      };
-
-      if (query.courseId) {
-        where.courseId = query.courseId;
-      }
-
-      if (query.sectionId) {
-        where.sectionId = query.sectionId;
-      }
-
-      if (query.batchId) {
-        where.batchId = query.batchId;
-      }
+      const where: Prisma.ClassSessionWhereInput = { facultyId };
+      if (query.courseId) where.courseId = query.courseId;
+      if (query.sectionId) where.sectionId = query.sectionId;
+      if (query.batchId) where.batchId = query.batchId;
 
       if (query.sessionDate) {
         const dayStart = new Date(`${query.sessionDate}T00:00:00.000Z`);
         const nextDayStart = new Date(`${query.sessionDate}T00:00:00.000Z`);
         nextDayStart.setUTCDate(nextDayStart.getUTCDate() + 1);
-
-        where.sessionDate = {
-          gte: dayStart,
-          lt: nextDayStart,
-        };
+        where.sessionDate = { gte: dayStart, lt: nextDayStart };
       }
 
-      logger.info("listSessions: fetching with where clause", {
-        where,
-        page,
-        limit,
-      });
-
-      const countStart = Date.now();
       const total = await db.classSession.count({ where });
-      logger.info("listSessions: count completed", {
-        durationMs: Date.now() - countStart,
-        total,
-      });
-
       let items: FacultyAttendanceSessionDTO[];
 
       try {
-        const fetchStart = Date.now();
-        // TEMPORARY: Using scalar-only select to diagnose hanging issue
-        // If this works quickly, problem is the include/relation JOINs
         const sessions = await db.classSession.findMany({
           where,
           orderBy: [{ sessionDate: "desc" }, { createdAt: "desc" }],
@@ -1052,25 +940,8 @@ export class FacultyAttendanceSessionService {
           sectionName: "",
           createdAt: s.createdAt.toISOString(),
         }));
-        logger.info("listSessions: main query completed (scalar)", {
-          durationMs: Date.now() - fetchStart,
-          itemCount: items.length,
-        });
       } catch (includeError) {
-        logger.error(
-          "Attendance sessions include resolution failed; retrying with scalar fallback",
-          {
-            includeError,
-            includeErrorMessage:
-              includeError instanceof Error
-                ? includeError.message
-                : "Unknown include error",
-            facultyId,
-            page,
-            limit,
-          }
-        );
-
+        logger.error("Error", { includeError });
         const scalarSessions = await db.classSession.findMany({
           where,
           orderBy: [{ sessionDate: "desc" }, { createdAt: "desc" }],
@@ -1097,7 +968,6 @@ export class FacultyAttendanceSessionService {
               .filter(isNonEmptyString)
           )
         );
-
         const uniqueSectionIds = Array.from(
           new Set(
             scalarSessions
@@ -1109,29 +979,14 @@ export class FacultyAttendanceSessionService {
         const [courses, sections] = await Promise.all([
           uniqueCourseIds.length > 0
             ? db.course.findMany({
-                where: {
-                  id: {
-                    in: uniqueCourseIds,
-                  },
-                },
-                select: {
-                  id: true,
-                  code: true,
-                  name: true,
-                },
+                where: { id: { in: uniqueCourseIds } },
+                select: { id: true, code: true, name: true },
               })
             : Promise.resolve([]),
           uniqueSectionIds.length > 0
             ? db.section.findMany({
-                where: {
-                  id: {
-                    in: uniqueSectionIds,
-                  },
-                },
-                select: {
-                  id: true,
-                  name: true,
-                },
+                where: { id: { in: uniqueSectionIds } },
+                select: { id: true, name: true },
               })
             : Promise.resolve([]),
         ]);
@@ -1151,15 +1006,6 @@ export class FacultyAttendanceSessionService {
       }
 
       const totalPages = Math.max(1, Math.ceil(total / limit));
-
-      logger.info("listSessions: completed", {
-        durationMs: Date.now() - startTime,
-        itemCount: items.length,
-        total,
-        page,
-        limit,
-      });
-
       return {
         status: "success",
         message: "Attendance sessions retrieved successfully",
@@ -1176,11 +1022,7 @@ export class FacultyAttendanceSessionService {
         },
       };
     } catch (error) {
-      logger.error("Error retrieving faculty attendance sessions", {
-        error,
-        errorMessage: error instanceof Error ? error.message : "Unknown error",
-        durationMs: Date.now() - startTime,
-      });
+      logger.error("Error", { error });
       throw new Error("Failed to retrieve attendance sessions");
     }
   }

@@ -27,10 +27,7 @@ model User {
   Department            Department[]
   departmentMemberships DepartmentUser[]
   faculty               Faculty?
-  frozenAsAdmin         Freeze[]         @relation("FrozenByAdmin")
-  frozenAsFaculty       Freeze[]         @relation("FrozenByFaculty")
-  frozenAsHod           Freeze[]         @relation("FrozenByHod")
-  Freeze                Freeze[]
+
   hod                   Hod?
   Semester              Semester[]
   student               Student?
@@ -208,6 +205,9 @@ model Batch {
   ClassSession     ClassSession[]
   CourseAssignment CourseAssignment[]
   students         Student[]          @relation("BatchStudents")
+
+  attendances       Attendance[]       // <-- NEW: Back-relation
+  attendanceRecords AttendanceRecord[] // <-- NEW: Back-relation
 
   @@unique([name, sectionId])
   @@index([sectionId])
@@ -468,6 +468,7 @@ model Attendance {
   id                String            @id @default(uuid())
   studentId         String
   courseId          String
+  batchId           String?           // <-- NEW: Added to track lab vs theory
   total             Int
   present           Int
   absent            Int
@@ -475,9 +476,12 @@ model Attendance {
   percentage        Float
   course            Course            @relation(fields: [courseId], references: [id])
   student           Student           @relation(fields: [studentId], references: [id])
+  batch             Batch?            @relation(fields: [batchId], references: [id]) // <-- NEW: Relation to Batch
 
-  @@unique([studentId, courseId])
+  // Updated unique constraint to allow separate aggregates for theory and lab
+  @@unique([studentId, courseId, batchId]) 
   @@index([courseId])
+  @@index([batchId])
 }
 
 model Mark {
@@ -522,18 +526,12 @@ model Freeze {
   facultyFrozenAt    DateTime?
   hodFrozenAt        DateTime?
   adminFrozenAt      DateTime?
-  frozenByFacultyId  String?
-  frozenByHodId      String?
-  frozenByAdminId    String?
   finalFrozen        Boolean          @default(false)
   finalDeadline      DateTime?
-  frozenAt           DateTime?
-  userId             String?
+  frozenByRole       FreezeActorRole?
+  frozenByUsername   String?
+  frozenByDisplay    String?
   courseAssignment   CourseAssignment @relation(fields: [courseAssignmentId], references: [id])
-  frozenByAdmin      User?            @relation("FrozenByAdmin", fields: [frozenByAdminId], references: [id])
-  frozenByFaculty    User?            @relation("FrozenByFaculty", fields: [frozenByFacultyId], references: [id])
-  frozenByHod        User?            @relation("FrozenByHod", fields: [frozenByHodId], references: [id])
-  User               User?            @relation(fields: [userId], references: [id])
 }
 
 model Admission {
@@ -668,13 +666,16 @@ model AttendanceRecord {
   id           String           @id
   sessionId    String
   studentId    String
+  batchId      String?          // <-- NEW: Added to link individual records to a batch
   status       AttendanceStatus
   markedAt     DateTime         @default(now())
   ClassSession ClassSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   Student      Student          @relation(fields: [studentId], references: [id])
+  Batch        Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull) // <-- NEW: Relation
 
   @@unique([sessionId, studentId])
   @@index([studentId])
+  @@index([batchId])
 }
 
 model ClassSession {
@@ -897,6 +898,12 @@ enum CourseApprovalStatus {
   PENDING
   APPROVED
   NEEDS_REVISION
+}
+
+enum FreezeActorRole {
+  FACULTY
+  HOD
+  ADMIN
 }
 
 enum AttendanceStatus {

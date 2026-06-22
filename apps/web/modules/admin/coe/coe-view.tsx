@@ -12,7 +12,7 @@ import { CoeUser } from "./coe-types";
 export const CoeView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
-  const { data: coes, isLoading } = useQuery<CoeUser[]>({
+  const { data: coes = [], isLoading } = useQuery<CoeUserResponse[]>({
     queryKey: ["admin-coes"],
     queryFn: async () => {
       const res = await axios.get(`${NEXT_PUBLIC_API_BASE_URL}/admin/coe`, {
@@ -42,29 +42,103 @@ export const CoeView = () => {
     },
   ];
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">COE Users</h2>
-          <p className="text-muted-foreground text-sm">
-            Manage COE users and their system access.
-          </p>
-        </div>
-        <CoeForm />
-      </div>
+            <FormField
+              control={form.control}
+              name="photo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Profile Photo</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          field.onChange(file);
+                        }
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-      {isLoading ? (
-        <div className="text-muted-foreground p-8 text-center text-sm">
-          Loading COE users...
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="jane.doe@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Username *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., janedoe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password *</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Password"
+                        className="pr-10"
+                        {...field}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2 focus:outline-none"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </DialogForm>
         </div>
-      ) : coes && coes.length > 0 ? (
-        <DataTable columns={columns} data={coes} />
-      ) : (
-        <div className="text-muted-foreground rounded-lg border p-12 text-center text-sm">
-          No COE users found. Create one to get started.
-        </div>
-      )}
+
+        {isLoading ? (
+          <div className="text-muted-foreground p-8 text-center text-sm">
+            Loading COE users...
+          </div>
+        ) : coes && coes.length > 0 ? (
+          <DataTable columns={CoeUserColumns} data={coes} />
+        ) : (
+          <div className="text-muted-foreground rounded-lg border p-12 text-center text-sm">
+            No COE users found. Create one to get started.
+          </div>
+        )}
+      </div>
     </div>
   );
 };

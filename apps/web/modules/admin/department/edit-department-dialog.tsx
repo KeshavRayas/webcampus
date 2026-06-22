@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import axios, { AxiosError, AxiosResponse } from "axios";
+import { Upload } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
@@ -59,8 +60,9 @@ export const EditDepartmentDialog = ({
       code: department.code,
       abbreviation: department.abbreviation,
       type: department.type || "DEGREE_GRANTING",
-      username: department.username || "",
-      displayUsername: department.displayUsername || department.name,
+      // FIX: Subarno - Removed username and displayUsername from the default values of the edit department form as they are no longer being sent to the API and are generated silently in the background based on the department name
+      // username: department.username || "",
+      // displayUsername: department.displayUsername || department.name,
     },
   });
 
@@ -72,8 +74,9 @@ export const EditDepartmentDialog = ({
         code: department.code,
         abbreviation: department.abbreviation,
         type: department.type || "DEGREE_GRANTING",
-        username: department.username || "",
-        displayUsername: department.displayUsername || department.name,
+        // FIX: Subarno - Removed username and displayUsername from the default values of the edit department form as they are no longer being sent to the API and are generated silently in the background based on the department name
+        // username: department.username || "",
+        // displayUsername: department.displayUsername || department.name,
       });
       setLogoFile(null);
     }
@@ -175,7 +178,9 @@ export const EditDepartmentDialog = ({
               )}
             />
 
-            <FormField
+            {/* FIX: Subarno - Removed username and displayUsername fields from the edit department form as they are no longer being sent to the API and are generated silently in the background based on the department name */}
+
+            {/* <FormField
               control={form.control}
               name="username"
               render={({ field }) => (
@@ -201,7 +206,7 @@ export const EditDepartmentDialog = ({
                   <FormMessage />
                 </FormItem>
               )}
-            />
+            /> */}
 
             <FormField
               control={form.control}
@@ -232,7 +237,46 @@ export const EditDepartmentDialog = ({
 
             <FormItem>
               <FormLabel>Update Department Logo</FormLabel>
-              <FormControl>
+              <div className="space-y-3">
+                {/* visual preview logic */}
+                {department.image && !logoFile && (
+                  <img
+                    src={department.image}
+                    alt="Department Logo"
+                    className="h-16 w-16 rounded-md border object-cover"
+                  />
+                )}
+
+                <FormControl>
+                  <div className="flex items-center gap-4">
+                    <Input
+                      id="edit-logo-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] || null;
+                        setLogoFile(file);
+                      }}
+                    />
+                    <Button type="button" variant="outline" asChild>
+                      <label
+                        htmlFor="edit-logo-upload"
+                        className="cursor-pointer"
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Browse New Logo...
+                      </label>
+                    </Button>
+                    {logoFile && (
+                      <span className="text-muted-foreground text-sm">
+                        {logoFile.name}
+                      </span>
+                    )}
+                  </div>
+                </FormControl>
+              </div>
+              {/* <FormControl>
                 <Input
                   type="file"
                   accept="image/*"
@@ -241,7 +285,7 @@ export const EditDepartmentDialog = ({
                     setLogoFile(file);
                   }}
                 />
-              </FormControl>
+              </FormControl> */}
               <FormMessage />
             </FormItem>
 

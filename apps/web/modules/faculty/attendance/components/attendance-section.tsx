@@ -56,7 +56,7 @@ export const AttendanceSection = ({
   return (
     <div className={cn("space-y-4", className)}>
       <Card className="border-primary/20 bg-background/95 shadow-sm">
-        <CardHeader className="space-y-3 pb-4">
+        <CardHeader className="space-y-3 px-4 pb-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold">Student Roster</p>
@@ -94,7 +94,7 @@ export const AttendanceSection = ({
           />
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="px-2 sm:px-6">
           {isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -105,7 +105,7 @@ export const AttendanceSection = ({
               ))}
             </div>
           ) : filteredStudents.length === 0 ? (
-            <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-6 text-sm">
+            <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-6 text-center text-sm">
               {studentChecklist.length === 0
                 ? "No students were found for this attendance session."
                 : "No students match your search."}
@@ -115,11 +115,18 @@ export const AttendanceSection = ({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-40">USN</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="w-36">Prev. Attendance %</TableHead>
-                    <TableHead className="w-24 text-center">
+                    {/* Tightly packed mobile columns */}
+                    <TableHead className="w-20 px-2 text-xs sm:w-32 sm:text-sm">
+                      USN
+                    </TableHead>
+                    <TableHead className="min-w-25 px-2 text-xs sm:text-sm">
+                      Name
+                    </TableHead>
+                    <TableHead className="w-20 px-2 text-center text-xs sm:w-28 sm:text-sm">
                       Attendance
+                    </TableHead>
+                    <TableHead className="w-16 px-2 text-center text-xs sm:w-24 sm:text-sm">
+                      Prev. %
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -159,23 +166,15 @@ export const AttendanceSection = ({
                         key={student.studentId}
                         className={cn(rowToneClass)}
                       >
-                        <TableCell className="font-mono text-xs tracking-wide">
+                        <TableCell className="px-2 py-2 align-middle font-mono text-[10px] tracking-wide sm:text-xs">
                           {student.usn}
                         </TableCell>
-                        <TableCell>
-                          <p className="font-medium leading-none">
+                        <TableCell className="px-2 py-2 align-middle">
+                          <p className="text-xs font-medium leading-tight sm:text-sm">
                             {student.name}
                           </p>
                         </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={cn(badgeColorClass)}
-                          >
-                            {attendanceBadge}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="px-2 py-2 text-center align-middle">
                           <div className="flex justify-center">
                             <Checkbox
                               checked={student.status === "PRESENT"}
@@ -187,8 +186,20 @@ export const AttendanceSection = ({
                               }}
                               disabled={isSaving}
                               aria-label={`Toggle attendance for ${student.name}`}
+                              className="h-5 w-5 sm:h-4 sm:w-4" // Slightly larger tap target on mobile
                             />
                           </div>
+                        </TableCell>
+                        <TableCell className="px-2 py-2 text-center align-middle">
+                          <Badge
+                            variant="secondary"
+                            className={cn(
+                              badgeColorClass,
+                              "px-1 text-[10px] sm:px-2.5 sm:text-xs"
+                            )}
+                          >
+                            {attendanceBadge}
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     );

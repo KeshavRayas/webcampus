@@ -1,3 +1,4 @@
+import { ensureFreezeRowTx } from "@webcampus/api/src/services/faculty/freeze.service";
 import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
@@ -450,13 +451,14 @@ export class CourseAssignmentService {
           },
         });
 
+        const createdAssignmentIds: string[] = [];
         let createdCount = 0;
         const labSectionIds = new Set<string>();
 
         for (const mapping of data.sectionMappings) {
           // Create THEORY assignment
           if (mapping.theoryFacultyId) {
-            await tx.courseAssignment.create({
+            const created = await tx.courseAssignment.create({
               data: {
                 courseId: data.courseId,
                 departmentId: department.id,
@@ -468,6 +470,7 @@ export class CourseAssignmentService {
                 academicYear: data.academicYear,
               },
             });
+            createdAssignmentIds.push(created.id);
             createdCount++;
           }
 
@@ -492,7 +495,7 @@ export class CourseAssignmentService {
 
             labSectionIds.add(mapping.sectionId);
 
-            await tx.courseAssignment.create({
+            const created = await tx.courseAssignment.create({
               data: {
                 courseId: data.courseId,
                 departmentId: department.id,
@@ -504,6 +507,7 @@ export class CourseAssignmentService {
                 academicYear: data.academicYear,
               },
             });
+            createdAssignmentIds.push(created.id);
             createdCount++;
           }
         }
@@ -515,6 +519,10 @@ export class CourseAssignmentService {
             semester.semesterNumber,
             data.academicYear
           );
+        }
+
+        for (const assignmentId of createdAssignmentIds) {
+          await ensureFreezeRowTx(tx, assignmentId);
         }
 
         return createdCount;

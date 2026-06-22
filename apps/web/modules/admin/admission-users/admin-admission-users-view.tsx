@@ -51,6 +51,10 @@ export const AdminAdmissionUsersView = () => {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
 
+  // State for password visibility and table filtering
+  const [showPassword, setShowPassword] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-admission-users"],
     queryFn: async () => {
@@ -261,7 +265,10 @@ export const AdminAdmissionUsersView = () => {
         {isLoading ? (
           <div className="text-muted-foreground text-sm">Loading users...</div>
         ) : (
-          <DataTable columns={AdminAdmissionUserColumns} data={users || []} />
+          <DataTable
+            columns={AdminAdmissionUserColumns}
+            data={filteredUsers || []}
+          />
         )}
       </div>
     </div>

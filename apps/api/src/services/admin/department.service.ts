@@ -126,8 +126,13 @@ export class DepartmentService {
       (DepartmentResponseDTO & {
         email?: string;
         emailVerified?: boolean;
-        username?: string | null;
-        displayUsername?: string | null;
+        image?: string | null;
+
+        // FIX: Subarno - Removed username and displayUsername from the response
+        // FIX: Subarno - Added image field to the response to include the department logo URL
+
+        // username?: string | null;
+        // displayUsername?: string | null;
       })[]
     >
   > {
@@ -140,25 +145,30 @@ export class DepartmentService {
             select: {
               email: true,
               emailVerified: true,
-              username: true,
-              displayUsername: true,
+              // username: true,
+              // displayUsername: true,
+              image: true,
             },
           },
         },
+        // FIX: Subarno - Added ordering by department name in ascending order
+        orderBy: { name: "asc" },
       });
       const formattedDepartments: (DepartmentResponseDTO & {
         email?: string;
         emailVerified?: boolean;
-        username?: string | null;
-        displayUsername?: string | null;
+        // username?: string | null;
+        // displayUsername?: string | null;
+        image?: string | null;
       })[] = departments.map((dept) => {
         const { user, ...departmentData } = dept;
         return {
           ...departmentData,
           email: user?.email,
           emailVerified: user?.emailVerified,
-          username: user?.username,
-          displayUsername: user?.displayUsername,
+          // username: user?.username,
+          // displayUsername: user?.displayUsername,
+          image: user?.image,
         };
       });
 
@@ -194,6 +204,7 @@ export class DepartmentService {
           code: true,
           abbreviation: true,
         },
+        orderBy: { name: "asc" },
       });
       return {
         status: "success",
@@ -296,34 +307,54 @@ export class DepartmentService {
         });
       }
 
-        const nextUserData: { username?: string; displayUsername?: string } = {};
-        if (data.username !== undefined) {
-          nextUserData.username = data.username;
-        }
-        if (data.displayUsername !== undefined) {
-          nextUserData.displayUsername = data.displayUsername;
-        }
+      const [updatedDepartment] = await db.$transaction([
+        db.department.update({
+          where: { id },
+          data: {
+            name: data.name,
+            code: data.code,
+            abbreviation: data.abbreviation,
+            type: data.type,
+          },
+        }),
+        db.user.update({
+          where: { id: existingDepartment.user.id },
+          data: {
+            ...(data.name && { name: data.name }),
+          },
+        }),
+      ]);
 
-        if (Object.keys(nextUserData).length > 0) {
-          await db.user.update({
-            where: { id: existingDepartment.user.id },
-            data: nextUserData,
-          });
-        }
+      // FIX: Subarno - Removed username and displayUsername updates from the transaction and handled them separately to avoid issues with partial updates
 
-        const departmentData = { ...data } as Record<string, unknown>;
-        delete departmentData.username;
-        delete departmentData.displayUsername;
+      // const nextUserData: { username?: string; displayUsername?: string } = {};
+      // if (data.username !== undefined) {
+      //   nextUserData.username = data.username;
+      // }
+      // if (data.displayUsername !== undefined) {
+      //   nextUserData.displayUsername = data.displayUsername;
+      // }
 
-      const department = await db.department.update({
-        where: { id },
-          data: departmentData,
-      });
+      //   if (Object.keys(nextUserData).length > 0) {
+      //     await db.user.update({
+      //       where: { id: existingDepartment.user.id },
+      //       data: nextUserData,
+      //     });
+      //   }
+
+      //   const departmentData = { ...data } as Record<string, unknown>;
+      //   delete departmentData.username;
+      //   delete departmentData.displayUsername;
+
+      // const department = await db.department.update({
+      //   where: { id },
+      //     data: departmentData,
+      // });
 
       return {
         status: "success",
         message: "Department updated successfully",
-        data: department,
+        data: updatedDepartment,
       };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {

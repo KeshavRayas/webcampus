@@ -20,6 +20,16 @@ export const useCreateAdminFacultyForm = (departmentId: string) => {
   const queryClient = useQueryClient();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!imageFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(imageFile);
+    setPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [imageFile]);
 
   const form = useForm<FormType>({
     resolver: zodResolver(FormSchema) as Resolver<FormType>,
@@ -88,5 +98,5 @@ export const useCreateAdminFacultyForm = (departmentId: string) => {
     mutate(values);
   };
 
-  return { form, onSubmit, imageFile, setImageFile };
+  return { form, onSubmit, imageFile, setImageFile, previewUrl };
 };

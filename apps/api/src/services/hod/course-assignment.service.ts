@@ -1,3 +1,4 @@
+import { ensureFreezeRowTx } from "@webcampus/api/src/services/faculty/freeze.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
@@ -30,7 +31,9 @@ export class CourseAssignment {
       }
 
       if (course.departmentId !== section.departmentId) {
-        throw new Error("Course and section must belong to the same department");
+        throw new Error(
+          "Course and section must belong to the same department"
+        );
       }
 
       const faculty = await db.faculty.findUnique({
@@ -48,11 +51,17 @@ export class CourseAssignment {
         );
       }
 
-      const assignment = await db.courseAssignment.create({
-        data: {
-          ...data,
-          departmentId: section.departmentId,
-        },
+      const assignment = await db.$transaction(async (tx) => {
+        const created = await tx.courseAssignment.create({
+          data: {
+            ...data,
+            departmentId: section.departmentId,
+          },
+        });
+
+        await ensureFreezeRowTx(tx, created.id);
+
+        return created;
       });
       const response: BaseResponse<CourseAssignmentResponseType> = {
         status: "success",

@@ -284,14 +284,21 @@ export class AdminAdmissionUserService {
           image: true,
           role: true,
           createdAt: true,
+          image: true, // Make sure the frontend can receive the image!
         },
         orderBy: { createdAt: "desc" },
       });
 
+      // Map the database 'image' back to 'photo' so the frontend table can read it
+      const formattedUsers = users.map((user) => ({
+        ...user,
+        photo: user.image,
+      }));
+
       return {
         status: "success",
         message: "Fetched admission users successfully",
-        data: users,
+        data: formattedUsers,
       };
     } catch (error) {
       logger.error("Failed to fetch admission users", error);
@@ -299,9 +306,68 @@ export class AdminAdmissionUserService {
     }
   }
 
+  // --- NEW UPDATE METHOD ---
+  static async update(
+    id: string,
+    data: Partial<CreateAdmissionUserType> & { photo?: string }
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      // 1. Find the existing user to get their current image
+      const existingUser = await db.user.findUnique({
+        where: { id },
+        select: { id: true, image: true, role: true },
+      });
+
+      if (!existingUser) {
+        throw new Error("User not found");
+      }
+
+      // 2. If a NEW photo was uploaded, and an OLD photo exists, delete the old one from S3!
+      if (data.photo && existingUser.image) {
+        const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+        await deleteFromS3(existingUser.image);
+      }
+
+      // 3. Prepare the update payload
+      const updateData: Record<string, unknown> = {};
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.username !== undefined) updateData.username = data.username;
+      if (data.photo !== undefined) updateData.image = data.photo; // Map photo -> image
+
+      // 4. Save to database
+      const updatedUser = await db.user.update({
+        where: { id },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          email: true,
+          role: true,
+          image: true,
+        },
+      });
+
+      return {
+        status: "success",
+        message: "User updated successfully",
+        data: updatedUser,
+      };
+    } catch (error) {
+      logger.error("Failed to update admission user", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to update user"
+      );
+    }
+  }
+
   static async delete(id: string): Promise<BaseResponse<unknown>> {
     try {
-      const user = await db.user.findUnique({ where: { id } });
+      const user = await db.user.findUnique({
+        where: { id },
+        select: { id: true, role: true, image: true }, // grab image to delete it!
+      });
+
       if (!user) {
         throw new Error("User not found");
       }
@@ -312,7 +378,14 @@ export class AdminAdmissionUserService {
         throw new Error("Cannot delete non-admission user via this endpoint");
       }
 
+      // --- CLEANUP S3 ON DELETE ---
+      if (user.image) {
+        const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+        await deleteFromS3(user.image);
+      }
+
       await db.user.delete({ where: { id } });
+
       return { status: "success", message: "User deleted", data: null };
     } catch (error) {
       logger.error("Failed to delete admission user", error);

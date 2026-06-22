@@ -9,9 +9,10 @@ import {
   SemesterLifecycleStatusSchema,
   SemesterTypeSchema,
 } from "@webcampus/schemas/admin";
+import { Button } from "@webcampus/ui/components/button"; // Add this import
+
 import {
   DEFAULT_FILTER_ALL_VALUE,
-  FilterActions,
   FilterBuilder,
   FilterPanel,
   type FilterFieldConfig,
@@ -52,7 +53,7 @@ const DEFAULT_SEMESTER_FILTERS: SemesterFilters = {
 };
 
 const normalizeFilters = (filters: SemesterFilters): SemesterFilters => ({
-  status: filters.status || "ACTIVE",
+  status: filters.status !== undefined ? filters.status : "ACTIVE",
   type: filters.type || "",
   year: filters.year || "",
 });
@@ -91,7 +92,7 @@ export const AdminSemesterView = () => {
     status: SemesterLifecycleStatusSchema.safeParse(appliedFilters.status)
       .success
       ? (appliedFilters.status as z.infer<typeof SemesterLifecycleStatusSchema>)
-      : "ACTIVE",
+      : undefined, // Changed from "ACTIVE" to undefined to fetch all statuses
     type: SemesterTypeSchema.safeParse(appliedFilters.type).success
       ? (appliedFilters.type as z.infer<typeof SemesterTypeSchema>)
       : undefined,
@@ -116,11 +117,19 @@ export const AdminSemesterView = () => {
     createTerm(data);
   };
 
-  const updateDraftFilter = (key: keyof SemesterFilters, value: string) => {
-    setDraftFilters((current) => ({
-      ...current,
+  const handleFilterChange = (key: keyof SemesterFilters, value: string) => {
+    const nextFilters = normalizeFilters({
+      ...appliedFilters,
       [key]: value,
-    }));
+    });
+
+    setDraftFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+
+    const query = createFilterQueryString(nextFilters);
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, {
+      scroll: false,
+    });
   };
 
   const semesterFilterFields: FilterFieldConfig<SemesterFilters>[] = [
@@ -128,7 +137,8 @@ export const AdminSemesterView = () => {
       key: "status",
       label: "Semester Status",
       type: "select",
-      placeholder: "Filter by status",
+      placeholder: "All",
+      allOptionLabel: "All",
       options: SemesterLifecycleStatusSchema.options.map((status) => ({
         label: status,
         value: status,
@@ -138,8 +148,8 @@ export const AdminSemesterView = () => {
       key: "type",
       label: "Term Type",
       type: "select",
-      placeholder: "All term types",
-      allOptionLabel: "All term types",
+      placeholder: "All",
+      allOptionLabel: "All",
       options: SemesterTypeSchema.options.map((type) => ({
         label: type.charAt(0).toUpperCase() + type.slice(1),
         value: type,
@@ -149,23 +159,14 @@ export const AdminSemesterView = () => {
       key: "year",
       label: "Year",
       type: "select",
-      placeholder: "All years",
-      allOptionLabel: "All years",
+      placeholder: "All",
+      allOptionLabel: "All",
       options: years.map((year) => ({
         label: year,
         value: year,
       })),
     },
   ];
-
-  const applyFilters = () => {
-    const nextFilters = normalizeFilters(draftFilters);
-    setAppliedFilters(nextFilters);
-    const query = createFilterQueryString(nextFilters);
-    router.replace(`${pathname}${query ? `?${query}` : ""}`, {
-      scroll: false,
-    });
-  };
 
   const resetFilters = () => {
     const nextFilters = DEFAULT_SEMESTER_FILTERS;
@@ -259,13 +260,16 @@ export const AdminSemesterView = () => {
             <FilterBuilder
               fields={semesterFilterFields}
               draftFilters={draftFilters}
-              onDraftChange={updateDraftFilter}
+              onDraftChange={handleFilterChange}
               allValue={DEFAULT_FILTER_ALL_VALUE}
               className="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
             />
-            <FilterActions onApply={applyFilters} onReset={resetFilters} />
+            <div className="flex w-full justify-end pt-2">
+              <Button variant="ghost" size="sm" onClick={resetFilters}>
+                Clear Filters
+              </Button>
+            </div>
           </FilterPanel>
-
           {terms && terms.length > 0 ? (
             <div className="space-y-4">
               {terms.map((term) => (

@@ -10,6 +10,10 @@ import multer from "multer";
 const router: Router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+// 2. Initialize multer to keep the uploaded file in memory
+const upload = multer({ storage: multer.memoryStorage() });
+
+// --- CREATE ROUTE ---
 router.post(
   "/",
   upload.single("photo"),
@@ -41,6 +45,19 @@ router.get(
   AdminAdmissionUserController.getAll
 );
 
+// --- UPDATE/EDIT ROUTE (Newly Added!) ---
+router.patch(
+  "/:id",
+  upload.single("photo"), // <-- Catch the "photo" file on edits
+  // Note: If you have an UpdateAdmissionUserSchema, you can add validateRequest() here!
+  protect({
+    role: "admin",
+    permissions: { user: ["set-role"] }, // Assuming editing requires the same permissions
+  }),
+  AdminAdmissionUserController.update // Make sure this method exists in your controller!
+);
+
+// --- DELETE ROUTE ---
 router.delete(
   "/:id",
   protect({

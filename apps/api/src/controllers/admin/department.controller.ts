@@ -1,13 +1,8 @@
-import { IncomingHttpHeaders } from "http";
 import { DepartmentService } from "@webcampus/api/src/services/admin/department.service";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
-import { CreateUserType } from "@webcampus/schemas/admin";
-import {
-  CreateDepartmentDTO,
-  UpdateDepartmentDTO,
-} from "@webcampus/schemas/department";
+import { UpdateDepartmentDTO } from "@webcampus/schemas/department";
 import { Request, Response } from "express";
 
 export class DepartmentController {
@@ -68,10 +63,26 @@ export class DepartmentController {
         throw new Error("Department logo is required");
       }
 
-      const request: CreateDepartmentDTO &
-        CreateUserType & { headers: IncomingHttpHeaders } = req.body;
+      const {
+        username,
+        name,
+        email,
+        password,
+        role,
+        code,
+        abbreviation,
+        type,
+      } = req.body;
+
       const response = await DepartmentService.create({
-        ...request,
+        username,
+        name,
+        email,
+        password,
+        role,
+        code,
+        abbreviation,
+        type,
         headers: req.headers,
         logoFile,
       });

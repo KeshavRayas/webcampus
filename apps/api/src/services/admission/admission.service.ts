@@ -285,12 +285,20 @@ export class AdmissionService {
       }
 
       if (!existingApplicantUser) {
+        const applicantFullName = [
+          data.firstName,
+          data.middleName,
+          data.lastName,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
         // We generate a dummy email and name since the applicant has not filled it out yet.
         // Username is normalized to lowercase for Better Auth compatibility.
         const userService = new UserService({
           request: {
             email: applicantEmail,
-            name: `Applicant ${applicationId}`,
+            name: applicantFullName,
             username: AdmissionService.normalizeApplicationId(applicationId),
             password: "password", // Dummy password
             role: "applicant",
@@ -313,6 +321,9 @@ export class AdmissionService {
       const admission = await db.admission.create({
         data: {
           applicationId,
+          firstName: data.firstName,
+          middleName: data.middleName,
+          lastName: data.lastName,
           modeOfAdmission: data.modeOfAdmission,
           semesterId: data.semesterId,
           departmentId: data.departmentId,

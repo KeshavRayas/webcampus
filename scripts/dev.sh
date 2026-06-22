@@ -13,7 +13,7 @@ trap cleanup INT TERM EXIT
 bunx tsx scripts/banner.ts
 
 # Start docker desktop
-docker desktop start
+# docker desktop start
 
 # Free up common development ports before starting the dev server
 sh scripts/kill-ports.sh
@@ -25,7 +25,7 @@ bun dx
 bun run bootstrap
 
 # Seed the database
-# bun turbo seed
+# bun turbo seed  
 
 
 # Start the Turborepo development server using Bun

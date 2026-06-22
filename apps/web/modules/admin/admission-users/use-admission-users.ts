@@ -27,8 +27,9 @@ export const useAdmissionUsers = () => {
       name: "",
       username: "",
       email: "",
-      password: "",
+      password: "password",
       role: "admission_reviewer",
+      photo: undefined,
     },
   });
 
@@ -122,6 +123,43 @@ export const useAdmissionUserUpdate = () => {
   });
 
   return { updateUser, isUpdating };
+};
+
+export const useAdmissionUserEdit = () => {
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const queryClient = useQueryClient();
+
+  const { mutateAsync: onEdit, isPending: isEditing } = useMutation({
+    // Changed this to accept FormData
+    mutationFn: async ({
+      id,
+      formData,
+    }: {
+      id: string;
+      formData: FormData;
+    }) => {
+      const response = await axios.patch(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users/${id}`,
+        formData,
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-admission-users"] });
+      toast.success("User updated successfully");
+    },
+    onError: (error: AxiosError<{ message?: string }>) => {
+      toast.error(error.response?.data?.message || "Failed to update user");
+    },
+  });
+
+  return { onEdit, isEditing };
 };
 
 export const useAdmissionUserDelete = () => {

@@ -185,10 +185,10 @@ const resolveContext = async (departmentCode: string) => {
 const submitAndApprove = async (
   applicationId: string,
   serial: number,
-  admissionId: string
+  admissionId: string,
+  firstName: string,
+  lastName: string
 ): Promise<void> => {
-  const firstName = faker.person.firstName();
-  const lastName = faker.person.lastName();
   const fullName = `${firstName} ${lastName}`;
 
   const data: Record<string, string> = {
@@ -285,9 +285,15 @@ async function main() {
     }
 
     try {
+      // Generate the names BEFORE creating the shell
+      const firstName = faker.person.firstName();
+      const lastName = faker.person.lastName();
+
       const shellResponse = await AdmissionService.createShell(
         {
           applicationId,
+          firstName, // Pass the new required field
+          lastName, // Pass the new required field
           modeOfAdmission: "KCET",
           semesterId: context.semesterId,
           departmentId: context.departmentId,
@@ -322,7 +328,13 @@ async function main() {
         throw new Error(`Admission id not found for ${applicationId}`);
       }
 
-      await submitAndApprove(applicationId, nextApplicationNumber, admissionId);
+      await submitAndApprove(
+        applicationId,
+        nextApplicationNumber,
+        admissionId,
+        firstName,
+        lastName
+      );
       approvedCreated += 1;
 
       if (approvedCreated % 50 === 0 || approvedCreated === args.count) {
