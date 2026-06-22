@@ -7,14 +7,11 @@ import {
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
-import { DataTable } from "@webcampus/ui/components/data-table";
 import {
-  DEFAULT_FILTER_ALL_VALUE,
-  FilterActions,
-  FilterBuilder,
-  FilterPanel,
-  type FilterFieldConfig,
-} from "@webcampus/ui/components/filter-builder";
+  FacultyHandlingAssignmentDTO,
+  FacultyHandlingStudentDTO,
+} from "@webcampus/types/api";
+import { DataTable } from "@webcampus/ui/components/data-table";
 import {
   Dialog,
   DialogContent,
@@ -22,14 +19,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
+import {
+  DEFAULT_FILTER_ALL_VALUE,
+  FilterActions,
+  FilterBuilder,
+  FilterPanel,
+  type FilterFieldConfig,
+} from "@webcampus/ui/components/filter-builder";
 import { Skeleton } from "@webcampus/ui/components/skeleton";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import {
-  FacultyHandlingAssignmentDTO,
-  FacultyHandlingStudentDTO,
-} from "@webcampus/types/api";
 import {
   FacultyHandlingFilters,
   FacultyHandlingKind,
@@ -59,12 +59,21 @@ const getAssignmentId = (row: FacultyHandlingAssignmentDTO): string | null => {
   return row.assignmentId;
 };
 
-const getAssignmentLabel = (row: FacultyHandlingAssignmentDTO): string => {
+const getAssignmentLabel = (
+  row: FacultyHandlingAssignmentDTO,
+  kind: FacultyHandlingKind
+): string => {
   const courseName = row.courseName || "Untitled course";
   const courseCode = row.courseCode ? ` (${row.courseCode})` : "";
   const batchName = row.batchName ? ` - Batch ${row.batchName}` : "";
   const section = row.section ? ` - Section ${row.section}` : "";
+  const semester =
+    row.semesterNumber != null && row.semesterNumber !== undefined
+      ? ` - Sem ${row.semesterNumber}`
+      : "";
 
+  if (kind == "courses")
+    return `${courseName}${courseCode}${section}${semester}`;
   return `${courseName}${courseCode}${section}${batchName}`;
 };
 
@@ -81,21 +90,23 @@ const studentColumns: ColumnDef<FacultyHandlingStudentDTO>[] = [
     header: "Email",
     accessorFn: (row) => row.email || "-",
   },
-  {
-    header: "Section",
-    accessorFn: (row) => row.section || "-",
-  },
-  {
-    header: "Batch",
-    accessorFn: (row) => row.batchName || "-",
-  },
-  {
-    header: "Semester",
-    accessorFn: (row) =>
-      row.semesterNumber !== null && row.semesterNumber !== undefined
-        ? String(row.semesterNumber)
-        : "-",
-  },
+  // {
+  //   header: "Section",
+  //   accessorFn: (row) => row.section || "-",
+  // },
+  // {
+  //   header: "Batch",
+  //   accessorFn: (row) => row.batchName || "-",
+  // },
+  // {
+  //   header: "Semester",
+  //   accessorFn: (row) =>
+  //     row.semesterNumber !== null && row.semesterNumber !== undefined
+  //       ? String(row.semesterNumber)
+  //       : "-",
+  // },
+
+  // Section, Batch and Semester removed for Mobile optimissation
 ];
 
 export const FacultyHandlingView = ({
@@ -148,7 +159,9 @@ export const FacultyHandlingView = ({
       : selectedTermSemesters;
 
   const sectionsBySemester = useMemo(() => {
-    return new Map(filterOptions.semesters.map((semester) => [semester.id, semester]));
+    return new Map(
+      filterOptions.semesters.map((semester) => [semester.id, semester])
+    );
   }, [filterOptions.semesters]);
 
   const filteredSections = useMemo(
@@ -256,7 +269,10 @@ export const FacultyHandlingView = ({
     toast.error(message);
   }, [studentsQuery.error, studentsQuery.isError]);
 
-  const updateDraftFilter = (key: keyof FacultyHandlingFilters, value: string) => {
+  const updateDraftFilter = (
+    key: keyof FacultyHandlingFilters,
+    value: string
+  ) => {
     setDraftFilters((current) => ({
       ...current,
       [key]: value,
@@ -362,7 +378,9 @@ export const FacultyHandlingView = ({
       label: "Program Type",
       type: "select",
       allOptionLabel: "All programs",
-      placeholder: draftFilters.academicTerm ? "All programs" : "Select term first",
+      placeholder: draftFilters.academicTerm
+        ? "All programs"
+        : "Select term first",
       options: [
         { label: "UG", value: "UG" },
         { label: "PG", value: "PG" },
@@ -385,7 +403,9 @@ export const FacultyHandlingView = ({
       label: "Section",
       type: "select",
       allOptionLabel: "All sections",
-      placeholder: draftFilters.academicTerm ? "All sections" : "Select term first",
+      placeholder: draftFilters.academicTerm
+        ? "All sections"
+        : "Select term first",
       options: sectionOptions,
     },
   ];
@@ -480,9 +500,11 @@ export const FacultyHandlingView = ({
                 <th className="h-10 px-4 text-left align-middle text-sm font-medium">
                   Section
                 </th>
-                <th className="h-10 px-4 text-left align-middle text-sm font-medium">
-                  Batch
-                </th>
+                {kind !== "courses" && (
+                  <th className="h-10 px-4 text-left align-middle text-sm font-medium">
+                    Batch
+                  </th>
+                )}
                 <th className="h-10 px-4 text-left align-middle text-sm font-medium">
                   Students
                 </th>
@@ -501,14 +523,19 @@ export const FacultyHandlingView = ({
                     <td className="p-4 text-sm">{row.courseCode || "-"}</td>
                     <td className="p-4 text-sm">{row.courseName || "-"}</td>
                     <td className="p-4 text-sm">
-                      {row.semesterNumber !== null && row.semesterNumber !== undefined
+                      {row.semesterNumber !== null &&
+                      row.semesterNumber !== undefined
                         ? row.semesterNumber
                         : "-"}
                     </td>
                     <td className="p-4 text-sm">{row.section || "-"}</td>
-                    <td className="p-4 text-sm">{row.batchName || "-"}</td>
+                    {/* hidden batch cell for courses */}
+                    {kind !== "courses" && (
+                      <td className="p-4 text-sm">{row.batchName || "-"}</td>
+                    )}
                     <td className="p-4 text-sm">
-                      {row.studentCount !== null && row.studentCount !== undefined
+                      {row.studentCount !== null &&
+                      row.studentCount !== undefined
                         ? row.studentCount
                         : "-"}
                     </td>
@@ -555,8 +582,9 @@ export const FacultyHandlingView = ({
             <DialogTitle>Assigned Students</DialogTitle>
             <DialogDescription>
               {selectedAssignment
-                ? getAssignmentLabel(selectedAssignment)
+                ? getAssignmentLabel(selectedAssignment, kind)
                 : "Selected assignment"}
+              {/* passed "kind" parameter to getAssignmentLabel */}
             </DialogDescription>
           </DialogHeader>
 
