@@ -545,6 +545,8 @@ model Admission {
   motherNumber                    String?
   class10thMarksPdf               String?
   class12thMarksPdf               String?
+  hasClass12                      Boolean?
+  hasDiploma                      Boolean?
   class10thSchoolName             String?
   modeOfAdmission                 String
   photo                           String?
@@ -569,6 +571,17 @@ model Admission {
   class12thAggregateScore         Float?
   class12thAggregateTotal         Float?
   class12thBranch                 String?
+  diplomaInstituteName            String?
+  diplomaInstituteType            String?
+  diplomaInstituteCity            String?
+  diplomaInstituteState           String?
+  diplomaInstituteCode            String?
+  diplomaYearOfPassing            String?
+  diplomaBranch                   String?
+  diplomaMediumOfTeaching         String?
+  diplomaAggregateScore           Float?
+  diplomaAggregateTotal           Float?
+  diplomaMarksPdf                 String?
   class12thInstituteCity          String?
   class12thInstituteCode          String?
   class12thInstituteName          String?

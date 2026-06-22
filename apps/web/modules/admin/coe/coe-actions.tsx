@@ -1,7 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { UpdateAdmissionUserSchema } from "@webcampus/schemas/admin";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { frontendEnv } from "@webcampus/common/env";
+import { UpdateAdminUserSchema } from "@webcampus/schemas/admin";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -27,49 +29,32 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@webcampus/ui/components/select";
+import axios, { AxiosError } from "axios";
 import { MoreHorizontal } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "react-toastify";
 import { z } from "zod";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
-import { AdminAdmissionUserResponse } from "./admin-admission-users-columns";
-import {
-  useAdmissionUserDelete,
-  useAdmissionUserUpdate,
-} from "./use-admission-users";
+import { CoeUser } from "./coe-types";
 
-type UpdateAdmissionUserFormValues = z.infer<typeof UpdateAdmissionUserSchema>;
+type UpdateCoeFormValues = z.infer<typeof UpdateAdminUserSchema>;
 
-export const AdminAdmissionUsersActions = ({
-  user,
-}: {
-  user: AdminAdmissionUserResponse;
-}) => {
+export const CoeActions = ({ user }: { user: CoeUser }) => {
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const queryClient = useQueryClient();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
-  const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
-  const { onDelete, isDeleting } = useAdmissionUserDelete();
-  const { updateUser, isUpdating } = useAdmissionUserUpdate();
 
-  const editForm = useForm<UpdateAdmissionUserFormValues>({
-    resolver: zodResolver(UpdateAdmissionUserSchema),
+  const editForm = useForm<UpdateCoeFormValues>({
+    resolver: zodResolver(UpdateAdminUserSchema),
     defaultValues: {
       name: user.name,
       username: user.username || "",
       email: user.email,
-      role:
-        user.role === "admission_admin"
-          ? "admission_admin"
-          : "admission_reviewer",
     },
   });
 
@@ -80,13 +65,13 @@ export const AdminAdmissionUsersActions = ({
     }
 
     if (!file) {
-      setEditPhotoPreview(null);
+      setPhotoPreview(null);
       return;
     }
 
     const nextPreviewUrl = URL.createObjectURL(file);
     previewUrlRef.current = nextPreviewUrl;
-    setEditPhotoPreview(nextPreviewUrl);
+    setPhotoPreview(nextPreviewUrl);
   };
 
   const resetEditState = () => {
@@ -94,34 +79,70 @@ export const AdminAdmissionUsersActions = ({
       name: user.name,
       username: user.username || "",
       email: user.email,
-      role:
-        user.role === "admission_admin"
-          ? "admission_admin"
-          : "admission_reviewer",
     });
-    setEditPhotoFile(null);
+    setPhotoFile(null);
     replacePhotoPreview(null);
   };
 
-  const handleEditPhotoChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0] || null;
-    setEditPhotoFile(file);
-    replacePhotoPreview(file);
-  };
+  const { mutateAsync: updateCoe, isPending: isUpdating } = useMutation({
+    mutationFn: async (data: UpdateCoeFormValues) => {
+      const formData = new FormData();
+      formData.append("name", data.name);
+      formData.append("username", data.username);
+      formData.append("email", data.email);
 
-  const handleEditSubmit = async (data: UpdateAdmissionUserFormValues) => {
+      if (photoFile) {
+        formData.append("photo", photoFile);
+      }
+
+      const response = await axios.put(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe/${user.id}`,
+        formData,
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-coes"] });
+      toast.success("COE user updated successfully");
+    },
+    onError: (error: AxiosError<{ message?: string }>) => {
+      toast.error(error.response?.data?.message || "Failed to update COE user");
+    },
+  });
+
+  const { mutateAsync: deleteCoe, isPending: isDeleting } = useMutation({
+    mutationFn: async () => {
+      const response = await axios.delete(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe/${user.id}`,
+        {
+          withCredentials: true,
+        }
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-coes"] });
+      toast.success("COE user deleted successfully");
+    },
+    onError: (error: AxiosError<{ message?: string }>) => {
+      toast.error(error.response?.data?.message || "Failed to delete COE user");
+    },
+  });
+
+  const handleEditSubmit = async (data: UpdateCoeFormValues) => {
     try {
-      await updateUser({
-        id: user.id,
-        data,
-        photoFile: editPhotoFile,
-      });
+      await updateCoe(data);
       setIsEditOpen(false);
       resetEditState();
     } catch {
-      // Toast feedback is handled by the mutation hook.
+      // Toast feedback is handled by the mutation.
     }
   };
 
@@ -129,7 +150,7 @@ export const AdminAdmissionUsersActions = ({
     if (isEditOpen) {
       resetEditState();
     }
-  }, [isEditOpen, user.email, user.name, user.role, user.username]);
+  }, [isEditOpen, user.email, user.name, user.username]);
 
   useEffect(() => {
     return () => {
@@ -155,9 +176,8 @@ export const AdminAdmissionUsersActions = ({
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => setIsDeleteOpen(true)}
-            className="cursor-pointer text-red-600 focus:text-red-600"
+            className="text-red-600 focus:text-red-600"
           >
-            <Trash className="mr-2 h-4 w-4" />
             Delete User
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -174,9 +194,9 @@ export const AdminAdmissionUsersActions = ({
       >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Edit Admission User</DialogTitle>
+            <DialogTitle>Edit COE User</DialogTitle>
             <DialogDescription>
-              Update login details and replace the current profile photo if
+              Update user details and replace the current profile photo if
               needed.
             </DialogDescription>
           </DialogHeader>
@@ -193,7 +213,7 @@ export const AdminAdmissionUsersActions = ({
                   <FormItem>
                     <FormLabel>Full Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g., John Doe" />
+                      <Input {...field} placeholder="e.g., Jane Doe" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -207,7 +227,7 @@ export const AdminAdmissionUsersActions = ({
                   <FormItem>
                     <FormLabel>Username *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g., john.doe" />
+                      <Input {...field} placeholder="e.g., jane.doe" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -222,37 +242,11 @@ export const AdminAdmissionUsersActions = ({
                     <FormLabel>Email *</FormLabel>
                     <FormControl>
                       <Input
-                        type="email"
                         {...field}
-                        placeholder="john@example.com"
+                        type="email"
+                        placeholder="jane@example.com"
                       />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={editForm.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="admission_admin">
-                          Admission Admin (Data Entry)
-                        </SelectItem>
-                        <SelectItem value="admission_reviewer">
-                          Admission Reviewer (Approvals)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -261,10 +255,14 @@ export const AdminAdmissionUsersActions = ({
               <UserPhotoUpload
                 label="Profile Photo"
                 personName={editForm.watch("name") || user.name}
-                previewUrl={editPhotoPreview}
+                previewUrl={photoPreview}
                 currentImageUrl={user.image}
-                selectedFileName={editPhotoFile?.name || null}
-                onChange={handleEditPhotoChange}
+                selectedFileName={photoFile?.name || null}
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  setPhotoFile(file);
+                  replacePhotoPreview(file);
+                }}
               />
 
               <DialogFooter>
@@ -291,10 +289,10 @@ export const AdminAdmissionUsersActions = ({
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Admission User</DialogTitle>
+            <DialogTitle>Delete COE User</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {user.name} ({user.role})? This
-              action cannot be undone and will permanently remove their access.
+              Are you sure you want to delete {user.name}? This action cannot be
+              undone and will permanently remove their access.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -308,7 +306,7 @@ export const AdminAdmissionUsersActions = ({
             <Button
               variant="destructive"
               onClick={async () => {
-                await onDelete(user.id);
+                await deleteCoe();
                 setIsDeleteOpen(false);
               }}
               disabled={isDeleting}

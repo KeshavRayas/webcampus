@@ -9,7 +9,8 @@ export type AdminAdmissionUserResponse = {
   id: string;
   name: string;
   email: string;
-  username: string;
+  username: string | null;
+  image?: string | null;
   role: string;
   photo?: string; // <-- Added photo to the type
 };

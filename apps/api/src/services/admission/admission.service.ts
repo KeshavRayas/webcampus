@@ -475,6 +475,7 @@ export class AdmissionService {
         admission.photo,
         admission.class10thMarksPdf,
         admission.class12thMarksPdf,
+        admission.diplomaMarksPdf,
         admission.casteCertificate,
         admission.disabilityCertificate,
         admission.economicallyBackwardCertificate,
@@ -727,6 +728,8 @@ export class AdmissionService {
             : null,
           class10thMediumOfTeaching: data.class10thMediumOfTeaching,
 
+          hasClass12: data.hasClass12 === "true",
+          hasDiploma: data.hasDiploma === "true",
           class12thInstituteName: data.class12thInstituteName,
           class12thInstituteType: data.class12thInstituteType,
           class12thInstituteCity: data.class12thInstituteCity,
@@ -741,6 +744,21 @@ export class AdmissionService {
             ? parseFloat(data.class12thAggregateTotal)
             : null,
           class12thMediumOfTeaching: data.class12thMediumOfTeaching,
+
+          diplomaInstituteName: data.diplomaInstituteName ?? null,
+          diplomaInstituteType: data.diplomaInstituteType ?? null,
+          diplomaInstituteCity: data.diplomaInstituteCity ?? null,
+          diplomaInstituteState: data.diplomaInstituteState ?? null,
+          diplomaInstituteCode: data.diplomaInstituteCode ?? null,
+          diplomaYearOfPassing: data.diplomaYearOfPassing ?? null,
+          diplomaBranch: data.diplomaBranch ?? null,
+          diplomaMediumOfTeaching: data.diplomaMediumOfTeaching ?? null,
+          diplomaAggregateScore: data.diplomaAggregateScore
+            ? parseFloat(data.diplomaAggregateScore)
+            : null,
+          diplomaAggregateTotal: data.diplomaAggregateTotal
+            ? parseFloat(data.diplomaAggregateTotal)
+            : null,
 
           // Parent Details
           fatherName: data.fatherName,
@@ -767,6 +785,9 @@ export class AdmissionService {
           }),
           ...(fileUrls.class12thMarksPdf && {
             class12thMarksPdf: fileUrls.class12thMarksPdf,
+          }),
+          ...(fileUrls.diplomaMarksPdf && {
+            diplomaMarksPdf: fileUrls.diplomaMarksPdf,
           }),
           ...(fileUrls.casteCertificate && {
             casteCertificate: fileUrls.casteCertificate,

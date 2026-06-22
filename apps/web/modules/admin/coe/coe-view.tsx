@@ -1,27 +1,16 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { ColumnDef } from "@tanstack/react-table";
 import { frontendEnv } from "@webcampus/common/env";
 import { DataTable } from "@webcampus/ui/components/data-table";
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@webcampus/ui/components/form";
-import { Input } from "@webcampus/ui/components/input";
-import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
 import axios from "axios";
-import { Eye, EyeOff } from "lucide-react";
-import React, { useState } from "react";
-import { CoeUserColumns, CoeUserResponse } from "./coe-users-columns";
-import { useCoeUsers } from "./use-coe-users";
+import { CoeActions } from "./coe-actions";
+import { CoeForm } from "./coe-form";
+import { CoeUser } from "./coe-types";
 
 export const CoeView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const { form, onSubmit } = useCoeUsers();
-  const [showPassword, setShowPassword] = useState(false);
 
   const { data: coes = [], isLoading } = useQuery<CoeUserResponse[]>({
     queryKey: ["admin-coes"],
@@ -33,36 +22,25 @@ export const CoeView = () => {
     },
   });
 
-  return (
-    <div className="space-y-6">
-      <div className="bg-card text-card-foreground space-y-4 rounded-lg border p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">COE Users</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Manage COE users and their system access.
-            </p>
-          </div>
-
-          <DialogForm
-            trigger="Create COE User"
-            title="Create COE User"
-            form={form}
-            onSubmit={onSubmit}
-          >
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Jane Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+  const columns: ColumnDef<CoeUser>[] = [
+    {
+      accessorKey: "name",
+      header: "Name",
+    },
+    {
+      accessorKey: "username",
+      header: "Username",
+      cell: ({ row }) => row.original.username || "-",
+    },
+    {
+      accessorKey: "email",
+      header: "Email",
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => <CoeActions user={row.original} />,
+    },
+  ];
 
             <FormField
               control={form.control}

@@ -9,4 +9,9 @@ export const CreateAdmissionUserSchema = z.object({
   photo: z.any().optional(),
 });
 
+export const UpdateAdmissionUserSchema = CreateAdmissionUserSchema.omit({
+  password: true,
+});
+
 export type CreateAdmissionUserType = z.infer<typeof CreateAdmissionUserSchema>;
+export type UpdateAdmissionUserType = z.infer<typeof UpdateAdmissionUserSchema>;

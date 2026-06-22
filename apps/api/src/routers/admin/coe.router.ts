@@ -1,5 +1,9 @@
 import { CoeController } from "@webcampus/api/src/controllers/admin/coe.controller";
-import { protect } from "@webcampus/backend-utils/middlewares";
+import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
+import {
+  createUserSchema,
+  UpdateAdminUserSchema,
+} from "@webcampus/schemas/admin";
 import { Router } from "express";
 import multer from "multer";
 
@@ -15,8 +19,18 @@ router.use(
   })
 );
 
-// Added upload.single("photo") to match the frontend key
-router.post("/", upload.single("photo"), CoeController.createCoe);
+router.post(
+  "/",
+  upload.single("photo"),
+  validateRequest(createUserSchema.omit({ role: true })),
+  CoeController.createCoe
+);
+router.put(
+  "/:id",
+  upload.single("photo"),
+  validateRequest(UpdateAdminUserSchema),
+  CoeController.updateCoe
+);
 router.get("/", CoeController.getCoes);
 
 // NEW: Added Patch route for editing COE users

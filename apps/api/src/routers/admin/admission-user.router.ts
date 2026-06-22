@@ -1,10 +1,14 @@
 import { AdminAdmissionUserController } from "@webcampus/api/src/controllers/admin/admission-user.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
-import { CreateAdmissionUserSchema } from "@webcampus/schemas/admin";
+import {
+  CreateAdmissionUserSchema,
+  UpdateAdmissionUserSchema,
+} from "@webcampus/schemas/admin";
 import { Router } from "express";
-import multer from "multer"; // <-- 1. Import multer
+import multer from "multer";
 
 const router: Router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 // 2. Initialize multer to keep the uploaded file in memory
 const upload = multer({ storage: multer.memoryStorage() });
@@ -12,7 +16,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // --- CREATE ROUTE ---
 router.post(
   "/",
-  upload.single("photo"), // <-- 3. Catch the "photo" file from FormData before validation
+  upload.single("photo"),
   validateRequest(CreateAdmissionUserSchema),
   protect({
     role: "admin",
@@ -21,7 +25,17 @@ router.post(
   AdminAdmissionUserController.create
 );
 
-// --- GET ALL ROUTE ---
+router.put(
+  "/:id",
+  upload.single("photo"),
+  validateRequest(UpdateAdmissionUserSchema),
+  protect({
+    role: "admin",
+    permissions: { user: ["set-role"] },
+  }),
+  AdminAdmissionUserController.update
+);
+
 router.get(
   "/",
   protect({
