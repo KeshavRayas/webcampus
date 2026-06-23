@@ -58,51 +58,53 @@ export class CoeController {
     }
   }
 
+  // static async updateCoe(req: Request, res: Response): Promise<void> {
+  //   try {
+  //     // FIX 2: Wrapped in String() to ensure it's not undefined or string[]
+  //     const id = String(req.params.id);
+
+  //     if (req.file) {
+  //       const fileName = generateFileName(req.file.originalname, "coe/photos/");
+  //       const s3Result = await uploadToS3(
+  //         req.file.buffer,
+  //         fileName,
+  //         req.file.mimetype
+  //       );
+
+  //       if (s3Result.success) {
+  //         req.body.photo = s3Result.url;
+  //       }
+  //     }
+
+  //     const response = await CoeService.update(id, req.body);
+
+  //     if (response.status === "success") {
+  //       sendResponse({
+  //         res,
+  //         status: "success",
+  //         statusCode: 200,
+  //         message: response.message,
+  //         data: response.data,
+  //       });
+  //     }
+  //   } catch (error: unknown) {
+  //     const err = error instanceof Error ? error : new Error(String(error));
+  //     logger.error(`Error creating COE: ${err.message}`, err);
+  //     sendResponse({
+  //       res,
+  //       status: "error",
+  //       message: err.message || "Failed to update COE user",
+  //       statusCode: 500,
+  //       error: error instanceof Error ? error : new Error(String(error)),
+  //     });
+  //   }
+  // }
+
+  // removed the duplicate updateCoe method and safely passed req.file to the service
+
   static async updateCoe(req: Request, res: Response): Promise<void> {
     try {
-      // FIX 2: Wrapped in String() to ensure it's not undefined or string[]
       const id = String(req.params.id);
-
-      if (req.file) {
-        const fileName = generateFileName(req.file.originalname, "coe/photos/");
-        const s3Result = await uploadToS3(
-          req.file.buffer,
-          fileName,
-          req.file.mimetype
-        );
-
-        if (s3Result.success) {
-          req.body.photo = s3Result.url;
-        }
-      }
-
-      const response = await CoeService.update(id, req.body);
-
-      if (response.status === "success") {
-        sendResponse({
-          res,
-          status: "success",
-          statusCode: 200,
-          message: response.message,
-          data: response.data,
-        });
-      }
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.error(`Error creating COE: ${err.message}`, err);
-      sendResponse({
-        res,
-        status: "error",
-        message: err.message || "Failed to update COE user",
-        statusCode: 500,
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-    }
-  }
-
-  static async updateCoe(req: Request, res: Response): Promise<void> {
-    try {
-      const id = req.params.id as string;
       const response = await CoeService.update(id, req.body, req.file);
 
       if (response.status === "success") {
@@ -114,29 +116,41 @@ export class CoeController {
           data: response.data,
         });
       }
-    } catch (error) {
-      if (error instanceof Error) {
-        logger.error(`Error updating COE: ${error.message}`, error);
-        sendResponse({
-          res,
-          status: "error",
-          message: error.message,
-          statusCode: error.message.includes("exists") ? 409 : 400,
-          error,
-        });
-      } else {
-        logger.error(
-          `Error updating COE: ${ERRORS.INTERNAL_SERVER_ERROR}`,
-          error
-        );
-        sendResponse({
-          res,
-          status: "error",
-          message: ERRORS.INTERNAL_SERVER_ERROR,
-          statusCode: 500,
-          error,
-        });
-      }
+    } catch (error: unknown) {
+      // Refactoring some error logging code for cleaner code
+
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error(`Error updating COE: ${err.message}`, err);
+      sendResponse({
+        res,
+        status: "error",
+        message: err.message || "Failed to update COE user",
+        statusCode: err.message.includes("exists") ? 409 : 500,
+        error: err,
+      });
+
+      // if (error instanceof Error) {
+      //   logger.error(`Error updating COE: ${error.message}`, error);
+      //   sendResponse({
+      //     res,
+      //     status: "error",
+      //     message: error.message,
+      //     statusCode: error.message.includes("exists") ? 409 : 400,
+      //     error,
+      //   });
+      // } else {
+      //   logger.error(
+      //     `Error updating COE: ${ERRORS.INTERNAL_SERVER_ERROR}`,
+      //     error
+      //   );
+      //   sendResponse({
+      //     res,
+      //     status: "error",
+      //     message: ERRORS.INTERNAL_SERVER_ERROR,
+      //     statusCode: 500,
+      //     error: err,
+      //   });
+      // }
     }
   }
 
@@ -155,13 +169,14 @@ export class CoeController {
       }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.error(`Error creating COE: ${err.message}`, err);
+      logger.error(`Error fetching COEs: ${err.message}`, err);
       sendResponse({
         res,
         status: "error",
         message: "Failed to get COEs",
         statusCode: 500,
-        error: error instanceof Error ? error : new Error(String(error)),
+        error: err,
+        // fixed redundant code
       });
     }
   }
@@ -189,7 +204,9 @@ export class CoeController {
         status: "error",
         message: err.message || "Failed to delete COE",
         statusCode: 500,
-        error: error instanceof Error ? error : new Error(String(error)),
+        // error: error instanceof Error ? error : new Error(String(error)),
+        error: err,
+        // fixed redundant code
       });
     }
   }

@@ -163,6 +163,8 @@ export class AdminAdmissionUserService {
     }
   }
 
+  // writing down a more robust update function
+
   static async update(
     id: string,
     data: UpdateAdmissionUserType,
@@ -189,6 +191,7 @@ export class AdminAdmissionUserService {
         throw new Error("Admission user not found");
       }
 
+      // 1. Safely handle S3 File Uploads
       if (photoFile) {
         uploadedImageUrl = await this.uploadPhoto(
           photoFile,
@@ -196,19 +199,36 @@ export class AdminAdmissionUserService {
         );
       }
 
-      if (existingUser.role !== data.role) {
+      // 2. Safely Sync Roles with external Auth provider
+      if (data.role && existingUser.role !== data.role) {
         await this.syncRole(id, data.role, headers);
       }
 
+      // 3.ROBUST PAYLOAD CONSTRUCTION
+      // Only updates fields that are explicitly provided, preventing undefined crashes
+      const updateData: Prisma.UserUpdateInput = {};
+
+      if (data.name) {
+        updateData.name = data.name.trim();
+        updateData.displayUsername = data.name.trim();
+      }
+      if (data.email) {
+        updateData.email = data.email.trim();
+      }
+      if (data.username) {
+        updateData.username = this.normalizeUsername(data.username);
+      }
+      if (data.role) {
+        updateData.role = data.role;
+      }
+      if (uploadedImageUrl) {
+        updateData.image = uploadedImageUrl;
+      }
+
+      // 4. Execute the safe database update
       const updatedUser = await db.user.update({
         where: { id },
-        data: {
-          name: data.name.trim(),
-          email: data.email.trim(),
-          username: this.normalizeUsername(data.username),
-          displayUsername: data.name.trim(),
-          ...(uploadedImageUrl ? { image: uploadedImageUrl } : {}),
-        },
+        data: updateData,
         select: {
           id: true,
           name: true,
@@ -221,6 +241,7 @@ export class AdminAdmissionUserService {
         },
       });
 
+      // 5. Cleanup the old S3 photo if a new one was uploaded
       if (uploadedImageUrl && existingUser.image) {
         try {
           await this.deletePhoto(existingUser.image);
@@ -235,9 +256,10 @@ export class AdminAdmissionUserService {
       return {
         status: "success",
         message: "Admission user updated successfully",
-        data: updatedUser,
+        data: updatedUser as AdmissionUserRecord,
       };
     } catch (error) {
+      // Revert the S3 upload if the database update failed
       if (uploadedImageUrl) {
         try {
           await this.deletePhoto(uploadedImageUrl);
@@ -265,6 +287,108 @@ export class AdminAdmissionUserService {
     }
   }
 
+  // static async update(
+  //   id: string,
+  //   data: UpdateAdmissionUserType,
+  //   headers: IncomingHttpHeaders,
+  //   photoFile?: Express.Multer.File
+  // ): Promise<BaseResponse<AdmissionUserRecord>> {
+  //   let uploadedImageUrl: string | null = null;
+
+  //   try {
+  //     const existingUser = await db.user.findUnique({
+  //       where: { id },
+  //       select: {
+  //         id: true,
+  //         role: true,
+  //         image: true,
+  //       },
+  //     });
+
+  //     if (
+  //       !existingUser ||
+  //       (existingUser.role !== "admission_admin" &&
+  //         existingUser.role !== "admission_reviewer")
+  //     ) {
+  //       throw new Error("Admission user not found");
+  //     }
+
+  //     if (photoFile) {
+  //       uploadedImageUrl = await this.uploadPhoto(
+  //         photoFile,
+  //         "admission_user_photo_"
+  //       );
+  //     }
+
+  //     if (existingUser.role !== data.role) {
+  //       await this.syncRole(id, data.role, headers);
+  //     }
+
+  //     const updatedUser = await db.user.update({
+  //       where: { id },
+  //       data: {
+  //         name: data.name.trim(),
+  //         email: data.email.trim(),
+  //         username: this.normalizeUsername(data.username),
+  //         displayUsername: data.name.trim(),
+  //         ...(uploadedImageUrl ? { image: uploadedImageUrl } : {}),
+  //       },
+  //       select: {
+  //         id: true,
+  //         name: true,
+  //         email: true,
+  //         username: true,
+  //         displayUsername: true,
+  //         image: true,
+  //         role: true,
+  //         createdAt: true,
+  //       },
+  //     });
+
+  //     if (uploadedImageUrl && existingUser.image) {
+  //       try {
+  //         await this.deletePhoto(existingUser.image);
+  //       } catch (cleanupError) {
+  //         logger.warn("Failed to delete previous admission user photo", {
+  //           previousImageUrl: existingUser.image,
+  //           cleanupError,
+  //         });
+  //       }
+  //     }
+
+  //     return {
+  //       status: "success",
+  //       message: "Admission user updated successfully",
+  //       data: updatedUser,
+  //     };
+  //   } catch (error) {
+  //     if (uploadedImageUrl) {
+  //       try {
+  //         await this.deletePhoto(uploadedImageUrl);
+  //       } catch (cleanupError) {
+  //         logger.warn("Failed to clean up new admission user photo", {
+  //           uploadedImageUrl,
+  //           cleanupError,
+  //         });
+  //       }
+  //     }
+
+  //     if (
+  //       error instanceof Prisma.PrismaClientKnownRequestError &&
+  //       error.code === "P2002"
+  //     ) {
+  //       throw new Error("Email or username already exists");
+  //     }
+
+  //     logger.error("Failed to update admission user", error);
+  //     throw new Error(
+  //       error instanceof Error
+  //         ? error.message
+  //         : "Failed to update admission user"
+  //     );
+  //   }
+  // }
+
   static async getAll(): Promise<BaseResponse<unknown>> {
     try {
       await UserService.backfillMissingProfileFields();
@@ -284,7 +408,7 @@ export class AdminAdmissionUserService {
           image: true,
           role: true,
           createdAt: true,
-          image: true, // Make sure the frontend can receive the image!
+          // image: true, // Make sure the frontend can receive the image!
         },
         orderBy: { createdAt: "desc" },
       });
@@ -307,59 +431,59 @@ export class AdminAdmissionUserService {
   }
 
   // --- NEW UPDATE METHOD ---
-  static async update(
-    id: string,
-    data: Partial<CreateAdmissionUserType> & { photo?: string }
-  ): Promise<BaseResponse<unknown>> {
-    try {
-      // 1. Find the existing user to get their current image
-      const existingUser = await db.user.findUnique({
-        where: { id },
-        select: { id: true, image: true, role: true },
-      });
+  // static async update(
+  //   id: string,
+  //   data: Partial<CreateAdmissionUserType> & { photo?: string }
+  // ): Promise<BaseResponse<unknown>> {
+  //   try {
+  //     // 1. Find the existing user to get their current image
+  //     const existingUser = await db.user.findUnique({
+  //       where: { id },
+  //       select: { id: true, image: true, role: true },
+  //     });
 
-      if (!existingUser) {
-        throw new Error("User not found");
-      }
+  //     if (!existingUser) {
+  //       throw new Error("User not found");
+  //     }
 
-      // 2. If a NEW photo was uploaded, and an OLD photo exists, delete the old one from S3!
-      if (data.photo && existingUser.image) {
-        const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
-        await deleteFromS3(existingUser.image);
-      }
+  //     // 2. If a NEW photo was uploaded, and an OLD photo exists, delete the old one from S3!
+  //     if (data.photo && existingUser.image) {
+  //       const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+  //       await deleteFromS3(existingUser.image);
+  //     }
 
-      // 3. Prepare the update payload
-      const updateData: Record<string, unknown> = {};
-      if (data.name !== undefined) updateData.name = data.name;
-      if (data.username !== undefined) updateData.username = data.username;
-      if (data.photo !== undefined) updateData.image = data.photo; // Map photo -> image
+  //     // 3. Prepare the update payload
+  //     const updateData: Record<string, unknown> = {};
+  //     if (data.name !== undefined) updateData.name = data.name;
+  //     if (data.username !== undefined) updateData.username = data.username;
+  //     if (data.photo !== undefined) updateData.image = data.photo; // Map photo -> image
 
-      // 4. Save to database
-      const updatedUser = await db.user.update({
-        where: { id },
-        data: updateData,
-        select: {
-          id: true,
-          name: true,
-          username: true,
-          email: true,
-          role: true,
-          image: true,
-        },
-      });
+  //     // 4. Save to database
+  //     const updatedUser = await db.user.update({
+  //       where: { id },
+  //       data: updateData,
+  //       select: {
+  //         id: true,
+  //         name: true,
+  //         username: true,
+  //         email: true,
+  //         role: true,
+  //         image: true,
+  //       },
+  //     });
 
-      return {
-        status: "success",
-        message: "User updated successfully",
-        data: updatedUser,
-      };
-    } catch (error) {
-      logger.error("Failed to update admission user", error);
-      throw new Error(
-        error instanceof Error ? error.message : "Failed to update user"
-      );
-    }
-  }
+  //     return {
+  //       status: "success",
+  //       message: "User updated successfully",
+  //       data: updatedUser,
+  //     };
+  //   } catch (error) {
+  //     logger.error("Failed to update admission user", error);
+  //     throw new Error(
+  //       error instanceof Error ? error.message : "Failed to update user"
+  //     );
+  //   }
+  // }
 
   static async delete(id: string): Promise<BaseResponse<unknown>> {
     try {

@@ -52,8 +52,10 @@ export const AdminAdmissionUsersView = () => {
   const previewUrlRef = useRef<string | null>(null);
 
   // State for password visibility and table filtering
-  const [showPassword, setShowPassword] = useState(false);
-  const [roleFilter, setRoleFilter] = useState<string>("all");
+  // const [showPassword, setShowPassword] = useState(false);
+  // const [roleFilter, setRoleFilter] = useState<string>("all");
+
+  // REMOVING UNUSED VARIABLES
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-admission-users"],
@@ -265,10 +267,7 @@ export const AdminAdmissionUsersView = () => {
         {isLoading ? (
           <div className="text-muted-foreground text-sm">Loading users...</div>
         ) : (
-          <DataTable
-            columns={AdminAdmissionUserColumns}
-            data={filteredUsers || []}
-          />
+          <DataTable columns={AdminAdmissionUserColumns} data={users} />
         )}
       </div>
     </div>
