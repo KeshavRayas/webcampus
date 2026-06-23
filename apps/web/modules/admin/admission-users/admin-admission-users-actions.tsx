@@ -34,7 +34,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-import { MoreHorizontal } from "lucide-react";
+// added import { Trash } from "lucide-react";
+
+import { MoreHorizontal, Trash } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";

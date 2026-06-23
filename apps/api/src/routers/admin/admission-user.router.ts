@@ -11,7 +11,9 @@ const router: Router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // 2. Initialize multer to keep the uploaded file in memory
-const upload = multer({ storage: multer.memoryStorage() });
+// const upload = multer({ storage: multer.memoryStorage() });
+
+// removed the duplicate line of code
 
 // --- CREATE ROUTE ---
 router.post(
@@ -49,7 +51,8 @@ router.get(
 router.patch(
   "/:id",
   upload.single("photo"), // <-- Catch the "photo" file on edits
-  // Note: If you have an UpdateAdmissionUserSchema, you can add validateRequest() here!
+  // Added missing Zod val idation request for the UpdateAdmissionUserSchema
+  validateRequest(UpdateAdmissionUserSchema),
   protect({
     role: "admin",
     permissions: { user: ["set-role"] }, // Assuming editing requires the same permissions
