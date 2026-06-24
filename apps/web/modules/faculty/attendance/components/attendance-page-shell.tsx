@@ -18,9 +18,12 @@ export const AttendancePageShell = ({
       )}
     >
       <header className="space-y-1 px-1 pt-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Mark Attendance</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Mark Attendance
+        </h1>
         <p className="text-muted-foreground text-sm">
-          Record today&apos;s class attendance with fast controls and clear progress.
+          Record today&apos;s class attendance with fast controls and clear
+          progress.
         </p>
       </header>
 
@@ -33,7 +36,7 @@ export const AttendancePageShell = ({
       <main className="min-h-0 flex-1 overflow-y-auto pr-1">{children}</main>
 
       {footer ? (
-        <footer className="sticky bottom-0 z-10 rounded-2xl border border-border/70 bg-background/95 p-3 shadow-sm backdrop-blur">
+        <footer className="border-border/70 bg-background/95 sticky bottom-0 z-10 rounded-2xl border p-3 shadow-sm backdrop-blur">
           {footer}
         </footer>
       ) : null}
