@@ -11,7 +11,6 @@ import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import {
-  DEFAULT_FILTER_ALL_VALUE,
   FilterActions,
   FilterBuilder,
   FilterPanel,
@@ -52,6 +51,7 @@ export const DepartmentSectionView = () => {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Check if department is a nested object
 
   const [draftFilters, setDraftFilters] = React.useState<SectionFilters>(() =>
     getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
@@ -248,7 +248,6 @@ export const DepartmentSectionView = () => {
       key: "termId",
       label: "Academic Term",
       type: "select",
-      allOptionLabel: "All terms",
       placeholder: "Select term...",
       options: terms.map((term) => ({
         label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
@@ -259,7 +258,6 @@ export const DepartmentSectionView = () => {
       key: "semesterId",
       label: "Semester",
       type: "select",
-      allOptionLabel: "All semesters",
       placeholder: draftFilters.termId
         ? "Select semester..."
         : "Select term first",
@@ -274,7 +272,6 @@ export const DepartmentSectionView = () => {
             key: "cycle",
             label: "Cycle",
             type: "select",
-            allOptionLabel: "All cycles",
             placeholder: "Select cycle...",
             options: BASIC_SCIENCES_CYCLE_OPTIONS.map((cycle) => ({
               label: cycle,
@@ -298,11 +295,16 @@ export const DepartmentSectionView = () => {
       ? (appliedFilters.cycle as SectionCycle)
       : BASIC_SCIENCES_CYCLE_OPTIONS[0];
 
+  const userDepartmentType = deptInfo?.type;
+  const activeFilters = sectionFilterFields.filter((field) => {
+    if (userDepartmentType === "BASIC_SCIENCES") return true;
+    return field.key !== "cycle";
+  });
   return (
     <div className="flex flex-col gap-6">
       <FilterPanel>
         <FilterBuilder
-          fields={sectionFilterFields}
+          fields={activeFilters}
           draftFilters={draftFilters}
           onDraftChange={(key, value) => {
             if (key === "termId") {
@@ -316,7 +318,6 @@ export const DepartmentSectionView = () => {
 
             updateDraftFilter(key, value);
           }}
-          allValue={DEFAULT_FILTER_ALL_VALUE}
           className="md:grid-cols-2 xl:grid-cols-3"
         />
         <FilterActions onApply={applyFilters} onReset={resetFilters} />

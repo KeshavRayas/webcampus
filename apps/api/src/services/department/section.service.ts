@@ -1,6 +1,6 @@
+import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma, Section } from "@webcampus/db";
-import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import {
   CreateSectionType,
   DetailedGenerationPreviewSectionDTO,
@@ -10,8 +10,8 @@ import {
   SectionQueryType,
   SectionResponseType,
 } from "@webcampus/schemas/department";
-import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 import { BaseResponse } from "@webcampus/types/api";
+import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 
 type SectionCycle = "PHYSICS" | "CHEMISTRY";
 
@@ -229,14 +229,25 @@ export class SectionService {
     const pooledStudents: { id: string; usn: string }[] = [];
 
     for (const allocation of validAllocations) {
-      if (!departments.some((department) => department.id === allocation.departmentId)) {
+      if (
+        !departments.some(
+          (department) => department.id === allocation.departmentId
+        )
+      ) {
         continue;
       }
 
-      const students = studentsByDepartmentId.get(allocation.departmentId) ?? [];
+      const students =
+        studentsByDepartmentId.get(allocation.departmentId) ?? [];
       const cursor = departmentCursorById.get(allocation.departmentId) ?? 0;
-      const selectedStudents = students.slice(cursor, cursor + allocation.count);
-      departmentCursorById.set(allocation.departmentId, cursor + allocation.count);
+      const selectedStudents = students.slice(
+        cursor,
+        cursor + allocation.count
+      );
+      departmentCursorById.set(
+        allocation.departmentId,
+        cursor + allocation.count
+      );
 
       pooledStudents.push(...selectedStudents);
     }
@@ -591,8 +602,10 @@ export class SectionService {
       });
 
       if (requestingUserId) {
-        const requestingDepartment =
-          await this.getRequestingDepartment(requestingUserId, requestContext);
+        const requestingDepartment = await this.getRequestingDepartment(
+          requestingUserId,
+          requestContext
+        );
 
         if (
           requestingDepartment.type !== "BASIC_SCIENCES" &&
@@ -847,9 +860,14 @@ export class SectionService {
             });
 
             if (batches.length > 0) {
-              for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+              for (
+                let batchIndex = 0;
+                batchIndex < batches.length;
+                batchIndex++
+              ) {
                 const studentsForBatch = plan.studentIds.filter(
-                  (_, studentIndex) => studentIndex % batches.length === batchIndex
+                  (_, studentIndex) =>
+                    studentIndex % batches.length === batchIndex
                 );
 
                 if (studentsForBatch.length > 0) {
@@ -857,7 +875,9 @@ export class SectionService {
                     where: { id: batches[batchIndex]!.id },
                     data: {
                       students: {
-                        connect: studentsForBatch.map((studentId) => ({ id: studentId })),
+                        connect: studentsForBatch.map((studentId) => ({
+                          id: studentId,
+                        })),
                       },
                     },
                   });
@@ -953,9 +973,14 @@ export class SectionService {
 
           if (batches.length > 0) {
             const chunkStudentIds = chunks[i]!.map((student) => student.id);
-            for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+            for (
+              let batchIndex = 0;
+              batchIndex < batches.length;
+              batchIndex++
+            ) {
               const studentsForBatch = chunkStudentIds.filter(
-                (_, studentIndex) => studentIndex % batches.length === batchIndex
+                (_, studentIndex) =>
+                  studentIndex % batches.length === batchIndex
               );
 
               if (studentsForBatch.length > 0) {
@@ -963,7 +988,9 @@ export class SectionService {
                   where: { id: batches[batchIndex]!.id },
                   data: {
                     students: {
-                      connect: studentsForBatch.map((studentId) => ({ id: studentId })),
+                      connect: studentsForBatch.map((studentId) => ({
+                        id: studentId,
+                      })),
                     },
                   },
                 });
@@ -1019,8 +1046,10 @@ export class SectionService {
       });
 
       if (requestingUserId) {
-        const requestingDepartment =
-          await this.getRequestingDepartment(requestingUserId, requestContext);
+        const requestingDepartment = await this.getRequestingDepartment(
+          requestingUserId,
+          requestContext
+        );
 
         if (
           requestingDepartment.type !== "BASIC_SCIENCES" &&
@@ -1096,8 +1125,10 @@ export class SectionService {
       });
 
       if (requestingUserId) {
-        const requestingDepartment =
-          await this.getRequestingDepartment(requestingUserId, requestContext);
+        const requestingDepartment = await this.getRequestingDepartment(
+          requestingUserId,
+          requestContext
+        );
 
         if (
           requestingDepartment.type !== "BASIC_SCIENCES" &&
@@ -1107,24 +1138,18 @@ export class SectionService {
         }
       }
 
+      // 1. Fetch semester with academicTerm to access the academicYear
       const semester = await db.semester.findUnique({
         where: { id: semesterId },
+        include: { academicTerm: true },
       });
       if (!semester) throw new Error("Semester not found");
 
-      const existingSections = await db.section.findMany({
-        where: {
-          semesterId,
-          department: {
-            is: {
-              id: resolvedDepartment.departmentId,
-            },
-          },
-        },
-        select: { id: true },
-      });
-      const existingSectionIds = existingSections.map((s) => s.id);
+      const academicYear = semester.academicTerm.year;
 
+      // 2. Fetch unassigned students using a strict filter on StudentSections
+      // We look for students in this department/semester who have NO records
+      // matching this exact semester number AND academic year.
       const students = await db.student.findMany({
         where: {
           department: {
@@ -1133,15 +1158,12 @@ export class SectionService {
             },
           },
           currentSemester: semester.semesterNumber,
-          ...(existingSectionIds.length > 0
-            ? {
-                studentSections: {
-                  none: {
-                    sectionId: { in: existingSectionIds },
-                  },
-                },
-              }
-            : {}),
+          studentSections: {
+            none: {
+              semester: semester.semesterNumber,
+              academicYear: academicYear,
+            },
+          },
         },
         include: {
           user: {
