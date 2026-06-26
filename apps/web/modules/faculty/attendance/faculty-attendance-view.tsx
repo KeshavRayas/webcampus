@@ -1,7 +1,6 @@
 "use client";
 
 import { getApiErrorMessage } from "@/lib/api-client";
-import { useQueryClient } from "@tanstack/react-query";
 import { dayjs } from "@webcampus/common/dayjs";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -18,7 +17,6 @@ import { ATTENDANCE_TIME_SLOTS } from "./attendance-time-slots";
 import { AttendanceForm } from "./components/attendance-form";
 import { AttendancePageShell } from "./components/attendance-page-shell";
 import { AttendanceSection } from "./components/attendance-section";
-import { ManageSessionsModal } from "./components/manage-sessions-modal";
 import {
   AttendanceChecklistRow,
   FacultyAttendanceFormState,
@@ -31,33 +29,6 @@ import {
   useFacultyAttendanceSessions,
   useFacultyAttendanceSessionStudents,
 } from "./use-faculty-attendance";
-
-type AttendanceSessionModalFilters = {
-  sessionDate: Date | undefined;
-  courseId: string;
-  sectionId: string;
-  batchId?: string;
-};
-
-type AttendanceSessionQueryState = AttendanceSessionModalFilters & {
-  page: number;
-  limit: number;
-};
-
-const DEFAULT_SESSION_PAGE_SIZE = 10;
-
-const EMPTY_SESSION_MODAL_FILTERS: AttendanceSessionModalFilters = {
-  sessionDate: undefined,
-  courseId: "",
-  sectionId: "",
-  batchId: undefined,
-};
-
-const INITIAL_SESSION_QUERY_STATE: AttendanceSessionQueryState = {
-  ...EMPTY_SESSION_MODAL_FILTERS,
-  page: 1,
-  limit: DEFAULT_SESSION_PAGE_SIZE,
-};
 
 const INITIAL_FORM_STATE: FacultyAttendanceFormState = {
   sessionDate: undefined,
@@ -139,18 +110,6 @@ const hasTimeOverlap = (
   return startA < endB && endA > startB;
 };
 
-const isFixedTimingCode = (
-  timingCode: string
-): timingCode is Exclude<FacultyAttendanceFormState["fixedTimingCode"], ""> => {
-  return ATTENDANCE_TIME_SLOTS.some((slot) => slot.code === timingCode);
-};
-
-const parseSessionDate = (sessionDate: string) => {
-  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(sessionDate);
-
-  return new Date(isDateOnly ? `${sessionDate}T00:00:00` : sessionDate);
-};
-
 const withUiChecklistMetadata = (
   rows: Array<{
     studentId: string;
@@ -177,54 +136,31 @@ export const FacultyAttendanceView = () => {
     useState<FacultyAttendanceFormState>(INITIAL_FORM_STATE);
   const [courseSelectionKey, setCourseSelectionKey] = useState<string>("");
   const [sectionSelectionKey, setSectionSelectionKey] = useState<string>("");
-  const [modalCourseSelectionKey, setModalCourseSelectionKey] =
-    useState<string>("");
-  const [modalSectionSelectionKey, setModalSectionSelectionKey] =
-    useState<string>("");
+
   const [studentChecklist, setStudentChecklist] = useState<
     AttendanceChecklistRow[]
   >([]);
   const [activeSessionId, setActiveSessionId] = useState<string>("");
   const [isTakeAttendanceModalOpen, setIsTakeAttendanceModalOpen] =
     useState(false);
-  const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(
     null
   );
   const [deleteConfirmSessionId, setDeleteConfirmSessionId] = useState<
     string | null
   >(null);
-  const [isSessionsDialogOpen, setIsSessionsDialogOpen] = useState(false);
-  const [sessionModalFilters, setSessionModalFilters] =
-    useState<AttendanceSessionModalFilters>(EMPTY_SESSION_MODAL_FILTERS);
-  const [appliedSessionFilters, setAppliedSessionFilters] =
-    useState<AttendanceSessionQueryState>(INITIAL_SESSION_QUERY_STATE);
   const [showSaveSuccessToast, setShowSaveSuccessToast] =
     useState<boolean>(false);
 
   const filterOptionsQuery = useFacultyAttendanceFilterOptions();
   const createOrOpenMutation = useCreateOrOpenFacultyAttendanceSession();
   const deleteSessionMutation = useDeleteFacultyAttendanceSession();
-  const queryClient = useQueryClient();
+
   const sessionDetailQuery = useFacultyAttendanceSessionDetail(
     {
       sessionId: activeSessionId,
     },
     Boolean(activeSessionId)
-  );
-
-  const sessionsQuery = useFacultyAttendanceSessions(
-    {
-      sessionDate: appliedSessionFilters.sessionDate
-        ? dayjs(appliedSessionFilters.sessionDate).format("YYYY-MM-DD")
-        : undefined,
-      courseId: appliedSessionFilters.courseId || undefined,
-      sectionId: appliedSessionFilters.sectionId || undefined,
-      batchId: appliedSessionFilters.batchId,
-      page: appliedSessionFilters.page,
-      limit: appliedSessionFilters.limit,
-    },
-    isSessionsDialogOpen
   );
 
   const assignmentOptions = useMemo(() => {
@@ -425,80 +361,11 @@ export const FacultyAttendanceView = () => {
     );
   }, [activeSessionId, overlapCheckQuery.data?.items, selectedTimingWindow]);
 
-  const overlapError =
-    !exactSession && overlappingSession
+  const overlapError = exactSession
+    ? "Attendance already taken for this slot. Please use the Edit Attendance tab to modify it."
+    : overlappingSession
       ? "Selected time slot overlaps another session"
       : null;
-
-  const resetActiveSessionContext = () => {
-    setActiveSessionId("");
-    setOpeningSessionId(null);
-    setIsTakeAttendanceModalOpen(false);
-    setStudentChecklist([]);
-  };
-
-  const clearActiveSessionOnly = () => {
-    setActiveSessionId("");
-    setOpeningSessionId(null);
-    setStudentChecklist([]);
-    // Keep modal open to avoid race conditions with async queries
-  };
-
-  const hydrateFormFromSession = (session: {
-    sessionDate: string;
-    courseId: string;
-    sectionId: string;
-    batchId?: string;
-    timingCode: string;
-    timingStartTime: string;
-    timingEndTime: string;
-  }) => {
-    const fixedTimingCode = isFixedTimingCode(session.timingCode)
-      ? session.timingCode
-      : "";
-
-    setForm({
-      sessionDate: parseSessionDate(session.sessionDate),
-      courseId: session.courseId,
-      sectionId: session.sectionId,
-      batchId: session.batchId,
-      timingMode: fixedTimingCode ? "FIXED" : "CUSTOM",
-      fixedTimingCode,
-      customStartTime: fixedTimingCode ? "" : session.timingStartTime,
-      customEndTime: fixedTimingCode ? "" : session.timingEndTime,
-    });
-
-    setCourseSelectionKey(
-      toCourseSelectionKey(session.courseId, session.batchId)
-    );
-    setSectionSelectionKey(
-      `${session.sectionId}${COURSE_SELECTION_DELIMITER}${session.batchId ?? "theory"}`
-    );
-  };
-
-  useEffect(() => {
-    const data = sessionDetailQuery.data;
-    if (
-      !data ||
-      typeof data !== "object" ||
-      !("session" in data) ||
-      !("students" in data)
-    ) {
-      return;
-    }
-
-    if (data.session.id !== activeSessionId) {
-      return;
-    }
-
-    hydrateFormFromSession(data.session);
-    setStudentChecklist(withUiChecklistMetadata(data.students));
-    setOpeningSessionId(null);
-  }, [
-    activeSessionId,
-    sessionDetailQuery.data,
-    sessionDetailQuery.dataUpdatedAt,
-  ]);
 
   useEffect(() => {
     if (!sessionDetailQuery.isError || !activeSessionId) {
@@ -511,8 +378,6 @@ export const FacultyAttendanceView = () => {
         "Failed to load attendance session detail"
       )
     );
-    setOpeningSessionId(null);
-    resetActiveSessionContext();
   }, [activeSessionId, sessionDetailQuery.error, sessionDetailQuery.isError]);
 
   const totalStudents = studentChecklist.length;
@@ -576,29 +441,6 @@ export const FacultyAttendanceView = () => {
     return studentChecklist.length > 0 && unmarkedCount === 0;
   }, [canOpenSession, studentChecklist.length, unmarkedCount]);
 
-  const modalSectionsForSelectedCourse = useMemo(() => {
-    const selectedCourse = parseCourseSelectionKey(modalCourseSelectionKey);
-
-    const filteredAssignments = assignmentOptions.filter((assignment) => {
-      if (!selectedCourse.courseId) {
-        return true;
-      }
-
-      if (assignment.courseId !== selectedCourse.courseId) {
-        return false;
-      }
-
-      return (assignment.batchId ?? undefined) === selectedCourse.batchId;
-    });
-
-    return filteredAssignments.map((assignment) => ({
-      id: `${assignment.sectionId}${COURSE_SELECTION_DELIMITER}${assignment.batchId ?? "theory"}`,
-      name: assignment.sectionName,
-      courseId: assignment.courseId,
-      label: assignment.sectionName,
-    }));
-  }, [assignmentOptions, modalCourseSelectionKey]);
-
   useEffect(() => {
     setForm((current) =>
       current.sessionDate
@@ -610,58 +452,8 @@ export const FacultyAttendanceView = () => {
     );
   }, []);
 
-  const applySessionFilters = () => {
-    setAppliedSessionFilters({
-      ...sessionModalFilters,
-      page: 1,
-      limit: DEFAULT_SESSION_PAGE_SIZE,
-    });
-  };
-
-  const resetSessionFilters = () => {
-    setSessionModalFilters(EMPTY_SESSION_MODAL_FILTERS);
-    setAppliedSessionFilters(INITIAL_SESSION_QUERY_STATE);
-    setModalCourseSelectionKey("");
-    setModalSectionSelectionKey("");
-  };
-
-  const handleSessionCourseChange = (selectionValue: string) => {
-    const parsed = parseCourseSelectionKey(selectionValue);
-    setModalCourseSelectionKey(selectionValue);
-    setModalSectionSelectionKey("");
-
-    setSessionModalFilters((current) => ({
-      ...current,
-      courseId: parsed.courseId,
-      batchId: parsed.batchId,
-      sectionId: "",
-    }));
-  };
-
-  const goToSessionPage = (nextPage: number) => {
-    const totalPages = sessionsQuery.data?.pagination.totalPages ?? 1;
-    const boundedPage = Math.min(Math.max(nextPage, 1), totalPages);
-
-    setAppliedSessionFilters((current) => ({
-      ...current,
-      page: boundedPage,
-    }));
-  };
-
-  const sessionPagination = sessionsQuery.data?.pagination ?? {
-    page: appliedSessionFilters.page,
-    limit: appliedSessionFilters.limit,
-    total: 0,
-    totalPages: 1,
-    hasNextPage: false,
-    hasPreviousPage: false,
-  };
-
-  const sessionRows = sessionsQuery.data?.items ?? [];
-
   const updateCourse = (selectionValue: string) => {
     const parsed = parseCourseSelectionKey(selectionValue);
-    clearActiveSessionOnly();
     setCourseSelectionKey(selectionValue);
     setSectionSelectionKey("");
 
@@ -676,7 +468,6 @@ export const FacultyAttendanceView = () => {
   };
 
   const updateTimingMode = (timingMode: "FIXED" | "CUSTOM") => {
-    clearActiveSessionOnly();
     setForm((current) => {
       if (timingMode === "FIXED") {
         return {
@@ -707,14 +498,6 @@ export const FacultyAttendanceView = () => {
     },
     isSessionStudentsQueryEnabled
   );
-
-  useEffect(() => {
-    if (!selectedSession || activeSessionId === selectedSession.id) {
-      return;
-    }
-
-    setActiveSessionId(selectedSession.id);
-  }, [activeSessionId, selectedSession]);
 
   useEffect(() => {
     if (
@@ -750,7 +533,6 @@ export const FacultyAttendanceView = () => {
         "Failed to load attendance roster"
       )
     );
-    resetActiveSessionContext();
   }, [
     isTakeAttendanceModalOpen,
     sessionStudentsQuery.error,
@@ -805,49 +587,15 @@ export const FacultyAttendanceView = () => {
     }
   };
 
-  const handleSelectSessionFromModal = async (sessionId: string) => {
-    setOpeningSessionId(sessionId);
-    setStudentChecklist([]);
-    setActiveSessionId(sessionId);
-    setIsTakeAttendanceModalOpen(true);
-    setIsSessionsDialogOpen(false);
-
-    try {
-      await queryClient.invalidateQueries({
-        queryKey: ["faculty-attendance", "session-detail"],
-      });
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to load session details"));
-      setOpeningSessionId(null);
-      setActiveSessionId("");
-      setIsTakeAttendanceModalOpen(false);
-    }
-  };
-
-  const handleDeleteSessionFromModal = (sessionId: string) => {
-    setDeleteConfirmSessionId(sessionId);
-  };
   const handleTakeAttendance = () => {
     if (!canOpenSession) {
       return;
     }
 
-    if (selectedSession && activeSessionId !== selectedSession.id) {
-      setOpeningSessionId(selectedSession.id);
-      setStudentChecklist([]);
-      setActiveSessionId(selectedSession.id);
-    }
-
-    if (!selectedSession) {
-      setStudentChecklist([]);
-    }
-
+    // Strictly for creating NEW attendance: clear the checklist, open modal, and fetch the roster
+    setStudentChecklist([]);
     setIsTakeAttendanceModalOpen(true);
-
-    if (!selectedSession) {
-      // Refetch to refresh roster state even when React Query serves a structurally shared payload.
-      sessionStudentsQuery.refetch();
-    }
+    sessionStudentsQuery.refetch();
   };
 
   const handleDeleteSessionConfirm = async () => {
@@ -858,11 +606,6 @@ export const FacultyAttendanceView = () => {
     try {
       setDeletingSessionId(deleteConfirmSessionId);
       await deleteSessionMutation.mutateAsync(deleteConfirmSessionId);
-
-      if (activeSessionId === deleteConfirmSessionId) {
-        resetActiveSessionContext();
-      }
-
       setDeleteConfirmSessionId(null);
       toast.success("Attendance session deleted successfully");
     } catch (error) {
@@ -907,7 +650,6 @@ export const FacultyAttendanceView = () => {
         selectedSectionValue={sectionSelectionKey}
         isLabBatch={Boolean(form.batchId)} // Added property to detect lab batch
         onDateChange={(date) => {
-          clearActiveSessionOnly();
           setForm((current) => ({
             ...current,
             sessionDate: date,
@@ -916,7 +658,6 @@ export const FacultyAttendanceView = () => {
         onCourseChange={updateCourse}
         onSectionChange={(sectionSelection) => {
           const parsed = parseSectionSelectionKey(sectionSelection);
-          clearActiveSessionOnly();
           setSectionSelectionKey(sectionSelection);
           setForm((current) => ({
             ...current,
@@ -926,21 +667,18 @@ export const FacultyAttendanceView = () => {
         }}
         onTimingModeChange={updateTimingMode}
         onFixedSlotChange={(fixedTimingCode) => {
-          clearActiveSessionOnly();
           setForm((current) => ({
             ...current,
             fixedTimingCode,
           }));
         }}
         onCustomStartTimeChange={(customStartTime) => {
-          clearActiveSessionOnly();
           setForm((current) => ({
             ...current,
             customStartTime,
           }));
         }}
         onCustomEndTimeChange={(customEndTime) => {
-          clearActiveSessionOnly();
           setForm((current) => ({
             ...current,
             customEndTime,
@@ -951,52 +689,6 @@ export const FacultyAttendanceView = () => {
           !canOpenSession || createOrOpenMutation.isPending
         }
         overlapError={overlapError}
-      />
-
-      <ManageSessionsModal
-        isOpen={isSessionsDialogOpen}
-        onOpenChange={setIsSessionsDialogOpen}
-        filters={sessionModalFilters}
-        selectedCourseValue={modalCourseSelectionKey}
-        selectedSectionValue={modalSectionSelectionKey}
-        onDateChange={(sessionDate) =>
-          setSessionModalFilters((current) => ({
-            ...current,
-            sessionDate,
-          }))
-        }
-        onCourseChange={handleSessionCourseChange}
-        onSectionChange={(sectionSelection) => {
-          const parsed = parseSectionSelectionKey(sectionSelection);
-          setModalSectionSelectionKey(sectionSelection);
-          setSessionModalFilters((current) => ({
-            ...current,
-            sectionId: parsed.sectionId,
-            batchId: parsed.batchId,
-          }));
-        }}
-        onApplyFilters={applySessionFilters}
-        onClearFilters={resetSessionFilters}
-        courses={courseOptions}
-        sections={modalSectionsForSelectedCourse}
-        sessions={sessionRows}
-        activeSessionId={activeSessionId}
-        isLoading={sessionsQuery.isLoading}
-        isError={sessionsQuery.isError}
-        errorMessage={
-          sessionsQuery.isError
-            ? getApiErrorMessage(sessionsQuery.error, "Failed to load sessions")
-            : null
-        }
-        openingSessionId={openingSessionId}
-        deletingSessionId={deletingSessionId}
-        page={sessionPagination.page}
-        totalPages={sessionPagination.totalPages}
-        isFetching={sessionsQuery.isFetching}
-        onPrevPage={() => goToSessionPage(sessionPagination.page - 1)}
-        onNextPage={() => goToSessionPage(sessionPagination.page + 1)}
-        onSelectSession={handleSelectSessionFromModal}
-        onDeleteSession={handleDeleteSessionFromModal}
       />
 
       <Dialog

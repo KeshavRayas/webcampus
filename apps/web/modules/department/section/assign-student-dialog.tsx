@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { BaseResponse, SuccessResponse } from "@webcampus/types/api";
+import { SuccessResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { Checkbox } from "@webcampus/ui/components/checkbox";
 import {
@@ -26,15 +26,6 @@ import { UserPlus } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "react-toastify";
 
-interface UnassignedStudent {
-  id: string;
-  usn: string;
-  user: {
-    name: string;
-    email: string;
-  };
-}
-
 interface AssignStudentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,27 +42,26 @@ export const AssignStudentDialog = ({
   sectionId,
   sectionName,
   semesterId,
-  departmentName,
   academicYear,
 }: AssignStudentDialogProps) => {
   const queryClient = useQueryClient();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const { data: students, isLoading } = useQuery({
-    queryKey: ["unassigned-students", semesterId, departmentName],
+  const { data: studentList = [], isLoading } = useQuery({
+    queryKey: ["unassigned-students", sectionId, semesterId, academicYear],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<UnassignedStudent[]>>(
+      const res = await axios.get(
         `${NEXT_PUBLIC_API_BASE_URL}/department/section/unassigned-students`,
         {
-          params: { semesterId, departmentName },
+          params: { semesterId, academicYear },
           withCredentials: true,
         }
       );
-      if (res.data.status === "success") return res.data.data;
-      return [] as UnassignedStudent[];
+      // Extract the 'students' array from the response object
+      return res.data.data.students;
     },
-    enabled: open && !!semesterId && !!departmentName,
+    enabled: open && !!semesterId && !!academicYear, // Ensure dialog is open and params exist
   });
 
   const toggleStudent = (id: string) => {
@@ -87,11 +77,11 @@ export const AssignStudentDialog = ({
   };
 
   const toggleAll = () => {
-    if (!students) return;
-    if (selectedIds.size === students.length) {
+    if (!studentList) return;
+    if (selectedIds.size === studentList.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(students.map((s) => s.id)));
+      setSelectedIds(new Set(studentList.map((s: { id: string }) => s.id)));
     }
   };
 
@@ -119,8 +109,6 @@ export const AssignStudentDialog = ({
       toast.error(error.response?.data?.error || "Failed to assign students");
     },
   });
-
-  const studentList = Array.isArray(students) ? students : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,26 +161,32 @@ export const AssignStudentDialog = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {studentList.map((student) => (
-                    <TableRow
-                      key={student.id}
-                      className="cursor-pointer"
-                      onClick={() => toggleStudent(student.id)}
-                    >
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(student.id)}
-                          onCheckedChange={() => toggleStudent(student.id)}
-                        />
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {student.usn}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {student.user.name}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {studentList.map(
+                    (student: {
+                      id: string;
+                      usn: string;
+                      user: { name: string };
+                    }) => (
+                      <TableRow
+                        key={student.id}
+                        className="cursor-pointer"
+                        onClick={() => toggleStudent(student.id)}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.has(student.id)}
+                            onCheckedChange={() => toggleStudent(student.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {student.usn}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {student.user.name}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  )}
                 </TableBody>
               </Table>
             </div>
