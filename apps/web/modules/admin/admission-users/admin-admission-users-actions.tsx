@@ -34,8 +34,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-// added import { Trash } from "lucide-react";
-
 import { MoreHorizontal, Trash } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -122,9 +120,7 @@ export const AdminAdmissionUsersActions = ({
       });
       setIsEditOpen(false);
       resetEditState();
-    } catch {
-      // Toast feedback is handled by the mutation hook.
-    }
+    } catch {}
   };
 
   useEffect(() => {
