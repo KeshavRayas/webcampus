@@ -60,9 +60,9 @@ export const ApplicantAdmissionView = () => {
     useState(false);
   const [class12Enabled, setClass12Enabled] = useState(true);
   const [diplomaEnabled, setDiplomaEnabled] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<Record<string, string>>(
-    {}
-  );
+  const [selectedFiles, setSelectedFiles] = useState<
+    Record<string, File | null>
+  >({});
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const filePreviewRef = useRef<string | null>(null);
   const sectionRefs = useRef<Record<StepKey, HTMLDivElement | null>>({
@@ -94,14 +94,55 @@ export const ApplicantAdmissionView = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    const formData = new FormData();
+
+    const htmlForm = new FormData(e.currentTarget);
+
+    // Copy every non-file field
+    htmlForm.forEach((value, key) => {
+      if (!(value instanceof File)) {
+        formData.append(key, value);
+      }
+    });
+
+    // Copy every selected file from React state
+    Object.entries(selectedFiles).forEach(([key, file]) => {
+      if (file) {
+        formData.append(key, file);
+      }
+    });
+
+    const requiredFiles: [string, string][] = [
+      ["photo", "Passport Size Photo"],
+      ["aadharCard", "Aadhar Card"],
+      ["class10thMarksPdf", "10th Marks Card"],
+      ["studyCertificate", "Study Certificate"],
+    ];
+
+    if (class12Enabled) {
+      requiredFiles.push(["class12thMarksPdf", "12th Marks Card"]);
+    }
+
+    if (diplomaEnabled) {
+      requiredFiles.push(["diplomaMarksPdf", "Diploma Marks Card"]);
+    }
+    for (const [field, label] of requiredFiles) {
+      const file = selectedFiles[field];
+
+      if (!file) {
+        toast.error(`${label} is required`);
+        return;
+      }
+    }
+
     if (!class12Enabled && !diplomaEnabled) {
       toast.error("Please fill either Class 12 / PUC or Diploma details.");
       return;
     }
+
     setIsSubmitting(true);
 
-    // We must use FormData because we are sending files alongside text!
-    const formData = new FormData(e.currentTarget);
     formData.set("hostel", hostelEnabled ? "true" : "false");
     formData.set("nri", nriEnabled ? "true" : "false");
     formData.set("disability", disabilityEnabled ? "true" : "false");
@@ -118,11 +159,14 @@ export const ApplicantAdmissionView = () => {
         formData,
         {
           withCredentials: true,
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         }
       );
+
       toast.success("Application submitted successfully!");
-      refetch(); // Refresh the screen to show the success state
+      refetch();
     } catch (error: unknown) {
       if (isAxiosError(error)) {
         toast.error(
@@ -148,17 +192,20 @@ export const ApplicantAdmissionView = () => {
   };
 
   const handleFileSelect = (name: string, file: File | null) => {
+    console.log(name, file);
+
     setSelectedFiles((current) => ({
       ...current,
-      [name]: file?.name || "",
+      [name]: file,
     }));
 
     if (name === "photo") {
       clearPreview();
+
       if (file) {
-        const nextPreview = URL.createObjectURL(file);
-        filePreviewRef.current = nextPreview;
-        setPhotoPreview(nextPreview);
+        const preview = URL.createObjectURL(file);
+        filePreviewRef.current = preview;
+        setPhotoPreview(preview);
       }
     }
   };
@@ -210,7 +257,8 @@ export const ApplicantAdmissionView = () => {
     disabled?: boolean;
     showPreview?: boolean;
   }) => {
-    const selectedName = selectedFiles[name] || "";
+    const selectedFile = selectedFiles[name];
+    const selectedName = selectedFile?.name || "";
     const inputId = `${name}-input`;
     return (
       <div className="space-y-2">
@@ -376,7 +424,7 @@ export const ApplicantAdmissionView = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-10">
+      <form noValidate onSubmit={handleSubmit} className="space-y-10">
         {/* ADMISSION DETAILS */}
         <div
           ref={(node) => {
