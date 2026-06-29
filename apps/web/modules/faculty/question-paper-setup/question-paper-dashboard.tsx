@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import { Badge } from "@webcampus/ui/components/badge";
@@ -59,6 +59,7 @@ const EMPTY_FILTERS: DashboardFilters = {
 };
 
 export const QuestionPaperDashboard = () => {
+  const queryClient = useQueryClient();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
   const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
@@ -349,6 +350,12 @@ export const QuestionPaperDashboard = () => {
           }}
           assessmentId={viewAssessmentId.id}
           courseName={viewAssessmentId.courseName}
+          onDelete={() => {
+            setViewAssessmentId(null);
+            queryClient.invalidateQueries({
+              queryKey: ["coordinated-courses"],
+            });
+          }}
         />
       )}
     </div>

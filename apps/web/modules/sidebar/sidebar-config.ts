@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Library,
   LifeBuoy,
+  Lock,
   Send,
   User,
   Users,
@@ -90,12 +91,24 @@ export const sidebarConfig: Record<Role, SidebarData> = {
         },
         {
           name: "Academics",
-          url: "/admin/attendance-windows",
+          url: "/admin/academics/freezing",
           icon: GraduationCap,
           children: [
             {
-              name: "Attendance Windows",
-              url: "/admin/attendance-windows",
+              name: "Freezing",
+              url: "/admin/academics/freezing",
+            },
+            {
+              name: "Attendance",
+              url: "/admin/academics/attendance",
+            },
+            {
+              name: "Marks",
+              url: "/admin/academics/marks",
+            },
+            {
+              name: "Condonation",
+              url: "/admin/academics/condonation",
             },
           ],
         },
@@ -199,6 +212,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           ],
         },
         {
+          name: "Freezing",
+          url: "/faculty/freezing",
+          icon: Lock,
+        },
+        {
           name: "Attendance",
           url: "/faculty/attendance/take",
           icon: Fingerprint,
@@ -206,7 +224,6 @@ export const sidebarConfig: Record<Role, SidebarData> = {
             { name: "Take Attendance", url: "/faculty/attendance/take" },
             { name: "Edit Attendance", url: "/faculty/attendance/edit" },
             { name: "Attendance Report", url: "/faculty/attendance/report" },
-            { name: "Attendance Freezing", url: "/faculty/attendance-windows" },
           ],
         },
         {
@@ -247,13 +264,25 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: GraduationCap,
         },
         {
-          name: "Attendance",
-          url: "/hod/attendance-windows",
-          icon: Fingerprint,
+          name: "Academics",
+          url: "/hod/academics/freezing",
+          icon: GraduationCap,
           children: [
             {
-              name: "Attendance Windows",
-              url: "/hod/attendance-windows",
+              name: "Freezing",
+              url: "/hod/academics/freezing",
+            },
+            {
+              name: "Attendance",
+              url: "/hod/academics/attendance",
+            },
+            {
+              name: "Marks",
+              url: "/hod/academics/marks",
+            },
+            {
+              name: "Condonation",
+              url: "/hod/academics/condonation",
             },
           ],
         },

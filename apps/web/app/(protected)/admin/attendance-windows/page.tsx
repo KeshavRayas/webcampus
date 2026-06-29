@@ -1,12 +1,7 @@
-import { AttendanceWindowsView } from "@/modules/admin/attendance-windows/attendance-windows-view";
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-const AttendanceWindowsPage = () => {
-  return (
-    <Suspense>
-      <AttendanceWindowsView />
-    </Suspense>
-  );
+const Page = () => {
+  redirect("/admin/academics/freezing");
 };
 
-export default AttendanceWindowsPage;
+export default Page;

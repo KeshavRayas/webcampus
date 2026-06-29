@@ -490,6 +490,28 @@ export class Mark {
         throw new Error("Unauthorized to save marks for this assessment");
       }
 
+      // Check freeze state before allowing marks to be saved
+      const freezeRecord = await db.courseAssignment.findFirst({
+        where: {
+          courseId: assessment.courseId,
+          facultyId: faculty.id,
+        },
+        include: {
+          freezes: true,
+        },
+      });
+
+      const freeze = freezeRecord?.freezes;
+
+      if (
+        freeze &&
+        (freeze.facultyFrozen || freeze.hodFrozen || freeze.adminFrozen)
+      ) {
+        throw new Error(
+          "Cannot save marks \u2014 marks and attendance have been frozen for this course"
+        );
+      }
+
       const hasQuestions = assessment.questions.length > 0;
       const marks = data.marks ?? [];
 

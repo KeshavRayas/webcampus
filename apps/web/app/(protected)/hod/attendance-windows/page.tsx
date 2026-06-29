@@ -1,12 +1,7 @@
-import { HODAttendanceWindowsView } from "@/modules/hod/attendance-windows/attendance-windows-view";
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-const HODAttendanceWindowsPage = () => {
-  return (
-    <Suspense>
-      <HODAttendanceWindowsView />
-    </Suspense>
-  );
+const Page = () => {
+  redirect("/hod/academics/freezing");
 };
 
-export default HODAttendanceWindowsPage;
+export default Page;

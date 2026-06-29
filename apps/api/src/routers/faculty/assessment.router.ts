@@ -24,4 +24,6 @@ router.post(
 
 router.get("/:id", AssessmentController.getAssessmentById);
 
+router.delete("/:id", AssessmentController.deleteAssessment);
+
 export default router;
