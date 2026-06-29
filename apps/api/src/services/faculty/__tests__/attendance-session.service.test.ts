@@ -101,7 +101,21 @@ const dbMock = {
           assignment.sectionId === where.sectionId
       );
 
-      return match ? { id: "assignment-1" } : null;
+      return match
+        ? {
+            id: "assignment-1",
+            semester: 3,
+            academicYear: "2025-26",
+            assignmentType: "THEORY",
+            batchId: null,
+            course: {
+              semesterId: "semester-uuid",
+              semester: {
+                academicTermId: "term-uuid",
+              },
+            },
+          }
+        : null;
     },
   },
   classSession: {
@@ -343,10 +357,10 @@ const dbMock = {
       return Array.from(byId.values());
     },
   },
-  studentSection: {
+  courseRegistration: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findMany: async (): Promise<any[]> => {
-      // Mock students in the section
+      // Mock registered students for the course
       return [{ studentId: "student-1" }, { studentId: "student-2" }];
     },
   },

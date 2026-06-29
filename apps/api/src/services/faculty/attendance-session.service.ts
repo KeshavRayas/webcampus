@@ -3,6 +3,7 @@ import {
   assertCanMutateAttendance,
   resolveFreezeState,
 } from "@webcampus/api/src/services/faculty/freeze.service";
+import { buildRegistrationWhere } from "@webcampus/api/src/services/shared/registration-helper.service";
 import { logger } from "@webcampus/common/logger";
 import { db, type Prisma } from "@webcampus/db";
 import {
@@ -40,6 +41,8 @@ type FacultyCourseSectionAssignmentContext = {
   academicYear: string;
   assignmentType: "THEORY" | "LAB";
   batchId: string | null;
+  semesterId: string;
+  academicTermId: string;
 };
 
 const toLabBatchNumber = (
@@ -340,6 +343,16 @@ export class FacultyAttendanceSessionService {
         academicYear: true,
         assignmentType: true,
         batchId: true,
+        course: {
+          select: {
+            semesterId: true,
+            semester: {
+              select: {
+                academicTermId: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -354,6 +367,8 @@ export class FacultyAttendanceSessionService {
       academicYear: assignment.academicYear,
       assignmentType: assignment.assignmentType,
       batchId: assignment.batchId,
+      semesterId: assignment.course.semesterId,
+      academicTermId: assignment.course.semester.academicTermId,
     };
   }
 
@@ -370,20 +385,17 @@ export class FacultyAttendanceSessionService {
         query.batchId
       );
 
-      const students = await db.studentSection.findMany({
-        where: {
+      const students = await db.courseRegistration.findMany({
+        where: buildRegistrationWhere({
+          courseId: query.courseId,
+          semesterId: assignmentContext.semesterId,
+          academicTermId: assignmentContext.academicTermId,
           sectionId: query.sectionId,
-          semester: assignmentContext.semester,
-          academicYear: assignmentContext.academicYear,
-          ...(assignmentContext.assignmentType === "LAB" &&
-          assignmentContext.batchId
-            ? {
-                student: {
-                  batches: { some: { id: assignmentContext.batchId } },
-                },
-              }
-            : {}),
-        },
+          batchId:
+            assignmentContext.assignmentType === "LAB"
+              ? (assignmentContext.batchId ?? undefined)
+              : undefined,
+        }),
         orderBy: { student: { usn: "asc" } },
         select: {
           student: {
@@ -707,15 +719,14 @@ export class FacultyAttendanceSessionService {
             },
           }));
 
-        const enrolledStudents = await tx.studentSection.findMany({
-          where: {
+        const enrolledStudents = await tx.courseRegistration.findMany({
+          where: buildRegistrationWhere({
+            courseId: payload.courseId,
+            semesterId: assignmentContext.semesterId,
+            academicTermId: assignmentContext.academicTermId,
             sectionId: payload.sectionId,
-            semester: assignmentContext.semester,
-            academicYear: assignmentContext.academicYear,
-            ...(payload.batchId
-              ? { student: { batches: { some: { id: payload.batchId } } } }
-              : {}),
-          },
+            batchId: payload.batchId ?? undefined,
+          }),
           select: { studentId: true },
         });
 
