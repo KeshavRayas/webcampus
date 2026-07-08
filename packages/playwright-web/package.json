@@ -20,6 +20,8 @@
     "start-server-and-test": "^2.0.12",
     "@webcampus/web": "workspace:*",
     "@webcampus/types": "workspace:*",
-    "@webcampus/ui": "workspace:*"
+    "@webcampus/ui": "workspace:*",
+    "@webcampus/db": "workspace:*",
+    "@webcampus/common": "workspace:*"
   }
 }

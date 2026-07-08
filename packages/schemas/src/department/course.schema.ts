@@ -254,10 +254,15 @@ const ApprovalScopeSchema = z.object({
     .optional(),
 });
 
-const requireDepartmentScope = <T extends {
-  departmentId?: string;
-  departmentName?: string;
-}>(value: T, ctx: z.RefinementCtx) => {
+const requireDepartmentScope = <
+  T extends {
+    departmentId?: string;
+    departmentName?: string;
+  },
+>(
+  value: T,
+  ctx: z.RefinementCtx
+) => {
   if (!value.departmentId && !value.departmentName) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -279,15 +284,14 @@ export const RequestRevisionForSemesterSchema = ApprovalScopeSchema.extend({
   requireDepartmentScope(value, ctx);
 });
 
-export const CourseBranchQuerySchema = z
-  .object({
-    semesterId: z.string().uuid("Invalid semester ID").optional(),
-    cycle: z
-      .enum(COURSE_CYCLES)
-      .or(z.literal(""))
-      .transform((value) => (value === "" ? undefined : value))
-      .optional(),
-  });
+export const CourseBranchQuerySchema = z.object({
+  semesterId: z.string().uuid("Invalid semester ID").optional(),
+  cycle: z
+    .enum(COURSE_CYCLES)
+    .or(z.literal(""))
+    .transform((value) => (value === "" ? undefined : value))
+    .optional(),
+});
 
 /**
  * Response schema for a single course (includes backend-computed fields)
@@ -298,6 +302,7 @@ export const CourseResponseSchema = BaseCourseSchema.extend({
   departmentName: z.string().nullable().optional(),
   totalCredits: z.number().int(),
   hasLaboratoryComponent: z.boolean(),
+  coordinatorCount: z.number().int().optional(),
   semester: z
     .object({
       programType: z.string(),

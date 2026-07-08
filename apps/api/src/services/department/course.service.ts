@@ -563,7 +563,7 @@ export class CourseService {
         },
         include: {
           _count: {
-            select: { assignments: true },
+            select: { assignments: true, coordinators: true },
           },
         },
         orderBy: { code: "asc" },
@@ -589,6 +589,7 @@ export class CourseService {
 
         return {
           ...course,
+          coordinatorCount: course._count.coordinators,
           departmentId: resolvedDepartment.departmentId,
           departmentName: resolvedDepartment.departmentName,
           isFullyMapped:
@@ -678,29 +679,109 @@ export class CourseService {
         requestContext,
       });
 
-      const result = await db.course.updateMany({
+      // Find relevant sections to compute expected assignment counts
+      const relevantSections = await db.section.findMany({
         where: {
           semesterId,
-          department: {
-            is: {
-              id: resolvedDepartment.departmentId,
-            },
-          },
+          departmentId: resolvedDepartment.departmentId,
+          ...(cycle && cycle !== "NONE"
+            ? { cycle: cycle as import("@webcampus/db").Cycle }
+            : {}),
+        },
+        include: {
+          _count: { select: { batches: true } },
+        },
+      });
+
+      const sectionCounts = relevantSections.reduce(
+        (acc, sec) => {
+          const key = `${sec.semesterId}_${sec.cycle}`;
+          if (!acc[key]) acc[key] = { sections: 0, batches: 0 };
+          acc[key].sections += 1;
+          acc[key].batches += sec._count.batches;
+          return acc;
+        },
+        {} as Record<string, { sections: number; batches: number }>
+      );
+
+      const courses = await db.course.findMany({
+        where: {
+          semesterId,
+          department: { is: { id: resolvedDepartment.departmentId } },
           approvalStatus: { in: ["DRAFT", "NEEDS_REVISION"] },
           ...(cycle && cycle !== "NONE"
             ? { cycle: cycle as import("@webcampus/db").Cycle }
             : {}),
         },
-        data: {
-          approvalStatus: "PENDING",
-          approvedByRole: null,
-          approvedByUsername: null,
-          approvedByDisplay: null,
-          approvedAt: null,
-          revisionRequestedByRole: null,
-          revisionNotes: null,
-          revisionRequestedAt: null,
+        include: {
+          _count: {
+            select: { assignments: true, coordinators: true },
+          },
         },
+      });
+
+      const errors: string[] = [];
+      for (const course of courses) {
+        const key = `${course.semesterId}_${course.cycle}`;
+        const counts = sectionCounts[key] || { sections: 0, batches: 0 };
+
+        let expectedAssignments = 0;
+        if (
+          course.courseMode === "NON_INTEGRATED" ||
+          course.courseMode === "NCMC"
+        ) {
+          expectedAssignments = counts.sections;
+        } else if (course.courseMode === "FINAL_SUMMARY") {
+          expectedAssignments = counts.batches;
+        } else if (course.courseMode === "INTEGRATED") {
+          expectedAssignments = counts.sections + counts.batches;
+        }
+
+        const assignmentCount = course._count.assignments;
+        const isFullyMapped =
+          expectedAssignments > 0
+            ? assignmentCount >= expectedAssignments
+            : true;
+
+        if (course._count.coordinators === 0) {
+          errors.push(
+            `${course.code} (${course.name}) — no coordinator appointed`
+          );
+        }
+        if (!isFullyMapped) {
+          errors.push(
+            `${course.code} (${course.name}) — not fully mapped (${assignmentCount}/${expectedAssignments} assignments)`
+          );
+        }
+      }
+
+      if (errors.length > 0) {
+        throw new Error(
+          `Cannot submit for approval. ${errors.length} course(s) have issues:\n${errors.join("\n")}`
+        );
+      }
+
+      const result = await db.$transaction(async (tx) => {
+        return tx.course.updateMany({
+          where: {
+            semesterId,
+            department: { is: { id: resolvedDepartment.departmentId } },
+            approvalStatus: { in: ["DRAFT", "NEEDS_REVISION"] },
+            ...(cycle && cycle !== "NONE"
+              ? { cycle: cycle as import("@webcampus/db").Cycle }
+              : {}),
+          },
+          data: {
+            approvalStatus: "PENDING",
+            approvedByRole: null,
+            approvedByUsername: null,
+            approvedByDisplay: null,
+            approvedAt: null,
+            revisionRequestedByRole: null,
+            revisionNotes: null,
+            revisionRequestedAt: null,
+          },
+        });
       });
 
       const response: BaseResponse<{ count: number }> = {
@@ -712,7 +793,12 @@ export class CourseService {
       return response;
     } catch (error) {
       logger.error("Failed to bulk submit courses for approval", error);
-      throw new Error("Failed to bulk submit courses");
+      if (CourseService.isKnownApprovalError(error)) {
+        throw error;
+      }
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to bulk submit courses"
+      );
     }
   }
 
@@ -808,28 +894,30 @@ export class CourseService {
       const approvedByDisplay =
         role === "admin" ? "Admin" : resolvedCoeUsername;
 
-      const result = await db.course.updateMany({
-        where: {
-          semesterId,
-          department: {
-            is: {
-              id: resolvedDepartment.departmentId,
+      const result = await db.$transaction(async (tx) => {
+        return tx.course.updateMany({
+          where: {
+            semesterId,
+            department: {
+              is: {
+                id: resolvedDepartment.departmentId,
+              },
             },
+            approvalStatus: "PENDING",
+            ...(cycle && cycle !== "NONE"
+              ? { cycle: cycle as import("@webcampus/db").Cycle }
+              : {}),
           },
-          approvalStatus: "PENDING",
-          ...(cycle && cycle !== "NONE"
-            ? { cycle: cycle as import("@webcampus/db").Cycle }
-            : {}),
-        },
-        data: {
-          // OR gate: either Admin OR COE approval fully approves the submission.
-          approvalStatus: "APPROVED",
-          approvedByRole: role,
-          approvedByUsername:
-            role === "coe" ? resolvedCoeUsername : (approverUsername ?? null),
-          approvedByDisplay,
-          approvedAt: new Date(),
-        },
+          data: {
+            // OR gate: either Admin OR COE approval fully approves the submission.
+            approvalStatus: "APPROVED",
+            approvedByRole: role,
+            approvedByUsername:
+              role === "coe" ? resolvedCoeUsername : (approverUsername ?? null),
+            approvedByDisplay,
+            approvedAt: new Date(),
+          },
+        });
       });
 
       return {
@@ -862,25 +950,27 @@ export class CourseService {
         departmentId,
         departmentName,
       });
-      const result = await db.course.updateMany({
-        where: {
-          semesterId,
-          department: {
-            is: {
-              id: resolvedDepartment.departmentId,
+      const result = await db.$transaction(async (tx) => {
+        return tx.course.updateMany({
+          where: {
+            semesterId,
+            department: {
+              is: {
+                id: resolvedDepartment.departmentId,
+              },
             },
+            approvalStatus: "PENDING",
+            ...(cycle && cycle !== "NONE"
+              ? { cycle: cycle as import("@webcampus/db").Cycle }
+              : {}),
           },
-          approvalStatus: "PENDING",
-          ...(cycle && cycle !== "NONE"
-            ? { cycle: cycle as import("@webcampus/db").Cycle }
-            : {}),
-        },
-        data: {
-          approvalStatus: "NEEDS_REVISION",
-          revisionRequestedByRole: role,
-          revisionNotes: reviewerNotes,
-          revisionRequestedAt: new Date(),
-        },
+          data: {
+            approvalStatus: "NEEDS_REVISION",
+            revisionRequestedByRole: role,
+            revisionNotes: reviewerNotes,
+            revisionRequestedAt: new Date(),
+          },
+        });
       });
 
       return {

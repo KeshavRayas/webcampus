@@ -112,6 +112,14 @@ export const DetailedGenerationPreviewRequestSchema = z.object({
   allocations: z.array(SectionAllocationSchema),
 });
 
+export const AssignStudentsSchema = z.object({
+  sectionId: z.string().uuid("Invalid section ID"),
+  studentIds: z
+    .array(z.string().uuid("Invalid student ID"))
+    .min(1, "At least one student is required"),
+  academicYear: z.string().min(1, "Academic year is required"),
+});
+
 export const DetailedGenerationPreviewSectionSchema = z.object({
   sectionName: z.string().min(1),
   studentUsns: z.array(z.string()),
@@ -138,3 +146,5 @@ export type DetailedGenerationPreviewRequestDTO = z.infer<
 export type DetailedGenerationPreviewSectionDTO = z.infer<
   typeof DetailedGenerationPreviewSectionSchema
 >;
+
+export type AssignStudentsDTO = z.infer<typeof AssignStudentsSchema>;

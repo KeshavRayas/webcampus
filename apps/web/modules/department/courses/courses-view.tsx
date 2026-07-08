@@ -12,7 +12,6 @@ import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import {
-  DEFAULT_FILTER_ALL_VALUE,
   FilterActions,
   FilterBuilder,
   FilterPanel,
@@ -123,10 +122,26 @@ export const CoursesView: React.FC = () => {
       );
     }
 
-    return allSemestersForSelectedDraftTerm.filter((semester) =>
+    const firstYearSems = allSemestersForSelectedDraftTerm.filter((semester) =>
       isFirstYearUgSemester(semester)
     );
-  }, [allSemestersForSelectedDraftTerm, isBasicSciences]);
+
+    if (firstYearSems.length === 0) return [];
+
+    const termType = selectedDraftTerm?.type;
+    if (termType === "odd") {
+      return firstYearSems.filter((s) => s.semesterNumber === 1);
+    }
+    if (termType === "even") {
+      return firstYearSems.filter((s) => s.semesterNumber === 2);
+    }
+
+    return firstYearSems;
+  }, [
+    allSemestersForSelectedDraftTerm,
+    isBasicSciences,
+    selectedDraftTerm?.type,
+  ]);
 
   const selectedAppliedTerm = terms.find(
     (term) => term.id === appliedFilters.termId
@@ -239,37 +254,13 @@ export const CoursesView: React.FC = () => {
     semesterOptions,
   ]);
 
-  useEffect(() => {
-    if (appliedFilters.termId && appliedFilters.semesterId) {
-      return;
-    }
-
-    if (!draftFilters.termId || !draftFilters.semesterId) {
-      return;
-    }
-
-    const initializedFilters = {
-      ...draftFilters,
-      cycle: isBasicSciences
-        ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
-        : "",
-    };
-
-    setAppliedFilters(initializedFilters);
-  }, [
-    appliedFilters.semesterId,
-    appliedFilters.termId,
-    draftFilters,
-    isBasicSciences,
-  ]);
-
   const courseFilterFields: FilterFieldConfig<CoursesFilters>[] = [
     {
       key: "termId",
       label: "Academic Term",
       type: "select",
       placeholder: "Select term...",
-      allOptionLabel: "All terms",
+      hideAllOption: true,
       options: terms.map((term) => ({
         label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
         value: term.id,
@@ -282,7 +273,7 @@ export const CoursesView: React.FC = () => {
       placeholder: draftFilters.termId
         ? "Select semester..."
         : "Select term first",
-      allOptionLabel: "All semesters",
+      hideAllOption: true,
       options: semesterOptions.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
@@ -295,7 +286,7 @@ export const CoursesView: React.FC = () => {
             label: "Cycle",
             type: "select",
             placeholder: "Select cycle...",
-            allOptionLabel: "All cycles",
+            hideAllOption: true,
             options: BASIC_SCIENCES_CYCLE_OPTIONS.map((cycle) => ({
               label: cycle,
               value: cycle,
@@ -379,7 +370,6 @@ export const CoursesView: React.FC = () => {
 
             updateDraftFilter(key, value);
           }}
-          allValue={DEFAULT_FILTER_ALL_VALUE}
           className="md:grid-cols-2 xl:grid-cols-3"
         />
         <FilterActions onApply={applyFilters} onReset={resetFilters} />

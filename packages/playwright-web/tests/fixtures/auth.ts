@@ -10,8 +10,8 @@ type AuthFixtures = {
 export const test = base.extend<AuthFixtures>({
   adminCredentials: async ({}, use) => {
     await use({
-      email: "hitishraop@gmail.com",
-      password: "password",
+      email: process.env.ADMIN_USER_EMAIL || "dev@webcampus.com",
+      password: process.env.ADMIN_USER_PASSWORD || "password",
     });
   },
 
@@ -25,11 +25,9 @@ export const test = base.extend<AuthFixtures>({
   authenticatedAsAdmin: async ({ page, adminCredentials }, use) => {
     await use(async () => {
       await page.goto("/admin/sign-in");
+      await page.getByLabel("Email").fill(adminCredentials.email);
       await page
-        .locator('input[placeholder="Enter your email"]')
-        .fill(adminCredentials.email);
-      await page
-        .locator('input[placeholder="Enter your password"]')
+        .getByPlaceholder("Enter your password")
         .fill(adminCredentials.password);
       await page.getByRole("button", { name: "Continue" }).click();
       await page.waitForURL("/admin");
@@ -39,11 +37,9 @@ export const test = base.extend<AuthFixtures>({
   authenticatedAsFaculty: async ({ page, facultyCredentials }, use) => {
     await use(async () => {
       await page.goto("/faculty/sign-in");
+      await page.getByLabel("Email").fill(facultyCredentials.email);
       await page
-        .locator('input[placeholder="Enter your email"]')
-        .fill(facultyCredentials.email);
-      await page
-        .locator('input[placeholder="Enter your password"]')
+        .getByPlaceholder("Enter your password")
         .fill(facultyCredentials.password);
       await page.getByRole("button", { name: "Continue" }).click();
       await page.waitForURL("/faculty");

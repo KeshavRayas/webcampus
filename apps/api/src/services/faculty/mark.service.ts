@@ -4,12 +4,22 @@ import {
   AssessmentWithStudentsType,
   CreateMarkType,
   MarkResponseType,
+  MarksReportDTO,
+  MarksReportFilterOptionsDTO,
   SaveAssessmentMarksType,
   UpdateMarkType,
 } from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
+import { recomputeStudentMark } from "../shared/mark-sync.service";
 
 export class Mark {
+  /**
+   * Direct Mark creation — bypasses the assessment aggregate pipeline.
+   * Does NOT call recomputeStudentMark, so cieTotal/status here will be
+   * OVERWRITTEN the next time saveAssessmentMarks or freeze triggers
+   * recomputeStudentMark for this student+course.
+   * Prefer saveAssessmentMarks + recomputeStudentMark for normal usage.
+   */
   static async create(
     data: CreateMarkType
   ): Promise<BaseResponse<MarkResponseType>> {
@@ -121,6 +131,14 @@ export class Mark {
     }
   }
 
+  /**
+   * Direct Mark update — bypasses the assessment aggregate pipeline.
+   * Does NOT call recomputeStudentMark.  Values set here (cieTotal, status)
+   * will be OVERWRITTEN the next time saveAssessmentMarks or freeze triggers
+   * recomputeStudentMark for this student+course.
+   * The freeze check below mirrors the one in saveAssessmentMarks to prevent
+   * manual overrides of frozen data.
+   */
   static async update(
     id: string,
     data: UpdateMarkType
@@ -148,8 +166,6 @@ export class Mark {
           error: "Mark not found",
         };
       }
-      // TODO :- Bro please check if the freezing thing below I have handled properly or not, I have just done as per my understanding
-      // Bro, I have followed the same in here and attendance as well,
 
       const courseAssignment = existingMark.course.assignments[0];
       const freeze = courseAssignment?.freezes;
@@ -593,6 +609,10 @@ export class Mark {
         }
       }
 
+      for (const studentId of totalsByStudent.keys()) {
+        await recomputeStudentMark(studentId, data.courseId);
+      }
+
       logger.info("Assessment marks saved successfully", {
         assessmentId: data.assessmentId,
       });
@@ -606,6 +626,230 @@ export class Mark {
       logger.error("Error saving assessment marks", error);
       if (error instanceof Error) throw error;
       throw new Error("Failed to save assessment marks");
+    }
+  }
+
+  static async getMarksReport(
+    userId: string,
+    courseId: string,
+    sectionId?: string
+  ): Promise<BaseResponse<MarksReportDTO>> {
+    try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
+      const assignment = await db.courseAssignment.findFirst({
+        where: {
+          courseId,
+          facultyId: faculty.id,
+        },
+        include: {
+          course: {
+            include: {
+              semester: {
+                include: {
+                  academicTerm: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!assignment) {
+        throw new Error("Unauthorized to view this course");
+      }
+
+      const course = assignment.course;
+
+      const assessments = await db.assessmentTemplate.findMany({
+        where: { courseId },
+        orderBy: { title: "asc" },
+      });
+
+      const registrations = await db.courseRegistration.findMany({
+        where: {
+          courseId,
+          semesterId: course.semesterId,
+          ...(sectionId
+            ? {
+                student: {
+                  studentSections: {
+                    some: { sectionId },
+                  },
+                },
+              }
+            : {}),
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              usn: true,
+              user: {
+                select: { name: true },
+              },
+            },
+          },
+        },
+      });
+
+      const studentIds = registrations.map((r) => r.student.id);
+
+      const studentAssessments = await db.studentAssessment.findMany({
+        where: {
+          studentId: { in: studentIds },
+          courseId,
+        },
+      });
+
+      const marksMap = new Map<
+        string,
+        { cieTotal: number | null; status: string }
+      >(
+        studentIds.map((id) => [id, { cieTotal: null, status: "NOT_ELIGIBLE" }])
+      );
+
+      const markRecords = await db.mark.findMany({
+        where: {
+          studentId: { in: studentIds },
+          courseId,
+        },
+      });
+
+      for (const mark of markRecords) {
+        marksMap.set(mark.studentId, {
+          cieTotal: mark.cieTotal,
+          status: mark.status,
+        });
+      }
+
+      const assessmentMap = new Map(
+        studentAssessments.map((sa) => [
+          `${sa.studentId}_${sa.assessmentId}`,
+          sa,
+        ])
+      );
+
+      const students: MarksReportDTO["students"] = registrations.map((reg) => {
+        const markInfo = marksMap.get(reg.student.id) ?? {
+          cieTotal: null,
+          status: "NOT_ELIGIBLE",
+        };
+
+        const assessmentScores = assessments.map((a) => {
+          const sa = assessmentMap.get(`${reg.student.id}_${a.id}`);
+          return {
+            assessmentId: a.id,
+            assessmentTitle: a.title,
+            totalMarks: sa?.totalMarks ?? null,
+            maxMarks: a.totalMarks,
+          };
+        });
+
+        return {
+          usn: reg.student.usn,
+          name: reg.student.user.name,
+          assessments: assessmentScores,
+          cieTotal: markInfo.cieTotal,
+          status: markInfo.status,
+        };
+      });
+
+      const result: MarksReportDTO = {
+        course: {
+          id: course.id,
+          code: course.code,
+          name: course.name,
+          cumulativeMinMarks: course.cumulativeMinMarks,
+        },
+        assessments: assessments.map((a) => ({
+          id: a.id,
+          title: a.title,
+          totalMarks: a.totalMarks,
+        })),
+        semester: {
+          id: course.semester.id,
+          semesterNumber: course.semester.semesterNumber,
+          academicTerm: {
+            id: course.semester.academicTerm.id,
+            type: course.semester.academicTerm.type,
+            year: course.semester.academicTerm.year,
+          },
+        },
+        students,
+      };
+
+      return {
+        status: "success",
+        message: "Marks report retrieved successfully",
+        data: result,
+      };
+    } catch (error) {
+      logger.error("Error fetching marks report", error);
+      if (error instanceof Error) throw error;
+      throw new Error("Failed to fetch marks report");
+    }
+  }
+
+  static async getMarksReportFilterOptions(
+    userId: string
+  ): Promise<BaseResponse<MarksReportFilterOptionsDTO>> {
+    try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
+      const assignments = await db.courseAssignment.findMany({
+        where: { facultyId: faculty.id },
+        select: {
+          course: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              semesterId: true,
+            },
+          },
+          section: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: { course: { code: "asc" } },
+      });
+
+      const courses = assignments.map((a) => ({
+        id: a.course.id,
+        code: a.course.code,
+        name: a.course.name,
+        sectionId: a.section.id,
+        sectionName: a.section.name,
+        semesterId: a.course.semesterId,
+      }));
+
+      return {
+        status: "success",
+        message: "Filter options retrieved successfully",
+        data: { courses },
+      };
+    } catch (error) {
+      logger.error("Error fetching marks report filter options", error);
+      if (error instanceof Error) throw error;
+      throw new Error("Failed to fetch filter options");
     }
   }
 }

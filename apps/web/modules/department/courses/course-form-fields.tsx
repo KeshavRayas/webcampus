@@ -9,14 +9,8 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@webcampus/ui/components/select";
-import React, { useEffect } from "react";
+import { Combobox } from "@webcampus/ui/molecules/combobox";
+import React, { useEffect, useRef } from "react";
 import { UseFormReturn, useWatch } from "react-hook-form";
 
 const COURSE_MODE_OPTIONS = [
@@ -35,16 +29,13 @@ const COURSE_TYPE_OPTIONS = [
 
 type NumericCourseField = Exclude<
   {
-    [K in keyof CreateCourseDTO]: CreateCourseDTO[K] extends number
-      ? K
-      : never;
+    [K in keyof CreateCourseDTO]: CreateCourseDTO[K] extends number ? K : never;
   }[keyof CreateCourseDTO],
   undefined
 >;
 
 type ModeRule = {
   preset: Partial<Record<NumericCourseField, number>>;
-  disabledFields: NumericCourseField[];
   helperText: string;
 };
 
@@ -69,21 +60,6 @@ const MODE_RULES: Partial<Record<CreateCourseDTO["courseMode"], ModeRule>> = {
       cumulativeMaxMarks: 100,
       cumulativeMinMarks: 40,
     },
-    disabledFields: [
-      "tutorialCredits",
-      "skillCredits",
-      "maxNoOfCies",
-      "minNoOfCies",
-      "cieMaxMarks",
-      "cieMinMarks",
-      "cieWeightage",
-      "assignmentMaxMarks",
-      "labMaxMarks",
-      "labMinMarks",
-      "labWeightage",
-      "cumulativeMaxMarks",
-      "cumulativeMinMarks",
-    ],
     helperText:
       "Integrated: Internal 50 (CIE 40×50% avg best 2/3 = 20 + AAT 5 + Lab 25) + SEE 50 (100×50% weightage, min 35). Pass if cumulative ≥ 40.",
   },
@@ -108,22 +84,6 @@ const MODE_RULES: Partial<Record<CreateCourseDTO["courseMode"], ModeRule>> = {
       cumulativeMaxMarks: 100,
       cumulativeMinMarks: 40,
     },
-    disabledFields: [
-      "tutorialCredits",
-      "practicalCredits",
-      "skillCredits",
-      "maxNoOfCies",
-      "minNoOfCies",
-      "cieMaxMarks",
-      "cieMinMarks",
-      "cieWeightage",
-      "assignmentMaxMarks",
-      "labMaxMarks",
-      "labMinMarks",
-      "labWeightage",
-      "cumulativeMaxMarks",
-      "cumulativeMinMarks",
-    ],
     helperText:
       "Non-Integrated: Internal 50 (CIE 40×100% avg best 2/3 = 40 + AAT 10) + SEE 50 (100×50% weightage, min 35). Pass if cumulative ≥ 40.",
   },
@@ -148,23 +108,6 @@ const MODE_RULES: Partial<Record<CreateCourseDTO["courseMode"], ModeRule>> = {
       cumulativeMaxMarks: 100,
       cumulativeMinMarks: 40,
     },
-    disabledFields: [
-      "tutorialCredits",
-      "practicalCredits",
-      "skillCredits",
-      "maxNoOfCies",
-      "minNoOfCies",
-      "cieMaxMarks",
-      "cieMinMarks",
-      "cieWeightage",
-      "noOfAssignments",
-      "assignmentMaxMarks",
-      "labMaxMarks",
-      "labMinMarks",
-      "labWeightage",
-      "cumulativeMaxMarks",
-      "cumulativeMinMarks",
-    ],
     helperText:
       "Final Summary: Internal 50 (CIE best 2/3 with max 50, min 20, 100% weightage) + SEE 50 (100×50% weightage, min 35). Pass if cumulative ≥ 40.",
   },
@@ -189,26 +132,6 @@ const MODE_RULES: Partial<Record<CreateCourseDTO["courseMode"], ModeRule>> = {
       cumulativeMaxMarks: 100,
       cumulativeMinMarks: 40,
     },
-    disabledFields: [
-      "tutorialCredits",
-      "practicalCredits",
-      "skillCredits",
-      "seeMaxMarks",
-      "seeMinMarks",
-      "seeWeightage",
-      "maxNoOfCies",
-      "minNoOfCies",
-      "cieMaxMarks",
-      "cieMinMarks",
-      "cieWeightage",
-      "noOfAssignments",
-      "assignmentMaxMarks",
-      "labMaxMarks",
-      "labMinMarks",
-      "labWeightage",
-      "cumulativeMaxMarks",
-      "cumulativeMinMarks",
-    ],
     helperText:
       "NCMC: Marks are interpreted as PP when score is 40 or above, otherwise NP.",
   },
@@ -280,8 +203,63 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
     name: "courseMode",
   });
 
+  const isModeInitialMount = useRef(true);
+  const originalFormSnapshot = useRef<Partial<
+    Record<NumericCourseField, number>
+  > | null>(null);
+  const originalCourseMode = useRef<string | null>(null);
+
   useEffect(() => {
+    if (isModeInitialMount.current) {
+      isModeInitialMount.current = false;
+      if (courseMode) {
+        originalCourseMode.current = courseMode;
+        const snapshot: Partial<Record<NumericCourseField, number>> = {};
+        const fields: NumericCourseField[] = [
+          "lectureCredits",
+          "tutorialCredits",
+          "practicalCredits",
+          "skillCredits",
+          "seeMaxMarks",
+          "seeMinMarks",
+          "seeWeightage",
+          "maxNoOfCies",
+          "minNoOfCies",
+          "cieMaxMarks",
+          "cieMinMarks",
+          "cieWeightage",
+          "noOfAssignments",
+          "assignmentMaxMarks",
+          "labMaxMarks",
+          "labMinMarks",
+          "labWeightage",
+          "cumulativeMaxMarks",
+          "cumulativeMinMarks",
+        ];
+        fields.forEach((f) => {
+          snapshot[f] = form.getValues(f);
+        });
+        originalFormSnapshot.current = snapshot;
+      }
+      return;
+    }
+
     if (!courseMode) return;
+
+    if (
+      originalCourseMode.current &&
+      courseMode === originalCourseMode.current &&
+      originalFormSnapshot.current
+    ) {
+      Object.entries(originalFormSnapshot.current).forEach(([field, value]) => {
+        form.setValue(field as NumericCourseField, value ?? 0, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      });
+      return;
+    }
+
     const modeRule = MODE_RULES[courseMode];
     if (!modeRule) return;
 
@@ -293,16 +271,10 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
     });
   }, [courseMode, form]);
 
-  const isModeFieldDisabled = (name: NumericCourseField) => {
-    if (!courseMode) return false;
-    const modeRule = MODE_RULES[courseMode];
-    return modeRule?.disabledFields.includes(name) ?? false;
-  };
-
   const modeHelperText =
     courseMode && MODE_RULES[courseMode]
       ? MODE_RULES[courseMode].helperText
-      : "Select a course mode to auto-fill rubric fields and lock non-applicable inputs.";
+      : "Select a course mode to auto-fill rubric fields.";
 
   return (
     <>
@@ -347,20 +319,18 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Course Mode *</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select mode" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {COURSE_MODE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <Combobox
+                  options={COURSE_MODE_OPTIONS.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                  }))}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  placeholder="Select mode"
+                  className="w-full"
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -372,20 +342,18 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Course Type *</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {COURSE_TYPE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <Combobox
+                  options={COURSE_TYPE_OPTIONS.map((opt) => ({
+                    value: opt.value,
+                    label: opt.label,
+                  }))}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  placeholder="Select type"
+                  className="w-full"
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -395,30 +363,18 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
       {/* ── Section 2: Credits (L-T-P-S) ── */}
       <FormSection title="Credits (L-T-P-S)">
         <div className="grid grid-cols-4 gap-3">
-          <NumberField
-            form={form}
-            name="lectureCredits"
-            label="Lecture (L)"
-            disabled={isModeFieldDisabled("lectureCredits")}
-          />
+          <NumberField form={form} name="lectureCredits" label="Lecture (L)" />
           <NumberField
             form={form}
             name="tutorialCredits"
             label="Tutorial (T)"
-            disabled={isModeFieldDisabled("tutorialCredits")}
           />
           <NumberField
             form={form}
             name="practicalCredits"
             label="Practical (P)"
-            disabled={isModeFieldDisabled("practicalCredits")}
           />
-          <NumberField
-            form={form}
-            name="skillCredits"
-            label="Skill (S)"
-            disabled={isModeFieldDisabled("skillCredits")}
-          />
+          <NumberField form={form} name="skillCredits" label="Skill (S)" />
         </div>
       </FormSection>
 
@@ -427,126 +383,92 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
         <div className="space-y-3">
           {/* SEE row */}
           <div>
-            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
+            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
               SEE (Semester End Exam)
             </p>
             <div className="grid grid-cols-3 gap-3">
-              <NumberField
-                form={form}
-                name="seeMaxMarks"
-                label="Max Marks"
-                disabled={isModeFieldDisabled("seeMaxMarks")}
-              />
-              <NumberField
-                form={form}
-                name="seeMinMarks"
-                label="Min Marks"
-                disabled={isModeFieldDisabled("seeMinMarks")}
-              />
-              <NumberField
-                form={form}
-                name="seeWeightage"
-                label="Weightage"
-                disabled={isModeFieldDisabled("seeWeightage")}
-              />
+              <NumberField form={form} name="seeMaxMarks" label="Max Marks" />
+              <NumberField form={form} name="seeMinMarks" label="Min Marks" />
+              <NumberField form={form} name="seeWeightage" label="Weightage" />
             </div>
           </div>
 
           {/* CIE row */}
           <div>
-            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
+            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
               CIE (Continuous Internal)
             </p>
-            <div className="grid grid-cols-5 gap-3">
-              <NumberField
-                form={form}
-                name="maxNoOfCies"
-                label="Max CIEs"
-                disabled={isModeFieldDisabled("maxNoOfCies")}
-              />
-              <NumberField
-                form={form}
-                name="minNoOfCies"
-                label="Min CIEs"
-                disabled={isModeFieldDisabled("minNoOfCies")}
-              />
-              <NumberField
-                form={form}
-                name="cieMaxMarks"
-                label="Max Marks"
-                disabled={isModeFieldDisabled("cieMaxMarks")}
-              />
-              <NumberField
-                form={form}
-                name="cieMinMarks"
-                label="Min Marks"
-                disabled={isModeFieldDisabled("cieMinMarks")}
-              />
-              <NumberField
-                form={form}
-                name="cieWeightage"
-                label="Weightage"
-                disabled={isModeFieldDisabled("cieWeightage")}
-              />
+            <div className="mb-3">
+              <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-wider">
+                CIE Counts
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <NumberField form={form} name="maxNoOfCies" label="Max CIEs" />
+                <NumberField form={form} name="minNoOfCies" label="Min CIEs" />
+              </div>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-wider">
+                CIE Marks
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                <NumberField form={form} name="cieMaxMarks" label="Max Marks" />
+                <NumberField form={form} name="cieMinMarks" label="Min Marks" />
+                <NumberField
+                  form={form}
+                  name="cieWeightage"
+                  label="Weightage"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Lab & Assignments row */}
+          {/* Lab section */}
           <div>
-            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
-              Lab &amp; Assignments
+            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
+              Lab
             </p>
-            <div className="grid grid-cols-5 gap-3">
-              <NumberField
-                form={form}
-                name="labMaxMarks"
-                label="Lab Max"
-                disabled={isModeFieldDisabled("labMaxMarks")}
-              />
-              <NumberField
-                form={form}
-                name="labMinMarks"
-                label="Lab Min"
-                disabled={isModeFieldDisabled("labMinMarks")}
-              />
-              <NumberField
-                form={form}
-                name="labWeightage"
-                label="Lab Wt."
-                disabled={isModeFieldDisabled("labWeightage")}
-              />
+            <div className="grid grid-cols-3 gap-3">
+              <NumberField form={form} name="labMaxMarks" label="Max Marks" />
+              <NumberField form={form} name="labMinMarks" label="Min Marks" />
+              <NumberField form={form} name="labWeightage" label="Weightage" />
+            </div>
+          </div>
+
+          {/* Theory Assignments section */}
+          <div>
+            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
+              Theory Assignments
+            </p>
+            <div className="grid grid-cols-2 gap-3">
               <NumberField
                 form={form}
                 name="noOfAssignments"
                 label="# Assign."
-                disabled={isModeFieldDisabled("noOfAssignments")}
               />
               <NumberField
                 form={form}
                 name="assignmentMaxMarks"
-                label="Assign. Max"
-                disabled={isModeFieldDisabled("assignmentMaxMarks")}
+                label="Max Marks"
               />
             </div>
           </div>
 
           {/* Cumulative row */}
           <div>
-            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold tracking-wider uppercase">
-              Cumulative
+            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
+              Cumulative (SEE + CIE)
             </p>
             <div className="grid grid-cols-2 gap-3">
               <NumberField
                 form={form}
                 name="cumulativeMaxMarks"
                 label="Max Marks"
-                disabled={isModeFieldDisabled("cumulativeMaxMarks")}
               />
               <NumberField
                 form={form}
                 name="cumulativeMinMarks"
                 label="Min Marks"
-                disabled={isModeFieldDisabled("cumulativeMinMarks")}
               />
             </div>
           </div>

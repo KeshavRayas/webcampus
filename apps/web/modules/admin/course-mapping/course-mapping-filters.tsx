@@ -57,7 +57,10 @@ export const AdminCourseMappingFilters = ({
 
   const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
 
-  const { data: departments = [] } = useDepartments();
+  const { data: rawDepartments = [] } = useDepartments();
+  const departments = rawDepartments.filter(
+    (d) => d.type !== "BASIC_SCIENCES" && d.type !== "SERVICE"
+  );
   const { data: rawTerms } = useAcademicTerms();
   const terms = rawTerms ?? [];
 
@@ -160,21 +163,20 @@ export const AdminCourseMappingFilters = ({
         return [];
       }
 
-      const res = await axios.get<BaseResponse<CourseMappingStatusResponseType>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/status`,
-        {
-          params: {
-            departmentId: draftFilters.departmentId,
-            departmentName: draftFilters.departmentName,
-            semesterId: draftFilters.semesterId,
-            academicYear: selectedDraftTerm.year,
-            ...(isBasicSciences && draftFilters.cycle
-              ? { cycle: draftFilters.cycle }
-              : {}),
-          },
-          withCredentials: true,
-        }
-      );
+      const res = await axios.get<
+        BaseResponse<CourseMappingStatusResponseType>
+      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/status`, {
+        params: {
+          departmentId: draftFilters.departmentId,
+          departmentName: draftFilters.departmentName,
+          semesterId: draftFilters.semesterId,
+          academicYear: selectedDraftTerm.year,
+          ...(isBasicSciences && draftFilters.cycle
+            ? { cycle: draftFilters.cycle }
+            : {}),
+        },
+        withCredentials: true,
+      });
 
       if (res.data.status === "success" && res.data.data?.courses) {
         return res.data.data.courses;
@@ -243,16 +245,6 @@ export const AdminCourseMappingFilters = ({
 
   const filterFields: FilterFieldConfig<typeof EMPTY_FILTERS>[] = [
     {
-      key: "departmentName",
-      label: "Department",
-      type: "select",
-      hideAllOption: true,
-      options: departments.map((department) => ({
-        label: department.name,
-        value: department.name,
-      })),
-    },
-    {
       key: "termId",
       label: "Academic Term",
       type: "select",
@@ -286,6 +278,16 @@ export const AdminCourseMappingFilters = ({
           } as FilterFieldConfig<typeof EMPTY_FILTERS>,
         ]
       : []),
+    {
+      key: "departmentName",
+      label: "Department",
+      type: "select",
+      hideAllOption: true,
+      options: departments.map((department) => ({
+        label: department.name,
+        value: department.name,
+      })),
+    },
     {
       key: "courseId",
       label: "Course",

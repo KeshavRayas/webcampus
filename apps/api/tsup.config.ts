@@ -13,5 +13,6 @@ export default defineConfig({
     "@webcampus/schemas",
     "@webcampus/db",
     "@webcampus/backend-utils",
+    "@webcampus/ui",
   ],
 });

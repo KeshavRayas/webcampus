@@ -84,13 +84,17 @@ test.describe("Faculty attendance", () => {
     const editAttendanceModal = getEditAttendanceModal(page);
     await expect(editAttendanceModal).toBeVisible();
     await expect(
-      editAttendanceModal.getByRole("heading", { name: "Edit Attendance Sessions" })
+      editAttendanceModal.getByRole("heading", {
+        name: "Edit Attendance Sessions",
+      })
     ).toBeVisible();
     await expect(
       editAttendanceModal.getByRole("button", { name: "Edit Session" })
     ).toBeVisible();
 
-    await editAttendanceModal.getByRole("button", { name: "Edit Session" }).click();
+    await editAttendanceModal
+      .getByRole("button", { name: "Edit Session" })
+      .click();
 
     const takeAttendanceModal = getTakeAttendanceModal(page);
     await expect(editAttendanceModal).toHaveCount(0);
@@ -121,11 +125,15 @@ test.describe("Faculty attendance", () => {
     ).toBeEnabled();
     expect(state.saveRequests).toHaveLength(0);
 
-    await takeAttendanceModal.getByLabel("Mark Alice Johnson as absent").click();
-    await takeAttendanceModal.getByRole("button", { name: "Save Attendance" }).click();
+    await takeAttendanceModal
+      .getByLabel("Mark Alice Johnson as absent")
+      .click();
+    await takeAttendanceModal
+      .getByRole("button", { name: "Save Attendance" })
+      .click();
 
     await expect.poll(() => state.saveRequests.length).toBe(1);
-    expect(state.saveRequests[0].studentStatuses).toEqual(
+    expect(state.saveRequests[0]!.studentStatuses).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           studentId: "student-1",

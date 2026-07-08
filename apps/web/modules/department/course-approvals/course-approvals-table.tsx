@@ -19,12 +19,25 @@ import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@webcampus/ui/components/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from "@webcampus/ui/components/table";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@webcampus/ui/components/tooltip";
 import axios, { AxiosError } from "axios";
+import { Eye, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-toastify";
 import { CourseApprovalsFiltersState } from "./course-approvals-filters";
@@ -42,6 +55,9 @@ export const CourseApprovalsTable = ({
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [detailCourse, setDetailCourse] = useState<CourseResponseDTO | null>(
+    null
+  );
 
   const { data: courses, isLoading } = useQuery({
     queryKey: [
@@ -121,9 +137,14 @@ export const CourseApprovalsTable = ({
   const allCoursesMapped =
     courseList.length > 0 && courseList.every((c) => c.isFullyMapped);
 
+  const allHaveCoordinators =
+    courseList.length > 0 &&
+    courseList.every((c) => (c.coordinatorCount ?? 0) > 0);
+
   const disableSubmit =
     courseList.length === 0 ||
     !allCoursesMapped ||
+    !allHaveCoordinators ||
     courseList.every(
       (c) => c.approvalStatus === "PENDING" || c.approvalStatus === "APPROVED"
     );
@@ -173,7 +194,9 @@ export const CourseApprovalsTable = ({
           approvedByRole === "admin"
             ? "Admin"
             : course.approvedByUsername || course.approvedByDisplay || "COE";
-        const revisionByRole = (course.revisionRequestedByRole || "").toLowerCase();
+        const revisionByRole = (
+          course.revisionRequestedByRole || ""
+        ).toLowerCase();
         const revisionByText = revisionByRole === "admin" ? "Admin" : "COE";
 
         let variant: "default" | "secondary" | "destructive" | "outline" =
@@ -215,6 +238,24 @@ export const CourseApprovalsTable = ({
         );
       },
     },
+    {
+      id: "viewDetails",
+      header: "",
+      cell: ({ row }) => {
+        const course = row.original;
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setDetailCourse(course)}
+          >
+            <Eye className="h-4 w-4" />
+            <span className="sr-only">View details</span>
+          </Button>
+        );
+      },
+    },
   ];
 
   return (
@@ -235,14 +276,16 @@ export const CourseApprovalsTable = ({
                 </Button>
               </div>
             </TooltipTrigger>
-            {!allCoursesMapped && courseList.length > 0 && (
-              <TooltipContent>
-                <p>
-                  You must map all courses to faculty before submitting for
-                  approval.
-                </p>
-              </TooltipContent>
-            )}
+            {courseList.length > 0 &&
+              (!allCoursesMapped || !allHaveCoordinators) && (
+                <TooltipContent>
+                  <p>
+                    {!allCoursesMapped
+                      ? "All courses must be fully mapped to faculty before submitting for approval."
+                      : "Every course must have at least one coordinator appointed before submitting."}
+                  </p>
+                </TooltipContent>
+              )}
           </Tooltip>
         </TooltipProvider>
 
@@ -273,6 +316,315 @@ export const CourseApprovalsTable = ({
       ) : (
         <DataTable columns={columns} data={courseList} />
       )}
+
+      <Dialog
+        open={!!detailCourse}
+        onOpenChange={(open) => {
+          if (!open) setDetailCourse(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {detailCourse?.code} — {detailCourse?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {detailCourse && (
+            <CourseDetailContent
+              courseId={detailCourse.id}
+              course={detailCourse}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+interface MappingInfo {
+  sectionId: string;
+  sectionName: string;
+  assignmentType: string;
+  facultyId: string;
+  facultyName: string;
+  batchName?: string;
+}
+
+interface CoordinatorInfo {
+  id: string;
+  facultyId: string;
+  faculty: { name: string };
+}
+
+const CourseDetailContent = ({
+  courseId,
+  course,
+}: {
+  courseId: string;
+  course: CourseResponseDTO;
+}) => {
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+
+  const { data: mappings, isLoading: loadingMappings } = useQuery({
+    queryKey: ["course-mapping-detail", courseId],
+    queryFn: async () => {
+      const res = await axios.get<BaseResponse<MappingInfo[]>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/by-course`,
+        { params: { courseId }, withCredentials: true }
+      );
+      return res.data.status === "success" && res.data.data
+        ? res.data.data
+        : [];
+    },
+    enabled: !!courseId,
+  });
+
+  const { data: coordinators, isLoading: loadingCoords } = useQuery({
+    queryKey: ["course-coordinators-detail", courseId],
+    queryFn: async () => {
+      const res = await axios.get<BaseResponse<CoordinatorInfo[]>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/course/${courseId}/coordinators`,
+        { withCredentials: true }
+      );
+      return res.data.status === "success" && res.data.data
+        ? res.data.data
+        : [];
+    },
+    enabled: !!courseId,
+  });
+
+  const theoryMappings = (mappings ?? []).filter(
+    (m) => m.assignmentType === "THEORY"
+  );
+  const labMappings = (mappings ?? []).filter(
+    (m) => m.assignmentType === "LAB"
+  );
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+          Course Info
+        </h4>
+        <Table>
+          <TableBody>
+            <TableRow>
+              <TableCell className="font-medium">Mode</TableCell>
+              <TableCell>{course.courseMode}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Type</TableCell>
+              <TableCell>{course.courseType}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Cycle</TableCell>
+              <TableCell>{course.cycle || "N/A"}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Total Credits</TableCell>
+              <TableCell>{course.totalCredits}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+
+      <div>
+        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+          L-T-P-S Credits
+        </h4>
+        <Table>
+          <TableBody>
+            <TableRow>
+              <TableCell className="font-medium">Lecture</TableCell>
+              <TableCell>{course.lectureCredits}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Tutorial</TableCell>
+              <TableCell>{course.tutorialCredits}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Practical</TableCell>
+              <TableCell>{course.practicalCredits}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Skill</TableCell>
+              <TableCell>{course.skillCredits}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+
+      <div>
+        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+          SEE (Semester End Exam)
+        </h4>
+        <Table>
+          <TableBody>
+            <TableRow>
+              <TableCell className="font-medium">Max Marks</TableCell>
+              <TableCell>{course.seeMaxMarks}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Min Marks</TableCell>
+              <TableCell>{course.seeMinMarks}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Weightage</TableCell>
+              <TableCell>{course.seeWeightage}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+
+      <div>
+        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+          CIE (Continuous Internal)
+        </h4>
+        <Table>
+          <TableBody>
+            <TableRow>
+              <TableCell className="font-medium">Max CIEs</TableCell>
+              <TableCell>{course.maxNoOfCies}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Min CIEs</TableCell>
+              <TableCell>{course.minNoOfCies}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Max Marks</TableCell>
+              <TableCell>{course.cieMaxMarks}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Min Marks</TableCell>
+              <TableCell>{course.cieMinMarks}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Weightage</TableCell>
+              <TableCell>{course.cieWeightage}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+
+      <div>
+        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+          Lab
+        </h4>
+        <Table>
+          <TableBody>
+            <TableRow>
+              <TableCell className="font-medium">Max Marks</TableCell>
+              <TableCell>{course.labMaxMarks}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Min Marks</TableCell>
+              <TableCell>{course.labMinMarks}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Weightage</TableCell>
+              <TableCell>{course.labWeightage}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+
+      <div>
+        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+          Assignments
+        </h4>
+        <Table>
+          <TableBody>
+            <TableRow>
+              <TableCell className="font-medium"># Assignments</TableCell>
+              <TableCell>{course.noOfAssignments}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Max Marks</TableCell>
+              <TableCell>{course.assignmentMaxMarks}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+
+      <div>
+        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+          Cumulative (SEE + CIE)
+        </h4>
+        <Table>
+          <TableBody>
+            <TableRow>
+              <TableCell className="font-medium">Max Marks</TableCell>
+              <TableCell>{course.cumulativeMaxMarks}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium">Min Marks</TableCell>
+              <TableCell>{course.cumulativeMinMarks}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+
+      <div>
+        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+          Faculty Mapping
+        </h4>
+        {loadingMappings ? (
+          <div className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Loader2 className="h-3 w-3 animate-spin" /> Loading mappings...
+          </div>
+        ) : theoryMappings.length === 0 && labMappings.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No faculty mapped.</p>
+        ) : (
+          <Table>
+            <TableBody>
+              {theoryMappings.map((m) => (
+                <TableRow key={m.sectionId + "-theory"}>
+                  <TableCell className="font-medium">
+                    Section {m.sectionName} (Theory)
+                  </TableCell>
+                  <TableCell>{m.facultyName}</TableCell>
+                </TableRow>
+              ))}
+              {labMappings.map((m) => (
+                <TableRow key={m.sectionId + m.batchName + "-lab"}>
+                  <TableCell className="font-medium">
+                    Section {m.sectionName} Lab {m.batchName}
+                  </TableCell>
+                  <TableCell>{m.facultyName}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+
+      <div>
+        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+          Course Coordinators
+        </h4>
+        {loadingCoords ? (
+          <div className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Loader2 className="h-3 w-3 animate-spin" /> Loading coordinators...
+          </div>
+        ) : coordinators && coordinators.length > 0 ? (
+          <ul className="list-inside list-disc text-sm">
+            {coordinators.map((c) => (
+              <li key={c.id}>{c.faculty.name}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            No coordinators appointed.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+          Status
+        </h4>
+        <Badge>{course.approvalStatus || "DRAFT"}</Badge>
+      </div>
     </div>
   );
 };

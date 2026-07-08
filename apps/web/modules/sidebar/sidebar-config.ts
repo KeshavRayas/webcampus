@@ -5,6 +5,7 @@ import {
   Building,
   CalendarDays,
   ClipboardList,
+  FileText,
   Fingerprint,
   GraduationCap,
   LayoutDashboard,
@@ -110,6 +111,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
               name: "Condonation",
               url: "/admin/academics/condonation",
             },
+            {
+              name: "Hall Tickets",
+              url: "/admin/academics/hall-ticket",
+            },
           ],
         },
       ],
@@ -141,11 +146,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Course Configuration", url: "/department/courses" },
             { name: "Course Mapping", url: "/department/course-mapping" },
-            { name: "Approvals", url: "/department/course-approvals" },
             {
               name: "Appoint Coordinators",
               url: "/department/course-coordinators",
             },
+            { name: "Approvals", url: "/department/course-approvals" },
           ],
         },
         {
@@ -184,6 +189,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "CIE",
           url: "/student/cie",
           icon: BookOpenText,
+        },
+        {
+          name: "Hall Ticket",
+          url: "/student/hall-ticket",
+          icon: FileText,
         },
         {
           name: "Profile",
@@ -230,6 +240,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Marks",
           url: "/faculty/marks",
           icon: BookOpenText,
+          children: [
+            { name: "Enter Marks", url: "/faculty/marks" },
+            { name: "Marks Report", url: "/faculty/marks/report" },
+          ],
         },
         {
           name: "Question Paper Setup",
