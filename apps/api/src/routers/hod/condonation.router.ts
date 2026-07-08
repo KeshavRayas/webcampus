@@ -30,6 +30,16 @@ router.get(
 );
 
 router.patch(
+  "/:attendanceId/revoke",
+  validateRequest(HODCondonationAttendanceIdSchema, "params"),
+  protect({
+    role: "hod",
+    permissions: { freeze: ["lock"] },
+  }),
+  HODCondonationController.revokeCondonation
+);
+
+router.patch(
   "/:attendanceId",
   validateRequest(HODCondonationAttendanceIdSchema, "params"),
   protect({

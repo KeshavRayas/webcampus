@@ -594,6 +594,7 @@ export const FacultyAttendanceView = () => {
 
     // Strictly for creating NEW attendance: clear the checklist, open modal, and fetch the roster
     setStudentChecklist([]);
+    setActiveSessionId("");
     setIsTakeAttendanceModalOpen(true);
     sessionStudentsQuery.refetch();
   };

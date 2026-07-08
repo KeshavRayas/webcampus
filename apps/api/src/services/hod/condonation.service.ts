@@ -81,13 +81,25 @@ export class HODCondonationService {
         };
       }
 
+      const whereRegistration = {
+        OR: registrations.map((r) => ({
+          studentId: r.studentId,
+          courseId: r.courseId,
+        })),
+      } as const;
+
+      const isApproved = filters.status === "approved";
+
+      const whereStatus = isApproved
+        ? { condonationStatus: "APPROVED" as const }
+        : {
+            percentage: { gte: MIN_CONDONATION, lt: MAX_CONDONATION },
+            condonationStatus: { not: "APPROVED" as const },
+          };
+
       const attendances = await db.attendance.findMany({
         where: {
-          OR: registrations.map((r) => ({
-            studentId: r.studentId,
-            courseId: r.courseId,
-          })),
-          percentage: { gte: MIN_CONDONATION, lt: MAX_CONDONATION },
+          AND: [whereRegistration, whereStatus],
         },
         include: {
           student: {
@@ -95,7 +107,12 @@ export class HODCondonationService {
           },
           course: { select: { code: true, name: true } },
         },
-        orderBy: [{ percentage: "asc" }, { student: { usn: "asc" } }],
+        orderBy: isApproved
+          ? [{ student: { usn: "asc" as const } }]
+          : [
+              { percentage: "asc" as const },
+              { student: { usn: "asc" as const } },
+            ],
       });
 
       const rows: HODCondonationStudentRow[] = attendances.map((a) => ({
@@ -114,7 +131,9 @@ export class HODCondonationService {
 
       return {
         status: "success",
-        message: "Eligible students fetched successfully",
+        message: isApproved
+          ? "Approved condonation students fetched successfully"
+          : "Eligible students fetched successfully",
         data: rows,
       };
     } catch (error) {
@@ -226,6 +245,82 @@ export class HODCondonationService {
       logger.error("Failed to approve condonation", error);
       if (error instanceof Error) throw error;
       throw new Error("Failed to approve condonation");
+    }
+  }
+
+  static async revokeCondonation(
+    userId: string,
+    attendanceId: string
+  ): Promise<
+    BaseResponse<{
+      attendanceId: string;
+      condonationStatus: string;
+      percentage: number;
+    }>
+  > {
+    try {
+      const departmentName = await this.resolveHODDepartmentName(userId);
+
+      const result = await db.$transaction(async (tx) => {
+        const attendance = await tx.attendance.findUnique({
+          where: { id: attendanceId },
+          include: {
+            course: {
+              include: {
+                department: { select: { name: true } },
+              },
+            },
+          },
+        });
+
+        if (!attendance) {
+          throw new Error("Attendance record not found");
+        }
+
+        if (attendance.course.department.name !== departmentName) {
+          throw new Error("Student is not in your department");
+        }
+
+        if (attendance.condonationStatus !== "APPROVED") {
+          throw new Error("Condonation has not been approved for this record");
+        }
+
+        const recalculatedPercentage =
+          Math.round((attendance.present / attendance.total) * 100 * 100) / 100;
+
+        const updated = await tx.attendance.update({
+          where: { id: attendanceId },
+          data: {
+            condonationStatus: "NOT_REQUESTED",
+            percentage: recalculatedPercentage,
+          },
+          select: {
+            id: true,
+            condonationStatus: true,
+            percentage: true,
+          },
+        });
+
+        if (!updated) {
+          throw new Error("Failed to revoke condonation");
+        }
+
+        return updated;
+      });
+
+      return {
+        status: "success",
+        message: "Condonation revoked successfully",
+        data: {
+          attendanceId: result.id,
+          condonationStatus: result.condonationStatus,
+          percentage: result.percentage,
+        },
+      };
+    } catch (error) {
+      logger.error("Failed to revoke condonation", error);
+      if (error instanceof Error) throw error;
+      throw new Error("Failed to revoke condonation");
     }
   }
 }

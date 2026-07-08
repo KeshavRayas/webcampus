@@ -19,7 +19,8 @@ const getStatusCode = (error: unknown): number => {
     return 404;
   if (
     error.message.includes("not eligible") ||
-    error.message.includes("already been approved")
+    error.message.includes("already been approved") ||
+    error.message.includes("not been approved")
   )
     return 409;
   return 500;
@@ -129,6 +130,39 @@ export class HODCondonationController {
       }
     } catch (error) {
       logger.error("Error approving condonation", error);
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: getStatusCode(error),
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        error,
+      });
+    }
+  }
+
+  static async revokeCondonation(req: Request, res: Response): Promise<void> {
+    try {
+      const session = await requireSession(req, res);
+      if (!session) return;
+
+      const params = req.params as HODCondonationAttendanceId;
+      const response = await HODCondonationService.revokeCondonation(
+        session.user.id,
+        params.attendanceId
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error revoking condonation", error);
       sendResponse({
         res,
         status: "error",

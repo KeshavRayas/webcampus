@@ -19,9 +19,16 @@ export type HODCondonationApproveResponse = {
   percentage: number;
 };
 
-const buildQueryKey = (filters: HODCondonationFilters) =>
+export type HODCondonationRevokeResponse = {
+  attendanceId: string;
+  condonationStatus: string;
+  percentage: number;
+};
+
+const buildQueryKey = (status: string, filters: HODCondonationFilters) =>
   [
     "hod-condonation",
+    status,
     filters.academicTermId,
     filters.semesterId,
     filters.courseId ?? null,
@@ -31,12 +38,13 @@ const buildQueryKey = (filters: HODCondonationFilters) =>
 
 export const useHODCondonationStudents = (
   filters: HODCondonationFilters,
+  status: "pending" | "approved",
   enabled: boolean
 ) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
   return useQuery({
-    queryKey: buildQueryKey(filters),
+    queryKey: buildQueryKey(status, filters),
     queryFn: async () => {
       const res = await axios.get<BaseResponse<HODCondonationStudentRow[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/hod/condonation/students`,
@@ -44,6 +52,7 @@ export const useHODCondonationStudents = (
           params: {
             academicTermId: filters.academicTermId,
             semesterId: filters.semesterId,
+            status,
             ...(filters.courseId ? { courseId: filters.courseId } : {}),
             ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
             ...(filters.search ? { search: filters.search } : {}),
@@ -87,7 +96,13 @@ export const useHODCondonationCourses = (
   });
 };
 
-export const useHODApproveCondonation = (filters: HODCondonationFilters) => {
+const invalidateCondonationQueries = (
+  queryClient: ReturnType<typeof useQueryClient>
+) => {
+  queryClient.invalidateQueries({ queryKey: ["hod-condonation"] });
+};
+
+export const useHODApproveCondonation = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
@@ -101,13 +116,35 @@ export const useHODApproveCondonation = (filters: HODCondonationFilters) => {
     },
     onSuccess: (res) => {
       toast.success(res.data.message);
-      queryClient.invalidateQueries({
-        queryKey: buildQueryKey(filters),
-      });
+      invalidateCondonationQueries(queryClient);
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(
         error.response?.data?.message || "Failed to approve condonation"
+      );
+    },
+  });
+};
+
+export const useHODRevokeCondonation = () => {
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (attendanceId: string) => {
+      return axios.patch<BaseResponse<HODCondonationRevokeResponse>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/hod/condonation/${attendanceId}/revoke`,
+        {},
+        { withCredentials: true }
+      );
+    },
+    onSuccess: (res) => {
+      toast.success(res.data.message);
+      invalidateCondonationQueries(queryClient);
+    },
+    onError: (error: AxiosError<ErrorResponse>) => {
+      toast.error(
+        error.response?.data?.message || "Failed to revoke condonation"
       );
     },
   });

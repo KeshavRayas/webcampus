@@ -9,6 +9,7 @@ export const HODCondonationFiltersSchema = z.object({
   courseId: z.string().uuid().optional(),
   sectionId: z.string().uuid().optional(),
   search: z.string().optional(),
+  status: z.enum(["pending", "approved"]).optional(),
 });
 
 export const HODCondonationStudentRowSchema = z.object({
@@ -63,6 +64,17 @@ export const HODCondonationApproveResponseSchema = z.object({
   percentage: z.number(),
 });
 
+export const HODCondonationRevokeResponseSchema = z.object({
+  attendanceId: z.string().uuid(),
+  condonationStatus: z.enum([
+    "NOT_REQUESTED",
+    "PENDING",
+    "APPROVED",
+    "REJECTED",
+  ]),
+  percentage: z.number(),
+});
+
 export type HODCondonationFilters = z.infer<typeof HODCondonationFiltersSchema>;
 export type HODCondonationStudentRow = z.infer<
   typeof HODCondonationStudentRowSchema
@@ -73,4 +85,7 @@ export type HODCondonationAttendanceId = z.infer<
 >;
 export type HODCondonationApproveResponse = z.infer<
   typeof HODCondonationApproveResponseSchema
+>;
+export type HODCondonationRevokeResponse = z.infer<
+  typeof HODCondonationRevokeResponseSchema
 >;

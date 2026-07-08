@@ -15,9 +15,12 @@ const selectAttendanceSlot = async (page: Page) => {
   await page.getByRole("option", { name: "A" }).click();
 
   await page
-    .getByRole("radio", {
-      name: "Use predefined slot 08:00 AM - 08:55 AM",
-    })
+    .locator("fieldset")
+    .filter({ hasText: "Time Slot" })
+    .locator("[role='combobox']")
+    .click();
+  await page
+    .getByRole("option", { name: "Regular: 08:00 AM - 08:55 AM" })
     .click();
 };
 
@@ -141,5 +144,39 @@ test.describe("Faculty attendance", () => {
         }),
       ])
     );
+  });
+
+  test("refetches student list after saving and changing filters", async ({
+    page,
+    authenticatedAsFaculty,
+  }) => {
+    const state = createFacultyAttendanceMockState();
+    await mockFacultyAttendanceApis(page, state);
+    await authenticatedAsFaculty();
+
+    await page.goto("/faculty/attendance");
+    await selectAttendanceSlot(page);
+
+    // Open Take Attendance modal
+    const takeAttendanceModal = getTakeAttendanceModal(page);
+    await page.getByRole("button", { name: "Take Attendance" }).click();
+    await expect(takeAttendanceModal).toBeVisible();
+    await expect(takeAttendanceModal.getByText("Alice Johnson")).toBeVisible();
+
+    // Save attendance, which would previously set activeSessionId and break future fetches
+    await takeAttendanceModal
+      .getByRole("button", { name: "Save Attendance" })
+      .click();
+    await expect(takeAttendanceModal).toHaveCount(0);
+    await expect.poll(() => state.saveRequests.length).toBe(1);
+
+    // Change the date to trigger a fresh filter combination
+    await page.locator("#attendance-session-date").fill("2026-04-17");
+
+    // Click Take Attendance again -- student list must appear
+    await page.getByRole("button", { name: "Take Attendance" }).click();
+    await expect(takeAttendanceModal).toBeVisible();
+    await expect(takeAttendanceModal.getByText("Alice Johnson")).toBeVisible();
+    await expect(takeAttendanceModal.getByText("Bob Rao")).toBeVisible();
   });
 });

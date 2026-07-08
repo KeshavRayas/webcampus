@@ -29,11 +29,18 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@webcampus/ui/components/tabs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useHODApproveCondonation,
   useHODCondonationCourses,
   useHODCondonationStudents,
+  useHODRevokeCondonation,
   type HODCondonationStudentRow,
 } from "./use-condonation";
 
@@ -78,6 +85,87 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
+const StudentTable = ({
+  rows,
+  actionLabel,
+  actionDisabled,
+  onAction,
+  getActionVariant,
+}: {
+  rows: HODCondonationStudentRow[];
+  actionLabel: (row: HODCondonationStudentRow) => string;
+  actionDisabled: (row: HODCondonationStudentRow) => boolean;
+  onAction: (row: HODCondonationStudentRow) => void;
+  getActionVariant?: (
+    row: HODCondonationStudentRow
+  ) => "default" | "destructive";
+}) => (
+  <div className="overflow-hidden rounded-lg border">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>USN</TableHead>
+          <TableHead>Name</TableHead>
+          <TableHead>Course</TableHead>
+          <TableHead>Percentage</TableHead>
+          <TableHead>Attended / Total</TableHead>
+          <TableHead>Condonation</TableHead>
+          <TableHead className="text-right">Action</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.attendanceId}>
+            <TableCell className="font-mono text-sm font-medium">
+              {row.usn}
+            </TableCell>
+            <TableCell className="text-sm">{row.name}</TableCell>
+            <TableCell>
+              <div className="space-y-1">
+                <div className="text-sm font-semibold">{row.courseCode}</div>
+                <div className="text-muted-foreground text-xs">
+                  {row.courseName}
+                </div>
+              </div>
+            </TableCell>
+            <TableCell>
+              <span
+                className={
+                  row.percentage < 80
+                    ? "text-destructive font-semibold"
+                    : "font-semibold text-amber-500"
+                }
+              >
+                {row.percentage}%
+              </span>
+            </TableCell>
+            <TableCell className="text-sm">
+              {row.present} / {row.total}
+            </TableCell>
+            <TableCell>{getStatusBadge(row.condonationStatus)}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                size="sm"
+                variant={getActionVariant?.(row) ?? "default"}
+                disabled={actionDisabled(row)}
+                onClick={() => onAction(row)}
+              >
+                {actionLabel(row)}
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </div>
+);
+
+const EmptyState = ({ message }: { message: string }) => (
+  <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
+    {message}
+  </div>
+);
+
 export const CondonationView = () => {
   const {
     data: termsData,
@@ -96,6 +184,10 @@ export const CondonationView = () => {
 
   const [approveTarget, setApproveTarget] =
     useState<HODCondonationStudentRow | null>(null);
+  const [revokeTarget, setRevokeTarget] =
+    useState<HODCondonationStudentRow | null>(null);
+  const [revokeRecalculatedPercentage, setRevokeRecalculatedPercentage] =
+    useState<number>(0);
 
   const selectedDraftTerm = terms.find(
     (term) => term.id === draftFilters.academicTermId
@@ -142,14 +234,24 @@ export const CondonationView = () => {
   );
 
   const {
-    data: students = [],
-    isLoading,
-    isError,
-    error,
-  } = useHODCondonationStudents(studentFilters, queryEnabled);
+    data: pendingStudents = [],
+    isLoading: pendingLoading,
+    isError: pendingError,
+    error: pendingErrorObj,
+  } = useHODCondonationStudents(studentFilters, "pending", queryEnabled);
+
+  const {
+    data: approvedStudents = [],
+    isLoading: approvedLoading,
+    isError: approvedError,
+    error: approvedErrorObj,
+  } = useHODCondonationStudents(studentFilters, "approved", queryEnabled);
 
   const { mutate: approveCondonation, isPending: isApproving } =
-    useHODApproveCondonation(studentFilters);
+    useHODApproveCondonation();
+
+  const { mutate: revokeCondonation, isPending: isRevoking } =
+    useHODRevokeCondonation();
 
   const handleConfirmApprove = useCallback(() => {
     if (!approveTarget) return;
@@ -157,6 +259,16 @@ export const CondonationView = () => {
       onSuccess: () => setApproveTarget(null),
     });
   }, [approveTarget, approveCondonation]);
+
+  const handleConfirmRevoke = useCallback(() => {
+    if (!revokeTarget) return;
+    revokeCondonation(revokeTarget.attendanceId, {
+      onSuccess: () => {
+        setRevokeTarget(null);
+        setRevokeRecalculatedPercentage(0);
+      },
+    });
+  }, [revokeTarget, revokeCondonation]);
 
   const filterFields = useMemo<FilterFieldConfig<FilterState>[]>(
     () => [
@@ -338,91 +450,72 @@ export const CondonationView = () => {
 
       {!queryEnabled ? (
         <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
-          Select Academic Term and Semester, then apply filters to view eligible
-          students.
-        </div>
-      ) : isLoading ? (
-        <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
-          Loading eligible students...
-        </div>
-      ) : isError ? (
-        <div className="text-destructive rounded-lg border p-8 text-center text-sm">
-          {error instanceof Error
-            ? error.message
-            : "Failed to load eligible students"}
-        </div>
-      ) : students.length === 0 && appliedSearch ? (
-        <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
-          No results match your search criteria.
-        </div>
-      ) : students.length === 0 ? (
-        <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
-          No students are currently eligible for condonation.
+          Select Academic Term and Semester, then apply filters to view
+          condonation records.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>USN</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Course</TableHead>
-                <TableHead>Percentage</TableHead>
-                <TableHead>Attended / Total</TableHead>
-                <TableHead>Condonation</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {students.map((row) => (
-                <TableRow key={row.attendanceId}>
-                  <TableCell className="font-mono text-sm font-medium">
-                    {row.usn}
-                  </TableCell>
-                  <TableCell className="text-sm">{row.name}</TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="text-sm font-semibold">
-                        {row.courseCode}
-                      </div>
-                      <div className="text-muted-foreground text-xs">
-                        {row.courseName}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={
-                        row.percentage < 80
-                          ? "text-destructive font-semibold"
-                          : "font-semibold text-amber-500"
-                      }
-                    >
-                      {row.percentage}%
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {row.present} / {row.total}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(row.condonationStatus)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      disabled={
-                        row.condonationStatus === "APPROVED" || isApproving
-                      }
-                      onClick={() => setApproveTarget(row)}
-                    >
-                      {row.condonationStatus === "APPROVED"
-                        ? "Approved"
-                        : "Approve"}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <Tabs defaultValue="pending">
+          <TabsList>
+            <TabsTrigger value="pending">
+              Pending ({pendingStudents.length})
+            </TabsTrigger>
+            <TabsTrigger value="approved">
+              Approved ({approvedStudents.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pending" className="mt-4">
+            {pendingLoading ? (
+              <EmptyState message="Loading eligible students..." />
+            ) : pendingError ? (
+              <div className="text-destructive rounded-lg border p-8 text-center text-sm">
+                {pendingErrorObj instanceof Error
+                  ? pendingErrorObj.message
+                  : "Failed to load eligible students"}
+              </div>
+            ) : pendingStudents.length === 0 && appliedSearch ? (
+              <EmptyState message="No results match your search criteria." />
+            ) : pendingStudents.length === 0 ? (
+              <EmptyState message="No students are currently eligible for condonation." />
+            ) : (
+              <StudentTable
+                rows={pendingStudents}
+                actionLabel={() => "Approve"}
+                actionDisabled={() => isApproving}
+                onAction={setApproveTarget}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="approved" className="mt-4">
+            {approvedLoading ? (
+              <EmptyState message="Loading approved students..." />
+            ) : approvedError ? (
+              <div className="text-destructive rounded-lg border p-8 text-center text-sm">
+                {approvedErrorObj instanceof Error
+                  ? approvedErrorObj.message
+                  : "Failed to load approved students"}
+              </div>
+            ) : approvedStudents.length === 0 && appliedSearch ? (
+              <EmptyState message="No results match your search criteria." />
+            ) : approvedStudents.length === 0 ? (
+              <EmptyState message="No approved condonation records." />
+            ) : (
+              <StudentTable
+                rows={approvedStudents}
+                actionLabel={() => "Revoke"}
+                getActionVariant={() => "destructive"}
+                actionDisabled={() => isRevoking}
+                onAction={(row) => {
+                  const recalculated =
+                    Math.round((row.present / row.total) * 100 * 100) / 100;
+                  setRevokeRecalculatedPercentage(recalculated);
+                  setRevokeTarget(row);
+                }}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
       <AlertDialog
@@ -450,6 +543,47 @@ export const CondonationView = () => {
               disabled={isApproving}
             >
               {isApproving ? "Approving..." : "Approve"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!revokeTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRevokeTarget(null);
+            setRevokeRecalculatedPercentage(0);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Condonation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove condonation for{" "}
+              <span className="font-semibold">{revokeTarget?.name}</span> (
+              <span className="font-mono">{revokeTarget?.usn}</span>)?
+              <br />
+              Attendance will change from{" "}
+              <span className="font-semibold">
+                {revokeTarget?.percentage}%
+              </span>{" "}
+              back to{" "}
+              <span className="font-semibold">
+                {revokeRecalculatedPercentage}%
+              </span>
+              .
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRevoking}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmRevoke}
+              disabled={isRevoking}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRevoking ? "Removing..." : "Remove Condonation"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
