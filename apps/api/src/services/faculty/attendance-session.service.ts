@@ -922,35 +922,14 @@ export class FacultyAttendanceSessionService {
           orderBy: [{ sessionDate: "desc" }, { createdAt: "desc" }],
           skip: (page - 1) * limit,
           take: limit,
-          select: {
-            id: true,
-            courseId: true,
-            sectionId: true,
-            batchId: true,
-            sessionDate: true,
-            timingCode: true,
-            timingLabel: true,
-            timingStartTime: true,
-            timingEndTime: true,
-            createdAt: true,
+          include: {
+            Course: { select: { code: true, name: true } },
+            Section: { select: { name: true } },
+            Batch: { select: { name: true } },
           },
         });
 
-        items = sessions.map((s) => ({
-          id: s.id,
-          courseId: s.courseId,
-          sectionId: s.sectionId,
-          batchId: s.batchId ?? undefined,
-          sessionDate: s.sessionDate.toISOString(),
-          timingCode: s.timingCode,
-          timingLabel: s.timingLabel,
-          timingStartTime: s.timingStartTime,
-          timingEndTime: s.timingEndTime,
-          courseCode: "",
-          courseName: "",
-          sectionName: "",
-          createdAt: s.createdAt.toISOString(),
-        }));
+        items = sessions.map(toSessionDto);
       } catch (includeError) {
         logger.error("Error", { includeError });
         const scalarSessions = await db.classSession.findMany({

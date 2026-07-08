@@ -523,6 +523,10 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
     expect(firstListedSession.id).toBe("session-list-1");
     expect(secondListedSession.id).toBe("session-list-2");
     expect(response.data.pagination.total).toBe(2);
+
+    expect(firstListedSession.courseCode).toBe("CS301");
+    expect(firstListedSession.courseName).toBe("Algorithms");
+    expect(firstListedSession.sectionName).toBe("A");
   });
 
   it("filters listed sessions by session date", async () => {
