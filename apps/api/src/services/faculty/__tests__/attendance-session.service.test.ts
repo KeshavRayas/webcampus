@@ -188,6 +188,30 @@ const dbMock = {
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findFirst: async ({ where }: any) => {
+      if (where.timingCode) {
+        return (
+          sessions.find((session) => {
+            if (session.sessionDate.getTime() !== where.sessionDate.getTime()) {
+              return false;
+            }
+
+            if (session.courseId !== where.courseId) {
+              return false;
+            }
+
+            if (session.sectionId !== where.sectionId) {
+              return false;
+            }
+
+            if (session.timingCode !== where.timingCode) {
+              return false;
+            }
+
+            return true;
+          }) ?? null
+        );
+      }
+
       const requestedEnd = where.timingStartTime?.lt;
       const requestedStart = where.timingEndTime?.gt;
 
@@ -408,7 +432,7 @@ mock.module(
   })
 );
 
-describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
+describe("FacultyAttendanceSessionService", () => {
   beforeEach(() => {
     assignments = [
       { facultyId: "faculty-1", courseId: "course-1", sectionId: "section-1" },
@@ -670,7 +694,7 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
     expect(fallbackListedSession.sectionName).toBe("A");
   });
 
-  it("opens existing same slot session for same faculty", async () => {
+  it("throws conflict when creating attendance for an existing session", async () => {
     sessions.push({
       id: "session-existing",
       courseId: "course-1",
@@ -686,28 +710,32 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
       Section: { name: "A" },
     });
 
+    attendanceRecordRows.push(
+      { sessionId: "session-existing", studentId: "student-1" },
+      { sessionId: "session-existing", studentId: "student-2" }
+    );
+
+    const sessionCountBefore = sessions.length;
+    const recordsSnapshot = [...attendanceRecordRows];
+
     const { FacultyAttendanceSessionService } = await import(
       "../attendance-session.service"
     );
 
-    const response = await FacultyAttendanceSessionService.createOrOpenSession(
-      "user-1",
-      {
+    await expect(
+      FacultyAttendanceSessionService.createSession("user-1", {
         courseId: "course-1",
         sectionId: "section-1",
         sessionDate: new Date("2026-04-13"),
         timingMode: "FIXED",
         timingCode: "08:00-08:55",
-      }
+      })
+    ).rejects.toThrow(
+      "Attendance already taken for this session. Please use Edit Attendance to modify it."
     );
 
-    expect(response.status).toBe("success");
-    if (response.status === "error" || !response.data) {
-      throw new Error("Expected success response with data");
-    }
-
-    expect(response.data.created).toBe(false);
-    expect(response.data.session.id).toBe("session-existing");
+    expect(sessions).toHaveLength(sessionCountBefore);
+    expect(attendanceRecordRows).toEqual(recordsSnapshot);
   });
 
   it("returns ownership mismatch when same slot belongs to another faculty", async () => {
@@ -730,23 +758,17 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
       "../attendance-session.service"
     );
 
-    const response = await FacultyAttendanceSessionService.createOrOpenSession(
-      "user-1",
-      {
+    await expect(
+      FacultyAttendanceSessionService.createSession("user-1", {
         courseId: "course-1",
         sectionId: "section-1",
         sessionDate: new Date("2026-04-13"),
         timingMode: "FIXED",
         timingCode: "08:00-08:55",
-      }
+      })
+    ).rejects.toThrow(
+      "Attendance already taken for this session. Please use Edit Attendance to modify it."
     );
-
-    expect(response.status).toBe("error");
-    if (response.status !== "error") {
-      throw new Error("Expected error response");
-    }
-
-    expect(response.message).toContain("already exists for this slot");
   });
 
   it("throws when custom timing overlaps an existing session", async () => {
@@ -770,7 +792,7 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
     );
 
     await expect(
-      FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+      FacultyAttendanceSessionService.createSession("user-1", {
         courseId: "course-1",
         sectionId: "section-1",
         sessionDate: new Date("2026-04-13"),
@@ -778,7 +800,9 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
         timingStartTime: "09:30",
         timingEndTime: "10:15",
       })
-    ).rejects.toThrow("Session time overlaps with an existing session");
+    ).rejects.toThrow(
+      "Faculty Overlap: You are already conducting a session at 09:00 - 10:00. You cannot take multiple classes at once."
+    );
   });
 
   it("creates a new session when timing is adjacent but non-overlapping", async () => {
@@ -801,7 +825,7 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
       "../attendance-session.service"
     );
 
-    const response = await FacultyAttendanceSessionService.createOrOpenSession(
+    const response = await FacultyAttendanceSessionService.createSession(
       "user-1",
       {
         courseId: "course-1",
@@ -848,7 +872,7 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
     );
 
     await expect(
-      FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+      FacultyAttendanceSessionService.createSession("user-1", {
         courseId: "course-1",
         sectionId: "section-1",
         sessionDate: new Date("2026-04-13"),
@@ -856,7 +880,9 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
         timingStartTime: "09:30",
         timingEndTime: "10:15",
       })
-    ).rejects.toThrow("Session time overlaps with an existing session");
+    ).rejects.toThrow(
+      "Faculty Overlap: You are already conducting a session at 09:00 - 10:00. You cannot take multiple classes at once."
+    );
   });
 
   it("throws when overlapping a session in the same section owned by another faculty", async () => {
@@ -880,7 +906,7 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
     );
 
     await expect(
-      FacultyAttendanceSessionService.createOrOpenSession("user-1", {
+      FacultyAttendanceSessionService.createSession("user-1", {
         courseId: "course-1",
         sectionId: "section-1",
         sessionDate: new Date("2026-04-13"),
@@ -888,7 +914,9 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
         timingStartTime: "09:30",
         timingEndTime: "10:15",
       })
-    ).rejects.toThrow("Session time overlaps with an existing session");
+    ).rejects.toThrow(
+      "Section Overlap: Another faculty member is already conducting a session for this section at 09:00 - 10:00."
+    );
   });
 
   it("creates a new session when overlap boundaries only touch", async () => {
@@ -911,7 +939,7 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
       "../attendance-session.service"
     );
 
-    const response = await FacultyAttendanceSessionService.createOrOpenSession(
+    const response = await FacultyAttendanceSessionService.createSession(
       "user-1",
       {
         courseId: "course-1",
@@ -937,7 +965,7 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
       "../attendance-session.service"
     );
 
-    const response = await FacultyAttendanceSessionService.createOrOpenSession(
+    const response = await FacultyAttendanceSessionService.createSession(
       "user-1",
       {
         courseId: "course-1",
@@ -963,7 +991,7 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
       "../attendance-session.service"
     );
 
-    const response = await FacultyAttendanceSessionService.createOrOpenSession(
+    const response = await FacultyAttendanceSessionService.createSession(
       "user-1",
       {
         courseId: "course-1",
@@ -1058,5 +1086,216 @@ describe("FacultyAttendanceSessionService.createOrOpenSession", () => {
         sessionId: "session-delete-forbidden",
       })
     ).rejects.toThrow("Forbidden");
+  });
+
+  describe("updateSession", () => {
+    beforeEach(() => {
+      assignments = [
+        {
+          facultyId: "faculty-1",
+          courseId: "course-1",
+          sectionId: "section-1",
+        },
+      ];
+      sessions = [];
+      attendanceRecordRows = [];
+      aggregateAttendanceForCourseCalls = 0;
+      aggregateAttendanceForStudentCourseCalls = [];
+    });
+
+    it("updates attendance records for an existing session", async () => {
+      const existing: SessionRecord = {
+        id: "session-update-1",
+        courseId: "course-1",
+        sectionId: "section-1",
+        facultyId: "faculty-1",
+        sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+        timingCode: "08:00-08:55",
+        timingLabel: "08:00 AM - 08:55 AM",
+        timingStartTime: "08:00",
+        timingEndTime: "08:55",
+        createdAt: new Date("2026-04-13T04:00:00.000Z"),
+        Course: { code: "CS301", name: "Algorithms" },
+        Section: { name: "A" },
+      };
+      sessions.push(existing);
+
+      const { FacultyAttendanceSessionService } = await import(
+        "../attendance-session.service"
+      );
+
+      const response = await FacultyAttendanceSessionService.updateSession(
+        "user-1",
+        "session-update-1",
+        [
+          { studentId: "student-1", status: "PRESENT" },
+          { studentId: "student-2", status: "ABSENT" },
+        ]
+      );
+
+      expect(response.status).toBe("success");
+      if (response.status === "error" || !response.data) {
+        throw new Error("Expected success response with data");
+      }
+
+      expect(response.data.created).toBe(false);
+      expect(response.data.session.id).toBe("session-update-1");
+      expect(response.data.attendanceInitialization.totalStudents).toBe(2);
+      expect(response.data.attendanceInitialization.absentCount).toBe(1);
+      expect(response.data.attendanceInitialization.presentCount).toBe(1);
+    });
+
+    it("preserves session ID and does not create a second session", async () => {
+      const existing: SessionRecord = {
+        id: "session-update-2",
+        courseId: "course-1",
+        sectionId: "section-1",
+        facultyId: "faculty-1",
+        sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+        timingCode: "08:00-08:55",
+        timingLabel: "08:00 AM - 08:55 AM",
+        timingStartTime: "08:00",
+        timingEndTime: "08:55",
+        createdAt: new Date("2026-04-13T04:00:00.000Z"),
+        Course: { code: "CS301", name: "Algorithms" },
+        Section: { name: "A" },
+      };
+      sessions.push(existing);
+
+      const sessionCountBefore = sessions.length;
+
+      const { FacultyAttendanceSessionService } = await import(
+        "../attendance-session.service"
+      );
+
+      const response = await FacultyAttendanceSessionService.updateSession(
+        "user-1",
+        "session-update-2",
+        [
+          { studentId: "student-1", status: "ABSENT" },
+          { studentId: "student-2", status: "PRESENT" },
+        ]
+      );
+
+      expect(response.status).toBe("success");
+      if (response.status === "error" || !response.data) {
+        throw new Error("Expected success response with data");
+      }
+
+      expect(response.data.session.id).toBe("session-update-2");
+      expect(sessions).toHaveLength(sessionCountBefore);
+    });
+
+    it("returns 404 for unknown session", async () => {
+      const { FacultyAttendanceSessionService } = await import(
+        "../attendance-session.service"
+      );
+
+      await expect(
+        FacultyAttendanceSessionService.updateSession(
+          "user-1",
+          "session-nonexistent",
+          []
+        )
+      ).rejects.toThrow("Attendance session not found");
+    });
+
+    it("returns 403 for another faculty's session", async () => {
+      const existing: SessionRecord = {
+        id: "session-other-faculty-update",
+        courseId: "course-2",
+        sectionId: "section-2",
+        facultyId: "faculty-2",
+        sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+        timingCode: "08:00-08:55",
+        timingLabel: "08:00 AM - 08:55 AM",
+        timingStartTime: "08:00",
+        timingEndTime: "08:55",
+        createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      };
+      sessions.push(existing);
+
+      const { FacultyAttendanceSessionService } = await import(
+        "../attendance-session.service"
+      );
+
+      await expect(
+        FacultyAttendanceSessionService.updateSession(
+          "user-1",
+          "session-other-faculty-update",
+          [{ studentId: "student-1", status: "PRESENT" }]
+        )
+      ).rejects.toThrow("Forbidden: session not owned by faculty");
+    });
+
+    it("does not modify attendance when faculty ownership validation fails", async () => {
+      const existing: SessionRecord = {
+        id: "session-ownership-fail",
+        courseId: "course-2",
+        sectionId: "section-2",
+        facultyId: "faculty-2",
+        sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+        timingCode: "08:00-08:55",
+        timingLabel: "08:00 AM - 08:55 AM",
+        timingStartTime: "08:00",
+        timingEndTime: "08:55",
+        createdAt: new Date("2026-04-13T04:00:00.000Z"),
+      };
+      sessions.push(existing);
+      attendanceRecordRows.push({
+        sessionId: "session-ownership-fail",
+        studentId: "student-1",
+      });
+
+      const recordsSnapshot = [...attendanceRecordRows];
+
+      const { FacultyAttendanceSessionService } = await import(
+        "../attendance-session.service"
+      );
+
+      await expect(
+        FacultyAttendanceSessionService.updateSession(
+          "user-1",
+          "session-ownership-fail",
+          [{ studentId: "student-1", status: "ABSENT" }]
+        )
+      ).rejects.toThrow("Forbidden");
+
+      expect(attendanceRecordRows).toEqual(recordsSnapshot);
+    });
+
+    it("triggers attendance aggregation after update", async () => {
+      const existing: SessionRecord = {
+        id: "session-aggregation",
+        courseId: "course-1",
+        sectionId: "section-1",
+        facultyId: "faculty-1",
+        sessionDate: new Date("2026-04-13T00:00:00.000Z"),
+        timingCode: "08:00-08:55",
+        timingLabel: "08:00 AM - 08:55 AM",
+        timingStartTime: "08:00",
+        timingEndTime: "08:55",
+        createdAt: new Date("2026-04-13T04:00:00.000Z"),
+        Course: { code: "CS301", name: "Algorithms" },
+        Section: { name: "A" },
+      };
+      sessions.push(existing);
+
+      const { FacultyAttendanceSessionService } = await import(
+        "../attendance-session.service"
+      );
+
+      const response = await FacultyAttendanceSessionService.updateSession(
+        "user-1",
+        "session-aggregation",
+        [
+          { studentId: "student-1", status: "PRESENT" },
+          { studentId: "student-2", status: "ABSENT" },
+        ]
+      );
+
+      expect(response.status).toBe("success");
+      expect(aggregateAttendanceForCourseCalls).toBe(1);
+    });
   });
 });

@@ -3,7 +3,6 @@
 import { getApiErrorMessage } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { dayjs } from "@webcampus/common/dayjs";
-import { FacultyFixedTimingCodeSchema } from "@webcampus/schemas/faculty";
 import { FacultyAttendanceSessionDTO } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -21,11 +20,11 @@ import { AttendancePageShell } from "./components/attendance-page-shell";
 import { AttendanceSection } from "./components/attendance-section";
 import { AttendanceChecklistRow } from "./faculty-attendance-types";
 import {
-  useCreateOrOpenFacultyAttendanceSession,
   useDeleteFacultyAttendanceSession,
   useFacultyAttendanceFilterOptions,
   useFacultyAttendanceSessionDetail,
   useFacultyAttendanceSessions,
+  useUpdateFacultyAttendanceSession,
 } from "./use-faculty-attendance";
 
 type AttendanceSessionModalFilters = {
@@ -137,7 +136,7 @@ export const FacultyAttendanceEditView = () => {
 
   const queryClient = useQueryClient();
   const filterOptionsQuery = useFacultyAttendanceFilterOptions();
-  const createOrOpenMutation = useCreateOrOpenFacultyAttendanceSession();
+  const updateMutation = useUpdateFacultyAttendanceSession();
   const deleteSessionMutation = useDeleteFacultyAttendanceSession();
 
   const sessionsQuery = useFacultyAttendanceSessions(
@@ -327,24 +326,9 @@ export const FacultyAttendanceEditView = () => {
   const handleSaveAttendance = async () => {
     if (!canSaveAttendance || !editingSessionInfo) return;
 
-    const isFixedTiming = FacultyFixedTimingCodeSchema.safeParse(
-      editingSessionInfo.timingCode
-    ).success;
-
     try {
-      await createOrOpenMutation.mutateAsync({
-        courseId: editingSessionInfo.courseId,
-        sectionId: editingSessionInfo.sectionId,
-        batchId: editingSessionInfo.batchId,
-        sessionDate: dayjs(editingSessionInfo.sessionDate).format("YYYY-MM-DD"),
-        timingMode: isFixedTiming ? "FIXED" : "CUSTOM",
-        timingCode: isFixedTiming ? editingSessionInfo.timingCode : undefined,
-        timingStartTime: isFixedTiming
-          ? undefined
-          : editingSessionInfo.timingStartTime,
-        timingEndTime: isFixedTiming
-          ? undefined
-          : editingSessionInfo.timingEndTime,
+      await updateMutation.mutateAsync({
+        sessionId: editingSessionInfo.id,
         studentStatuses: studentChecklist.map((student) => ({
           studentId: student.studentId,
           status: student.status ?? "PRESENT",
@@ -504,7 +488,7 @@ export const FacultyAttendanceEditView = () => {
             <AttendanceSection
               studentChecklist={studentChecklist}
               isLoading={sessionDetailQuery.isLoading}
-              isSaving={createOrOpenMutation.isPending}
+              isSaving={updateMutation.isPending}
               onAllPresent={() =>
                 setStudentChecklist((current) =>
                   current.map((s) => ({ ...s, status: "PRESENT" }))
@@ -546,10 +530,10 @@ export const FacultyAttendanceEditView = () => {
             <Button
               type="button"
               onClick={handleSaveAttendance}
-              disabled={!canSaveAttendance || createOrOpenMutation.isPending}
+              disabled={!canSaveAttendance || updateMutation.isPending}
               className="min-w-50 w-full sm:w-auto"
             >
-              {createOrOpenMutation.isPending
+              {updateMutation.isPending
                 ? "Saving..."
                 : canSaveAttendance
                   ? "Update Attendance"

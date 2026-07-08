@@ -193,6 +193,10 @@ export type CreateOrOpenFacultyAttendanceSessionDTO = {
   attendanceInitialization: FacultyAttendanceSessionInitializationSummaryDTO;
 };
 
+export type UpdateFacultyAttendanceSessionPayloadDTO = {
+  studentStatuses?: FacultyAttendanceStudentStatusInputDTO[];
+};
+
 export type DeleteFacultyAttendanceSessionDTO = {
   sessionId: string;
   courseId: string;
