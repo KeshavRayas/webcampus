@@ -3,6 +3,7 @@
 import { getApiErrorMessage } from "@/lib/api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { dayjs } from "@webcampus/common/dayjs";
+import { FacultyFixedTimingCodeSchema } from "@webcampus/schemas/faculty";
 import { FacultyAttendanceSessionDTO } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -235,7 +236,6 @@ export const FacultyAttendanceEditView = () => {
 
     setStudentChecklist(withUiChecklistMetadata(data.students));
     setOpeningSessionId(null);
-    setIsEditModalOpen(true);
   }, [
     activeSessionId,
     sessionDetailQuery.data,
@@ -310,6 +310,7 @@ export const FacultyAttendanceEditView = () => {
     setOpeningSessionId(sessionId);
     setStudentChecklist([]);
     setActiveSessionId(sessionId);
+    setIsEditModalOpen(true);
 
     try {
       await queryClient.invalidateQueries({
@@ -319,11 +320,16 @@ export const FacultyAttendanceEditView = () => {
       toast.error(getApiErrorMessage(error, "Failed to load session details"));
       setOpeningSessionId(null);
       setActiveSessionId("");
+      setIsEditModalOpen(false);
     }
   };
 
   const handleSaveAttendance = async () => {
     if (!canSaveAttendance || !editingSessionInfo) return;
+
+    const isFixedTiming = FacultyFixedTimingCodeSchema.safeParse(
+      editingSessionInfo.timingCode
+    ).success;
 
     try {
       await createOrOpenMutation.mutateAsync({
@@ -331,7 +337,14 @@ export const FacultyAttendanceEditView = () => {
         sectionId: editingSessionInfo.sectionId,
         batchId: editingSessionInfo.batchId,
         sessionDate: dayjs(editingSessionInfo.sessionDate).format("YYYY-MM-DD"),
-        timingMode: "FIXED", // Fallback, the backend upserts using the existing IDs anyway
+        timingMode: isFixedTiming ? "FIXED" : "CUSTOM",
+        timingCode: isFixedTiming ? editingSessionInfo.timingCode : undefined,
+        timingStartTime: isFixedTiming
+          ? undefined
+          : editingSessionInfo.timingStartTime,
+        timingEndTime: isFixedTiming
+          ? undefined
+          : editingSessionInfo.timingEndTime,
         studentStatuses: studentChecklist.map((student) => ({
           studentId: student.studentId,
           status: student.status ?? "PRESENT",
@@ -339,8 +352,8 @@ export const FacultyAttendanceEditView = () => {
       });
 
       setIsEditModalOpen(false);
+      setActiveSessionId("");
       setShowSaveSuccessToast(true);
-      sessionsQuery.refetch();
     } catch (error) {
       toast.error(
         getApiErrorMessage(error, "Failed to save edited attendance")
