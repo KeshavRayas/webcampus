@@ -23,11 +23,13 @@ const logoDataUri: string = (() => {
   }
 })();
 
-let browserInstance: import("puppeteer-core").Browser | null = null;
+let browserInstance: import("puppeteer").Browser | null = null;
 
-async function getBrowser(): Promise<import("puppeteer-core").Browser> {
+async function getBrowser(): Promise<import("puppeteer").Browser> {
   if (browserInstance && browserInstance.connected) return browserInstance;
-  const puppeteer = await import("puppeteer-core");
+
+  // Import the full puppeteer package
+  const puppeteer = await import("puppeteer");
   const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
   try {
     browserInstance = await puppeteer.launch({
