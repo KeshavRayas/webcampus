@@ -17,6 +17,8 @@ import {
 } from "@webcampus/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@webcampus/ui/components/tabs";
 import axios, { isAxiosError } from "axios";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -25,6 +27,9 @@ type ApplicantAdmissionData = {
   modeOfAdmission: string;
   status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
   department?: { name: string };
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
   categoryClaimed?: string;
   categoryAllotted?: string;
   quota?: string;
@@ -48,6 +53,8 @@ const STEP_LABELS: Record<StepKey, string> = {
   review: "Review",
 };
 
+const VISIBLE_STEPS: StepKey[] = ["admission", "personal", "education", "parent"];
+
 export const ApplicantAdmissionView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,7 +71,10 @@ export const ApplicantAdmissionView = () => {
     Record<string, File | null>
   >({});
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [reviewPdfUrl, setReviewPdfUrl] = useState<string | null>(null);
   const filePreviewRef = useRef<string | null>(null);
+  const reviewPdfRef = useRef<string | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const sectionRefs = useRef<Record<StepKey, HTMLDivElement | null>>({
     admission: null,
     personal: null,
@@ -183,6 +193,30 @@ export const ApplicantAdmissionView = () => {
   const activeIndex = STEP_ORDER.indexOf(activeStep);
   const progressValue = ((activeIndex + 1) / STEP_ORDER.length) * 100;
 
+  const validateStep = (step: StepKey) => {
+    const section = sectionRefs.current[step];
+
+    if (!section) {
+      return true;
+    }
+
+    const fields = Array.from(
+      section.querySelectorAll<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >("input, select, textarea")
+    );
+
+    for (const field of fields) {
+      if (!field.checkValidity()) {
+        field.reportValidity();
+        field.focus();
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const clearPreview = () => {
     if (filePreviewRef.current) {
       URL.revokeObjectURL(filePreviewRef.current);
@@ -192,8 +226,6 @@ export const ApplicantAdmissionView = () => {
   };
 
   const handleFileSelect = (name: string, file: File | null) => {
-    console.log(name, file);
-
     setSelectedFiles((current) => ({
       ...current,
       [name]: file,
@@ -211,6 +243,10 @@ export const ApplicantAdmissionView = () => {
   };
 
   const saveAndNext = (step: StepKey) => {
+    if (!validateStep(step)) {
+      return;
+    }
+
     const nextIndex = STEP_ORDER.indexOf(step) + 1;
     const nextStep = STEP_ORDER[
       Math.min(nextIndex, STEP_ORDER.length - 1)
@@ -224,18 +260,296 @@ export const ApplicantAdmissionView = () => {
     setActiveStep(previousStep);
   };
 
+  const formatReviewKey = (key: string) =>
+    key
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const formatReviewValue = (key: string, value: FormDataEntryValue | null) => {
+    if (value === null) {
+      return "-";
+    }
+
+    if (value instanceof File) {
+      return value.name || "Attached file";
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return "-";
+    }
+
+    if (
+      [
+        "hostel",
+        "nri",
+        "disability",
+        "economicallyBackward",
+        "hasClass12",
+        "hasDiploma",
+      ].includes(key)
+    ) {
+      return trimmed === "true" ? "Yes" : "No";
+    }
+
+    return trimmed;
+  };
+
+  const generateReviewPdf = () => {
+    const currentAdmission = admission;
+
+    if (!formRef.current || !currentAdmission) {
+      return null;
+    }
+
+    if (reviewPdfRef.current) {
+      URL.revokeObjectURL(reviewPdfRef.current);
+      reviewPdfRef.current = null;
+    }
+
+    const formData = new FormData(formRef.current);
+    const doc = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
+    const margin = 40;
+    let cursorY = 44;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Application Review Summary", margin, cursorY);
+    cursorY += 16;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Generated on ${new Date().toLocaleString()}`, margin, cursorY);
+    cursorY += 20;
+
+    const reviewSections: Array<{
+      title: string;
+      fields: string[];
+      includeAdmissionSummary?: boolean;
+    }> = [
+      {
+        title: "Admission Details",
+        includeAdmissionSummary: true,
+        fields: [
+          "applicationId",
+          "modeOfAdmission",
+          "entranceExamRank",
+          "originalAdmissionOrderNumber",
+          "originalAdmissionOrderDate",
+          "feePayable",
+          "feePaid",
+          "hostel",
+          "hostelRoomNumber",
+        ],
+      },
+      {
+        title: "Personal Information",
+        fields: [
+          "nameAsPer10th",
+          "dob",
+          "bloodGroup",
+          "gender",
+          "photo",
+          "primaryPhoneNumber",
+          "secondaryPhoneNumber",
+          "emergencyContactNumber",
+          "primaryEmail",
+          "secondaryEmail",
+          "currentAddress",
+          "currentArea",
+          "currentCity",
+          "currentDistrict",
+          "currentState",
+          "currentCountry",
+          "currentPincode",
+          "permanentAddress",
+          "permanentArea",
+          "permanentCity",
+          "permanentDistrict",
+          "permanentState",
+          "permanentCountry",
+          "permanentPincode",
+          "placeOfBirth",
+          "stateOfBirth",
+          "religion",
+          "caste",
+          "subCaste",
+          "casteCertificate",
+          "motherTongue",
+          "nationality",
+          "nri",
+          "disability",
+          "disabilityType",
+          "disabilityCertificate",
+          "economicallyBackward",
+          "economicallyBackwardCertificate",
+          "aadharNumber",
+          "aadharCard",
+        ],
+      },
+      {
+        title: "Education Details",
+        fields: [
+          "class10thSchoolName",
+          "class10thSchoolType",
+          "class10thSchoolCity",
+          "class10thSchoolState",
+          "class10thSchoolCode",
+          "class10thYearOfPassing",
+          "class10thAggregateScore",
+          "class10thAggregateTotal",
+          "class10thMediumOfTeaching",
+          "class10thMarksPdf",
+          "hasClass12",
+          "hasDiploma",
+          "class12thInstituteName",
+          "class12thInstituteType",
+          "class12thInstituteCity",
+          "class12thInstituteState",
+          "class12thInstituteCode",
+          "class12thYearOfPassing",
+          "class12thBranch",
+          "class12thMediumOfTeaching",
+          "class12thAggregateScore",
+          "class12thAggregateTotal",
+          "class12thMarksPdf",
+          "diplomaInstituteName",
+          "diplomaInstituteType",
+          "diplomaInstituteCity",
+          "diplomaInstituteState",
+          "diplomaInstituteCode",
+          "diplomaYearOfPassing",
+          "diplomaBranch",
+          "diplomaMediumOfTeaching",
+          "diplomaAggregateScore",
+          "diplomaAggregateTotal",
+          "diplomaMarksPdf",
+          "studyCertificate",
+          "transferCertificate",
+        ],
+      },
+      {
+        title: "Parent / Guardian Details",
+        fields: [
+          "fatherName",
+          "fatherEmail",
+          "fatherNumber",
+          "fatherOccupation",
+          "fatherPermanentAddress",
+          "motherName",
+          "motherEmail",
+          "motherNumber",
+          "motherOccupation",
+          "motherPermanentAddress",
+          "guardianName",
+          "guardianEmail",
+          "guardianNumber",
+          "guardianOccupation",
+          "guardianPermanentAddress",
+        ],
+      },
+    ];
+
+    const addRows = (section: typeof reviewSections[number]) => {
+      const body: string[][] = [];
+
+      if (section.includeAdmissionSummary) {
+        body.push(
+          ["Branch", currentAdmission.department?.name || "Assigned Branch"],
+          ["First Name", currentAdmission.firstName || "-"],
+          ["Middle Name", currentAdmission.middleName || "-"],
+          ["Last Name", currentAdmission.lastName || "-"],
+          ["Category Claimed", currentAdmission.categoryClaimed || "Not Set"],
+          [
+            "Category Allotted",
+            currentAdmission.categoryAllotted || "Not Set",
+          ],
+          ["Quota", currentAdmission.quota || "Not Set"],
+          ["Application Status", currentAdmission.status]
+        );
+      }
+
+      for (const key of section.fields) {
+        body.push([formatReviewKey(key), formatReviewValue(key, formData.get(key))]);
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.text(section.title, margin, cursorY);
+      cursorY += 8;
+
+      autoTable(doc, {
+        startY: cursorY,
+        head: [["Field", "Value"]],
+        body,
+        theme: "grid",
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+          overflow: "linebreak",
+          valign: "top",
+        },
+        headStyles: {
+          fillColor: [55, 65, 81],
+          textColor: 255,
+          fontStyle: "bold",
+        },
+        margin: { left: margin, right: margin },
+        columnStyles: {
+          0: { cellWidth: 160 },
+          1: { cellWidth: 335 },
+        },
+      });
+
+      const finalY = (doc as typeof doc & { lastAutoTable?: { finalY?: number } })
+        .lastAutoTable?.finalY;
+      cursorY = (finalY ?? cursorY) + 16;
+    };
+
+    reviewSections.forEach(addRows);
+
+    const blob = doc.output("blob");
+    const nextUrl = URL.createObjectURL(blob);
+    reviewPdfRef.current = nextUrl;
+    setReviewPdfUrl(nextUrl);
+    return nextUrl;
+  };
+
   const handleReviewStep = () => {
+    if (!validateStep("parent")) {
+      return;
+    }
+
     if (!class12Enabled && !diplomaEnabled) {
       toast.error("Please fill either Class 12 / PUC or Diploma details.");
       return;
     }
+
+    const nextUrl = generateReviewPdf();
+    if (!nextUrl) {
+      return;
+    }
+
     setActiveStep("review");
+  };
+
+  const handleTabChange = (nextStep: StepKey) => {
+    const currentIndex = STEP_ORDER.indexOf(activeStep);
+    const nextIndex = STEP_ORDER.indexOf(nextStep);
+
+    if (nextIndex > currentIndex && !validateStep(activeStep)) {
+      return;
+    }
+
+    setActiveStep(nextStep);
   };
 
   useEffect(() => {
     return () => {
       if (filePreviewRef.current) {
         URL.revokeObjectURL(filePreviewRef.current);
+      }
+      if (reviewPdfRef.current) {
+        URL.revokeObjectURL(reviewPdfRef.current);
       }
     };
   }, []);
@@ -399,11 +713,11 @@ export const ApplicantAdmissionView = () => {
 
         <Tabs
           value={activeStep}
-          onValueChange={(value) => setActiveStep(value as StepKey)}
+          onValueChange={(value) => handleTabChange(value as StepKey)}
           className="space-y-4"
         >
-          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 p-1 md:grid-cols-5">
-            {STEP_ORDER.map((step) => (
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 p-1 md:grid-cols-4">
+            {VISIBLE_STEPS.map((step) => (
               <TabsTrigger
                 key={step}
                 value={step}
@@ -424,7 +738,7 @@ export const ApplicantAdmissionView = () => {
         </div>
       </div>
 
-      <form noValidate onSubmit={handleSubmit} className="space-y-10">
+      <form ref={formRef} noValidate onSubmit={handleSubmit} className="space-y-10">
         {/* ADMISSION DETAILS */}
         <div
           ref={(node) => {
@@ -441,6 +755,51 @@ export const ApplicantAdmissionView = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="applicationId">Application ID</Label>
+              <Input
+                id="applicationId"
+                name="applicationId"
+                value={admission.applicationId}
+                readOnly
+              />
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="modeOfAdmission">Mode</Label>
+              <Input
+                id="modeOfAdmission"
+                name="modeOfAdmission"
+                value={admission.modeOfAdmission}
+                readOnly
+              />
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="firstName">First Name</Label>
+              <Input
+                id="firstName"
+                name="firstName"
+                value={admission.firstName || "-"}
+                disabled
+              />
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="middleName">Middle Name</Label>
+              <Input
+                id="middleName"
+                name="middleName"
+                value={admission.middleName || "-"}
+                disabled
+              />
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                id="lastName"
+                name="lastName"
+                value={admission.lastName || "-"}
+                disabled
+              />
+            </div>
             <div className="space-y-2 md:col-span-3">
               <Label>Branch</Label>
               <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
@@ -1578,8 +1937,8 @@ export const ApplicantAdmissionView = () => {
           <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
             <p className="text-muted-foreground text-sm">
               Review the details you entered in each section before submitting
-              your application. You can go back to any section using the tabs
-              above.
+              your application. You can go back to any section using the
+              section buttons above.
             </p>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="bg-background rounded-md border p-3">
@@ -1601,6 +1960,38 @@ export const ApplicantAdmissionView = () => {
                 </p>
               </div>
             </div>
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-3">
+                <Button type="button" variant="outline" onClick={generateReviewPdf}>
+                  Generate PDF Preview
+                </Button>
+                {reviewPdfUrl ? (
+                  <Button asChild variant="outline">
+                    <a
+                      href={reviewPdfUrl}
+                      download={`application-review-${admission.applicationId}.pdf`}
+                    >
+                      Download PDF
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
+
+              {reviewPdfUrl ? (
+                <div className="overflow-hidden rounded-lg border bg-background">
+                  <iframe
+                    title="Application review PDF preview"
+                    src={reviewPdfUrl}
+                    className="h-[70vh] w-full"
+                  />
+                </div>
+              ) : (
+                <div className="bg-background text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                  Generate the PDF preview to review all submitted details in
+                  one document.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap justify-between gap-3 border-t pt-6">
@@ -1617,7 +2008,7 @@ export const ApplicantAdmissionView = () => {
               className="w-full px-8 md:w-auto"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Uploading Documents..." : "Submit Application"}
+              {isSubmitting ? "Uploading Documents..." : "Review and Submit"}
             </Button>
           </div>
         </div>
