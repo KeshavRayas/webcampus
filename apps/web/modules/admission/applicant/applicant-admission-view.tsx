@@ -19,8 +19,11 @@ import { Tabs, TabsList, TabsTrigger } from "@webcampus/ui/components/tabs";
 import axios, { isAxiosError } from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { City, Country, State } from "country-state-city";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import "react-phone-number-input/style.css";
+import { PhoneNumberInput } from "@webcampus/ui/components/phone-input";
 
 type ApplicantAdmissionData = {
   applicationId: string;
@@ -63,6 +66,39 @@ export const ApplicantAdmissionView = () => {
   const [hostelEnabled, setHostelEnabled] = useState(false);
   const [nriEnabled, setNriEnabled] = useState(false);
   const [disabilityEnabled, setDisabilityEnabled] = useState(false);
+  const [fatherAddressSource, setFatherAddressSource] = useState<
+    "current" | "permanent" | "custom"
+  >("current");
+
+  const [motherAddressSource, setMotherAddressSource] = useState<
+    "current" | "permanent" | "custom"
+  >("current");
+
+  const [guardianAddressSource, setGuardianAddressSource] = useState<
+    "current" | "permanent" | "custom"
+  >("current");
+  const [currentCountry, setCurrentCountry] = useState("IN");
+  const [currentState, setCurrentState] = useState("");
+  const [currentDistrict, setCurrentDistrict] = useState("");
+
+  const [currentAddress, setCurrentAddress] = useState("");
+  const [currentArea, setCurrentArea] = useState("");
+  const [currentPincode, setCurrentPincode] = useState("");
+
+  const [permanentCountry, setPermanentCountry] = useState("IN");
+  const [permanentState, setPermanentState] = useState("");
+  const [permanentDistrict, setPermanentDistrict] = useState("");
+
+  const [permanentAddress, setPermanentAddress] = useState("");
+  const [permanentArea, setPermanentArea] = useState("");
+  const [permanentPincode, setPermanentPincode] = useState("");
+  const [primaryPhone, setPrimaryPhone] = useState("");
+  const [secondaryPhone, setSecondaryPhone] = useState("");
+  const [emergencyPhone, setEmergencyPhone] = useState("");
+
+  const [fatherPhone, setFatherPhone] = useState("");
+  const [motherPhone, setMotherPhone] = useState("");
+  const [guardianPhone, setGuardianPhone] = useState("");
   const [economicallyBackwardEnabled, setEconomicallyBackwardEnabled] =
     useState(false);
   const [class12Enabled, setClass12Enabled] = useState(true);
@@ -242,15 +278,38 @@ export const ApplicantAdmissionView = () => {
     }
   };
 
+  const validateStep = (step: StepKey) => {
+    const section = sectionRefs.current[step];
+
+    if (!section) return true;
+
+    const fields = Array.from(
+      section.querySelectorAll<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >("input, select, textarea")
+    );
+
+    for (const field of fields) {
+      if (!field.checkValidity()) {
+        field.reportValidity();
+        field.focus();
+        return false;
+      }
+    }
+
+    return true;
+  };
   const saveAndNext = (step: StepKey) => {
     if (!validateStep(step)) {
       return;
     }
 
     const nextIndex = STEP_ORDER.indexOf(step) + 1;
+
     const nextStep = STEP_ORDER[
       Math.min(nextIndex, STEP_ORDER.length - 1)
     ] as StepKey;
+
     setActiveStep(nextStep);
   };
 
@@ -554,6 +613,32 @@ export const ApplicantAdmissionView = () => {
     };
   }, []);
 
+  const getAddress = (type: "current" | "permanent") => {
+    if (type === "current") {
+      return [
+        currentAddress,
+        currentArea,
+        currentDistrict,
+        currentState,
+        currentCountry,
+        currentPincode,
+      ]
+        .filter(Boolean)
+        .join(", ");
+    }
+
+    return [
+      permanentAddress,
+      permanentArea,
+      permanentDistrict,
+      permanentState,
+      permanentCountry,
+      permanentPincode,
+    ]
+      .filter(Boolean)
+      .join(", ");
+  };
+
   const FilePicker = ({
     name,
     label,
@@ -621,6 +706,41 @@ export const ApplicantAdmissionView = () => {
     );
   };
 
+  const handleSameAsCurrentAddress = (checked: boolean) => {
+    setIsSameAddress(checked);
+  };
+  useEffect(() => {
+    if (!isSameAddress) return;
+
+    setPermanentCountry(currentCountry);
+    setPermanentState(currentState);
+    setPermanentDistrict(currentDistrict);
+
+    setPermanentAddress(currentAddress);
+    setPermanentArea(currentArea);
+    setPermanentPincode(currentPincode);
+  }, [
+    isSameAddress,
+    currentCountry,
+    currentState,
+    currentDistrict,
+    currentAddress,
+    currentArea,
+    currentPincode,
+  ]);
+
+  const countries = Country.getAllCountries();
+
+  const currentStates = State.getStatesOfCountry(currentCountry);
+
+  const currentDistricts = City.getCitiesOfState(currentCountry, currentState);
+  const permanentStates = State.getStatesOfCountry(permanentCountry);
+
+  const permanentDistricts = City.getCitiesOfState(
+    permanentCountry,
+    permanentState
+  );
+
   if (isLoading) {
     return (
       <div className="flex justify-center p-12">
@@ -660,45 +780,6 @@ export const ApplicantAdmissionView = () => {
       </div>
     );
   }
-
-  const handleSameAsCurrentAddress = (checked: boolean) => {
-    setIsSameAddress(checked);
-
-    // List of the field suffixes we need to copy
-    const fields = [
-      "Address",
-      "Area",
-      "City",
-      "District",
-      "State",
-      "Country",
-      "Pincode",
-    ];
-
-    fields.forEach((field) => {
-      // Find the input elements in the DOM by their name attribute
-      const currentInput = document.querySelector(
-        `[name="current${field}"]`
-      ) as HTMLInputElement;
-      const permanentInput = document.querySelector(
-        `[name="permanent${field}"]`
-      ) as HTMLInputElement;
-
-      if (currentInput && permanentInput) {
-        if (checked) {
-          // Copy the value from current to permanent
-          permanentInput.value = currentInput.value;
-          // Optional: Make it read-only so they don't accidentally edit it while checked
-          permanentInput.readOnly = true;
-        } else {
-          // Clear the value if unchecked
-          permanentInput.value = "";
-          permanentInput.readOnly = false;
-        }
-      }
-    });
-  };
-
   return (
     <div className="bg-card rounded-lg border p-6 shadow-sm">
       <div className="mb-6 space-y-4">
@@ -982,36 +1063,56 @@ export const ApplicantAdmissionView = () => {
             {/* Contact Info */}
             <div className="space-y-2">
               <Label htmlFor="primaryPhoneNumber">Primary Phone Number *</Label>
-              <Input
+
+              <PhoneNumberInput
                 id="primaryPhoneNumber"
-                name="primaryPhoneNumber"
-                type="tel"
+                value={primaryPhone}
+                onChange={(value) => setPrimaryPhone(value ?? "")}
                 required
+              />
+
+              <input
+                type="hidden"
+                name="primaryPhoneNumber"
+                value={primaryPhone}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="secondaryPhoneNumber">
                 Secondary Phone Number *
               </Label>
-              <Input
+
+              <PhoneNumberInput
                 id="secondaryPhoneNumber"
-                name="secondaryPhoneNumber"
-                type="tel"
+                value={secondaryPhone}
+                onChange={(value) => setSecondaryPhone(value ?? "")}
                 required
+              />
+
+              <input
+                type="hidden"
+                name="secondaryPhoneNumber"
+                value={secondaryPhone}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="emergencyContactNumber">
                 Emergency Contact Number *
               </Label>
-              <Input
+
+              <PhoneNumberInput
                 id="emergencyContactNumber"
-                name="emergencyContactNumber"
-                type="tel"
+                value={emergencyPhone}
+                onChange={(value) => setEmergencyPhone(value ?? "")}
                 required
               />
-            </div>
 
+              <input
+                type="hidden"
+                name="emergencyContactNumber"
+                value={emergencyPhone}
+              />
+            </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-1">
               <Label htmlFor="primaryEmail">Primary Email Address *</Label>
               <Input
@@ -1034,45 +1135,155 @@ export const ApplicantAdmissionView = () => {
             </div>
 
             {/* Current Address */}
+            {/* Current Address */}
             <div className="md:col-span-2 lg:col-span-3">
               <h4 className="mb-2 mt-4 text-lg font-semibold">
                 Current Address
               </h4>
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Address */}
                 <div className="space-y-2 md:col-span-2 lg:col-span-3">
                   <Label htmlFor="currentAddress">Address Line *</Label>
-                  <Input id="currentAddress" name="currentAddress" required />
+
+                  <Input
+                    id="currentAddress"
+                    name="currentAddress"
+                    value={currentAddress}
+                    onChange={(e) => setCurrentAddress(e.target.value)}
+                    required
+                  />
                 </div>
+
+                {/* Area */}
                 <div className="space-y-2">
                   <Label htmlFor="currentArea">Area *</Label>
-                  <Input id="currentArea" name="currentArea" required />
+
+                  <Input
+                    id="currentArea"
+                    name="currentArea"
+                    value={currentArea}
+                    onChange={(e) => setCurrentArea(e.target.value)}
+                    required
+                  />
                 </div>
+
+                {/* Country */}
                 <div className="space-y-2">
-                  <Label htmlFor="currentCity">City *</Label>
-                  <Input id="currentCity" name="currentCity" required />
+                  <Label>Country *</Label>
+
+                  <Select
+                    value={currentCountry}
+                    onValueChange={(value) => {
+                      setCurrentCountry(value);
+                      setCurrentState("");
+                      setCurrentDistrict("");
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {countries.map((country) => (
+                        <SelectItem
+                          key={country.isoCode}
+                          value={country.isoCode}
+                        >
+                          {country.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <input
+                    type="hidden"
+                    name="currentCountry"
+                    value={
+                      countries.find((c) => c.isoCode === currentCountry)
+                        ?.name ?? ""
+                    }
+                    required
+                  />
                 </div>
+
+                {/* State */}
                 <div className="space-y-2">
-                  <Label htmlFor="currentDistrict">District *</Label>
-                  <Input id="currentDistrict" name="currentDistrict" required />
+                  <Label>State *</Label>
+
+                  <Select
+                    value={currentState}
+                    onValueChange={(value) => {
+                      setCurrentState(value);
+                      setCurrentDistrict("");
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {currentStates.map((state) => (
+                        <SelectItem key={state.isoCode} value={state.isoCode}>
+                          {state.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <input
+                    type="hidden"
+                    name="currentState"
+                    value={
+                      currentStates.find((s) => s.isoCode === currentState)
+                        ?.name ?? ""
+                    }
+                    required
+                  />
                 </div>
+
+                {/* District */}
                 <div className="space-y-2">
-                  <Label htmlFor="currentState">State *</Label>
-                  <Input id="currentState" name="currentState" required />
+                  <Label>District *</Label>
+
+                  <Select
+                    value={currentDistrict}
+                    onValueChange={setCurrentDistrict}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select District" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {currentDistricts.map((city) => (
+                        <SelectItem key={city.name} value={city.name}>
+                          {city.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <input
+                    type="hidden"
+                    name="currentDistrict"
+                    value={currentDistrict}
+                    required
+                  />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="currentCountry">Country *</Label>
-                  <Input id="currentCountry" name="currentCountry" required />
-                </div>
+
+                {/* Pincode */}
                 <div className="space-y-2">
                   <Label htmlFor="currentPincode">Pincode *</Label>
+
                   <Input
                     id="currentPincode"
                     name="currentPincode"
+                    value={currentPincode}
+                    onChange={(e) => setCurrentPincode(e.target.value)}
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]{6}"
                     maxLength={6}
-                    placeholder="560001"
                     required
                   />
                 </div>
@@ -1083,12 +1294,14 @@ export const ApplicantAdmissionView = () => {
             <div className="border-t pt-6 md:col-span-2 lg:col-span-3">
               <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                 <h4 className="text-lg font-semibold">Permanent Address</h4>
+
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="same-address"
                     checked={isSameAddress}
                     onCheckedChange={handleSameAsCurrentAddress}
                   />
+
                   <label
                     htmlFor="same-address"
                     className="cursor-pointer text-sm font-medium leading-none"
@@ -1097,211 +1310,322 @@ export const ApplicantAdmissionView = () => {
                   </label>
                 </div>
               </div>
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Address */}
                 <div className="space-y-2 md:col-span-2 lg:col-span-3">
                   <Label htmlFor="permanentAddress">Address Line *</Label>
+
                   <Input
                     id="permanentAddress"
                     name="permanentAddress"
+                    value={permanentAddress}
+                    onChange={(e) => setPermanentAddress(e.target.value)}
+                    readOnly={isSameAddress}
                     required
                   />
                 </div>
+
+                {/* Area */}
                 <div className="space-y-2">
                   <Label htmlFor="permanentArea">Area *</Label>
-                  <Input id="permanentArea" name="permanentArea" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="permanentCity">City *</Label>
-                  <Input id="permanentCity" name="permanentCity" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="permanentDistrict">District *</Label>
+
                   <Input
-                    id="permanentDistrict"
-                    name="permanentDistrict"
+                    id="permanentArea"
+                    name="permanentArea"
+                    value={permanentArea}
+                    onChange={(e) => setPermanentArea(e.target.value)}
+                    readOnly={isSameAddress}
                     required
                   />
                 </div>
+
+                {/* Country */}
                 <div className="space-y-2">
-                  <Label htmlFor="permanentState">State *</Label>
-                  <Input id="permanentState" name="permanentState" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="permanentCountry">Country *</Label>
-                  <Input
-                    id="permanentCountry"
+                  <Label>Country *</Label>
+
+                  <Select
+                    value={permanentCountry}
+                    onValueChange={(value) => {
+                      setPermanentCountry(value);
+                      setPermanentState("");
+                      setPermanentDistrict("");
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {countries.map((country) => (
+                        <SelectItem
+                          key={country.isoCode}
+                          value={country.isoCode}
+                        >
+                          {country.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <input
+                    type="hidden"
                     name="permanentCountry"
+                    value={
+                      countries.find((c) => c.isoCode === permanentCountry)
+                        ?.name ?? ""
+                    }
+                    disabled={isSameAddress}
                     required
                   />
                 </div>
+
+                {/* State */}
+                <div className="space-y-2">
+                  <Label>State *</Label>
+
+                  <Select
+                    value={permanentState}
+                    onValueChange={(value) => {
+                      setPermanentState(value);
+                      setPermanentDistrict("");
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {permanentStates.map((state) => (
+                        <SelectItem key={state.isoCode} value={state.isoCode}>
+                          {state.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <input
+                    type="hidden"
+                    name="permanentState"
+                    value={
+                      permanentStates.find((s) => s.isoCode === permanentState)
+                        ?.name ?? ""
+                    }
+                    disabled={isSameAddress}
+                    required
+                  />
+                </div>
+
+                {/* District */}
+                <div className="space-y-2">
+                  <Label>District *</Label>
+
+                  <Select
+                    value={permanentDistrict}
+                    onValueChange={setPermanentDistrict}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select District" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {permanentDistricts.map((city) => (
+                        <SelectItem key={city.name} value={city.name}>
+                          {city.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <input
+                    type="hidden"
+                    name="permanentDistrict"
+                    value={permanentDistrict}
+                    disabled={isSameAddress}
+                    required
+                  />
+                </div>
+
+                {/* Pincode */}
                 <div className="space-y-2">
                   <Label htmlFor="permanentPincode">Pincode *</Label>
+
                   <Input
                     id="permanentPincode"
                     name="permanentPincode"
+                    value={permanentPincode}
+                    onChange={(e) => setPermanentPincode(e.target.value)}
+                    readOnly={isSameAddress}
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]{6}"
                     maxLength={6}
-                    placeholder="560001"
                     required
                   />
                 </div>
               </div>
             </div>
-
             {/* Demographics & Identity */}
-            <div className="space-y-2">
-              <Label htmlFor="placeOfBirth">Place of Birth *</Label>
-              <Input id="placeOfBirth" name="placeOfBirth" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stateOfBirth">State of Birth *</Label>
-              <Input id="stateOfBirth" name="stateOfBirth" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="religion">Religion *</Label>
-              <Input id="religion" name="religion" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="caste">Caste *</Label>
-              <Input id="caste" name="caste" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subCaste">Sub caste</Label>
-              <Input id="subCaste" name="subCaste" />
-            </div>
-            <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <FilePicker
-                name="casteCertificate"
-                label="Caste Certificate (PDF)"
-                accept="application/pdf"
-              />
-            </div>
+            {/* Identity & Personal Details */}
+            <div className="border-t pt-6 md:col-span-2 lg:col-span-3">
+              <h4 className="mb-4 text-lg font-semibold">Other Details</h4>
 
-            <div className="space-y-2">
-              <Label htmlFor="motherTongue">Mother Tongue *</Label>
-              <Input id="motherTongue" name="motherTongue" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="nationality">Nationality *</Label>
-              <Input id="nationality" name="nationality" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="nri">NRI Citizen *</Label>
-              <input
-                type="hidden"
-                name="nri"
-                value={nriEnabled ? "true" : "false"}
-              />
-              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                <Checkbox
-                  id="nri-toggle"
-                  checked={nriEnabled}
-                  onCheckedChange={(checked) => setNriEnabled(Boolean(checked))}
-                />
-                <Label
-                  htmlFor="nri-toggle"
-                  className="cursor-pointer text-sm font-medium"
-                >
-                  Has NRI status
-                </Label>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="placeOfBirth">Place of Birth *</Label>
+                  <Input id="placeOfBirth" name="placeOfBirth" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stateOfBirth">State of Birth *</Label>
+                  <Input id="stateOfBirth" name="stateOfBirth" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="religion">Religion *</Label>
+                  <Input id="religion" name="religion" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="caste">Caste *</Label>
+                  <Input id="caste" name="caste" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="subCaste">Sub caste</Label>
+                  <Input id="subCaste" name="subCaste" />
+                </div>
+                <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                  <FilePicker
+                    name="casteCertificate"
+                    label="Caste Certificate (PDF)"
+                    accept="application/pdf"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="motherTongue">Mother Tongue *</Label>
+                  <Input id="motherTongue" name="motherTongue" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nationality">Nationality *</Label>
+                  <Input id="nationality" name="nationality" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nri">NRI Citizen *</Label>
+                  <input
+                    type="hidden"
+                    name="nri"
+                    value={nriEnabled ? "true" : "false"}
+                  />
+                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                    <Checkbox
+                      id="nri-toggle"
+                      checked={nriEnabled}
+                      onCheckedChange={(checked) =>
+                        setNriEnabled(Boolean(checked))
+                      }
+                    />
+                    <Label
+                      htmlFor="nri-toggle"
+                      className="cursor-pointer text-sm font-medium"
+                    >
+                      Has NRI status
+                    </Label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="disability">Disability Status *</Label>
+                  <input
+                    type="hidden"
+                    name="disability"
+                    value={disabilityEnabled ? "true" : "false"}
+                  />
+                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                    <Checkbox
+                      id="disability-toggle"
+                      checked={disabilityEnabled}
+                      onCheckedChange={(checked) =>
+                        setDisabilityEnabled(Boolean(checked))
+                      }
+                    />
+                    <Label
+                      htmlFor="disability-toggle"
+                      className="cursor-pointer text-sm font-medium"
+                    >
+                      Has disability
+                    </Label>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="disabilityType">Disability Details </Label>
+                  <Input
+                    id="disabilityType"
+                    name="disabilityType"
+                    disabled={!disabilityEnabled}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FilePicker
+                    name="disabilityCertificate"
+                    label="Disability Certificate"
+                    accept="application/pdf"
+                    disabled={!disabilityEnabled}
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-1 lg:col-span-1">
+                  <Label htmlFor="economicallyBackward">
+                    Economically Backward Status *
+                  </Label>
+                  <input
+                    type="hidden"
+                    name="economicallyBackward"
+                    value={economicallyBackwardEnabled ? "true" : "false"}
+                  />
+                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                    <Checkbox
+                      id="economicallyBackward-toggle"
+                      checked={economicallyBackwardEnabled}
+                      onCheckedChange={(checked) =>
+                        setEconomicallyBackwardEnabled(Boolean(checked))
+                      }
+                    />
+                    <Label
+                      htmlFor="economicallyBackward-toggle"
+                      className="cursor-pointer text-sm font-medium"
+                    >
+                      Economically backward
+                    </Label>
+                  </div>
+                </div>
+                <div className="space-y-2 md:col-span-1 lg:col-span-2">
+                  <FilePicker
+                    name="economicallyBackwardCertificate"
+                    label="Economically Backward Status Certificate"
+                    accept="application/pdf"
+                    disabled={!economicallyBackwardEnabled}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="aadharNumber">Aadhar Number *</Label>
+                  <Input
+                    id="aadharNumber"
+                    name="aadharNumber"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{12}"
+                    maxLength={12}
+                    required
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-1 lg:col-span-2">
+                  <FilePicker
+                    name="aadharCard"
+                    label="Aadhar Card Proof"
+                    accept="application/pdf"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="disability">Disability Status *</Label>
-              <input
-                type="hidden"
-                name="disability"
-                value={disabilityEnabled ? "true" : "false"}
-              />
-              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                <Checkbox
-                  id="disability-toggle"
-                  checked={disabilityEnabled}
-                  onCheckedChange={(checked) =>
-                    setDisabilityEnabled(Boolean(checked))
-                  }
-                />
-                <Label
-                  htmlFor="disability-toggle"
-                  className="cursor-pointer text-sm font-medium"
-                >
-                  Has disability
-                </Label>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="disabilityType">Disability Details </Label>
-              <Input
-                id="disabilityType"
-                name="disabilityType"
-                disabled={!disabilityEnabled}
-              />
-            </div>
-            <div className="space-y-2">
-              <FilePicker
-                name="disabilityCertificate"
-                label="Disability Certificate"
-                accept="application/pdf"
-                disabled={!disabilityEnabled}
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-1 lg:col-span-1">
-              <Label htmlFor="economicallyBackward">
-                Economically Backward Status *
-              </Label>
-              <input
-                type="hidden"
-                name="economicallyBackward"
-                value={economicallyBackwardEnabled ? "true" : "false"}
-              />
-              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                <Checkbox
-                  id="economicallyBackward-toggle"
-                  checked={economicallyBackwardEnabled}
-                  onCheckedChange={(checked) =>
-                    setEconomicallyBackwardEnabled(Boolean(checked))
-                  }
-                />
-                <Label
-                  htmlFor="economicallyBackward-toggle"
-                  className="cursor-pointer text-sm font-medium"
-                >
-                  Economically backward
-                </Label>
-              </div>
-            </div>
-            <div className="space-y-2 md:col-span-1 lg:col-span-2">
-              <FilePicker
-                name="economicallyBackwardCertificate"
-                label="Economically Backward Status Certificate"
-                accept="application/pdf"
-                disabled={!economicallyBackwardEnabled}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="aadharNumber">Aadhar Number *</Label>
-              <Input
-                id="aadharNumber"
-                name="aadharNumber"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]{12}"
-                maxLength={12}
-                required
-              />
-            </div>
-            <div className="space-y-2 md:col-span-1 lg:col-span-2">
-              <FilePicker
-                name="aadharCard"
-                label="Aadhar Card Proof"
-                accept="application/pdf"
-                required
-              />
             </div>
           </div>
           <div className="flex flex-wrap justify-between gap-3">
@@ -1455,9 +1779,14 @@ export const ApplicantAdmissionView = () => {
                   <Checkbox
                     id="class12-toggle"
                     checked={class12Enabled}
-                    onCheckedChange={(checked) =>
-                      setClass12Enabled(Boolean(checked))
-                    }
+                    onCheckedChange={(checked) => {
+                      const enabled = Boolean(checked);
+                      setClass12Enabled(enabled);
+
+                      if (enabled) {
+                        setDiplomaEnabled(false);
+                      }
+                    }}
                   />
                   <Label
                     htmlFor="class12-toggle"
@@ -1470,9 +1799,14 @@ export const ApplicantAdmissionView = () => {
                   <Checkbox
                     id="diploma-toggle"
                     checked={diplomaEnabled}
-                    onCheckedChange={(checked) =>
-                      setDiplomaEnabled(Boolean(checked))
-                    }
+                    onCheckedChange={(checked) => {
+                      const enabled = Boolean(checked);
+                      setDiplomaEnabled(enabled);
+
+                      if (enabled) {
+                        setClass12Enabled(false);
+                      }
+                    }}
                   />
                   <Label
                     htmlFor="diploma-toggle"
@@ -1497,7 +1831,10 @@ export const ApplicantAdmissionView = () => {
               </p>
             </div>
 
-            <fieldset className="contents" disabled={!class12Enabled}>
+            <fieldset
+              className="contents"
+              disabled={!class12Enabled || diplomaEnabled}
+            >
               <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2 lg:col-span-3">
                 Class XII / PUC Details
               </h4>
@@ -1630,7 +1967,10 @@ export const ApplicantAdmissionView = () => {
               </div>
             </fieldset>
 
-            <fieldset className="contents" disabled={!diplomaEnabled}>
+            <fieldset
+              className="contents"
+              disabled={!diplomaEnabled || class12Enabled}
+            >
               <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2 lg:col-span-3">
                 Diploma Details
               </h4>
@@ -1811,24 +2151,70 @@ export const ApplicantAdmissionView = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fatherNumber">Phone Number *</Label>
-                <Input
+
+                <PhoneNumberInput
                   id="fatherNumber"
-                  name="fatherNumber"
-                  type="tel"
+                  value={fatherPhone}
+                  onChange={(value) => setFatherPhone(value ?? "")}
                   required
                 />
+
+                <input type="hidden" name="fatherNumber" value={fatherPhone} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fatherOccupation">Occupation </Label>
                 <Input id="fatherOccupation" name="fatherOccupation" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="fatherPermanentAddress">Address *</Label>
-                <Input
-                  id="fatherPermanentAddress"
-                  name="fatherPermanentAddress"
-                  required
-                />
+              <div className="space-y-3">
+                <Label>Address *</Label>
+
+                <div className="space-y-2 rounded-md border p-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="father-current"
+                      checked={fatherAddressSource === "current"}
+                      onCheckedChange={(checked) =>
+                        setFatherAddressSource(checked ? "current" : "custom")
+                      }
+                    />
+                    <Label htmlFor="father-current">
+                      Same as Current Address
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="father-permanent"
+                      checked={fatherAddressSource === "permanent"}
+                      onCheckedChange={(checked) =>
+                        setFatherAddressSource(checked ? "permanent" : "custom")
+                      }
+                    />
+                    <Label htmlFor="father-permanent">
+                      Same as Permanent Address
+                    </Label>
+                  </div>
+                </div>
+
+                {fatherAddressSource === "custom" ? (
+                  <Input
+                    key="father-custom"
+                    name="fatherPermanentAddress"
+                    placeholder="Enter father's address"
+                    defaultValue=""
+                  />
+                ) : (
+                  <Input
+                    key="father-auto"
+                    value={
+                      fatherAddressSource === "current"
+                        ? getAddress("current")
+                        : getAddress("permanent")
+                    }
+                    readOnly
+                    className="bg-muted text-muted-foreground"
+                  />
+                )}
               </div>
             </div>
 
@@ -1850,24 +2236,70 @@ export const ApplicantAdmissionView = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="motherNumber">Phone Number *</Label>
-                <Input
+
+                <PhoneNumberInput
                   id="motherNumber"
-                  name="motherNumber"
-                  type="tel"
+                  value={motherPhone}
+                  onChange={(value) => setMotherPhone(value ?? "")}
                   required
                 />
+
+                <input type="hidden" name="motherNumber" value={motherPhone} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="motherOccupation">Occupation </Label>
                 <Input id="motherOccupation" name="motherOccupation" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="motherPermanentAddress">Address *</Label>
-                <Input
-                  id="motherPermanentAddress"
-                  name="motherPermanentAddress"
-                  required
-                />
+              <div className="space-y-3">
+                <Label>Address *</Label>
+
+                <div className="space-y-2 rounded-md border p-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="mother-current"
+                      checked={motherAddressSource === "current"}
+                      onCheckedChange={(checked) =>
+                        setMotherAddressSource(checked ? "current" : "custom")
+                      }
+                    />
+                    <Label htmlFor="mother-current">
+                      Same as Current Address
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="mother-permanent"
+                      checked={motherAddressSource === "permanent"}
+                      onCheckedChange={(checked) =>
+                        setMotherAddressSource(checked ? "permanent" : "custom")
+                      }
+                    />
+                    <Label htmlFor="mother-permanent">
+                      Same as Permanent Address
+                    </Label>
+                  </div>
+                </div>
+
+                {motherAddressSource === "custom" ? (
+                  <Input
+                    key="mother-custom"
+                    name="motherPermanentAddress"
+                    placeholder="Enter mother's address"
+                    defaultValue=""
+                  />
+                ) : (
+                  <Input
+                    key="mother-auto"
+                    value={
+                      motherAddressSource === "current"
+                        ? getAddress("current")
+                        : getAddress("permanent")
+                    }
+                    readOnly
+                    className="bg-muted text-muted-foreground"
+                  />
+                )}
               </div>
             </div>
 
@@ -1890,18 +2322,77 @@ export const ApplicantAdmissionView = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="guardianNumber">Phone Number</Label>
-                  <Input id="guardianNumber" name="guardianNumber" type="tel" />
+
+                  <PhoneNumberInput
+                    id="guardianNumber"
+                    value={guardianPhone}
+                    onChange={(value) => setGuardianPhone(value ?? "")}
+                  />
+
+                  <input
+                    type="hidden"
+                    name="guardianNumber"
+                    value={guardianPhone}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="guardianOccupation">Occupation</Label>
                   <Input id="guardianOccupation" name="guardianOccupation" />
                 </div>
-                <div className="space-y-2 md:col-span-2 lg:col-span-2">
-                  <Label htmlFor="guardianPermanentAddress">Address</Label>
-                  <Input
-                    id="guardianPermanentAddress"
-                    name="guardianPermanentAddress"
-                  />
+                <div className="space-y-3">
+                  <Label>Address</Label>
+
+                  <div className="space-y-2 rounded-md border p-3">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="guardian-current"
+                        checked={guardianAddressSource === "current"}
+                        onCheckedChange={(checked) =>
+                          setGuardianAddressSource(
+                            checked ? "current" : "custom"
+                          )
+                        }
+                      />
+                      <Label htmlFor="guardian-current">
+                        Same as Current Address
+                      </Label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="guardian-permanent"
+                        checked={guardianAddressSource === "permanent"}
+                        onCheckedChange={(checked) =>
+                          setGuardianAddressSource(
+                            checked ? "permanent" : "custom"
+                          )
+                        }
+                      />
+                      <Label htmlFor="guardian-permanent">
+                        Same as Permanent Address
+                      </Label>
+                    </div>
+                  </div>
+
+                  {guardianAddressSource === "custom" ? (
+                    <Input
+                      key="guardian-custom"
+                      name="guardianPermanentAddress"
+                      placeholder="Enter guardian's address"
+                      defaultValue=""
+                    />
+                  ) : (
+                    <Input
+                      key="guardian-auto"
+                      value={
+                        guardianAddressSource === "current"
+                          ? getAddress("current")
+                          : getAddress("permanent")
+                      }
+                      readOnly
+                      className="bg-muted text-muted-foreground"
+                    />
+                  )}
                 </div>
               </div>
             </div>
