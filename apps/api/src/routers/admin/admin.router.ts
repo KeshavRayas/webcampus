@@ -10,7 +10,9 @@ import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
 import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
 import UserRouter from "@webcampus/api/src/routers/admin/user.router";
 import { Router } from "express";
+import { getSections } from "../../controllers/admin/section.controller";
 import facultyRouter from "./faculty.router";
+import HallTicketRouter from "./hall-ticket.router";
 
 const router: Router = Router();
 
@@ -35,5 +37,9 @@ router.use("/registration-windows", RegistrationWindowRouter);
 router.use("/registration-tracking", RegistrationTrackingRouter);
 
 router.use("/attendance-windows", AttendanceWindowRouter);
+
+router.use("/hall-ticket", HallTicketRouter);
+
+router.get("/sections", getSections);
 
 export default router;

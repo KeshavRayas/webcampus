@@ -5,11 +5,13 @@ import {
   Building,
   CalendarDays,
   ClipboardList,
+  FileText,
   Fingerprint,
   GraduationCap,
   LayoutDashboard,
   Library,
   LifeBuoy,
+  Lock,
   Send,
   User,
   Users,
@@ -90,12 +92,28 @@ export const sidebarConfig: Record<Role, SidebarData> = {
         },
         {
           name: "Academics",
-          url: "/admin/attendance-windows",
+          url: "/admin/academics/freezing",
           icon: GraduationCap,
           children: [
             {
-              name: "Attendance Windows",
-              url: "/admin/attendance-windows",
+              name: "Freezing",
+              url: "/admin/academics/freezing",
+            },
+            {
+              name: "Attendance",
+              url: "/admin/academics/attendance",
+            },
+            {
+              name: "Marks",
+              url: "/admin/academics/marks",
+            },
+            {
+              name: "Condonation",
+              url: "/admin/academics/condonation",
+            },
+            {
+              name: "Hall Tickets",
+              url: "/admin/academics/hall-ticket",
             },
           ],
         },
@@ -128,11 +146,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Course Configuration", url: "/department/courses" },
             { name: "Course Mapping", url: "/department/course-mapping" },
-            { name: "Approvals", url: "/department/course-approvals" },
             {
               name: "Appoint Coordinators",
               url: "/department/course-coordinators",
             },
+            { name: "Approvals", url: "/department/course-approvals" },
           ],
         },
         {
@@ -173,6 +191,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: BookOpenText,
         },
         {
+          name: "Hall Ticket",
+          url: "/student/hall-ticket",
+          icon: FileText,
+        },
+        {
           name: "Profile",
           url: "/student/profile",
           icon: User,
@@ -199,6 +222,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           ],
         },
         {
+          name: "Freezing",
+          url: "/faculty/freezing",
+          icon: Lock,
+        },
+        {
           name: "Attendance",
           url: "/faculty/attendance/take",
           icon: Fingerprint,
@@ -206,13 +234,16 @@ export const sidebarConfig: Record<Role, SidebarData> = {
             { name: "Take Attendance", url: "/faculty/attendance/take" },
             { name: "Edit Attendance", url: "/faculty/attendance/edit" },
             { name: "Attendance Report", url: "/faculty/attendance/report" },
-            { name: "Attendance Freezing", url: "/faculty/attendance-windows" },
           ],
         },
         {
           name: "Marks",
           url: "/faculty/marks",
           icon: BookOpenText,
+          children: [
+            { name: "Enter Marks", url: "/faculty/marks" },
+            { name: "Marks Report", url: "/faculty/marks/report" },
+          ],
         },
         {
           name: "Question Paper Setup",
@@ -247,13 +278,25 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: GraduationCap,
         },
         {
-          name: "Attendance",
-          url: "/hod/attendance-windows",
-          icon: Fingerprint,
+          name: "Academics",
+          url: "/hod/academics/freezing",
+          icon: GraduationCap,
           children: [
             {
-              name: "Attendance Windows",
-              url: "/hod/attendance-windows",
+              name: "Freezing",
+              url: "/hod/academics/freezing",
+            },
+            {
+              name: "Attendance",
+              url: "/hod/academics/attendance",
+            },
+            {
+              name: "Marks",
+              url: "/hod/academics/marks",
+            },
+            {
+              name: "Condonation",
+              url: "/hod/academics/condonation",
             },
           ],
         },

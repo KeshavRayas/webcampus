@@ -100,3 +100,53 @@ export type StudentAssessmentStatusType = z.infer<
 export type StudentAssessmentTotalType = z.infer<
   typeof StudentAssessmentTotalSchema
 >;
+
+export interface MarksReportAssessmentScore {
+  assessmentId: string;
+  assessmentTitle: string;
+  totalMarks: number | null;
+  maxMarks: number;
+}
+
+export interface MarksReportStudent {
+  usn: string;
+  name: string;
+  assessments: MarksReportAssessmentScore[];
+  cieTotal: number | null;
+  status: string;
+}
+
+export interface MarksReportDTO {
+  course: {
+    id: string;
+    code: string;
+    name: string;
+    cumulativeMinMarks: number;
+  };
+  assessments: Array<{
+    id: string;
+    title: string;
+    totalMarks: number;
+  }>;
+  semester: {
+    id: string;
+    semesterNumber: number;
+    academicTerm: {
+      id: string;
+      type: string;
+      year: string;
+    };
+  };
+  students: MarksReportStudent[];
+}
+
+export interface MarksReportFilterOptionsDTO {
+  courses: Array<{
+    id: string;
+    code: string;
+    name: string;
+    sectionId: string;
+    sectionName: string;
+    semesterId: string;
+  }>;
+}

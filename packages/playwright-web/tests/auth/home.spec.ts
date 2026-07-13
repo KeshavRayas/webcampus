@@ -1,6 +1,19 @@
 import { expect, test } from "@playwright/test";
 import { roles } from "@webcampus/types/rbac";
-import { capitalize } from "@webcampus/ui/lib/utils";
+
+function roleDisplayName(role: string): string {
+  if (role === "admission_admin" || role === "admission_reviewer") {
+    return "Admission";
+  }
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+function signInHref(role: string): string {
+  if (role === "admission_admin" || role === "admission_reviewer") {
+    return "/admission/sign-in";
+  }
+  return `/${role}/sign-in`;
+}
 
 test.describe("Home page", () => {
   test("Home page displays all layout and auth elements", async ({ page }) => {
@@ -14,12 +27,14 @@ test.describe("Home page", () => {
     await expect(
       page.getByText(/Sign in with your personal credentials/i)
     ).toBeVisible();
+
     for (const role of roles) {
-      const buttonText = `${capitalize(role)} Sign In`;
-      await expect(page.getByRole("link", { name: buttonText })).toBeVisible();
+      const buttonText = `${roleDisplayName(role)} Sign In`;
       const link = page.getByRole("link", { name: buttonText });
-      await expect(link).toHaveAttribute("href", `/${role}/sign-in`);
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute("href", signInHref(role));
     }
+
     const heroImage = page.locator(
       'img[src*="auth-hero-home.svg"], img[src*="auth-hero.svg"]'
     );

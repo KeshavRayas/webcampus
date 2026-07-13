@@ -303,7 +303,7 @@ export const FacultyAttendanceView = () => {
       sectionId: form.sectionId || undefined,
       batchId: form.batchId,
       page: 1,
-      limit: 200,
+      limit: 100,
     },
     Boolean(
       form.sessionDate &&
@@ -424,13 +424,23 @@ export const FacultyAttendanceView = () => {
       return false;
     }
 
-    return !overlapError;
+    if (overlapCheckQuery.isFetching || overlapCheckQuery.isLoading) {
+      return false;
+    }
+
+    if (overlapError) {
+      return false;
+    }
+
+    return true;
   }, [
     form.courseId,
     form.sectionId,
     form.sessionDate,
     hasValidTiming,
     overlapError,
+    overlapCheckQuery.isFetching,
+    overlapCheckQuery.isLoading,
   ]);
 
   const canSaveAttendance = useMemo(() => {
@@ -558,6 +568,15 @@ export const FacultyAttendanceView = () => {
       return;
     }
 
+    // Re-check overlap before saving in case data loaded after modal opened
+    if (exactSession) {
+      toast.error(
+        "Attendance already taken for this session. Please use the Edit Attendance tab to modify it."
+      );
+      setIsTakeAttendanceModalOpen(false);
+      return;
+    }
+
     try {
       const response = await createOrOpenMutation.mutateAsync({
         courseId: form.courseId,
@@ -594,6 +613,7 @@ export const FacultyAttendanceView = () => {
 
     // Strictly for creating NEW attendance: clear the checklist, open modal, and fetch the roster
     setStudentChecklist([]);
+    setActiveSessionId("");
     setIsTakeAttendanceModalOpen(true);
     sessionStudentsQuery.refetch();
   };

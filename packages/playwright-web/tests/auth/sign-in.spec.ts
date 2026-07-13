@@ -8,14 +8,16 @@ test.describe("Sign in page", () => {
     await expect(
       page.getByRole("heading", { name: /Student sign in/i })
     ).toBeVisible();
-    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.getByLabel("Student Email")).toBeVisible();
     await expect(
-      page.locator('input[placeholder="Enter your email"]')
+      page.getByPlaceholder("Enter your student email")
     ).toBeVisible();
-    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.getByPlaceholder("Enter your password")).toBeVisible();
   });
 
-  test("should render applicant sign in with application ID field", async ({ page }) => {
+  test("should render applicant sign in with application ID field", async ({
+    page,
+  }) => {
     await page.goto("/applicant/sign-in");
 
     await expect(
@@ -23,9 +25,9 @@ test.describe("Sign in page", () => {
     ).toBeVisible();
     await expect(page.getByLabel("Application ID")).toBeVisible();
     await expect(
-      page.locator('input[placeholder="Enter your Application ID"]')
+      page.getByPlaceholder("Enter your Application ID")
     ).toBeVisible();
-    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.getByPlaceholder("Enter your password")).toBeVisible();
   });
 
   test("should sign in as admin successfully", async ({
@@ -36,11 +38,9 @@ test.describe("Sign in page", () => {
     await expect(
       page.getByRole("heading", { name: /Admin sign in/i })
     ).toBeVisible();
+    await page.getByLabel("Email").fill(adminCredentials.email);
     await page
-      .locator('input[placeholder="Enter your email"]')
-      .fill(adminCredentials.email);
-    await page
-      .locator('input[placeholder="Enter your password"]')
+      .getByPlaceholder("Enter your password")
       .fill(adminCredentials.password);
     await page.getByRole("button", { name: "Continue" }).click();
     await page.waitForURL("/admin");
@@ -49,13 +49,12 @@ test.describe("Sign in page", () => {
 
   test("should show error for invalid credentials", async ({ page }) => {
     await page.goto("/admin/sign-in");
-    await page
-      .locator('input[placeholder="Enter your email"]')
-      .fill("invalid@example.com");
-    await page
-      .locator('input[placeholder="Enter your password"]')
-      .fill("wrongpassword");
+    await page.getByLabel("Email").fill("invalid@example.com");
+    await page.getByPlaceholder("Enter your password").fill("wrongpassword");
     await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.getByText(/Invalid email or password/i)).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test("should redirect admin to 403 page when accessing another role's dashboard", async ({

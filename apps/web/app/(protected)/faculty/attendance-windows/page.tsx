@@ -1,16 +1,7 @@
-import { AttendanceWindowsView } from "@/modules/faculty/attendance-windows/attendance-windows-view";
-import React, { Suspense } from "react";
+import { redirect } from "next/navigation";
 
 const Page = () => {
-  return (
-    <Suspense
-      fallback={
-        <div className="p-4 text-sm">Loading attendance windows...</div>
-      }
-    >
-      <AttendanceWindowsView />
-    </Suspense>
-  );
+  redirect("/faculty/freezing");
 };
 
 export default Page;

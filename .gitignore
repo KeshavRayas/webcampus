@@ -46,11 +46,12 @@ playwright-report/
 playwright-report copy/
 playwright/.cache/
 playwright/.auth
+**/tests/.auth/
 
 .tsup
 
 .agents/
-
+.opencode/
 .github/
 
 scripts/dev.sh

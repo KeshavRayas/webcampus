@@ -45,6 +45,7 @@ model AcademicTerm {
   Semester  Semester[]
   registrationWindows RegistrationWindow[]
   courseRegistrations   CourseRegistration[]
+  hallTickets           HallTicket[]
 
   @@unique([type, year])
 }
@@ -64,6 +65,7 @@ model Semester {
   registrationWindows RegistrationWindow[]
   courseRegistrations   CourseRegistration[]
   Section        Section[]
+  hallTickets    HallTicket[]
   academicTerm   AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
   createdBy      User         @relation(fields: [userId], references: [id])
 
@@ -252,6 +254,7 @@ model Student {
   user              User                 @relation(fields: [userId], references: [id])
   studentSections   StudentSection[]
   batches           Batch[]              @relation("BatchStudents")
+  hallTickets        HallTicket[]
 
   @@index([departmentName])
   @@index([departmentName, currentSemester])
@@ -531,7 +534,26 @@ model Freeze {
   frozenByRole       FreezeActorRole?
   frozenByUsername   String?
   frozenByDisplay    String?
-  courseAssignment   CourseAssignment @relation(fields: [courseAssignmentId], references: [id])
+  courseAssignment   CourseAssignment @relation(fields: [courseAssignmentId], references: [id], onDelete: Cascade)
+}
+
+model HallTicket {
+  id             String  @id @default(uuid())
+  studentId      String
+  academicTermId String
+  semesterId     String
+  isSent         Boolean @default(false)
+  sentAt         DateTime?
+  sentBy         String?
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id])
+  semester     Semester     @relation(fields: [semesterId], references: [id])
+
+  @@unique([studentId, academicTermId, semesterId])
+  @@index([studentId])
+  @@index([academicTermId])
+  @@index([semesterId])
 }
 
 model Admission {
@@ -910,3 +932,5 @@ enum AttendanceStatus {
   PRESENT
   ABSENT
 }
+
+

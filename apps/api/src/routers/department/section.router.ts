@@ -3,6 +3,7 @@ import { SectionService } from "@webcampus/api/src/services/department/section.s
 import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
+  AssignStudentsSchema,
   CreateSectionSchema,
   DetailedGenerationPreviewRequestSchema,
   GenerateCycleSectionsSchema,
@@ -243,6 +244,7 @@ router.get(
 
 router.post(
   "/assign-students",
+  validateRequest(AssignStudentsSchema),
   protect({
     role: "department",
     permissions: {

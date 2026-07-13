@@ -16,6 +16,7 @@ import {
   FacultyAttendanceSessionDTO,
   FacultyAttendanceSessionStudentsDTO,
   PaginatedResponse,
+  UpdateFacultyAttendanceSessionPayloadDTO,
 } from "@webcampus/types/api";
 import { ListFacultyAttendanceSessionsFilters } from "./faculty-attendance-types";
 
@@ -71,6 +72,27 @@ export const createOrOpenFacultyAttendanceSession = async (
   } catch (error) {
     throw new Error(
       getApiErrorMessage(error, "Failed to create/open attendance session")
+    );
+  }
+};
+
+export const updateFacultyAttendanceSession = async (
+  sessionId: string,
+  payload: UpdateFacultyAttendanceSessionPayloadDTO
+): Promise<CreateOrOpenFacultyAttendanceSessionDTO> => {
+  try {
+    const response = await apiClient.patch<
+      BaseResponse<CreateOrOpenFacultyAttendanceSessionDTO>
+    >(`/faculty/attendance/session/${sessionId}`, payload);
+
+    if (response.data.status !== "success" || !response.data.data) {
+      throw new Error(response.data.message || "Failed to update session");
+    }
+
+    return response.data.data;
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error, "Failed to update attendance session")
     );
   }
 };

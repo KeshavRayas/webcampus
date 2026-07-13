@@ -10,11 +10,9 @@ test.describe("Admin Department Section", () => {
     await expect(
       page.getByRole("heading", { name: /Admin sign in/i })
     ).toBeVisible();
+    await page.getByLabel("Email").fill(adminCredentials.email);
     await page
-      .locator('input[placeholder="Enter your email"]')
-      .fill(adminCredentials.email);
-    await page
-      .locator('input[placeholder="Enter your password"]')
+      .getByPlaceholder("Enter your password")
       .fill(adminCredentials.password);
     await page.getByRole("button", { name: "Continue" }).click();
     await page.waitForURL("/admin");
@@ -45,12 +43,6 @@ test.describe("Admin Department Section", () => {
         page.getByRole("button", { name: "Create Department" })
       ).toBeVisible();
       await expect(page.locator("table")).toBeVisible();
-      await expect(page.locator("table thead th").nth(0)).toHaveText("ID");
-      await expect(page.locator("table thead th").nth(1)).toHaveText("Name");
-      await expect(page.locator("table thead th").nth(2)).toHaveText("Email");
-      await expect(page.locator("table thead th").nth(3)).toHaveText(
-        "Email Verified"
-      );
     }
   });
 

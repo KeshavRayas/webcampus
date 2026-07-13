@@ -131,6 +131,7 @@ export const SectionCardsView = ({
       toast.success(data.data.message);
       queryClient.invalidateQueries({ queryKey: ["sections-with-students"] });
       queryClient.invalidateQueries({ queryKey: ["unassigned-count"] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-students"] });
       setDeleteTarget(null);
     },
     onError: (error: AxiosError<{ error?: string }>) => {

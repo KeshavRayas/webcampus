@@ -1,5 +1,5 @@
 import { logger } from "@webcampus/common/logger";
-import { Cycle, db } from "@webcampus/db";
+import { Cycle, db, Prisma } from "@webcampus/db";
 import type { CreateAssessmentType } from "@webcampus/schemas/faculty";
 import type { BaseResponse } from "@webcampus/types/api";
 
@@ -194,6 +194,81 @@ export class AssessmentService {
       logger.error("Error creating assessment template", error);
       if (error instanceof Error) throw error;
       throw new Error("Failed to create assessment");
+    }
+  }
+
+  /**
+   * Delete an Assessment Template.
+   * Ensures the faculty is a coordinator of the course and no student records exist.
+   */
+  static async deleteAssessment(
+    userId: string,
+    assessmentId: string
+  ): Promise<BaseResponse<null>> {
+    try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
+      const assessment = await db.assessmentTemplate.findUnique({
+        where: { id: assessmentId },
+        select: { courseId: true },
+      });
+
+      if (!assessment) {
+        throw new Error("Assessment not found");
+      }
+
+      const isCoordinator = await db.courseCoordinator.findFirst({
+        where: {
+          courseId: assessment.courseId,
+          facultyId: faculty.id,
+        },
+      });
+
+      if (!isCoordinator) {
+        throw new Error("Unauthorized to delete this assessment");
+      }
+
+      const hasStudentRecords = await db.studentAssessment.findFirst({
+        where: { assessmentId },
+        select: { id: true },
+      });
+
+      if (hasStudentRecords) {
+        throw new Error(
+          "Cannot delete this assessment because student marks have already been recorded."
+        );
+      }
+
+      try {
+        await db.assessmentTemplate.delete({ where: { id: assessmentId } });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2003"
+        ) {
+          throw new Error(
+            "Cannot delete this assessment because student marks have already been recorded."
+          );
+        }
+        throw error;
+      }
+
+      return {
+        status: "success",
+        message: "Assessment deleted successfully",
+        data: null,
+      };
+    } catch (error) {
+      logger.error("Error deleting assessment", error);
+      if (error instanceof Error) throw error;
+      throw new Error("Failed to delete assessment");
     }
   }
 

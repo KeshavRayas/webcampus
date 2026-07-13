@@ -249,6 +249,7 @@ export const DepartmentSectionView = () => {
       label: "Academic Term",
       type: "select",
       placeholder: "Select term...",
+      hideAllOption: true,
       options: terms.map((term) => ({
         label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
         value: term.id,
@@ -261,6 +262,7 @@ export const DepartmentSectionView = () => {
       placeholder: draftFilters.termId
         ? "Select semester..."
         : "Select term first",
+      hideAllOption: true,
       options: semesterOptions.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
@@ -273,6 +275,7 @@ export const DepartmentSectionView = () => {
             label: "Cycle",
             type: "select",
             placeholder: "Select cycle...",
+            hideAllOption: true,
             options: BASIC_SCIENCES_CYCLE_OPTIONS.map((cycle) => ({
               label: cycle,
               value: cycle,

@@ -20,11 +20,11 @@ import { AttendancePageShell } from "./components/attendance-page-shell";
 import { AttendanceSection } from "./components/attendance-section";
 import { AttendanceChecklistRow } from "./faculty-attendance-types";
 import {
-  useCreateOrOpenFacultyAttendanceSession,
   useDeleteFacultyAttendanceSession,
   useFacultyAttendanceFilterOptions,
   useFacultyAttendanceSessionDetail,
   useFacultyAttendanceSessions,
+  useUpdateFacultyAttendanceSession,
 } from "./use-faculty-attendance";
 
 type AttendanceSessionModalFilters = {
@@ -136,7 +136,7 @@ export const FacultyAttendanceEditView = () => {
 
   const queryClient = useQueryClient();
   const filterOptionsQuery = useFacultyAttendanceFilterOptions();
-  const createOrOpenMutation = useCreateOrOpenFacultyAttendanceSession();
+  const updateMutation = useUpdateFacultyAttendanceSession();
   const deleteSessionMutation = useDeleteFacultyAttendanceSession();
 
   const sessionsQuery = useFacultyAttendanceSessions(
@@ -235,7 +235,6 @@ export const FacultyAttendanceEditView = () => {
 
     setStudentChecklist(withUiChecklistMetadata(data.students));
     setOpeningSessionId(null);
-    setIsEditModalOpen(true);
   }, [
     activeSessionId,
     sessionDetailQuery.data,
@@ -310,6 +309,7 @@ export const FacultyAttendanceEditView = () => {
     setOpeningSessionId(sessionId);
     setStudentChecklist([]);
     setActiveSessionId(sessionId);
+    setIsEditModalOpen(true);
 
     try {
       await queryClient.invalidateQueries({
@@ -319,6 +319,7 @@ export const FacultyAttendanceEditView = () => {
       toast.error(getApiErrorMessage(error, "Failed to load session details"));
       setOpeningSessionId(null);
       setActiveSessionId("");
+      setIsEditModalOpen(false);
     }
   };
 
@@ -326,12 +327,8 @@ export const FacultyAttendanceEditView = () => {
     if (!canSaveAttendance || !editingSessionInfo) return;
 
     try {
-      await createOrOpenMutation.mutateAsync({
-        courseId: editingSessionInfo.courseId,
-        sectionId: editingSessionInfo.sectionId,
-        batchId: editingSessionInfo.batchId,
-        sessionDate: dayjs(editingSessionInfo.sessionDate).format("YYYY-MM-DD"),
-        timingMode: "FIXED", // Fallback, the backend upserts using the existing IDs anyway
+      await updateMutation.mutateAsync({
+        sessionId: editingSessionInfo.id,
         studentStatuses: studentChecklist.map((student) => ({
           studentId: student.studentId,
           status: student.status ?? "PRESENT",
@@ -339,8 +336,8 @@ export const FacultyAttendanceEditView = () => {
       });
 
       setIsEditModalOpen(false);
+      setActiveSessionId("");
       setShowSaveSuccessToast(true);
-      sessionsQuery.refetch();
     } catch (error) {
       toast.error(
         getApiErrorMessage(error, "Failed to save edited attendance")
@@ -491,7 +488,7 @@ export const FacultyAttendanceEditView = () => {
             <AttendanceSection
               studentChecklist={studentChecklist}
               isLoading={sessionDetailQuery.isLoading}
-              isSaving={createOrOpenMutation.isPending}
+              isSaving={updateMutation.isPending}
               onAllPresent={() =>
                 setStudentChecklist((current) =>
                   current.map((s) => ({ ...s, status: "PRESENT" }))
@@ -533,10 +530,10 @@ export const FacultyAttendanceEditView = () => {
             <Button
               type="button"
               onClick={handleSaveAttendance}
-              disabled={!canSaveAttendance || createOrOpenMutation.isPending}
+              disabled={!canSaveAttendance || updateMutation.isPending}
               className="min-w-50 w-full sm:w-auto"
             >
-              {createOrOpenMutation.isPending
+              {updateMutation.isPending
                 ? "Saving..."
                 : canSaveAttendance
                   ? "Update Attendance"

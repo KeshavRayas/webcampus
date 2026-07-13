@@ -84,7 +84,7 @@ export const QPSetupForm = ({
           generated.push({
             part,
             qNumber: `${mainNumber}${letter}`,
-            marks: 0,
+            marks: 1,
             co: "",
             po: "",
             bl: "",
@@ -95,7 +95,7 @@ export const QPSetupForm = ({
         generated.push({
           part,
           qNumber: `${mainNumber}`,
-          marks: 0,
+          marks: 1,
           co: "",
           po: "",
           bl: "",
@@ -224,10 +224,26 @@ export const QPSetupForm = ({
 
   // Sum marks with OR logic and update total both locally and to parent
   useEffect(() => {
-    const total = computeTotalMarks(questionsWatch);
-    form.setValue("totalMarks", total);
-    onMarksChange(total);
-  }, [questionsWatch, form, onMarksChange]);
+    const computeAndSetTotal = () => {
+      const questions = form.getValues("questions");
+      const total = computeTotalMarks(questions);
+
+      if (form.getValues("totalMarks") !== total) {
+        form.setValue("totalMarks", total);
+        onMarksChange(total);
+      }
+    };
+
+    computeAndSetTotal();
+
+    const subscription = form.watch((_value, { name }) => {
+      if (name === "questions" || name?.startsWith("questions.")) {
+        computeAndSetTotal();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, onMarksChange]);
 
   // Dynamic parts state
   const [numberOfParts, setNumberOfParts] = useState(1);
@@ -273,7 +289,7 @@ export const QPSetupForm = ({
     setGenerators((prev) => ({
       ...prev,
       [part]: {
-        ...(prev[part] || { qCount: 1, subQCount: 0 }),
+        ...(prev[part] || { qCount: 1, subQCount: 1 }),
         [field]: value,
       },
     }));
@@ -282,7 +298,7 @@ export const QPSetupForm = ({
   const handleGenerate = (part: string) => {
     const { qCount, subQCount } = generators[part] || {
       qCount: 1,
-      subQCount: 0,
+      subQCount: 1,
     };
     if (qCount <= 0) return;
 
@@ -436,9 +452,9 @@ export const QPSetupForm = ({
                     <span className="text-muted-foreground ml-2 mr-2">/</span>
                     <Input
                       type="number"
-                      min={0}
+                      min={1}
                       className="h-8 w-20"
-                      value={generators[part]?.subQCount ?? 0}
+                      value={generators[part]?.subQCount ?? 1}
                       onChange={(e) =>
                         updateGenerator(
                           part,

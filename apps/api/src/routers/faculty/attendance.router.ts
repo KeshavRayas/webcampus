@@ -1,5 +1,5 @@
-import { AttendanceController } from "@webcampus/api/src/controllers/faculty/attendance.controller";
 import { FacultyAttendanceSessionController } from "@webcampus/api/src/controllers/faculty/attendance-session.controller";
+import { AttendanceController } from "@webcampus/api/src/controllers/faculty/attendance.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   CreateAttendanceSchema,
@@ -15,12 +15,9 @@ import { Router } from "express";
 
 const router: Router = Router();
 
-router.get(
-  "/session/test-hang",
-  (req, res) => {
-    res.json({ ok: true, message: "test route works" });
-  }
-);
+router.get("/session/test-hang", (req, res) => {
+  res.json({ ok: true, message: "test route works" });
+});
 
 router.use(
   protect({
@@ -49,7 +46,7 @@ router.get(
 router.post(
   "/session",
   validateRequest(CreateOrOpenFacultyAttendanceSessionSchema),
-  FacultyAttendanceSessionController.createOrOpenSession
+  FacultyAttendanceSessionController.createSession
 );
 
 router.get(

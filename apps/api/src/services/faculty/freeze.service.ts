@@ -2,6 +2,7 @@ import { db } from "@webcampus/db";
 import type { Freeze, FreezeActorRole, Prisma } from "@webcampus/db";
 import type { FreezeDisplayState } from "@webcampus/schemas/faculty";
 import type { Role } from "@webcampus/types/rbac";
+import { recomputeCourseMarks } from "../shared/mark-sync.service";
 
 export type FrozenByInfo = {
   frozenByRole: FreezeActorRole | null;
@@ -398,13 +399,13 @@ export class FreezeService {
   ): Promise<FreezeResolution> {
     const assignment = await db.courseAssignment.findUnique({
       where: { id: courseAssignmentId },
-      select: { id: true },
+      select: { id: true, courseId: true },
     });
     if (!assignment) {
       throw new Error(notFound("Course assignment"));
     }
 
-    return db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       const freeze = await tx.freeze.findUnique({
         where: { courseAssignmentId },
       });
@@ -447,6 +448,10 @@ export class FreezeService {
 
       return resolveFreezeState(updated);
     });
+
+    await recomputeCourseMarks(assignment.courseId);
+
+    return result;
   }
 
   static async unfreeze(
@@ -510,14 +515,14 @@ export class FreezeService {
     username?: string | null,
     displayUsername?: string | null
   ): Promise<number> {
-    return db.$transaction(async (tx) => {
+    const count = await db.$transaction(async (tx) => {
       const where: Prisma.CourseAssignmentWhereInput = {
         ...(departmentId ? { departmentId } : {}),
         section: { semesterId },
       };
       const assignments = await tx.courseAssignment.findMany({
         where,
-        select: { id: true },
+        select: { id: true, courseId: true },
       });
 
       // TODO: optimize with updateMany for large bulk operations
@@ -542,8 +547,15 @@ export class FreezeService {
         });
       }
 
-      return assignments.length;
+      return assignments;
     });
+
+    const courseIds = [...new Set(count.map((a) => a.courseId))];
+    for (const courseId of courseIds) {
+      await recomputeCourseMarks(courseId);
+    }
+
+    return count.length;
   }
 
   static async bulkUnfreeze(

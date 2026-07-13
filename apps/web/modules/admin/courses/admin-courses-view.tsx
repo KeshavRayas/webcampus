@@ -12,7 +12,6 @@ import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import {
-  DEFAULT_FILTER_ALL_VALUE,
   FilterActions,
   FilterBuilder,
   FilterPanel,
@@ -62,7 +61,10 @@ export const AdminCoursesView = () => {
     setAppliedFilters(nextFilters);
   }, [searchParams]);
 
-  const { data: departments = [] } = useDepartments();
+  const { data: rawDepartments = [] } = useDepartments();
+  const departments = rawDepartments.filter(
+    (d) => d.type !== "BASIC_SCIENCES" && d.type !== "SERVICE"
+  );
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
 
@@ -222,17 +224,6 @@ export const AdminCoursesView = () => {
 
   const courseFilterFields: FilterFieldConfig<AdminCoursesFilters>[] = [
     {
-      key: "departmentName",
-      label: "Department",
-      type: "select",
-      options: departments.map((department) => ({
-        label: department.name,
-        value: department.name,
-      })),
-      allOptionLabel: "All departments",
-      hideAllOption: true,
-    },
-    {
       key: "termId",
       label: "Academic Term",
       type: "select",
@@ -240,7 +231,7 @@ export const AdminCoursesView = () => {
         label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
         value: term.id,
       })),
-      allOptionLabel: "All terms",
+      hideAllOption: true,
     },
     {
       key: "semesterId",
@@ -253,7 +244,7 @@ export const AdminCoursesView = () => {
       placeholder: draftFilters.termId
         ? "Select semester..."
         : "Select term first",
-      allOptionLabel: "All semesters",
+      hideAllOption: true,
     },
     ...(isBasicSciences
       ? [
@@ -265,10 +256,20 @@ export const AdminCoursesView = () => {
               label: cycle,
               value: cycle,
             })),
-            allOptionLabel: "All cycles",
+            hideAllOption: true,
           } as FilterFieldConfig<AdminCoursesFilters>,
         ]
       : []),
+    {
+      key: "departmentName",
+      label: "Department",
+      type: "select",
+      options: departments.map((department) => ({
+        label: department.name,
+        value: department.name,
+      })),
+      hideAllOption: true,
+    },
   ];
 
   const { data: courses, isLoading: coursesLoading } = useQuery({
@@ -369,7 +370,6 @@ export const AdminCoursesView = () => {
 
             setDraftFilters((current) => ({ ...current, [key]: value }));
           }}
-          allValue={DEFAULT_FILTER_ALL_VALUE}
           className="md:grid-cols-2 xl:grid-cols-4"
         />
         <FilterActions onApply={applyFilters} onReset={resetFilters} />

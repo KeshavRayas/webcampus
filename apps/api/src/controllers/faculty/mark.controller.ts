@@ -303,4 +303,93 @@ export class MarkController {
       });
     }
   }
+
+  static async getMarksReport(req: Request, res: Response): Promise<void> {
+    try {
+      const user = await resolveSessionUser(req);
+
+      const courseId = req.query.courseId as string;
+      const sectionId = req.query.sectionId as string | undefined;
+
+      if (!courseId) {
+        sendResponse({
+          res,
+          status: "error",
+          message: "courseId is required",
+          statusCode: 400,
+          error: "Missing courseId",
+        });
+        return;
+      }
+
+      const response = await Mark.getMarksReport(user.id, courseId, sectionId);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          message: response.message,
+          data: response.data,
+          statusCode: 200,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: 400,
+          error: response.error,
+        });
+      }
+    } catch (error) {
+      logger.error("Error fetching marks report:", { error });
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: getStatusCodeForError(message),
+        error,
+      });
+    }
+  }
+
+  static async getMarksReportFilterOptions(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const user = await resolveSessionUser(req);
+
+      const response = await Mark.getMarksReportFilterOptions(user.id);
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          message: response.message,
+          data: response.data,
+          statusCode: 200,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: 400,
+          error: response.error,
+        });
+      }
+    } catch (error) {
+      logger.error("Error fetching marks report filter options:", { error });
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: getStatusCodeForError(message),
+        error,
+      });
+    }
+  }
 }

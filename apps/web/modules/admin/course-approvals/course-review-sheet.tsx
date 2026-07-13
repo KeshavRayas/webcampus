@@ -4,13 +4,13 @@ import { frontendEnv } from "@webcampus/common/env";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@webcampus/ui/components/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@webcampus/ui/components/dialog";
 import axios, { AxiosError } from "axios";
 import { useState } from "react";
 import { toast } from "react-toastify";
@@ -113,10 +113,10 @@ export const CourseReviewSheet = ({
   };
 
   return (
-    <Sheet open={true} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-xl">
-        <SheetHeader className="border-b px-6 py-6">
-          <SheetTitle className="flex items-center gap-2 text-xl">
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-xl">
             Review Submission
             <Badge
               variant={groupStatusBadge.variant}
@@ -124,9 +124,9 @@ export const CourseReviewSheet = ({
             >
               {groupStatusBadge.label}
             </Badge>
-          </SheetTitle>
-          <SheetDescription asChild>
-            <div className="mt-2 flex flex-col gap-1">
+          </DialogTitle>
+          <DialogDescription asChild>
+            <div className="flex flex-col gap-1">
               <span className="text-foreground font-semibold">
                 {group.departmentName}
               </span>
@@ -136,10 +136,10 @@ export const CourseReviewSheet = ({
               </span>
               <span>Total Courses: {group.courseCount}</span>
             </div>
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+        <div className="flex max-h-[50vh] flex-col gap-4 overflow-y-auto py-4">
           {group.courses.map((course) => {
             const courseStatusBadge = getApprovalBadgeConfig({
               approvalStatus: course.approvalStatus,
@@ -192,7 +192,7 @@ export const CourseReviewSheet = ({
           })}
         </div>
 
-        <SheetFooter className="bg-muted/20 flex-col gap-4 border-t p-6 sm:flex-col">
+        <DialogFooter className="flex-col gap-4 border-t pt-4 sm:flex-col">
           {showRevisionInput && !isApproved ? (
             <div className="flex w-full flex-col gap-3">
               <textarea
@@ -243,8 +243,8 @@ export const CourseReviewSheet = ({
               </Button>
             </div>
           )}
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

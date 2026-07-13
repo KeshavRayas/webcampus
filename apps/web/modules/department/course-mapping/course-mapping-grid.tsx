@@ -10,7 +10,7 @@ import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { Combobox } from "@webcampus/ui/molecules/combobox";
 import axios, { AxiosError } from "axios";
-import { Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -120,6 +120,7 @@ export const CourseMappingGrid = ({
   );
 
   const [mappings, setMappings] = useState<SectionMappingState[]>([]);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
 
   // Initialize mapping state when sections or existing mappings load
   useEffect(() => {
@@ -203,6 +204,7 @@ export const CourseMappingGrid = ({
     },
     onSuccess: (res) => {
       toast.success(res.data.message);
+      setLastSaved(new Date().toLocaleTimeString());
       queryClient.invalidateQueries({ queryKey: ["course-mapping"] });
       queryClient.invalidateQueries({ queryKey: ["course-mapping-status"] });
     },
@@ -315,11 +317,20 @@ export const CourseMappingGrid = ({
         </table>
       </div>
 
-      <div className="flex justify-end pt-4">
+      <div className="flex items-center justify-end gap-4 pt-4">
+        {lastSaved && (
+          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Saved at {lastSaved}
+          </span>
+        )}
         <Button
           onClick={() => saveMutation.mutate()}
           disabled={saveMutation.isPending || isLocked}
           size="lg"
+          className={
+            lastSaved ? "ring-2 ring-emerald-500/30 ring-offset-2" : ""
+          }
         >
           {saveMutation.isPending && (
             <Loader2 className="mr-2 size-4 animate-spin" />

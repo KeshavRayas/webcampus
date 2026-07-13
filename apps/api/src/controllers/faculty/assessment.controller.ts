@@ -159,6 +159,49 @@ export class AssessmentController {
   }
 
   /**
+   * DELETE /:id
+   * Deletes an assessment template
+   */
+  static async deleteAssessment(req: Request, res: Response): Promise<void> {
+    try {
+      const user = await resolveSessionUser(req);
+      const { id } = req.params;
+
+      if (!id || typeof id !== "string") {
+        throw new Error("Assessment ID is required");
+      }
+
+      const response = await AssessmentService.deleteAssessment(user.id, id);
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+
+      logger.error("Error deleting assessment", {
+        error,
+        path: req.path,
+      });
+
+      sendResponse({
+        res,
+        status: "error",
+        message: errorMessage,
+        statusCode: getStatusCodeForError(errorMessage),
+        error,
+      });
+    }
+  }
+
+  /**
    * GET /:id
    * Fetches an assessment template with questions
    */

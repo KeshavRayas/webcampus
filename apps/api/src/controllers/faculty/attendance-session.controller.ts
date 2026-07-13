@@ -8,6 +8,7 @@ import {
   FacultyAttendanceSessionDetailQueryType,
   FacultyAttendanceSessionStudentsQueryType,
   ListFacultyAttendanceSessionsQueryType,
+  UpdateFacultyAttendanceSessionType,
 } from "@webcampus/schemas/faculty";
 import type { Request, Response } from "express";
 import { FacultyAttendanceSessionService } from "../../services/faculty/attendance-session.service";
@@ -39,6 +40,10 @@ const getStatusCodeForError = (message: string): number => {
 
   if (message.toLowerCase().includes("not found")) {
     return 404;
+  }
+
+  if (message.toLowerCase().includes("already taken")) {
+    return 409;
   }
 
   return 400;
@@ -160,27 +165,14 @@ export class FacultyAttendanceSessionController {
     }
   }
 
-  static async createOrOpenSession(req: Request, res: Response): Promise<void> {
+  static async createSession(req: Request, res: Response): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
-      logger.info("createOrOpenSession: user resolved", {
-        userId: user.id,
-        email: user.email,
-      });
       const payload = req.body as CreateOrOpenFacultyAttendanceSessionType;
-      logger.info("createOrOpenSession: payload", { payload });
-      const response =
-        await FacultyAttendanceSessionService.createOrOpenSession(
-          user.id,
-          payload
-        );
-
-      logger.info("createOrOpenSession: response", {
-        status: response.status,
-        message: response.message,
-        created:
-          response.status === "success" ? response.data?.created : undefined,
-      });
+      const response = await FacultyAttendanceSessionService.createSession(
+        user.id,
+        payload
+      );
 
       if (response.status !== "success") {
         throw new Error(response.message);
@@ -191,13 +183,54 @@ export class FacultyAttendanceSessionController {
         status: "success",
         message: response.message,
         data: response.data,
-        statusCode: response.data?.created ? 201 : 200,
+        statusCode: 201,
       });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
 
-      logger.error("Error creating/opening faculty attendance session", {
+      logger.error("Error creating faculty attendance session", {
+        error,
+        path: req.path,
+      });
+
+      sendResponse({
+        res,
+        status: "error",
+        message: errorMessage,
+        statusCode: getStatusCodeForError(errorMessage),
+        error,
+      });
+    }
+  }
+
+  static async updateSession(req: Request, res: Response): Promise<void> {
+    try {
+      const user = await resolveSessionUser(req);
+      const sessionId = req.params.sessionId as string;
+      const payload = req.body as UpdateFacultyAttendanceSessionType;
+      const response = await FacultyAttendanceSessionService.updateSession(
+        user.id,
+        sessionId,
+        payload.studentStatuses ?? []
+      );
+
+      if (response.status !== "success") {
+        throw new Error(response.message);
+      }
+
+      sendResponse({
+        res,
+        status: "success",
+        message: response.message,
+        data: response.data,
+        statusCode: 200,
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+
+      logger.error("Error updating faculty attendance session", {
         error,
         path: req.path,
       });

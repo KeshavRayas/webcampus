@@ -32,6 +32,13 @@ router.post(
   MarkController.saveAssessmentMarks
 );
 
+// Marks Report routes
+router.get(
+  "/report/filter-options",
+  MarkController.getMarksReportFilterOptions
+);
+router.get("/report", MarkController.getMarksReport);
+
 // Basic mark CRUD routes
 router.post("/", validateRequest(CreateMarkSchema), MarkController.create);
 router.get("/", MarkController.getAll);

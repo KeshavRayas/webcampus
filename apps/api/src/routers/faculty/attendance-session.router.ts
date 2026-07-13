@@ -6,6 +6,7 @@ import {
   FacultyAttendanceSessionDetailQuerySchema,
   FacultyAttendanceSessionStudentsQuerySchema,
   ListFacultyAttendanceSessionsQuerySchema,
+  UpdateFacultyAttendanceSessionSchema,
 } from "@webcampus/schemas/faculty";
 import { Router } from "express";
 
@@ -42,7 +43,13 @@ router.get(
 router.post(
   "/",
   validateRequest(CreateOrOpenFacultyAttendanceSessionSchema),
-  FacultyAttendanceSessionController.createOrOpenSession
+  FacultyAttendanceSessionController.createSession
+);
+
+router.patch(
+  "/:sessionId",
+  validateRequest(UpdateFacultyAttendanceSessionSchema),
+  FacultyAttendanceSessionController.updateSession
 );
 
 router.get(

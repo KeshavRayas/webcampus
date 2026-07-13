@@ -1,8 +1,19 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import type { BaseResponse } from "@webcampus/types/api";
+import type { BaseResponse, ErrorResponse } from "@webcampus/types/api";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@webcampus/ui/components/alert-dialog";
+import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
   DialogContent,
@@ -10,8 +21,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
-import axios from "axios";
-import { Loader2 } from "lucide-react";
+import axios, { AxiosError } from "axios";
+import { Loader2, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "react-toastify";
 
 interface AssessmentQuestion {
   id: string;
@@ -41,6 +54,7 @@ interface ViewAssessmentDialogProps {
   onOpenChange: (open: boolean) => void;
   assessmentId: string;
   courseName: string;
+  onDelete?: () => void;
 }
 
 export const ViewAssessmentDialog = ({
@@ -48,6 +62,7 @@ export const ViewAssessmentDialog = ({
   onOpenChange,
   assessmentId,
   courseName,
+  onDelete,
 }: ViewAssessmentDialogProps) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
@@ -64,6 +79,29 @@ export const ViewAssessmentDialog = ({
       return null;
     },
     enabled: !!assessmentId,
+  });
+
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await axios.delete<BaseResponse<null>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment/${assessmentId}`,
+        { withCredentials: true }
+      );
+      return res.data;
+    },
+    onSuccess: () => {
+      toast.success("Assessment deleted successfully");
+      onDelete?.();
+      setDeleteConfirmOpen(false);
+      onOpenChange(false);
+    },
+    onError: (error: AxiosError<ErrorResponse>) => {
+      toast.error(
+        error.response?.data?.message || "Failed to delete assessment"
+      );
+    },
   });
 
   // Group questions by part for nice rendering
@@ -91,8 +129,72 @@ export const ViewAssessmentDialog = ({
               </DialogDescription>
             </div>
             {!isLoading && assessment && (
-              <div className="bg-primary/10 text-primary rounded-lg px-4 py-2 text-lg font-semibold">
-                Total Marks: {assessment.totalMarks}
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 text-primary rounded-lg px-4 py-2 text-lg font-semibold">
+                  Total Marks: {assessment.totalMarks}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="bg-border mx-2 h-8 w-px" />
+                  <AlertDialog
+                    open={deleteConfirmOpen}
+                    onOpenChange={setDeleteConfirmOpen}
+                  >
+                    <div>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Delete this assessment?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete the assessment and all
+                            configured questions. This action cannot be undone.
+                          </AlertDialogDescription>
+                          <AlertDialogDescription className="font-medium text-amber-600">
+                            Assessments that already contain student marks
+                            cannot be deleted.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel
+                            disabled={deleteMutation.isPending}
+                          >
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            disabled={deleteMutation.isPending}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              deleteMutation.mutate();
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {deleteMutation.isPending ? (
+                              <>
+                                <Loader2 className="mr-2 size-4 animate-spin" />
+                                Deleting...
+                              </>
+                            ) : (
+                              "Delete"
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => setDeleteConfirmOpen(true)}
+                    >
+                      {deleteMutation.isPending ? (
+                        <Loader2 className="mr-1 size-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-1 size-4" />
+                      )}
+                      Delete Setup
+                    </Button>
+                  </AlertDialog>
+                </div>
               </div>
             )}
           </div>

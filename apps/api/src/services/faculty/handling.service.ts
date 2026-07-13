@@ -128,13 +128,17 @@ const toLegacySemesterNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
-const normalizeFilters = (filters: FacultyHandlingQueryInput): NormalizedFilters => {
+const normalizeFilters = (
+  filters: FacultyHandlingQueryInput
+): NormalizedFilters => {
   const page = toPositiveInteger(filters.page, DEFAULT_PAGE);
   const limit = toPositiveInteger(filters.limit, DEFAULT_LIMIT);
 
   return {
     search: toTrimmedString(filters.search),
-    academicTermId: toTrimmedString(filters.academicTermId ?? filters.academicTerm),
+    academicTermId: toTrimmedString(
+      filters.academicTermId ?? filters.academicTerm
+    ),
     programType: filters.programType,
     semesterId: toTrimmedString(filters.semesterId),
     sectionId: toTrimmedString(filters.sectionId ?? filters.section),
@@ -152,7 +156,9 @@ const isUuid = (value: string): boolean => {
   );
 };
 
-const buildSectionFilter = (sectionId: string): Prisma.CourseAssignmentWhereInput => {
+const buildSectionFilter = (
+  sectionId: string
+): Prisma.CourseAssignmentWhereInput => {
   if (isUuid(sectionId)) {
     return {
       OR: [
@@ -167,10 +173,15 @@ const buildSectionFilter = (sectionId: string): Prisma.CourseAssignmentWhereInpu
   };
 };
 
-const buildBatchFilter = (batchId: string): Prisma.CourseAssignmentWhereInput => {
+const buildBatchFilter = (
+  batchId: string
+): Prisma.CourseAssignmentWhereInput => {
   if (isUuid(batchId)) {
     return {
-      OR: [{ batchId }, { batch: { name: { contains: batchId, mode: "insensitive" } } }],
+      OR: [
+        { batchId },
+        { batch: { name: { contains: batchId, mode: "insensitive" } } },
+      ],
     };
   }
 
@@ -246,11 +257,15 @@ const buildAssignmentWhere = (
   ];
 
   if (filters.academicTermId) {
-    andConditions.push({ course: { semester: { academicTermId: filters.academicTermId } } });
+    andConditions.push({
+      course: { semester: { academicTermId: filters.academicTermId } },
+    });
   }
 
   if (filters.programType) {
-    andConditions.push({ course: { semester: { programType: filters.programType } } });
+    andConditions.push({
+      course: { semester: { programType: filters.programType } },
+    });
   }
 
   if (filters.semesterId) {
@@ -279,7 +294,9 @@ const buildAssignmentWhere = (
       OR: [
         { course: { code: { contains: filters.search, mode: "insensitive" } } },
         { course: { name: { contains: filters.search, mode: "insensitive" } } },
-        { section: { name: { contains: filters.search, mode: "insensitive" } } },
+        {
+          section: { name: { contains: filters.search, mode: "insensitive" } },
+        },
         { batch: { name: { contains: filters.search, mode: "insensitive" } } },
       ],
     });
@@ -387,7 +404,9 @@ export class FacultyHandlingService {
     }
 
     if (assignment.facultyId !== facultyId) {
-      throw new Error("Forbidden: assignment does not belong to current faculty");
+      throw new Error(
+        "Forbidden: assignment does not belong to current faculty"
+      );
     }
 
     if (assignment.assignmentType !== assignmentType) {
@@ -407,7 +426,8 @@ export class FacultyHandlingService {
     query: FacultyHandlingQueryInput
   ): Promise<BaseResponse<PaginatedResponse<FacultyHandlingAssignmentDTO>>> {
     try {
-      const facultyId = await FacultyHandlingService.getFacultyIdByUserId(userId);
+      const facultyId =
+        await FacultyHandlingService.getFacultyIdByUserId(userId);
       const filters = normalizeFilters(query);
       const where = buildAssignmentWhere(facultyId, assignmentType, filters);
       const skip = (filters.page - 1) * filters.limit;
@@ -440,6 +460,7 @@ export class FacultyHandlingService {
                 id: true,
                 code: true,
                 name: true,
+                semesterId: true,
                 semesterNumber: true,
                 semester: {
                   select: {
@@ -464,7 +485,7 @@ export class FacultyHandlingService {
         }),
       ]);
 
-      const theoryCountFilters = Array.from(
+      const theoryFilters = Array.from(
         new Map(
           assignments
             .filter((assignment) => assignment.assignmentType === "THEORY")
@@ -478,6 +499,11 @@ export class FacultyHandlingService {
               return [
                 key,
                 {
+                  key,
+                  courseId: assignment.course.id,
+                  courseSemesterId: assignment.course.semesterId,
+                  courseAcademicTermId:
+                    assignment.course.semester.academicTermId,
                   sectionId: assignment.section.id,
                   semester: assignment.semester,
                   academicYear: assignment.academicYear,
@@ -487,28 +513,64 @@ export class FacultyHandlingService {
         ).values()
       );
 
-      const theoryCounts = theoryCountFilters.length
-        ? await db.studentSection.groupBy({
-            by: ["sectionId", "semester", "academicYear"],
-            where: {
-              OR: theoryCountFilters,
-            },
-            _count: {
-              _all: true,
-            },
-          })
-        : [];
+      const theoryCountByKey = new Map<string, number>();
+      if (theoryFilters.length > 0) {
+        const theoryCourseIds = [
+          ...new Set(theoryFilters.map((f) => f.courseId)),
+        ];
 
-      const theoryCountByKey = new Map(
-        theoryCounts.map((count) => [
-          toStudentSectionCountKey(
-            count.sectionId,
-            count.semester,
-            count.academicYear
-          ),
-          count._count._all,
-        ])
-      );
+        const registrations = await db.courseRegistration.findMany({
+          where: { courseId: { in: theoryCourseIds } },
+          select: { courseId: true, studentId: true },
+        });
+
+        const regStudentIds = [
+          ...new Set(registrations.map((r) => r.studentId)),
+        ];
+
+        const studentSections = await db.studentSection.findMany({
+          where: {
+            studentId: { in: regStudentIds },
+            OR: theoryFilters.map((f) => ({
+              sectionId: f.sectionId,
+              semester: f.semester,
+              academicYear: f.academicYear,
+            })),
+          },
+          select: {
+            studentId: true,
+            sectionId: true,
+            semester: true,
+            academicYear: true,
+          },
+        });
+
+        const studentSectionMap = new Map<string, Set<string>>();
+        for (const ss of studentSections) {
+          const key = toStudentSectionCountKey(
+            ss.sectionId,
+            ss.semester,
+            ss.academicYear
+          );
+          const set = studentSectionMap.get(ss.studentId) ?? new Set();
+          set.add(key);
+          studentSectionMap.set(ss.studentId, set);
+        }
+
+        for (const reg of registrations) {
+          const sectionKeys = studentSectionMap.get(reg.studentId);
+          if (sectionKeys) {
+            for (const key of sectionKeys) {
+              const match = theoryFilters.find(
+                (f) => f.key === key && f.courseId === reg.courseId
+              );
+              if (match) {
+                theoryCountByKey.set(key, (theoryCountByKey.get(key) ?? 0) + 1);
+              }
+            }
+          }
+        }
+      }
 
       const items: FacultyHandlingAssignmentDTO[] = assignments.map(
         (assignment) => {
@@ -553,7 +615,8 @@ export class FacultyHandlingService {
     assignmentType: AssignmentType
   ): Promise<BaseResponse<FacultyHandlingFilterOptionsDTO>> {
     try {
-      const facultyId = await FacultyHandlingService.getFacultyIdByUserId(userId);
+      const facultyId =
+        await FacultyHandlingService.getFacultyIdByUserId(userId);
 
       const assignments = await db.courseAssignment.findMany({
         where: {
@@ -605,7 +668,10 @@ export class FacultyHandlingService {
           semesterNumber: number;
         }
       >();
-      const sectionMap = new Map<string, { id: string; name: string; semesterId: string }>();
+      const sectionMap = new Map<
+        string,
+        { id: string; name: string; semesterId: string }
+      >();
 
       for (const assignment of assignments) {
         const semester = assignment.course.semester;
@@ -649,11 +715,15 @@ export class FacultyHandlingService {
         return termPriority[a.type] - termPriority[b.type];
       });
 
-      const termOrder = new Map(academicTerms.map((term, index) => [term.id, index]));
+      const termOrder = new Map(
+        academicTerms.map((term, index) => [term.id, index])
+      );
 
       const semesters = Array.from(semesterMap.values()).sort((a, b) => {
-        const aTermOrder = termOrder.get(a.academicTermId) ?? Number.MAX_SAFE_INTEGER;
-        const bTermOrder = termOrder.get(b.academicTermId) ?? Number.MAX_SAFE_INTEGER;
+        const aTermOrder =
+          termOrder.get(a.academicTermId) ?? Number.MAX_SAFE_INTEGER;
+        const bTermOrder =
+          termOrder.get(b.academicTermId) ?? Number.MAX_SAFE_INTEGER;
 
         if (aTermOrder !== bTermOrder) {
           return aTermOrder - bTermOrder;
@@ -665,7 +735,10 @@ export class FacultyHandlingService {
         };
 
         if (a.programType !== b.programType) {
-          return programTypePriority[a.programType] - programTypePriority[b.programType];
+          return (
+            programTypePriority[a.programType] -
+            programTypePriority[b.programType]
+          );
         }
 
         return a.semesterNumber - b.semesterNumber;
@@ -700,12 +773,14 @@ export class FacultyHandlingService {
     query: FacultyHandlingQueryInput
   ): Promise<BaseResponse<PaginatedResponse<FacultyHandlingStudentDTO>>> {
     try {
-      const facultyId = await FacultyHandlingService.getFacultyIdByUserId(userId);
-      const assignment = await FacultyHandlingService.getOwnedApprovedAssignment(
-        facultyId,
-        assignmentId,
-        assignmentType
-      );
+      const facultyId =
+        await FacultyHandlingService.getFacultyIdByUserId(userId);
+      const assignment =
+        await FacultyHandlingService.getOwnedApprovedAssignment(
+          facultyId,
+          assignmentId,
+          assignmentType
+        );
 
       if (assignment.assignmentType === "LAB" && !assignment.batchId) {
         throw new Error("Invalid assignment: LAB assignment must have a batch");
@@ -713,27 +788,45 @@ export class FacultyHandlingService {
 
       const filters = normalizeFilters(query);
 
-      if (filters.academicTermId && assignment.course.semester.academicTermId !== filters.academicTermId) {
+      if (
+        filters.academicTermId &&
+        assignment.course.semester.academicTermId !== filters.academicTermId
+      ) {
         throw new Error("Assignment not found for the provided filters");
       }
 
-      if (filters.programType && assignment.course.semester.programType !== filters.programType) {
+      if (
+        filters.programType &&
+        assignment.course.semester.programType !== filters.programType
+      ) {
         throw new Error("Assignment not found for the provided filters");
       }
 
-      if (filters.semesterId && assignment.course.semesterId !== filters.semesterId) {
+      if (
+        filters.semesterId &&
+        assignment.course.semesterId !== filters.semesterId
+      ) {
         throw new Error("Assignment not found for the provided filters");
       }
 
-      if (filters.semesterNumber !== undefined && assignment.semester !== filters.semesterNumber) {
+      if (
+        filters.semesterNumber !== undefined &&
+        assignment.semester !== filters.semesterNumber
+      ) {
         throw new Error("Assignment not found for the provided filters");
       }
 
-      if (filters.academicYear && assignment.academicYear !== filters.academicYear) {
+      if (
+        filters.academicYear &&
+        assignment.academicYear !== filters.academicYear
+      ) {
         throw new Error("Assignment not found for the provided filters");
       }
 
-      if (filters.sectionId && !matchesIdentifierOrName(assignment.section, filters.sectionId)) {
+      if (
+        filters.sectionId &&
+        !matchesIdentifierOrName(assignment.section, filters.sectionId)
+      ) {
         throw new Error("Assignment not found for the provided filters");
       }
 
@@ -754,8 +847,16 @@ export class FacultyHandlingService {
         studentConditions.push({
           OR: [
             { usn: { contains: search, mode: "insensitive" as const } },
-            { user: { name: { contains: search, mode: "insensitive" as const } } },
-            { user: { email: { contains: search, mode: "insensitive" as const } } },
+            {
+              user: {
+                name: { contains: search, mode: "insensitive" as const },
+              },
+            },
+            {
+              user: {
+                email: { contains: search, mode: "insensitive" as const },
+              },
+            },
           ],
         });
       }
@@ -779,6 +880,12 @@ export class FacultyHandlingService {
           },
         });
       }
+
+      studentConditions.push({
+        registrations: {
+          some: { courseId: assignment.course.id },
+        },
+      });
 
       const studentWhere: Prisma.StudentWhereInput = {
         AND: studentConditions,
@@ -810,7 +917,10 @@ export class FacultyHandlingService {
         name: student.user.name,
         email: student.user.email,
         section: assignment.section.name,
-        batchName: assignment.assignmentType === "LAB" ? assignment.batch?.name ?? undefined : undefined,
+        batchName:
+          assignment.assignmentType === "LAB"
+            ? (assignment.batch?.name ?? undefined)
+            : undefined,
         semesterNumber: assignment.semester,
       }));
 

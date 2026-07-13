@@ -3,6 +3,7 @@ import {
   assertCanMutateAttendance,
   resolveFreezeState,
 } from "@webcampus/api/src/services/faculty/freeze.service";
+import { buildRegistrationWhere } from "@webcampus/api/src/services/shared/registration-helper.service";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import {
@@ -283,8 +284,23 @@ export class Attendance {
         },
       });
 
-      const studentSections = await db.studentSection.findMany({
-        where: { sectionId },
+      const course = await db.course.findUnique({
+        where: { id: courseId },
+        select: {
+          semesterId: true,
+          semester: { select: { academicTermId: true } },
+        },
+      });
+      if (!course) throw new Error("Course not found");
+
+      const registrations = await db.courseRegistration.findMany({
+        where: buildRegistrationWhere({
+          courseId,
+          semesterId: course.semesterId,
+          academicTermId: course.semester.academicTermId,
+          sectionId,
+          batchId: batchId ?? undefined,
+        }),
         orderBy: {
           student: {
             usn: "asc",
@@ -305,7 +321,7 @@ export class Attendance {
         },
       });
 
-      if (!sessions.length || !studentSections.length) {
+      if (!sessions.length || !registrations.length) {
         return {
           status: "success",
           message: "Detailed report retrieved successfully",
@@ -320,7 +336,7 @@ export class Attendance {
       }
 
       const sessionIds = sessions.map((s) => s.id);
-      const studentIds = studentSections.map((ss) => ss.student.id);
+      const studentIds = registrations.map((r) => r.student.id);
 
       const attendanceRecords = await db.attendanceRecord.findMany({
         where: {
@@ -352,13 +368,13 @@ export class Attendance {
       );
 
       const students: FacultyAttendanceDetailedReportDTO["students"] =
-        studentSections.map((ss) => {
-          const studentId = ss.student.id;
+        registrations.map((r) => {
+          const studentId = r.student.id;
           const recordMap = new Map<string, "PRESENT" | "ABSENT">();
           attendanceRecords
-            .filter((r) => r.studentId === studentId)
-            .forEach((r) => {
-              recordMap.set(r.sessionId, r.status);
+            .filter((ar) => ar.studentId === studentId)
+            .forEach((ar) => {
+              recordMap.set(ar.sessionId, ar.status);
             });
 
           const sessionStatuses = sessions.map((s) => {
@@ -391,8 +407,8 @@ export class Attendance {
 
           return {
             studentId,
-            usn: ss.student.usn,
-            name: ss.student.user.name,
+            usn: r.student.usn,
+            name: r.student.user.name,
             sessionStatuses,
             condonationStatus,
             totalSessions,
