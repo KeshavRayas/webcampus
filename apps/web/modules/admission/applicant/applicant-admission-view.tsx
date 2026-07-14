@@ -17,9 +17,9 @@ import {
 } from "@webcampus/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@webcampus/ui/components/tabs";
 import axios, { isAxiosError } from "axios";
+import { City, Country, State } from "country-state-city";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { City, Country, State } from "country-state-city";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import "react-phone-number-input/style.css";
@@ -56,7 +56,12 @@ const STEP_LABELS: Record<StepKey, string> = {
   review: "Review",
 };
 
-const VISIBLE_STEPS: StepKey[] = ["admission", "personal", "education", "parent"];
+const VISIBLE_STEPS: StepKey[] = [
+  "admission",
+  "personal",
+  "education",
+  "parent",
+];
 
 export const ApplicantAdmissionView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
@@ -137,7 +142,6 @@ export const ApplicantAdmissionView = () => {
     },
     retry: false,
   });
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -232,9 +236,7 @@ export const ApplicantAdmissionView = () => {
   const validateStep = (step: StepKey) => {
     const section = sectionRefs.current[step];
 
-    if (!section) {
-      return true;
-    }
+    if (!section) return true;
 
     const fields = Array.from(
       section.querySelectorAll<
@@ -242,10 +244,39 @@ export const ApplicantAdmissionView = () => {
       >("input, select, textarea")
     );
 
+    // Validate normal fields only
     for (const field of fields) {
+      if (field instanceof HTMLInputElement && field.type === "file") {
+        continue;
+      }
+
       if (!field.checkValidity()) {
         field.reportValidity();
         field.focus();
+        return false;
+      }
+    }
+
+    // Validate required files using React state
+    const requiredFiles: Record<StepKey, string[]> = {
+      admission: [],
+      personal: ["photo", "aadharCard"],
+      education: ["class10thMarksPdf", "studyCertificate"],
+      parent: [],
+      review: [],
+    };
+
+    if (class12Enabled) {
+      requiredFiles.education.push("class12thMarksPdf");
+    }
+
+    if (diplomaEnabled) {
+      requiredFiles.education.push("diplomaMarksPdf");
+    }
+
+    for (const name of requiredFiles[step]) {
+      if (!selectedFiles[name]) {
+        toast.error(`${name} is required`);
         return false;
       }
     }
@@ -278,27 +309,27 @@ export const ApplicantAdmissionView = () => {
     }
   };
 
-  const validateStep = (step: StepKey) => {
-    const section = sectionRefs.current[step];
+  // const validateStep = (step: StepKey) => {
+  //   const section = sectionRefs.current[step];
 
-    if (!section) return true;
+  //   if (!section) return true;
 
-    const fields = Array.from(
-      section.querySelectorAll<
-        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-      >("input, select, textarea")
-    );
+  //   const fields = Array.from(
+  //     section.querySelectorAll<
+  //       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+  //     >("input, select, textarea")
+  //   );
 
-    for (const field of fields) {
-      if (!field.checkValidity()) {
-        field.reportValidity();
-        field.focus();
-        return false;
-      }
-    }
+  //   for (const field of fields) {
+  //     if (!field.checkValidity()) {
+  //       field.reportValidity();
+  //       field.focus();
+  //       return false;
+  //     }
+  //   }
 
-    return true;
-  };
+  //   return true;
+  // };
   const saveAndNext = (step: StepKey) => {
     if (!validateStep(step)) {
       return;
@@ -509,7 +540,7 @@ export const ApplicantAdmissionView = () => {
       },
     ];
 
-    const addRows = (section: typeof reviewSections[number]) => {
+    const addRows = (section: (typeof reviewSections)[number]) => {
       const body: string[][] = [];
 
       if (section.includeAdmissionSummary) {
@@ -519,17 +550,17 @@ export const ApplicantAdmissionView = () => {
           ["Middle Name", currentAdmission.middleName || "-"],
           ["Last Name", currentAdmission.lastName || "-"],
           ["Category Claimed", currentAdmission.categoryClaimed || "Not Set"],
-          [
-            "Category Allotted",
-            currentAdmission.categoryAllotted || "Not Set",
-          ],
+          ["Category Allotted", currentAdmission.categoryAllotted || "Not Set"],
           ["Quota", currentAdmission.quota || "Not Set"],
           ["Application Status", currentAdmission.status]
         );
       }
 
       for (const key of section.fields) {
-        body.push([formatReviewKey(key), formatReviewValue(key, formData.get(key))]);
+        body.push([
+          formatReviewKey(key),
+          formatReviewValue(key, formData.get(key)),
+        ]);
       }
 
       doc.setFont("helvetica", "bold");
@@ -559,8 +590,9 @@ export const ApplicantAdmissionView = () => {
         },
       });
 
-      const finalY = (doc as typeof doc & { lastAutoTable?: { finalY?: number } })
-        .lastAutoTable?.finalY;
+      const finalY = (
+        doc as typeof doc & { lastAutoTable?: { finalY?: number } }
+      ).lastAutoTable?.finalY;
       cursorY = (finalY ?? cursorY) + 16;
     };
 
@@ -671,12 +703,15 @@ export const ApplicantAdmissionView = () => {
             name={name}
             type="file"
             accept={accept}
-            required={required}
             disabled={disabled}
-            onChange={(event) =>
-              handleFileSelect(name, event.target.files?.[0] || null)
-            }
-            className="sr-only"
+            onChange={(event) => {
+              console.log(event.target.files);
+              console.log(event.target.files?.length);
+              console.log(event.target.files?.[0]);
+
+              handleFileSelect(name, event.target.files?.[0] || null);
+            }}
+            className="hidden"
           />
           <Button
             type="button"
@@ -709,6 +744,9 @@ export const ApplicantAdmissionView = () => {
   const handleSameAsCurrentAddress = (checked: boolean) => {
     setIsSameAddress(checked);
   };
+  useEffect(() => {
+    console.log(selectedFiles);
+  }, [selectedFiles]);
   useEffect(() => {
     if (!isSameAddress) return;
 
@@ -785,11 +823,6 @@ export const ApplicantAdmissionView = () => {
       <div className="mb-6 space-y-4">
         <div>
           <h3 className="text-lg font-medium">Complete Your Application</h3>
-          <p className="text-muted-foreground text-sm">
-            Application ID:{" "}
-            <span className="font-bold">{admission.applicationId}</span> | Mode:{" "}
-            <span className="font-bold">{admission.modeOfAdmission}</span>
-          </p>
         </div>
 
         <Tabs
@@ -819,7 +852,12 @@ export const ApplicantAdmissionView = () => {
         </div>
       </div>
 
-      <form ref={formRef} noValidate onSubmit={handleSubmit} className="space-y-10">
+      <form
+        ref={formRef}
+        noValidate
+        onSubmit={handleSubmit}
+        className="space-y-10"
+      >
         {/* ADMISSION DETAILS */}
         <div
           ref={(node) => {
@@ -837,48 +875,66 @@ export const ApplicantAdmissionView = () => {
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="applicationId">Application ID</Label>
-              <Input
-                id="applicationId"
+              <Label>Application ID</Label>
+              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
+                {admission.applicationId}
+              </div>
+
+              <input
+                type="hidden"
                 name="applicationId"
                 value={admission.applicationId}
-                readOnly
               />
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="modeOfAdmission">Mode</Label>
-              <Input
-                id="modeOfAdmission"
+              <Label>Mode</Label>
+              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
+                {admission.modeOfAdmission}
+              </div>
+
+              <input
+                type="hidden"
                 name="modeOfAdmission"
                 value={admission.modeOfAdmission}
-                readOnly
               />
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                id="firstName"
+              <Label>First Name</Label>
+
+              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
+                {admission.firstName || "-"}
+              </div>
+
+              <input
+                type="hidden"
                 name="firstName"
-                value={admission.firstName || "-"}
-                disabled
+                value={admission.firstName ?? ""}
               />
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="middleName">Middle Name</Label>
-              <Input
-                id="middleName"
+              <Label>Middle Name</Label>
+
+              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
+                {admission.middleName || "-"}
+              </div>
+
+              <input
+                type="hidden"
                 name="middleName"
-                value={admission.middleName || "-"}
-                disabled
+                value={admission.middleName ?? ""}
               />
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
+              <Label>Last Name</Label>
+
+              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
+                {admission.lastName || "-"}
+              </div>
+
+              <input
+                type="hidden"
                 name="lastName"
-                value={admission.lastName || "-"}
-                disabled
+                value={admission.lastName ?? ""}
               />
             </div>
             <div className="space-y-2 md:col-span-3">
@@ -1055,7 +1111,6 @@ export const ApplicantAdmissionView = () => {
                 name="photo"
                 label="Passport Size Photo (Image)"
                 accept="image/*"
-                required
                 showPreview
               />
             </div>
@@ -1622,7 +1677,6 @@ export const ApplicantAdmissionView = () => {
                     name="aadharCard"
                     label="Aadhar Card Proof"
                     accept="application/pdf"
-                    required
                   />
                 </div>
               </div>
@@ -1769,7 +1823,6 @@ export const ApplicantAdmissionView = () => {
                 name="class10thMarksPdf"
                 label="10th Marks Card (PDF)"
                 accept="application/pdf"
-                required
               />
             </div>
 
@@ -1962,7 +2015,6 @@ export const ApplicantAdmissionView = () => {
                   label="12th Marks Card (PDF)"
                   accept="application/pdf"
                   disabled={!class12Enabled}
-                  required={class12Enabled}
                 />
               </div>
             </fieldset>
@@ -2080,7 +2132,6 @@ export const ApplicantAdmissionView = () => {
                   name="diplomaMarksPdf"
                   label="Diploma Marks Card (PDF)"
                   accept="application/pdf"
-                  required={diplomaEnabled}
                 />
               </div>
             </fieldset>
@@ -2094,7 +2145,6 @@ export const ApplicantAdmissionView = () => {
                 name="studyCertificate"
                 label="Study Certificate (PDF)"
                 accept="application/pdf"
-                required
               />
             </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-1">
@@ -2428,8 +2478,8 @@ export const ApplicantAdmissionView = () => {
           <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
             <p className="text-muted-foreground text-sm">
               Review the details you entered in each section before submitting
-              your application. You can go back to any section using the
-              section buttons above.
+              your application. You can go back to any section using the section
+              buttons above.
             </p>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="bg-background rounded-md border p-3">
@@ -2453,7 +2503,11 @@ export const ApplicantAdmissionView = () => {
             </div>
             <div className="space-y-3">
               <div className="flex flex-wrap gap-3">
-                <Button type="button" variant="outline" onClick={generateReviewPdf}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={generateReviewPdf}
+                >
                   Generate PDF Preview
                 </Button>
                 {reviewPdfUrl ? (
@@ -2469,7 +2523,7 @@ export const ApplicantAdmissionView = () => {
               </div>
 
               {reviewPdfUrl ? (
-                <div className="overflow-hidden rounded-lg border bg-background">
+                <div className="bg-background overflow-hidden rounded-lg border">
                   <iframe
                     title="Application review PDF preview"
                     src={reviewPdfUrl}

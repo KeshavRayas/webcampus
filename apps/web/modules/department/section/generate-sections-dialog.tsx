@@ -117,7 +117,7 @@ export const GenerateSectionsDialog = ({
   const termOptions = Array.isArray(terms) ? terms : [];
   const selectedTerm = termOptions.find((t) => t.id === termId);
   const selectedSemester = selectedTerm?.Semester?.find(
-    (s) => s.id === semesterId
+    (s: { id: string }) => s.id === semesterId
   );
 
   const isBasicSciences = deptInfo?.type === "BASIC_SCIENCES";
