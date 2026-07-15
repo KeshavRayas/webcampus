@@ -6,6 +6,7 @@
 @import "tw-animate-css";
 @custom-variant dark (&:is(.dark *));
 @plugin "tailwind-scrollbar";
+@import "react-phone-number-input/style.css";
 
 :root {
   --background: oklch(1 0 0);
@@ -126,4 +127,29 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+.phone-input {
+  display: flex;
+  width: 100%;
+  align-items: center;
+}
+
+.phone-input .PhoneInputCountry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 0.75rem;
+  margin-right: 0;
+
+  background-color: hsl(var(--background)) !important;
+}
+
+.phone-input .PhoneInputCountrySelect {
+  background: hsl(var(--background)) !important;
+  color: hsl(var(--foreground));
+}
+
+.phone-input .PhoneInputInput {
+  width: 100%;
 }
