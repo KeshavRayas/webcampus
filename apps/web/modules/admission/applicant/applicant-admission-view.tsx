@@ -123,6 +123,20 @@ export const ApplicantAdmissionView = () => {
     parent: null,
     review: null,
   });
+  const [birthState, setBirthState] = useState("");
+  const [birthPlace, setBirthPlace] = useState("");
+  const [filePreviews, setFilePreviews] = useState<Record<string, string>>({});
+  // Class 10
+  const [class10State, setClass10State] = useState("");
+  const [class10City, setClass10City] = useState("");
+
+  // Class 12
+  const [class12State, setClass12State] = useState("");
+  const [class12City, setClass12City] = useState("");
+
+  // Diploma
+  const [diplomaState, setDiplomaState] = useState("");
+  const [diplomaCity, setDiplomaCity] = useState("");
 
   // Fetch the applicant's existing shell
   const {
@@ -142,6 +156,13 @@ export const ApplicantAdmissionView = () => {
     },
     retry: false,
   });
+  const fullName = [
+    admission?.firstName,
+    admission?.middleName,
+    admission?.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ");
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -297,7 +318,26 @@ export const ApplicantAdmissionView = () => {
       ...current,
       [name]: file,
     }));
+    if (file) {
+      if (filePreviews[name]) {
+        URL.revokeObjectURL(filePreviews[name]);
+      }
 
+      setFilePreviews((current) => ({
+        ...current,
+        [name]: URL.createObjectURL(file),
+      }));
+    } else {
+      if (filePreviews[name]) {
+        URL.revokeObjectURL(filePreviews[name]);
+      }
+
+      setFilePreviews((current) => {
+        const updated = { ...current };
+        delete updated[name];
+        return updated;
+      });
+    }
     if (name === "photo") {
       clearPreview();
 
@@ -308,28 +348,6 @@ export const ApplicantAdmissionView = () => {
       }
     }
   };
-
-  // const validateStep = (step: StepKey) => {
-  //   const section = sectionRefs.current[step];
-
-  //   if (!section) return true;
-
-  //   const fields = Array.from(
-  //     section.querySelectorAll<
-  //       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-  //     >("input, select, textarea")
-  //   );
-
-  //   for (const field of fields) {
-  //     if (!field.checkValidity()) {
-  //       field.reportValidity();
-  //       field.focus();
-  //       return false;
-  //     }
-  //   }
-
-  //   return true;
-  // };
   const saveAndNext = (step: StepKey) => {
     if (!validateStep(step)) {
       return;
@@ -691,6 +709,7 @@ export const ApplicantAdmissionView = () => {
     const selectedFile = selectedFiles[name];
     const selectedName = selectedFile?.name || "";
     const inputId = `${name}-input`;
+    const previewUrl = filePreviews[name];
     return (
       <div className="space-y-2">
         <Label htmlFor={inputId}>
@@ -734,6 +753,15 @@ export const ApplicantAdmissionView = () => {
             />
           </div>
         ) : null}
+        {previewUrl && accept === "application/pdf" && (
+          <div className="mt-2">
+            <iframe
+              src={previewUrl}
+              title={`${name}-preview`}
+              className="h-96 w-full rounded-lg border"
+            />
+          </div>
+        )}
         {helperText ? (
           <p className="text-muted-foreground text-xs">{helperText}</p>
         ) : null}
@@ -778,6 +806,14 @@ export const ApplicantAdmissionView = () => {
     permanentCountry,
     permanentState
   );
+  const birthStates = State.getStatesOfCountry("IN");
+
+  const birthPlaces = City.getCitiesOfState("IN", birthState);
+  const educationStates = State.getStatesOfCountry("IN");
+
+  const class10Cities = City.getCitiesOfState("IN", class10State);
+  const class12Cities = City.getCitiesOfState("IN", class12State);
+  const diplomaCities = City.getCitiesOfState("IN", diplomaState);
 
   if (isLoading) {
     return (
@@ -804,7 +840,6 @@ export const ApplicantAdmissionView = () => {
   if (!admission) {
     return <div className="p-6 text-center">No admission profile found.</div>;
   }
-
   if (admission.status !== "PENDING") {
     return (
       <div className="bg-secondary/20 flex flex-col items-center justify-center rounded-lg border p-12 text-center">
@@ -937,9 +972,9 @@ export const ApplicantAdmissionView = () => {
                 value={admission.lastName ?? ""}
               />
             </div>
-            <div className="space-y-2 md:col-span-3">
+            <div className="space-y-2 md:col-span-4">
               <Label>Branch</Label>
-              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
+              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center truncate rounded-md border px-3 py-2 text-sm">
                 {admission.department?.name || "Assigned Branch"}
               </div>
             </div>
@@ -1066,8 +1101,8 @@ export const ApplicantAdmissionView = () => {
               <Input
                 id="nameAsPer10th"
                 name="nameAsPer10th"
+                defaultValue={fullName}
                 required
-                placeholder="Robert J Oppenheimer"
               />
             </div>
 
@@ -1527,12 +1562,59 @@ export const ApplicantAdmissionView = () => {
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="placeOfBirth">Place of Birth *</Label>
-                  <Input id="placeOfBirth" name="placeOfBirth" required />
+                  <Label htmlFor="stateOfBirth">State of Birth *</Label>
+                  <Select
+                    value={birthState}
+                    onValueChange={(value) => {
+                      setBirthState(value);
+                      setBirthPlace("");
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {birthStates.map((state) => (
+                        <SelectItem key={state.isoCode} value={state.isoCode}>
+                          {state.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <input
+                    type="hidden"
+                    name="stateOfBirth"
+                    value={
+                      birthStates.find((s) => s.isoCode === birthState)?.name ??
+                      ""
+                    }
+                    required
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="stateOfBirth">State of Birth *</Label>
-                  <Input id="stateOfBirth" name="stateOfBirth" required />
+                  <Label htmlFor="placeOfBirth">Place of Birth *</Label>
+                  <Select value={birthPlace} onValueChange={setBirthPlace}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select Place of Birth" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {birthPlaces.map((city) => (
+                        <SelectItem key={city.name} value={city.name}>
+                          {city.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <input
+                    type="hidden"
+                    name="placeOfBirth"
+                    value={birthPlace}
+                    required
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="religion">Religion *</Label>
@@ -1747,20 +1829,61 @@ export const ApplicantAdmissionView = () => {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="class10thSchoolCity">School City *</Label>
-              <Input
-                id="class10thSchoolCity"
-                name="class10thSchoolCity"
+              <Label htmlFor="class10thSchoolState">School State *</Label>
+
+              <Select
+                value={class10State}
+                onValueChange={(value) => {
+                  setClass10State(value);
+                  setClass10City("");
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select State" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {educationStates.map((state) => (
+                    <SelectItem key={state.isoCode} value={state.isoCode}>
+                      {state.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <input
+                type="hidden"
+                name="class10thSchoolState"
+                value={
+                  educationStates.find((s) => s.isoCode === class10State)
+                    ?.name ?? ""
+                }
                 required
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="class10thSchoolState">School State *</Label>
-              <Input
-                id="class10thSchoolState"
-                name="class10thSchoolState"
+              <Label htmlFor="class10thSchoolCity">School City *</Label>
+
+              <Select value={class10City} onValueChange={setClass10City}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select City" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {class10Cities.map((city) => (
+                    <SelectItem key={city.name} value={city.name}>
+                      {city.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <input
+                type="hidden"
+                name="class10thSchoolCity"
+                value={class10City}
                 required
               />
             </div>
@@ -1833,12 +1956,7 @@ export const ApplicantAdmissionView = () => {
                     id="class12-toggle"
                     checked={class12Enabled}
                     onCheckedChange={(checked) => {
-                      const enabled = Boolean(checked);
-                      setClass12Enabled(enabled);
-
-                      if (enabled) {
-                        setDiplomaEnabled(false);
-                      }
+                      setClass12Enabled(Boolean(checked));
                     }}
                   />
                   <Label
@@ -1853,12 +1971,7 @@ export const ApplicantAdmissionView = () => {
                     id="diploma-toggle"
                     checked={diplomaEnabled}
                     onCheckedChange={(checked) => {
-                      const enabled = Boolean(checked);
-                      setDiplomaEnabled(enabled);
-
-                      if (enabled) {
-                        setClass12Enabled(false);
-                      }
+                      setDiplomaEnabled(Boolean(checked));
                     }}
                   />
                   <Label
@@ -1884,10 +1997,7 @@ export const ApplicantAdmissionView = () => {
               </p>
             </div>
 
-            <fieldset
-              className="contents"
-              disabled={!class12Enabled || diplomaEnabled}
-            >
+            <fieldset className="contents" disabled={!class12Enabled}>
               <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2 lg:col-span-3">
                 Class XII / PUC Details
               </h4>
@@ -1924,30 +2034,62 @@ export const ApplicantAdmissionView = () => {
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="class12thInstituteCity">Institute City *</Label>
-                <Input
-                  id="class12thInstituteCity"
-                  name="class12thInstituteCity"
-                  required
-                />
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="class12thInstituteState">
                   Institute State *
                 </Label>
-                <Input
-                  id="class12thInstituteState"
+
+                <Select
+                  value={class12State}
+                  onValueChange={(value) => {
+                    setClass12State(value);
+                    setClass12City("");
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select State" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {educationStates.map((state) => (
+                      <SelectItem key={state.isoCode} value={state.isoCode}>
+                        {state.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <input
+                  type="hidden"
                   name="class12thInstituteState"
+                  value={
+                    educationStates.find((s) => s.isoCode === class12State)
+                      ?.name ?? ""
+                  }
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="class12thInstituteCode">Institute Code *</Label>
-                <Input
-                  id="class12thInstituteCode"
-                  name="class12thInstituteCode"
+                <Label htmlFor="class12thInstituteCity">Institute City *</Label>
+
+                <Select value={class12City} onValueChange={setClass12City}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select City" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {class12Cities.map((city) => (
+                      <SelectItem key={city.name} value={city.name}>
+                        {city.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <input
+                  type="hidden"
+                  name="class12thInstituteCity"
+                  value={class12City}
                   required
                 />
               </div>
@@ -2019,10 +2161,7 @@ export const ApplicantAdmissionView = () => {
               </div>
             </fieldset>
 
-            <fieldset
-              className="contents"
-              disabled={!diplomaEnabled || class12Enabled}
-            >
+            <fieldset className="contents" disabled={!diplomaEnabled}>
               <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2 lg:col-span-3">
                 Diploma Details
               </h4>
@@ -2052,18 +2191,59 @@ export const ApplicantAdmissionView = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="diplomaInstituteCity">Institute City *</Label>
-                <Input
-                  id="diplomaInstituteCity"
-                  name="diplomaInstituteCity"
+                <Label htmlFor="diplomaInstituteState">Institute State *</Label>
+
+                <Select
+                  value={diplomaState}
+                  onValueChange={(value) => {
+                    setDiplomaState(value);
+                    setDiplomaCity("");
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select State" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {educationStates.map((state) => (
+                      <SelectItem key={state.isoCode} value={state.isoCode}>
+                        {state.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <input
+                  type="hidden"
+                  name="diplomaInstituteState"
+                  value={
+                    educationStates.find((s) => s.isoCode === diplomaState)
+                      ?.name ?? ""
+                  }
                   required={diplomaEnabled}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="diplomaInstituteState">Institute State *</Label>
-                <Input
-                  id="diplomaInstituteState"
-                  name="diplomaInstituteState"
+                <Label htmlFor="diplomaInstituteCity">Institute City *</Label>
+
+                <Select value={diplomaCity} onValueChange={setDiplomaCity}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select City" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {diplomaCities.map((city) => (
+                      <SelectItem key={city.name} value={city.name}>
+                        {city.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <input
+                  type="hidden"
+                  name="diplomaInstituteCity"
+                  value={diplomaCity}
                   required={diplomaEnabled}
                 />
               </div>
@@ -2276,13 +2456,8 @@ export const ApplicantAdmissionView = () => {
                 <Input id="motherName" name="motherName" required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="motherEmail">Email Address *</Label>
-                <Input
-                  id="motherEmail"
-                  name="motherEmail"
-                  type="email"
-                  required
-                />
+                <Label htmlFor="motherEmail">Email Address</Label>
+                <Input id="motherEmail" name="motherEmail" type="email" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="motherNumber">Phone Number *</Label>
