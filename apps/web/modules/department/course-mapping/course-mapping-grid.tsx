@@ -10,8 +10,8 @@ import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { Combobox } from "@webcampus/ui/molecules/combobox";
 import axios, { AxiosError } from "axios";
-import { CheckCircle2, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Download, Loader2, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 
 interface SectionData {
@@ -32,6 +32,7 @@ interface CourseMappingGridProps {
   academicYear: string;
   cycle: string;
   isLocked?: boolean;
+  isAdmin?: boolean;
 }
 
 type SectionMappingState = {
@@ -40,7 +41,7 @@ type SectionMappingState = {
   labFacultyByBatch: { batchName: string; facultyId: string | null }[];
 };
 
-const DEFAULT_BATCHES = ["L1", "L2", "L3", "L4"];
+const DEFAULT_BATCHES = ["L1", "L2", "L3", "L4", "PA", "PB"];
 
 export const CourseMappingGrid = ({
   course,
@@ -48,9 +49,14 @@ export const CourseMappingGrid = ({
   academicYear,
   cycle,
   isLocked = false,
+  isAdmin = false,
 }: CourseMappingGridProps) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isVisuallyLocked = isLocked && !isAdmin;
+  const isSuperEdit = isLocked && isAdmin;
 
   const hasTheory = ["INTEGRATED", "NON_INTEGRATED", "NCMC"].includes(
     course.courseMode
@@ -121,8 +127,8 @@ export const CourseMappingGrid = ({
 
   const [mappings, setMappings] = useState<SectionMappingState[]>([]);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // Initialize mapping state when sections or existing mappings load
   useEffect(() => {
     if (loadingSections || loadingExisting) return;
 
@@ -180,13 +186,111 @@ export const CourseMappingGrid = ({
     );
   };
 
+  // --- Excel Handlers ---
+  const handleDownloadExcel = async () => {
+    try {
+      const res = await axios.get(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/excel/download`,
+        {
+          params: { courseId: course.id, semesterId, academicYear },
+          responseType: "blob",
+          withCredentials: true,
+        }
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `${course.code}_Mapping_Template.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to download Excel template");
+    }
+  };
+
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await axios.post(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/excel/upload`,
+        formData,
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+
+      const extractedData = res.data.data.extractedData as {
+        section: string;
+        facultyName: string;
+      }[];
+
+      setMappings((prev) => {
+        // Deep clone to safely mutate nested arrays
+        const next = prev.map((mapping) => ({
+          ...mapping,
+          labFacultyByBatch: [...mapping.labFacultyByBatch],
+        }));
+
+        extractedData.forEach(({ section: rowLabel, facultyName }) => {
+          // Clean the faculty name to match combobox options exactly
+          const cleanFacName = facultyName?.trim();
+          const facId =
+            facultyOptions.find((f) => f.label.trim() === cleanFacName)
+              ?.value ?? null;
+
+          // Check if the row label matches a Section Name (for Theory)
+          const matchedSection = sections.find((s) => s.name === rowLabel);
+
+          if (matchedSection && hasTheory) {
+            const targetMapping = next.find(
+              (m) => m.sectionId === matchedSection.id
+            );
+            if (targetMapping) {
+              targetMapping.theoryFacultyId = facId;
+            }
+          }
+          // If not a section, check if the row label matches a Batch Name (for Lab)
+          else if (hasLab) {
+            next.forEach((m) => {
+              const targetBatch = m.labFacultyByBatch.find(
+                (b) => b.batchName === rowLabel
+              );
+              if (targetBatch) {
+                targetBatch.facultyId = facId;
+              }
+            });
+          }
+        });
+        return next;
+      });
+
+      toast.success("Excel data populated! Please review before saving.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to parse Excel file");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
         courseId: course.id,
         semesterId,
         academicYear,
-        studentsPerLabBatch: 20, // default
+        isSuperEdit,
+        studentsPerLabBatch: 20,
         sectionMappings: mappings.map((m) => ({
           sectionId: m.sectionId,
           theoryFacultyId: hasTheory ? m.theoryFacultyId : null,
@@ -199,7 +303,9 @@ export const CourseMappingGrid = ({
       return axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/upsert`,
         payload,
-        { withCredentials: true }
+        {
+          withCredentials: true,
+        }
       );
     },
     onSuccess: (res) => {
@@ -209,6 +315,7 @@ export const CourseMappingGrid = ({
       queryClient.invalidateQueries({ queryKey: ["course-mapping-status"] });
     },
     onError: (err) => {
+      console.error(err);
       const message =
         err instanceof AxiosError
           ? err.response?.data?.message
@@ -217,9 +324,7 @@ export const CourseMappingGrid = ({
     },
   });
 
-  const isLoading = loadingSections || loadingFaculty || loadingExisting;
-
-  if (isLoading) {
+  if (loadingSections || loadingFaculty || loadingExisting) {
     return (
       <div className="text-muted-foreground flex items-center justify-center p-12">
         <Loader2 className="size-8 animate-spin" />
@@ -237,15 +342,44 @@ export const CourseMappingGrid = ({
 
   return (
     <div className="space-y-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Faculty Assignments</h3>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleDownloadExcel}>
+            <Download className="mr-2 h-4 w-4" /> Template
+          </Button>
+          <input
+            type="file"
+            accept=".xlsx"
+            ref={fileInputRef}
+            className="hidden"
+            onChange={handleExcelUpload}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading || isVisuallyLocked}
+          >
+            {isUploading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="mr-2 h-4 w-4" />
+            )}
+            Upload Excel
+          </Button>
+        </div>
+      </div>
+
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full text-left text-sm">
           <thead className="bg-muted border-b font-medium leading-normal">
             <tr>
-              <th className="border-border min-w-[100px] border-r px-4 py-3">
+              <th className="border-border min-w-25 border-r px-4 py-3">
                 Section
               </th>
               {hasTheory && (
-                <th className="border-border min-w-[200px] border-r px-4 py-3">
+                <th className="border-border min-w-50 border-r px-4 py-3">
                   Theory Faculty
                 </th>
               )}
@@ -253,7 +387,7 @@ export const CourseMappingGrid = ({
                 DEFAULT_BATCHES.map((batch) => (
                   <th
                     key={batch}
-                    className="border-border min-w-[200px] border-r px-4 py-3 text-center last:border-0"
+                    className="border-border min-w-50 border-r px-4 py-3 text-center last:border-0"
                   >
                     Lab: {batch}
                   </th>
@@ -273,7 +407,6 @@ export const CourseMappingGrid = ({
                   <td className="border-border bg-muted/20 group-hover:bg-muted/60 border-r px-4 py-4 font-medium">
                     {section.name}
                   </td>
-
                   {hasTheory && (
                     <td className="border-border border-r px-4">
                       <Combobox
@@ -282,11 +415,10 @@ export const CourseMappingGrid = ({
                         onValueChange={(val) => updateTheory(section.id, val)}
                         placeholder="Select Theory Faculty"
                         className="bg-background"
-                        disabled={isLocked}
+                        disabled={isVisuallyLocked}
                       />
                     </td>
                   )}
-
                   {hasLab &&
                     DEFAULT_BATCHES.map((batchName) => {
                       const batchState = state.labFacultyByBatch.find(
@@ -305,7 +437,7 @@ export const CourseMappingGrid = ({
                             }
                             placeholder={`Select ${batchName} Faculty`}
                             className="bg-background text-xs"
-                            disabled={isLocked}
+                            disabled={isVisuallyLocked}
                           />
                         </td>
                       );
@@ -326,7 +458,7 @@ export const CourseMappingGrid = ({
         )}
         <Button
           onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending || isLocked}
+          disabled={saveMutation.isPending || isVisuallyLocked}
           size="lg"
           className={
             lastSaved ? "ring-2 ring-emerald-500/30 ring-offset-2" : ""
@@ -335,7 +467,7 @@ export const CourseMappingGrid = ({
           {saveMutation.isPending && (
             <Loader2 className="mr-2 size-4 animate-spin" />
           )}
-          Save Mappings
+          {isSuperEdit ? "Super Edit & Save" : "Save Mappings"}
         </Button>
       </div>
     </div>

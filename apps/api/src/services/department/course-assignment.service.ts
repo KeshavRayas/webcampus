@@ -8,6 +8,7 @@ import type {
 } from "@webcampus/schemas/department";
 import type { BaseResponse } from "@webcampus/types/api";
 import type { DepartmentRequestContext } from "@webcampus/types/request-context";
+import ExcelJS from "exceljs";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 
@@ -358,13 +359,16 @@ export class CourseAssignmentService {
         },
       });
       if (!course) throw new Error("Course not found");
-      if (
+      const isLocked =
         course.approvalStatus === "PENDING" ||
-        course.approvalStatus === "APPROVED"
-      ) {
-        throw new Error(
-          "403 Forbidden: Cannot modify faculty assignments for a locked course"
-        );
+        course.approvalStatus === "APPROVED";
+
+      if (isLocked) {
+        if (context?.requesterRole !== "admin" || !data.isSuperEdit) {
+          throw new Error(
+            "403 Forbidden: Cannot modify faculty assignments for a locked course"
+          );
+        }
       }
 
       // RBAC: non-BASIC_SCIENCES cannot map first-year UG semesters
@@ -523,6 +527,17 @@ export class CourseAssignmentService {
 
         for (const assignmentId of createdAssignmentIds) {
           await ensureFreezeRowTx(tx, assignmentId);
+        }
+
+        if (isLocked && data.isSuperEdit) {
+          await tx.courseMappingAuditLog.create({
+            data: {
+              courseId: data.courseId,
+              adminId: requestingUserId,
+              action: "SUPER_EDIT_MAPPING",
+              details: JSON.stringify(data.sectionMappings),
+            },
+          });
         }
 
         return createdCount;
@@ -698,5 +713,116 @@ export class CourseAssignmentService {
       if (error instanceof Error) throw error;
       throw new Error("Failed to delete course mappings");
     }
+  }
+  /**
+   * Generates an Excel template for course mapping
+   */
+  static async generateMappingTemplate(
+    courseId: string,
+    semesterId: string,
+    academicYear: string,
+    requestingUserId: string,
+    context?: MappingContext
+  ): Promise<Buffer> {
+    const department = await CourseAssignmentService.getRequestingDepartment(
+      requestingUserId,
+      context
+    );
+
+    const course = await db.course.findUnique({
+      where: { id: courseId },
+      include: {
+        semester: { include: { academicTerm: true } },
+      },
+    });
+
+    if (!course) throw new Error("Course not found");
+
+    const sections = await db.section.findMany({
+      where: {
+        semesterId,
+        departmentId: department.id,
+        ...(course.cycle && course.cycle !== "NONE"
+          ? { cycle: course.cycle }
+          : {}),
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Course Mapping");
+
+    // Add Meta Data (Rows 1-5)
+    worksheet.addRow([
+      "Academic Term",
+      `${course.semester.academicTerm.type} ${course.semester.academicTerm.year}`,
+    ]);
+    worksheet.addRow(["Semester", course.semester.semesterNumber]);
+    worksheet.addRow([
+      "Department or Cycle",
+      course.cycle !== "NONE" ? course.cycle : department.name,
+    ]);
+    worksheet.addRow(["Course Name", course.name]);
+    worksheet.addRow(["Course Code", course.code]);
+    worksheet.addRow([]); // Empty row for spacing
+
+    // Add Table Headers
+    const headerRow = worksheet.addRow(["Section", "Faculty Name (Theory)"]);
+    headerRow.font = { bold: true };
+
+    // Populate Sections
+    sections.forEach((section) => {
+      worksheet.addRow([section.name, ""]);
+    });
+
+    // Formatting
+    worksheet.getColumn(1).width = 20;
+    worksheet.getColumn(2).width = 40;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return buffer as unknown as Buffer;
+  }
+
+  /**
+   * Parses an uploaded Excel mapping file
+   * Note: In a production scenario, you would map string names back to faculty IDs here.
+   */
+  static async parseMappingUpload(
+    fileBuffer: Buffer,
+    requestingUserId: string,
+    context?: MappingContext
+  ): Promise<BaseResponse<unknown>> {
+    void requestingUserId;
+    void context;
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(fileBuffer as unknown as ArrayBuffer);
+    const worksheet = workbook.getWorksheet(1);
+
+    if (!worksheet) throw new Error("Invalid Excel file format");
+
+    const parsedMappings: { section: string; facultyName: string }[] = [];
+
+    // Assuming table data starts at row 8 based on the generation template
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber >= 8) {
+        const sectionName = row.getCell(1).text;
+        const facultyName = row.getCell(2).text;
+
+        if (sectionName) {
+          parsedMappings.push({
+            section: sectionName,
+            facultyName: facultyName || "",
+          });
+        }
+      }
+    });
+
+    return {
+      status: "success",
+      message:
+        "Excel parsed successfully. Please verify mappings before saving.",
+      data: { extractedData: parsedMappings },
+    };
   }
 }

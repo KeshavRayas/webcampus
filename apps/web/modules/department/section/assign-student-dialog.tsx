@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { SuccessResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { Checkbox } from "@webcampus/ui/components/checkbox";
 import {
@@ -21,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import axios, { AxiosError } from "axios";
 import { UserPlus } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "react-toastify";
@@ -87,26 +86,32 @@ export const AssignStudentDialog = ({
 
   const assignMutation = useMutation({
     mutationFn: async () => {
-      return await axios.post(
+      const payload = {
+        sectionId,
+        studentIds: Array.from(selectedIds),
+        academicYear,
+      };
+      return axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/department/section/assign-students`,
-        {
-          sectionId,
-          studentIds: Array.from(selectedIds),
-          academicYear,
-        },
+        payload,
         { withCredentials: true }
       );
     },
-    onSuccess: (data: AxiosResponse<SuccessResponse<{ count: number }>>) => {
-      toast.success(data.data.message);
+    onSuccess: () => {
+      toast.success(`Assigned ${selectedIds.size} student(s) successfully`);
       queryClient.invalidateQueries({ queryKey: ["sections-with-students"] });
       queryClient.invalidateQueries({ queryKey: ["unassigned-students"] });
-      queryClient.invalidateQueries({ queryKey: ["unassigned-count"] });
+      // <-- NEW: Reload global counts after assigning
+      queryClient.invalidateQueries({ queryKey: ["unassigned-counts"] });
       setSelectedIds(new Set());
       onOpenChange(false);
     },
-    onError: (error: AxiosError<{ error?: string }>) => {
-      toast.error(error.response?.data?.error || "Failed to assign students");
+    onError: (error) => {
+      const message =
+        error instanceof AxiosError
+          ? error.response?.data?.message
+          : "Failed to assign students";
+      toast.error(message || "Failed to assign students");
     },
   });
 

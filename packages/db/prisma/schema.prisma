@@ -34,6 +34,7 @@ model User {
   accounts              Account[]
   sessions              Session[]
 
+  courseMappingAuditLogs CourseMappingAuditLog[]
   @@map("user")
 }
 
@@ -414,6 +415,7 @@ model Course {
   registrations           CourseRegistration[]
   marks                   Mark[]
   studentAssessments      StudentAssessment[]
+  mappingAuditLogs       CourseMappingAuditLog[]
 
   @@unique([id, departmentId])
   @@index([code])
@@ -934,3 +936,17 @@ enum AttendanceStatus {
 }
 
 
+model CourseMappingAuditLog {
+  id           String   @id @default(uuid())
+  courseId     String
+  adminId      String
+  action       String   // e.g., "SUPER_EDIT_MAPPING"
+  details      String?  // JSON string storing the exact changes made
+  createdAt    DateTime @default(now())
+
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  admin        User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([adminId])
+}
