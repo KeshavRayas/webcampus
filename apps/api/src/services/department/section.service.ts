@@ -2,6 +2,7 @@ import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/de
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma, Section } from "@webcampus/db";
 import {
+  AssignStudentsDTO,
   CreateSectionType,
   DetailedGenerationPreviewSectionDTO,
   GenerateCycleSectionsDTO,
@@ -505,68 +506,53 @@ export class SectionService {
 
   static async deleteSection(
     id: string,
-    requestingUserId?: string,
     requestContext?: DepartmentRequestContext
-  ): Promise<BaseResponse<void>> {
+  ): Promise<BaseResponse<null>> {
     try {
-      const requestingDepartment = requestingUserId
-        ? await this.getRequestingDepartment(requestingUserId, requestContext)
-        : null;
-
-      await db.$transaction(async (tx) => {
-        const section = await tx.section.findFirst({
-          where: {
-            id,
-            ...(requestingDepartment
-              ? {
-                  department: {
-                    is: {
-                      id: requestingDepartment.id,
-                    },
-                  },
-                }
-              : {}),
-          },
-          select: {
-            id: true,
-            _count: {
-              select: {
-                courses: true,
-                batches: true,
-              },
-            },
-          },
-        });
-
-        if (!section) {
-          throw new Error("Section not found");
-        }
-
-        if (section._count.courses > 0 || section._count.batches > 0) {
-          throw new Error(
-            "Cannot delete section with assigned courses or batches. Remove them first."
-          );
-        }
-
-        await tx.studentSection.deleteMany({
-          where: { sectionId: id },
-        });
-
-        await tx.section.delete({
-          where: { id },
-        });
+      const resolvedDepartment = await this.resolveDepartmentContext({
+        source: "section.delete",
+        requestContext,
       });
 
-      const response: BaseResponse<void> = {
+      // Include counts to check dependencies
+      const existing = await db.section.findFirst({
+        where: {
+          id,
+          department: { is: { id: resolvedDepartment.departmentId } },
+        },
+        include: {
+          _count: {
+            select: { studentSections: true, courses: true },
+          },
+        },
+      });
+
+      if (!existing) {
+        throw new Error("Section not found");
+      }
+
+      // Safe Deletion Validation Rule
+      if (existing._count.studentSections > 0) {
+        throw new Error(
+          "Cannot delete section: Students are already mapped to this section. Remove students first."
+        );
+      }
+      if (existing._count.courses > 0) {
+        throw new Error(
+          "Cannot delete section: Courses are mapped to this section."
+        );
+      }
+
+      await db.section.delete({ where: { id } });
+
+      return {
         status: "success",
-        message: "Section deleted successfully and students unassigned",
+        message: "Section deleted successfully",
         data: null,
       };
-      logger.info(response);
-      return response;
     } catch (error) {
-      logger.error("Error deleting section:", { error });
-      throw new Error("Failed to delete section");
+      logger.error("Failed to delete section", { error });
+      throw error; // Let controller handle the 400 error message
     }
   }
 
@@ -1193,77 +1179,59 @@ export class SectionService {
    * Assign specific students to a section by creating StudentSection records.
    */
   static async assignStudentsToSection(
-    sectionId: string,
-    studentIds: string[],
-    academicYear: string
-  ): Promise<BaseResponse<{ count: number }>> {
+    data: AssignStudentsDTO,
+    _requestingUserId: string,
+    requestContext?: DepartmentRequestContext
+  ): Promise<BaseResponse<{ assigned: number }>> {
     try {
-      const section = await db.section.findUnique({
-        where: { id: sectionId },
+      const resolvedDepartment = await this.resolveDepartmentContext({
+        source: "section.assignStudentsToSection",
+        requestContext,
+      });
+
+      const section = await db.section.findFirst({
+        where: {
+          id: data.sectionId,
+          departmentId: resolvedDepartment.departmentId,
+        },
         include: { semester: true },
       });
+
       if (!section) throw new Error("Section not found");
 
-      if (studentIds.length === 0) {
-        return {
-          status: "success",
-          message: `0 student(s) assigned to section ${section.name}`,
-          data: { count: 0 },
-        };
-      }
+      // We explicitly DO NOT check capacity limits here to allow manual override.
 
-      const normalizedStudentIds = Array.from(new Set(studentIds));
-      const students = await db.student.findMany({
-        where: {
-          id: { in: normalizedStudentIds },
-        },
-        select: {
-          id: true,
-          department: {
-            select: {
-              id: true,
-            },
+      const result = await db.$transaction(async (tx) => {
+        // Delete any existing mappings for these students in the same semester to prevent duplicates
+        await tx.studentSection.deleteMany({
+          where: {
+            studentId: { in: data.studentIds },
+            semester: section.semester.semesterNumber,
+            academicYear: data.academicYear,
           },
-        },
-      });
+        });
 
-      if (students.length !== normalizedStudentIds.length) {
-        throw new Error("One or more students are invalid");
-      }
+        // Insert new mappings
+        const created = await tx.studentSection.createMany({
+          data: data.studentIds.map((studentId) => ({
+            studentId,
+            sectionId: section.id,
+            semester: section.semester.semesterNumber,
+            academicYear: data.academicYear,
+          })),
+          skipDuplicates: true,
+        });
 
-      const outOfDepartmentStudent = students.find(
-        (student) => student.department.id !== section.departmentId
-      );
-
-      if (outOfDepartmentStudent) {
-        throw new Error(
-          "Student and Section do not belong to the same department"
-        );
-      }
-
-      const result = await db.studentSection.createMany({
-        data: normalizedStudentIds.map((studentId) => ({
-          studentId,
-          sectionId,
-          semester: section.semester.semesterNumber,
-          academicYear,
-        })),
-        skipDuplicates: true,
+        return created;
       });
 
       return {
         status: "success",
-        message: `${result.count} student(s) assigned to section ${section.name}`,
-        data: { count: result.count },
+        message: `Successfully assigned ${result.count} students`,
+        data: { assigned: result.count },
       };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === "P2002") {
-          throw new Error("Some students are already assigned to this section");
-        }
-      }
-      if (error instanceof Error) throw error;
-      logger.error("Error assigning students to section:", { error });
+      logger.error("Failed to assign students to section", { error });
       throw new Error("Failed to assign students to section");
     }
   }

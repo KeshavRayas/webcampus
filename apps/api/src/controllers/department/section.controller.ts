@@ -1,8 +1,8 @@
 import { SectionService } from "@webcampus/api/src/services/department/section.service";
+import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
-import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
 import {
   CreateSectionType,
   DetailedGenerationPreviewRequestDTO,
@@ -141,7 +141,6 @@ export class SectionController {
 
       const response = await SectionService.deleteSection(
         req.params.id,
-        requestContext.userId,
         requestContext
       );
       if (response.status === "success") {
@@ -361,10 +360,8 @@ export class SectionController {
     res: Response
   ): Promise<void> {
     try {
-      const { sectionId, studentIds, academicYear } = req.body as {
+      const { sectionId } = req.body as {
         sectionId: string;
-        studentIds: string[];
-        academicYear: string;
       };
       const requestContext = await SectionController.getRequestContext(req);
       await SectionService.assertSectionWriteAccess(
@@ -374,9 +371,9 @@ export class SectionController {
       );
 
       const response = await SectionService.assignStudentsToSection(
-        sectionId,
-        studentIds,
-        academicYear
+        req.body, // Pass the entire DTO object here
+        requestContext.userId,
+        requestContext
       );
       if (response.status === "success") {
         sendResponse({

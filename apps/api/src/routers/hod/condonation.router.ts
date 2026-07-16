@@ -1,3 +1,4 @@
+import { HODCondonationReportController } from "@webcampus/api/src/controllers/hod/condonation-report.controller";
 import { HODCondonationController } from "@webcampus/api/src/controllers/hod/condonation.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
@@ -47,6 +48,13 @@ router.patch(
     permissions: { freeze: ["lock"] },
   }),
   HODCondonationController.approveCondonation
+);
+
+router.get(
+  "/report",
+  validateRequest(HODCondonationFiltersSchema, "query"), // Or appropriate schema
+  protect({ role: "hod", permissions: { freeze: ["read"] } }),
+  HODCondonationReportController.getCondonedReport
 );
 
 export default router;

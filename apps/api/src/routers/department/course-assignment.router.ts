@@ -3,12 +3,15 @@ import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   CourseMappingByCourseQuerySchema,
   CourseMappingFacultyQuerySchema,
-  CourseMappingStatusQuerySchema,
   CourseMappingSectionsQuerySchema,
+  CourseMappingStatusQuerySchema,
+  DownloadMappingTemplateQuerySchema,
   UpsertCourseMappingSchema,
 } from "@webcampus/schemas/department";
 import { Router } from "express";
+import multer from "multer";
 
+const upload = multer({ storage: multer.memoryStorage() });
 const router: Router = Router();
 
 // GET /status — mapping status for all courses in a semester
@@ -74,6 +77,28 @@ router.get(
     },
   }),
   CourseAssignmentController.getSectionsForMapping
+);
+
+// GET /excel/download — Download mapping template
+router.get(
+  "/excel/download",
+  validateRequest(DownloadMappingTemplateQuerySchema, "query"),
+  protect({
+    role: "department",
+    permissions: { courseAssignment: ["read"] },
+  }),
+  CourseAssignmentController.downloadTemplate
+);
+
+// POST /excel/upload — Upload mapping template
+router.post(
+  "/excel/upload",
+  protect({
+    role: "department",
+    permissions: { courseAssignment: ["create"] },
+  }),
+  upload.single("file"),
+  CourseAssignmentController.uploadTemplate
 );
 
 export default router;

@@ -248,24 +248,20 @@ export const DepartmentSectionView = () => {
       key: "termId",
       label: "Academic Term",
       type: "select",
-      placeholder: "Select term...",
       hideAllOption: true,
-      options: terms.map((term) => ({
-        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
-        value: term.id,
+      options: terms.map((t) => ({
+        label: `${t.type.charAt(0).toUpperCase() + t.type.slice(1)} ${t.year}`,
+        value: t.id,
       })),
     },
     {
       key: "semesterId",
       label: "Semester",
       type: "select",
-      placeholder: draftFilters.termId
-        ? "Select semester..."
-        : "Select term first",
-      hideAllOption: true,
-      options: semesterOptions.map((semester) => ({
-        label: `${semester.programType} - Semester ${semester.semesterNumber}`,
-        value: semester.id,
+      hideAllOption: true, // <-- NEW: Disables the 'All' option
+      options: semesterOptions.map((s) => ({
+        label: `${s.programType} - Semester ${s.semesterNumber}`,
+        value: s.id,
       })),
     },
     ...(isBasicSciences
@@ -274,13 +270,12 @@ export const DepartmentSectionView = () => {
             key: "cycle",
             label: "Cycle",
             type: "select",
-            placeholder: "Select cycle...",
-            hideAllOption: true,
-            options: BASIC_SCIENCES_CYCLE_OPTIONS.map((cycle) => ({
-              label: cycle,
-              value: cycle,
+            hideAllOption: true, // <-- NEW: Disables the 'All' option
+            options: BASIC_SCIENCES_CYCLE_OPTIONS.map((c) => ({
+              label: c,
+              value: c,
             })),
-          } as FilterFieldConfig<SectionFilters>,
+          } as FilterFieldConfig<typeof EMPTY_FILTERS>,
         ]
       : []),
   ];

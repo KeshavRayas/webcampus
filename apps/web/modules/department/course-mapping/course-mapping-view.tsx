@@ -6,7 +6,7 @@ import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import axios from "axios";
-import { Lock } from "lucide-react";
+import { Lock, UnlockKeyhole } from "lucide-react";
 import { useState } from "react";
 import { CourseDetailsCard } from "./course-details-card";
 import {
@@ -19,23 +19,23 @@ export const CourseMappingView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: session } = authClient.useSession();
 
+  const isAdmin = session?.user?.role === "admin";
+
   const [appliedFilters, setAppliedFilters] =
     useState<CourseMappingFiltersState | null>(null);
   const [selectedCourse, setSelectedCourse] =
     useState<CourseResponseDTO | null>(null);
 
-  // Fetch department type for conditional rendering
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
-        {
-          withCredentials: true,
-        }
-      );
+      const res = await axios.get<
+        BaseResponse<{ type: string; name: string; id: string }>
+      >(`${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`, {
+        withCredentials: true,
+      });
       if (res.data.status === "success") return res.data.data;
-      return { type: "", name: "" };
+      return null;
     },
     enabled: !!session?.user?.id,
   });
@@ -46,7 +46,7 @@ export const CourseMappingView = () => {
 
   return (
     <div className="space-y-8">
-      {isCourseLocked && (
+      {isCourseLocked && !isAdmin && (
         <div className="border-destructive/20 bg-destructive/10 text-destructive flex items-start gap-3 rounded-lg border p-4">
           <Lock className="mt-0.5 h-5 w-5" />
           <div className="flex flex-col gap-1">
@@ -56,6 +56,21 @@ export const CourseMappingView = () => {
             <div className="text-sm">
               This course is part of a semester that is locked for
               review/approval. Mappings cannot be altered.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCourseLocked && isAdmin && (
+        <div className="flex items-start gap-3 rounded-lg border border-orange-500/20 bg-orange-500/10 p-4 text-orange-600">
+          <UnlockKeyhole className="mt-0.5 h-5 w-5" />
+          <div className="flex flex-col gap-1">
+            <h5 className="font-medium leading-none tracking-tight">
+              Super Edit Mode
+            </h5>
+            <div className="text-sm">
+              This course is locked, but you have Admin privileges. Any edits
+              made will be saved to the audit log.
             </div>
           </div>
         </div>
@@ -76,15 +91,13 @@ export const CourseMappingView = () => {
 
             <div className="bg-card text-card-foreground w-full overflow-hidden rounded-xl border shadow-sm">
               <div className="p-6">
-                <h3 className="mb-4 text-lg font-semibold">
-                  Faculty Assignments
-                </h3>
                 <CourseMappingGrid
                   course={selectedCourse}
                   semesterId={appliedFilters.semesterId}
                   academicYear={appliedFilters.academicYear}
                   cycle={appliedFilters.cycle}
                   isLocked={isCourseLocked}
+                  isAdmin={isAdmin}
                 />
               </div>
             </div>

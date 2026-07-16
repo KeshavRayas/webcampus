@@ -3,7 +3,7 @@
 import { authClient } from "@/lib/auth-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { BaseResponse, SuccessResponse } from "@webcampus/types/api";
+import { BaseResponse } from "@webcampus/types/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import axios, { AxiosError } from "axios";
 import { Plus, Trash2, Users } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { toast } from "react-toastify";
@@ -122,20 +122,24 @@ export const SectionCardsView = ({
 
   const deleteSectionMutation = useMutation({
     mutationFn: async (sectionId: string) => {
-      return await axios.delete(
+      return axios.delete(
         `${NEXT_PUBLIC_API_BASE_URL}/department/section/${sectionId}`,
         { withCredentials: true }
       );
     },
-    onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
-      toast.success(data.data.message);
+    onSuccess: (res) => {
+      toast.success(res.data.message || "Section deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["sections-with-students"] });
-      queryClient.invalidateQueries({ queryKey: ["unassigned-count"] });
+      // <-- NEW: Reload unassigned students/counts globally upon deletion
+      queryClient.invalidateQueries({ queryKey: ["unassigned-counts"] });
       queryClient.invalidateQueries({ queryKey: ["unassigned-students"] });
       setDeleteTarget(null);
     },
-    onError: (error: AxiosError<{ error?: string }>) => {
-      toast.error(error.response?.data?.error || "Failed to delete section");
+    onError: (err: AxiosError<{ message?: string }>) => {
+      toast.error(
+        err.response?.data?.message ||
+          "Failed to delete section. It may have mapped students."
+      );
     },
   });
 

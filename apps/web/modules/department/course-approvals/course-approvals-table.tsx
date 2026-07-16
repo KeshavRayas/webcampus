@@ -6,6 +6,12 @@ import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@webcampus/ui/components/accordion";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -323,7 +329,7 @@ export const CourseApprovalsTable = ({
           if (!open) setDetailCourse(null);
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
               {detailCourse?.code} — {detailCourse?.name}
@@ -401,230 +407,308 @@ const CourseDetailContent = ({
   );
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-          Course Info
-        </h4>
-        <Table>
-          <TableBody>
-            <TableRow>
-              <TableCell className="font-medium">Mode</TableCell>
-              <TableCell>{course.courseMode}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Type</TableCell>
-              <TableCell>{course.courseType}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Cycle</TableCell>
-              <TableCell>{course.cycle || "N/A"}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Total Credits</TableCell>
-              <TableCell>{course.totalCredits}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+    <div className="space-y-4 py-2">
+      {/* ALWAYS VISIBLE HEADER */}
+      <div className="flex items-center justify-between pb-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">{course.courseMode}</Badge>
+          <Badge variant="outline">{course.courseType}</Badge>
+          {course.cycle && course.cycle !== "NONE" && (
+            <Badge variant="outline">Cycle: {course.cycle}</Badge>
+          )}
+          <Badge variant="outline" className="bg-primary/5 font-semibold">
+            Total Credits: {course.totalCredits}
+          </Badge>
+        </div>
+        <Badge
+          variant={
+            course.approvalStatus === "APPROVED" ? "default" : "secondary"
+          }
+        >
+          {course.approvalStatus || "DRAFT"}
+        </Badge>
       </div>
 
-      <div>
-        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-          L-T-P-S Credits
-        </h4>
-        <Table>
-          <TableBody>
-            <TableRow>
-              <TableCell className="font-medium">Lecture</TableCell>
-              <TableCell>{course.lectureCredits}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Tutorial</TableCell>
-              <TableCell>{course.tutorialCredits}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Practical</TableCell>
-              <TableCell>{course.practicalCredits}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Skill</TableCell>
-              <TableCell>{course.skillCredits}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
+      <Accordion
+        type="multiple"
+        defaultValue={["config", "mapping"]}
+        className="w-full"
+      >
+        {/* ACCORDION 1: CONFIGURATION */}
+        <AccordionItem value="config">
+          <AccordionTrigger className="text-muted-foreground text-sm font-semibold uppercase tracking-wider hover:no-underline">
+            Course Configuration
+          </AccordionTrigger>
+          <AccordionContent className="pb-2 pt-4">
+            <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+              {/* L-T-P-S */}
+              <div>
+                <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+                  L-T-P-S Credits
+                </h4>
+                <div className="overflow-hidden rounded-md border">
+                  <Table className="text-xs">
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="bg-muted/20 py-2 font-medium">
+                          Lecture
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {course.lectureCredits}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="bg-muted/20 py-2 font-medium">
+                          Tutorial
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {course.tutorialCredits}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="bg-muted/20 py-2 font-medium">
+                          Practical
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {course.practicalCredits}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="bg-muted/20 py-2 font-medium">
+                          Skill
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {course.skillCredits}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
 
-      <div>
-        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-          SEE (Semester End Exam)
-        </h4>
-        <Table>
-          <TableBody>
-            <TableRow>
-              <TableCell className="font-medium">Max Marks</TableCell>
-              <TableCell>{course.seeMaxMarks}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Min Marks</TableCell>
-              <TableCell>{course.seeMinMarks}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Weightage</TableCell>
-              <TableCell>{course.seeWeightage}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
+              {/* SEE */}
+              <div>
+                <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+                  SEE (Semester End Exam)
+                </h4>
+                <div className="overflow-hidden rounded-md border">
+                  <Table className="text-xs">
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="bg-muted/20 py-2 font-medium">
+                          Max Marks
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {course.seeMaxMarks}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="bg-muted/20 py-2 font-medium">
+                          Min Marks
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {course.seeMinMarks}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="bg-muted/20 py-2 font-medium">
+                          Weightage
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {course.seeWeightage}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
 
-      <div>
-        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-          CIE (Continuous Internal)
-        </h4>
-        <Table>
-          <TableBody>
-            <TableRow>
-              <TableCell className="font-medium">Max CIEs</TableCell>
-              <TableCell>{course.maxNoOfCies}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Min CIEs</TableCell>
-              <TableCell>{course.minNoOfCies}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Max Marks</TableCell>
-              <TableCell>{course.cieMaxMarks}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Min Marks</TableCell>
-              <TableCell>{course.cieMinMarks}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Weightage</TableCell>
-              <TableCell>{course.cieWeightage}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
+              {/* CIE */}
+              <div>
+                <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+                  CIE (Continuous Internal)
+                </h4>
+                <div className="overflow-hidden rounded-md border">
+                  <Table className="text-xs">
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="bg-muted/20 py-2 font-medium">
+                          Max / Min CIEs
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {course.maxNoOfCies} / {course.minNoOfCies}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="bg-muted/20 py-2 font-medium">
+                          Max / Min Marks
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {course.cieMaxMarks} / {course.cieMinMarks}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="bg-muted/20 py-2 font-medium">
+                          Weightage
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {course.cieWeightage}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
 
-      <div>
-        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-          Lab
-        </h4>
-        <Table>
-          <TableBody>
-            <TableRow>
-              <TableCell className="font-medium">Max Marks</TableCell>
-              <TableCell>{course.labMaxMarks}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Min Marks</TableCell>
-              <TableCell>{course.labMinMarks}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Weightage</TableCell>
-              <TableCell>{course.labWeightage}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
+              {/* Lab & Assignments combined into one visual column block */}
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+                    Lab & Assignments
+                  </h4>
+                  <div className="overflow-hidden rounded-md border">
+                    <Table className="text-xs">
+                      <TableBody>
+                        <TableRow>
+                          <TableCell className="bg-muted/20 py-2 font-medium">
+                            Lab Max/Min Marks
+                          </TableCell>
+                          <TableCell className="py-2">
+                            {course.labMaxMarks} / {course.labMinMarks}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="bg-muted/20 py-2 font-medium">
+                            Lab Weightage
+                          </TableCell>
+                          <TableCell className="py-2">
+                            {course.labWeightage}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="bg-muted/20 border-t py-2 font-medium">
+                            # Assignments
+                          </TableCell>
+                          <TableCell className="border-t py-2">
+                            {course.noOfAssignments}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="bg-muted/20 py-2 font-medium">
+                            Assignment Max
+                          </TableCell>
+                          <TableCell className="py-2">
+                            {course.assignmentMaxMarks}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
 
-      <div>
-        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-          Assignments
-        </h4>
-        <Table>
-          <TableBody>
-            <TableRow>
-              <TableCell className="font-medium"># Assignments</TableCell>
-              <TableCell>{course.noOfAssignments}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Max Marks</TableCell>
-              <TableCell>{course.assignmentMaxMarks}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
+                <div>
+                  <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
+                    Cumulative (SEE + CIE)
+                  </h4>
+                  <div className="overflow-hidden rounded-md border">
+                    <Table className="text-xs">
+                      <TableBody>
+                        <TableRow>
+                          <TableCell className="bg-muted/20 py-2 font-medium">
+                            Max Marks
+                          </TableCell>
+                          <TableCell className="py-2">
+                            {course.cumulativeMaxMarks}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="bg-muted/20 py-2 font-medium">
+                            Min Marks
+                          </TableCell>
+                          <TableCell className="py-2">
+                            {course.cumulativeMinMarks}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
 
-      <div>
-        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-          Cumulative (SEE + CIE)
-        </h4>
-        <Table>
-          <TableBody>
-            <TableRow>
-              <TableCell className="font-medium">Max Marks</TableCell>
-              <TableCell>{course.cumulativeMaxMarks}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Min Marks</TableCell>
-              <TableCell>{course.cumulativeMinMarks}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
+        {/* ACCORDION 2: MAPPINGS */}
+        <AccordionItem value="mapping">
+          <AccordionTrigger className="text-muted-foreground text-sm font-semibold uppercase tracking-wider hover:no-underline">
+            Course Mapping & Coordinators
+          </AccordionTrigger>
+          <AccordionContent className="space-y-6 pb-2 pt-4">
+            <div>
+              <h4 className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">
+                Faculty Mapping
+              </h4>
+              {loadingMappings ? (
+                <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading
+                  mappings...
+                </div>
+              ) : theoryMappings.length === 0 && labMappings.length === 0 ? (
+                <p className="text-muted-foreground text-sm italic">
+                  No faculty mapped.
+                </p>
+              ) : (
+                <div className="overflow-hidden rounded-md border">
+                  <Table className="text-sm">
+                    <TableBody>
+                      {theoryMappings.map((m) => (
+                        <TableRow key={m.sectionId + "-theory"}>
+                          <TableCell className="bg-muted/10 w-1/2 font-medium">
+                            Section {m.sectionName} (Theory)
+                          </TableCell>
+                          <TableCell>{m.facultyName}</TableCell>
+                        </TableRow>
+                      ))}
+                      {labMappings.map((m) => (
+                        <TableRow key={m.sectionId + m.batchName + "-lab"}>
+                          <TableCell className="bg-muted/10 w-1/2 font-medium">
+                            Section {m.sectionName} Lab {m.batchName}
+                          </TableCell>
+                          <TableCell>{m.facultyName}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
 
-      <div>
-        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-          Faculty Mapping
-        </h4>
-        {loadingMappings ? (
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Loader2 className="h-3 w-3 animate-spin" /> Loading mappings...
-          </div>
-        ) : theoryMappings.length === 0 && labMappings.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No faculty mapped.</p>
-        ) : (
-          <Table>
-            <TableBody>
-              {theoryMappings.map((m) => (
-                <TableRow key={m.sectionId + "-theory"}>
-                  <TableCell className="font-medium">
-                    Section {m.sectionName} (Theory)
-                  </TableCell>
-                  <TableCell>{m.facultyName}</TableCell>
-                </TableRow>
-              ))}
-              {labMappings.map((m) => (
-                <TableRow key={m.sectionId + m.batchName + "-lab"}>
-                  <TableCell className="font-medium">
-                    Section {m.sectionName} Lab {m.batchName}
-                  </TableCell>
-                  <TableCell>{m.facultyName}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
-
-      <div>
-        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-          Course Coordinators
-        </h4>
-        {loadingCoords ? (
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Loader2 className="h-3 w-3 animate-spin" /> Loading coordinators...
-          </div>
-        ) : coordinators && coordinators.length > 0 ? (
-          <ul className="list-inside list-disc text-sm">
-            {coordinators.map((c) => (
-              <li key={c.id}>{c.faculty.name}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            No coordinators appointed.
-          </p>
-        )}
-      </div>
-
-      <div>
-        <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-          Status
-        </h4>
-        <Badge>{course.approvalStatus || "DRAFT"}</Badge>
-      </div>
+            <div>
+              <h4 className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">
+                Assigned Coordinators
+              </h4>
+              {loadingCoords ? (
+                <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Loading
+                  coordinators...
+                </div>
+              ) : coordinators && coordinators.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {coordinators.map((c) => (
+                    <Badge key={c.id} variant="secondary" className="px-3 py-1">
+                      {c.faculty.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm italic">
+                  No coordinators appointed.
+                </p>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 };

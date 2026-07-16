@@ -46,8 +46,7 @@ export const useCreateSectionForm = (
 ) => {
   const queryClient = useQueryClient();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const departmentName =
-    options.fixedDepartmentName ?? "AUTH_SCOPED";
+  const departmentName = options.fixedDepartmentName ?? "AUTH_SCOPED";
   const semesterId = options.fixedSemesterId ?? "";
 
   const form = useForm({
@@ -169,6 +168,8 @@ export const useCreateCycleSectionsForm = (
       semesterNumber: options.semesterNumber,
       cycle: options.cycle,
       academicYear: options.academicYear,
+      studentsPerSection:
+        (values as { studentsPerSection?: number }).studentsPerSection || 60,
       allocations,
     });
   });
