@@ -135,8 +135,8 @@ interface GroupedCourseSubmission {
 }
 
 export class CourseService {
-  private static _ensureCourseIsEditable(status?: string) {
-    if (status === "PENDING" || status === "APPROVED") {
+  private static _ensureCourseIsEditable(status?: string, isAdmin?: boolean) {
+    if ((status === "PENDING" || status === "APPROVED") && !isAdmin) {
       throw new Error(
         "403 Forbidden: Course is locked for review/approval and cannot be modified"
       );
@@ -277,7 +277,8 @@ export class CourseService {
 
   static async update(
     data: UpdateCourseDTO,
-    requestContext?: DepartmentRequestContext
+    requestContext?: DepartmentRequestContext,
+    adminContext?: { isAdmin: boolean; adminUserId: string }
   ): Promise<BaseResponse<CourseWithDepartmentContext>> {
     try {
       const { id, departmentName, semesterId, cycle, ...updateFields } = data;
@@ -303,7 +304,10 @@ export class CourseService {
         throw new Error("Course not found");
       }
 
-      this._ensureCourseIsEditable(existing.approvalStatus);
+      this._ensureCourseIsEditable(
+        existing.approvalStatus,
+        adminContext?.isAdmin
+      );
 
       const merged: CreateCourseDTO = {
         code: updateFields.code ?? existing.code,
@@ -380,6 +384,24 @@ export class CourseService {
         },
       });
 
+      if (
+        adminContext?.isAdmin &&
+        (existing.approvalStatus === "PENDING" ||
+          existing.approvalStatus === "APPROVED")
+      ) {
+        await db.adminEditLog.create({
+          data: {
+            entityId: course.id,
+            entityType: "COURSE",
+            adminUserId: adminContext.adminUserId,
+            details: JSON.stringify({
+              action: "UPDATE",
+              previousFields: existing,
+            }),
+          },
+        });
+      }
+
       const response: BaseResponse<CourseWithDepartmentContext> = {
         status: "success",
         message: "Course updated successfully",
@@ -402,7 +424,8 @@ export class CourseService {
 
   static async delete(
     id: string,
-    requestContext?: DepartmentRequestContext
+    requestContext?: DepartmentRequestContext,
+    adminContext?: { isAdmin: boolean; adminUserId: string }
   ): Promise<BaseResponse<null>> {
     try {
       const resolvedDepartment = await this.resolveCourseDepartmentContext({
@@ -435,7 +458,10 @@ export class CourseService {
         throw new Error("Course not found");
       }
 
-      this._ensureCourseIsEditable(existing.approvalStatus);
+      this._ensureCourseIsEditable(
+        existing.approvalStatus,
+        adminContext?.isAdmin
+      );
 
       const { assignments, registrations, marks, attendances } =
         existing._count;
@@ -446,6 +472,21 @@ export class CourseService {
       }
 
       await db.course.delete({ where: { id } });
+
+      if (
+        adminContext?.isAdmin &&
+        (existing.approvalStatus === "PENDING" ||
+          existing.approvalStatus === "APPROVED")
+      ) {
+        await db.adminEditLog.create({
+          data: {
+            entityId: existing.id,
+            entityType: "COURSE",
+            adminUserId: adminContext.adminUserId,
+            details: JSON.stringify({ action: "DELETE" }),
+          },
+        });
+      }
 
       const response: BaseResponse<null> = {
         status: "success",

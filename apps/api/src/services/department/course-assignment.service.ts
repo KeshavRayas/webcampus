@@ -362,9 +362,26 @@ export class CourseAssignmentService {
         course.approvalStatus === "PENDING" ||
         course.approvalStatus === "APPROVED"
       ) {
-        throw new Error(
-          "403 Forbidden: Cannot modify faculty assignments for a locked course"
-        );
+        // ALLOW admins to bypass the lock for Super Edit Access
+        if (context?.requesterRole !== "admin") {
+          throw new Error(
+            "403 Forbidden: Cannot modify faculty assignments for a locked course"
+          );
+        }
+
+        if (context?.requesterRole === "admin") {
+          await db.adminEditLog.create({
+            data: {
+              entityId: course.id,
+              entityType: "COURSE_MAPPING",
+              adminUserId: requestingUserId,
+              details: JSON.stringify({
+                action: "UPSERT_MAPPING",
+                courseId: course.id,
+              }),
+            },
+          });
+        }
       }
 
       // RBAC: non-BASIC_SCIENCES cannot map first-year UG semesters
@@ -670,6 +687,33 @@ export class CourseAssignmentService {
 
       if (!semester) {
         throw new Error("Semester not found");
+      }
+
+      // bypass and audit logic for super edit access for admins
+
+      const course = await db.course.findUnique({ where: { id: courseId } });
+      if (
+        course &&
+        (course.approvalStatus === "PENDING" ||
+          course.approvalStatus === "APPROVED")
+      ) {
+        if (context?.requesterRole !== "admin") {
+          throw new Error(
+            "403 Forbidden: Cannot delete mappings for a locked course"
+          );
+        }
+
+        // logging the super admin deletion
+        if (context?.requesterRole === "admin") {
+          await db.adminEditLog.create({
+            data: {
+              entityId: courseId,
+              entityType: "COURSE_MAPPING",
+              adminUserId: requestingUserId,
+              details: JSON.stringify({ action: "DELETE_MAPPING", courseId }),
+            },
+          });
+        }
       }
 
       const result = await db.courseAssignment.deleteMany({

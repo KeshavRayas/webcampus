@@ -11,12 +11,18 @@ export class AdminCourseService {
     return CourseService.create(data);
   }
 
-  static update(data: UpdateCourseDTO) {
-    return CourseService.update(data);
+  static update(
+    data: UpdateCourseDTO,
+    adminContext?: { isAdmin: boolean; adminUserId: string }
+  ) {
+    return CourseService.update(data, undefined, adminContext);
   }
 
-  static delete(id: string) {
-    return CourseService.delete(id);
+  static delete(
+    id: string,
+    adminContext?: { isAdmin: boolean; adminUserId: string }
+  ) {
+    return CourseService.delete(id, undefined, adminContext);
   }
 
   static getById(id: string) {

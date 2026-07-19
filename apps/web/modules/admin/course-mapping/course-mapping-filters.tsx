@@ -17,7 +17,7 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import axios from "axios";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
@@ -59,96 +59,95 @@ export const AdminCourseMappingFilters = ({
 
   const { data: rawDepartments = [] } = useDepartments();
   const departments = rawDepartments.filter(
-    (d) => d.type !== "BASIC_SCIENCES" && d.type !== "SERVICE"
+    (department) =>
+      department.name !== "First Year" && department.type !== "SERVICE"
   );
+
+  const firstYearDepartment = rawDepartments.find(
+    (department) => department.name === "First Year"
+  );
+
   const { data: rawTerms } = useAcademicTerms();
   const terms = rawTerms ?? [];
-
-  useEffect(() => {
-    if (draftFilters.departmentName || departments.length === 0) {
-      return;
-    }
-
-    setDraftFilters((current) => ({
-      ...current,
-      departmentId: departments[0]!.id,
-      departmentName: departments[0]!.name,
-    }));
-  }, [departments, draftFilters.departmentName]);
-
-  const selectedDepartment = departments.find(
-    (department) => department.name === draftFilters.departmentName
-  );
-  const isBasicSciences = selectedDepartment?.type === "BASIC_SCIENCES";
 
   const selectedDraftTerm = terms.find(
     (term) => term.id === draftFilters.termId
   );
-  const nestedSemesters = selectedDraftTerm?.Semester ?? [];
+  const semesters = selectedDraftTerm?.Semester ?? [];
+  const selectedDraftSemester = semesters.find(
+    (semester) => semester.id === draftFilters.semesterId
+  );
+
+  const isFirstYearUG =
+    selectedDraftSemester?.programType == "UG" &&
+    FIRST_YEAR_UG_SEMESTERS.has(selectedDraftSemester?.semesterNumber);
 
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: nestedSemesters,
+    semesters: semesters,
   });
 
-  const semesterOptions = useMemo(() => {
-    const isFirstYearUgSemester = (semester: {
-      programType: string;
-      semesterNumber: number;
-    }) =>
-      semester.programType === "UG" &&
-      FIRST_YEAR_UG_SEMESTERS.has(semester.semesterNumber);
-
-    if (isBasicSciences) {
-      return nestedSemesters.filter((semester) =>
-        isFirstYearUgSemester(semester)
-      );
-    }
-
-    return nestedSemesters.filter(
-      (semester) => !isFirstYearUgSemester(semester)
-    );
-  }, [isBasicSciences, nestedSemesters]);
-
-  useEffect(() => {
-    if (isBasicSciences && !draftFilters.cycle) {
-      setDraftFilters((current) => ({
-        ...current,
-        cycle: BASIC_SCIENCES_CYCLE_OPTIONS[0],
-      }));
-    }
-
-    if (!isBasicSciences && draftFilters.cycle) {
-      setDraftFilters((current) => ({ ...current, cycle: "" }));
-    }
-  }, [draftFilters.cycle, isBasicSciences]);
-
+  // Default to current term
   useEffect(() => {
     if (!draftFilters.termId && terms.length > 0) {
       const currentTerm = terms.find((term) => term.isCurrent) ?? terms[0];
-      if (currentTerm) {
-        setDraftFilters((current) => ({ ...current, termId: currentTerm.id }));
-      }
+      setDraftFilters((current) => ({
+        ...current,
+        termId: currentTerm?.id ?? "",
+      }));
     }
   }, [draftFilters.termId, terms]);
 
+  // Default to the first semester of the term
   useEffect(() => {
     if (
       draftFilters.termId &&
       !draftFilters.semesterId &&
-      semesterOptions.length > 0
+      semesters.length > 0
     ) {
       setDraftFilters((current) => ({
         ...current,
-        semesterId: semesterOptions[0]!.id,
+        semesterId: semesters[0]?.id ?? "",
       }));
     }
-  }, [draftFilters.semesterId, draftFilters.termId, semesterOptions]);
+  }, [draftFilters.termId, draftFilters.semesterId, semesters]);
+
+  // Handle First Year (Cycle) vs Higher Semesters (Branch) & ID Mapping
+  useEffect(() => {
+    if (isFirstYearUG && !draftFilters.cycle) {
+      setDraftFilters((current) => ({
+        ...current,
+        cycle: BASIC_SCIENCES_CYCLE_OPTIONS[0],
+        departmentName: "First Year",
+        departmentId: firstYearDepartment?.id ?? "",
+      }));
+    } else if (
+      !isFirstYearUG &&
+      (!draftFilters.departmentName ||
+        draftFilters.departmentName === "First Year") &&
+      departments.length > 0
+    ) {
+      setDraftFilters((current) => ({
+        ...current,
+        cycle: "",
+        departmentName: departments[0]?.name ?? "",
+        departmentId: departments[0]?.id ?? "",
+      }));
+    }
+  }, [
+    isFirstYearUG,
+    draftFilters.cycle,
+    draftFilters.departmentName,
+    departments,
+    firstYearDepartment,
+  ]);
+
+  // Fetch courses dynamically based on Term/Semester/Cycle/Branch
 
   const { data: rawCourses, isLoading: loadingCourses } = useQuery({
     queryKey: [
       "admin-course-mapping-status",
-      draftFilters.departmentName,
+      draftFilters.departmentId,
       draftFilters.semesterId,
       selectedDraftTerm?.year,
       draftFilters.cycle,
@@ -171,22 +170,21 @@ export const AdminCourseMappingFilters = ({
           departmentName: draftFilters.departmentName,
           semesterId: draftFilters.semesterId,
           academicYear: selectedDraftTerm.year,
-          ...(isBasicSciences && draftFilters.cycle
+          ...(isFirstYearUG && draftFilters.cycle
             ? { cycle: draftFilters.cycle }
             : {}),
         },
         withCredentials: true,
       });
 
-      if (res.data.status === "success" && res.data.data?.courses) {
+      if (res.data.status == "success" && res.data.data?.courses) {
         return res.data.data.courses;
       }
-
       return [];
     },
+
     enabled:
       !!draftFilters.departmentId &&
-      !!draftFilters.departmentName &&
       !!draftFilters.semesterId &&
       !!selectedDraftTerm?.year,
   });
@@ -196,7 +194,6 @@ export const AdminCourseMappingFilters = ({
   const applyFilters = async () => {
     if (
       !draftFilters.departmentId ||
-      !draftFilters.departmentName ||
       !draftFilters.termId ||
       !draftFilters.semesterId ||
       !draftFilters.courseId
@@ -204,10 +201,8 @@ export const AdminCourseMappingFilters = ({
       return;
     }
 
-    const term = terms.find((item) => item.id === draftFilters.termId);
-    if (!term) {
-      return;
-    }
+    const term = terms.find((t) => t.id === draftFilters.termId);
+    if (!term) return;
 
     try {
       const res = await axios.get<BaseResponse<CourseResponseDTO>>(
@@ -220,6 +215,10 @@ export const AdminCourseMappingFilters = ({
         onAppliedFiltersChange({
           ...draftFilters,
           academicYear: term.year,
+          cycle: isFirstYearUG ? draftFilters.cycle : "",
+          departmentName: isFirstYearUG
+            ? "First Year"
+            : draftFilters.departmentName,
         });
       } else {
         toast.error(res.data.message || "Failed to load course details");
@@ -231,14 +230,18 @@ export const AdminCourseMappingFilters = ({
   };
 
   const resetFilters = () => {
-    setDraftFilters({
+    setDraftFilters((current) => ({
       ...EMPTY_FILTERS,
-      departmentId: draftFilters.departmentId,
-      departmentName: draftFilters.departmentName,
-      termId: draftFilters.termId,
-      semesterId: draftFilters.semesterId,
-      cycle: isBasicSciences ? draftFilters.cycle : "",
-    });
+      termId: current.termId,
+      semesterId: current.semesterId,
+      cycle: isFirstYearUG ? current.cycle : "",
+      departmentName: isFirstYearUG
+        ? "First Year"
+        : (departments[0]?.name ?? ""),
+      departmentId: isFirstYearUG
+        ? (firstYearDepartment?.id ?? "")
+        : (departments[0]?.id ?? ""),
+    }));
     onAppliedFiltersChange(null);
     onCourseSelect(null);
   };
@@ -250,21 +253,24 @@ export const AdminCourseMappingFilters = ({
       type: "select",
       hideAllOption: true,
       options: terms.map((term) => ({
-        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)}${term.year}`,
         value: term.id,
       })),
     },
     {
       key: "semesterId",
-      label: "Semester",
+      label: "Semster",
       type: "select",
       hideAllOption: true,
-      options: semesterOptions.map((semester) => ({
+      placeholder: draftFilters.termId
+        ? "Select semester..."
+        : "Select term first",
+      options: semesters.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
     },
-    ...(isBasicSciences
+    ...(isFirstYearUG
       ? [
           {
             key: "cycle",
@@ -277,23 +283,24 @@ export const AdminCourseMappingFilters = ({
             })),
           } as FilterFieldConfig<typeof EMPTY_FILTERS>,
         ]
-      : []),
-    {
-      key: "departmentName",
-      label: "Department",
-      type: "select",
-      hideAllOption: true,
-      options: departments.map((department) => ({
-        label: department.name,
-        value: department.name,
-      })),
-    },
+      : [
+          {
+            key: "departmentName",
+            label: "Department (Branch)",
+            type: "select",
+            hideAllOption: true,
+            options: departments.map((department) => ({
+              label: department.name,
+              value: department.name,
+            })),
+          } as FilterFieldConfig<typeof EMPTY_FILTERS>,
+        ]),
     {
       key: "courseId",
       label: "Course",
       type: "select",
       hideAllOption: true,
-      placeholder: loadingCourses ? "Loading courses..." : "Select a course",
+      placeholder: loadingCourses ? "Loading Courses..." : "Select a course",
       options: courses.map((course) => ({
         label: `${course.code} - ${course.name} [${course.status}]`,
         value: course.courseId,
@@ -309,22 +316,21 @@ export const AdminCourseMappingFilters = ({
         onDraftChange={(key, value) => {
           setDraftFilters((current) => {
             const next = { ...current, [key]: value };
-            if (
-              key === "departmentName" ||
-              key === "termId" ||
-              key === "semesterId" ||
-              key === "cycle"
-            ) {
-              next.courseId = "";
-            }
-            if (key === "departmentName") {
-              const selected = departments.find(
-                (department) => department.name === value
-              );
-              next.departmentId = selected?.id ?? "";
-              next.termId = "";
+
+            if (key === "termId") {
               next.semesterId = "";
               next.cycle = "";
+              next.courseId = "";
+            } else if (key === "semesterId") {
+              next.cycle = "";
+              next.courseId = "";
+            } else if (key === "cycle" || key === "departmentName") {
+              next.courseId = "";
+            }
+
+            if (key === "departmentName") {
+              const selected = departments.find((d) => d.name === value);
+              next.departmentId = selected?.id ?? "";
             }
             return next;
           });

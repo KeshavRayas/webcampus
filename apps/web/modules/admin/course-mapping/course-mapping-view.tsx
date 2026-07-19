@@ -1,9 +1,13 @@
 "use client";
 
 import { useDepartments } from "@/lib/use-departments";
+import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
-import { Lock } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Button } from "@webcampus/ui/components/button";
+import axios from "axios";
+import { Download, Lock, Upload } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import { CourseDetailsCard } from "../../department/course-mapping/course-details-card";
 import {
   AdminCourseMappingFilters,
@@ -17,6 +21,82 @@ export const AdminCourseMappingView = () => {
     useState<AdminCourseMappingFiltersState | null>(null);
   const [selectedCourse, setSelectedCourse] =
     useState<CourseResponseDTO | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isProcessingExcel, setIsProcessingExcel] = useState(false);
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+
+  const handleDownloadTemplate = async () => {
+    if (!selectedCourse || !appliedFilters) return;
+    try {
+      setIsProcessingExcel(true);
+      const res = await axios.get(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/excel/template`,
+        {
+          params: {
+            courseId: selectedCourse.id,
+            semesterId: appliedFilters.semesterId,
+            departmentId: appliedFilters.departmentId,
+          },
+          responseType: "blob",
+          withCredentials: true,
+        }
+      );
+
+      // create a blob link to download
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `${selectedCourse.code}_mapping_template.xlsx`
+      );
+      document.body.appendChild(link);
+
+      link.click();
+      link.remove();
+    } catch (error: unknown) {
+      console.error(error);
+      toast.error("Failed to download template");
+    } finally {
+      setIsProcessingExcel(false);
+    }
+  };
+
+  const handleUploadExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCourse || !appliedFilters) return;
+
+    try {
+      setIsProcessingExcel(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("courseId", selectedCourse.id);
+      formData.append("semesterId", appliedFilters.semesterId);
+      formData.append("departmentId", appliedFilters.departmentId);
+      formData.append("academicYear", appliedFilters.academicYear);
+
+      await axios.post(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/excel/upload`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          withCredentials: true,
+        }
+      );
+
+      toast.success("Excel mapping uploaded successfully");
+
+      // Can optionally trigger a re-fetch of course assignments here
+    } catch (error: unknown) {
+      console.error(error);
+      toast.error("Failed to upload Excel mapping");
+    } finally {
+      setIsProcessingExcel(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const selectedDepartment = useMemo(
     () =>
@@ -62,9 +142,39 @@ export const AdminCourseMappingView = () => {
 
             <div className="bg-card text-card-foreground w-full overflow-hidden rounded-xl border shadow-sm">
               <div className="p-6">
-                <h3 className="mb-4 text-lg font-semibold">
-                  Faculty Assignments
-                </h3>
+                {/* --- Excel Action Buttons --- */}
+                <div className="mb-4 flex flex-row items-center justify-between">
+                  <h3 className="text-lg font-semibold">Faculty Assignments</h3>
+
+                  {!isCourseLocked && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleDownloadTemplate}
+                        disabled={isProcessingExcel}
+                      >
+                        <Download className="mr-2 h-4 w-4" /> Download Template
+                      </Button>
+
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept=".xlsx"
+                        onChange={handleUploadExcel}
+                      />
+
+                      <Button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isProcessingExcel}
+                      >
+                        <Upload className="mr-2 h-4 w-4" /> Upload Excel
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                {/* --- End of Excel Action Buttons --- */}
+
                 <AdminCourseMappingGrid
                   course={selectedCourse}
                   departmentId={selectedDepartment.id}

@@ -61,159 +61,340 @@ export const AdminCoursesView = () => {
     setAppliedFilters(nextFilters);
   }, [searchParams]);
 
+  // const { data: rawDepartments = [] } = useDepartments();
+  // const departments = rawDepartments.filter(
+  //   (d) => d.type !== "BASIC_SCIENCES" && d.type !== "SERVICE"
+  // );
+  // const { data: termsData } = useAcademicTerms();
+  // const terms = termsData ?? [];
+
+  // useEffect(() => {
+  //   if (draftFilters.departmentName || departments.length === 0) {
+  //     return;
+  //   }
+
+  //   setDraftFilters((current) => ({
+  //     ...current,
+  //     departmentName: departments[0]!.name,
+  //   }));
+  // }, [departments, draftFilters.departmentName]);
+
+  // const selectedDepartment = departments.find(
+  //   (department) => department.name === draftFilters.departmentName
+  // );
+  // const isBasicSciences = selectedDepartment?.type === "BASIC_SCIENCES";
+
+  // useEffect(() => {
+  //   if (isBasicSciences && !draftFilters.cycle) {
+  //     setDraftFilters((current) => ({
+  //       ...current,
+  //       cycle: BASIC_SCIENCES_CYCLE_OPTIONS[0],
+  //     }));
+  //     return;
+  //   }
+
+  //   if (!isBasicSciences && draftFilters.cycle) {
+  //     setDraftFilters((current) => ({ ...current, cycle: "" }));
+  //   }
+  // }, [draftFilters.cycle, isBasicSciences]);
+
+  // const selectedDraftTerm = terms.find(
+  //   (term) => term.id === draftFilters.termId
+  // );
+  // const allSemestersForSelectedDraftTerm = selectedDraftTerm?.Semester ?? [];
+
+  // useCascadingFilterSync(draftFilters, setDraftFilters, {
+  //   academicTerms: terms,
+  //   semesters: allSemestersForSelectedDraftTerm,
+  // });
+
+  // const semesterOptions = useMemo(() => {
+  //   const isFirstYearUgSemester = (semester: {
+  //     programType: string;
+  //     semesterNumber: number;
+  //   }) =>
+  //     semester.programType === "UG" &&
+  //     FIRST_YEAR_UG_SEMESTERS.has(semester.semesterNumber);
+
+  //   if (isBasicSciences) {
+  //     return allSemestersForSelectedDraftTerm.filter((semester) =>
+  //       isFirstYearUgSemester(semester)
+  //     );
+  //   }
+
+  //   return allSemestersForSelectedDraftTerm.filter(
+  //     (semester) => !isFirstYearUgSemester(semester)
+  //   );
+  // }, [allSemestersForSelectedDraftTerm, isBasicSciences]);
+
+  // useEffect(() => {
+  //   if (draftFilters.termId || terms.length === 0) {
+  //     return;
+  //   }
+
+  //   const currentTerm = terms.find((term) => term.isCurrent) ?? terms[0];
+  //   if (currentTerm) {
+  //     setDraftFilters((current) => ({
+  //       ...current,
+  //       termId: currentTerm.id,
+  //     }));
+  //   }
+  // }, [draftFilters.termId, terms]);
+
+  // useEffect(() => {
+  //   if (!draftFilters.termId || draftFilters.semesterId) {
+  //     return;
+  //   }
+
+  //   if (semesterOptions.length > 0) {
+  //     setDraftFilters((current) => ({
+  //       ...current,
+  //       semesterId: semesterOptions[0]!.id,
+  //     }));
+  //   }
+  // }, [draftFilters.semesterId, draftFilters.termId, semesterOptions]);
+
+  // useEffect(() => {
+  //   if (!draftFilters.semesterId) {
+  //     return;
+  //   }
+
+  //   const isSelectedSemesterAllowed = semesterOptions.some(
+  //     (semester) => semester.id === draftFilters.semesterId
+  //   );
+
+  //   if (!isSelectedSemesterAllowed) {
+  //     setDraftFilters((current) => ({ ...current, semesterId: "" }));
+  //   }
+  // }, [draftFilters.semesterId, semesterOptions]);
+
+  // useEffect(() => {
+  //   if (appliedFilters.termId && appliedFilters.semesterId) {
+  //     return;
+  //   }
+
+  //   if (
+  //     !draftFilters.termId ||
+  //     !draftFilters.semesterId ||
+  //     !draftFilters.departmentName
+  //   ) {
+  //     return;
+  //   }
+
+  //   setAppliedFilters({
+  //     ...draftFilters,
+  //     cycle: isBasicSciences
+  //       ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
+  //       : "",
+  //   });
+  // }, [
+  //   appliedFilters.semesterId,
+  //   appliedFilters.termId,
+  //   draftFilters,
+  //   isBasicSciences,
+  // ]);
+
+  // const selectedAppliedTerm = terms.find(
+  //   (term) => term.id === appliedFilters.termId
+  // );
+  // const selectedAppliedSemester = (selectedAppliedTerm?.Semester || []).find(
+  //   (semester) => semester.id === appliedFilters.semesterId
+  // );
+
+  // const applyFilters = () => {
+  //   const nextFilters = {
+  //     ...draftFilters,
+  //     cycle: isBasicSciences
+  //       ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
+  //       : "",
+  //   };
+
+  //   setAppliedFilters(nextFilters);
+  //   const query = createFilterQueryString(nextFilters);
+  //   router.replace(`${pathname}${query ? `?${query}` : ""}`, {
+  //     scroll: false,
+  //   });
+  // };
+
+  // const resetFilters = () => {
+  //   setDraftFilters(EMPTY_FILTERS);
+  //   setAppliedFilters(EMPTY_FILTERS);
+  //   router.replace(pathname, { scroll: false });
+  // };
+
+  // const courseFilterFields: FilterFieldConfig<AdminCoursesFilters>[] = [
+  //   {
+  //     key: "termId",
+  //     label: "Academic Term",
+  //     type: "select",
+  //     options: terms.map((term) => ({
+  //       label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+  //       value: term.id,
+  //     })),
+  //     hideAllOption: true,
+  //   },
+  //   {
+  //     key: "semesterId",
+  //     label: "Semester",
+  //     type: "select",
+  //     options: semesterOptions.map((semester) => ({
+  //       label: `${semester.programType} - Semester ${semester.semesterNumber}`,
+  //       value: semester.id,
+  //     })),
+  //     placeholder: draftFilters.termId
+  //       ? "Select semester..."
+  //       : "Select term first",
+  //     hideAllOption: true,
+  //   },
+  //   ...(isBasicSciences
+  //     ? [
+  //         {
+  //           key: "cycle",
+  //           label: "Cycle",
+  //           type: "select",
+  //           options: BASIC_SCIENCES_CYCLE_OPTIONS.map((cycle) => ({
+  //             label: cycle,
+  //             value: cycle,
+  //           })),
+  //           hideAllOption: true,
+  //         } as FilterFieldConfig<AdminCoursesFilters>,
+  //       ]
+  //     : []),
+  //   {
+  //     key: "departmentName",
+  //     label: "Department",
+  //     type: "select",
+  //     options: departments.map((department) => ({
+  //       label: department.name,
+  //       value: department.name,
+  //     })),
+  //     hideAllOption: true,
+  //   },
+  // ];
+
+  // FIX: Subarno - changed the filtering logic to ensure mapping works seamlessly.
+
   const { data: rawDepartments = [] } = useDepartments();
   const departments = rawDepartments.filter(
-    (d) => d.type !== "BASIC_SCIENCES" && d.type !== "SERVICE"
+    (d) => d.name !== "First Year" && d.type !== "SERVICE"
   );
+
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
-
-  useEffect(() => {
-    if (draftFilters.departmentName || departments.length === 0) {
-      return;
-    }
-
-    setDraftFilters((current) => ({
-      ...current,
-      departmentName: departments[0]!.name,
-    }));
-  }, [departments, draftFilters.departmentName]);
-
-  const selectedDepartment = departments.find(
-    (department) => department.name === draftFilters.departmentName
-  );
-  const isBasicSciences = selectedDepartment?.type === "BASIC_SCIENCES";
-
-  useEffect(() => {
-    if (isBasicSciences && !draftFilters.cycle) {
-      setDraftFilters((current) => ({
-        ...current,
-        cycle: BASIC_SCIENCES_CYCLE_OPTIONS[0],
-      }));
-      return;
-    }
-
-    if (!isBasicSciences && draftFilters.cycle) {
-      setDraftFilters((current) => ({ ...current, cycle: "" }));
-    }
-  }, [draftFilters.cycle, isBasicSciences]);
 
   const selectedDraftTerm = terms.find(
     (term) => term.id === draftFilters.termId
   );
-  const allSemestersForSelectedDraftTerm = selectedDraftTerm?.Semester ?? [];
+  const semesters = selectedDraftTerm?.Semester ?? [];
+
+  const selectedDraftSemester = semesters.find(
+    (semester) => semester.id === draftFilters.semesterId
+  );
+
+  const isFirstYearUG =
+    selectedDraftSemester?.programType === "UG" &&
+    FIRST_YEAR_UG_SEMESTERS.has(selectedDraftSemester?.semesterNumber);
 
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: allSemestersForSelectedDraftTerm,
+    semesters: semesters,
   });
 
-  const semesterOptions = useMemo(() => {
-    const isFirstYearUgSemester = (semester: {
-      programType: string;
-      semesterNumber: number;
-    }) =>
-      semester.programType === "UG" &&
-      FIRST_YEAR_UG_SEMESTERS.has(semester.semesterNumber);
-
-    if (isBasicSciences) {
-      return allSemestersForSelectedDraftTerm.filter((semester) =>
-        isFirstYearUgSemester(semester)
-      );
-    }
-
-    return allSemestersForSelectedDraftTerm.filter(
-      (semester) => !isFirstYearUgSemester(semester)
-    );
-  }, [allSemestersForSelectedDraftTerm, isBasicSciences]);
-
   useEffect(() => {
-    if (draftFilters.termId || terms.length === 0) {
-      return;
-    }
-
-    const currentTerm = terms.find((term) => term.isCurrent) ?? terms[0];
-    if (currentTerm) {
+    if (!draftFilters.termId && terms.length > 0) {
+      const currentTerm = terms.find((term) => term.isCurrent) ?? terms[0];
       setDraftFilters((current) => ({
         ...current,
-        termId: currentTerm.id,
+        termId: currentTerm?.id ?? "",
       }));
     }
   }, [draftFilters.termId, terms]);
 
   useEffect(() => {
-    if (!draftFilters.termId || draftFilters.semesterId) {
-      return;
-    }
-
-    if (semesterOptions.length > 0) {
+    if (
+      draftFilters.termId &&
+      !draftFilters.semesterId &&
+      semesters.length > 0
+    ) {
       setDraftFilters((current) => ({
         ...current,
-        semesterId: semesterOptions[0]!.id,
+        semesterId: semesters[0]?.id ?? "",
       }));
     }
-  }, [draftFilters.semesterId, draftFilters.termId, semesterOptions]);
+  }, [draftFilters.termId, draftFilters.semesterId, semesters]);
 
   useEffect(() => {
-    if (!draftFilters.semesterId) {
-      return;
+    if (isFirstYearUG && !draftFilters.cycle) {
+      setDraftFilters((current) => ({
+        ...current,
+        cycle: BASIC_SCIENCES_CYCLE_OPTIONS[0],
+        departmentName: "First Year",
+      }));
+    } else if (
+      !isFirstYearUG &&
+      !draftFilters.departmentName &&
+      departments.length > 0
+    ) {
+      setDraftFilters((current) => ({
+        ...current,
+        cycle: "",
+        departmentName: departments[0]?.name ?? "",
+      }));
     }
-
-    const isSelectedSemesterAllowed = semesterOptions.some(
-      (semester) => semester.id === draftFilters.semesterId
-    );
-
-    if (!isSelectedSemesterAllowed) {
-      setDraftFilters((current) => ({ ...current, semesterId: "" }));
-    }
-  }, [draftFilters.semesterId, semesterOptions]);
+  }, [
+    isFirstYearUG,
+    draftFilters.cycle,
+    draftFilters.departmentName,
+    departments,
+  ]);
 
   useEffect(() => {
-    if (appliedFilters.termId && appliedFilters.semesterId) {
-      return;
-    }
-
+    if (appliedFilters.termId && appliedFilters.semesterId) return;
     if (
       !draftFilters.termId ||
       !draftFilters.semesterId ||
       !draftFilters.departmentName
-    ) {
+    )
       return;
-    }
 
     setAppliedFilters({
       ...draftFilters,
-      cycle: isBasicSciences
+      cycle: isFirstYearUG
         ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
         : "",
+      departmentName: isFirstYearUG
+        ? "First Year"
+        : draftFilters.departmentName,
     });
   }, [
     appliedFilters.semesterId,
     appliedFilters.termId,
     draftFilters,
-    isBasicSciences,
+    isFirstYearUG,
   ]);
 
-  const selectedAppliedTerm = terms.find(
-    (term) => term.id === appliedFilters.termId
+  const selectedappliedTerm = terms.find(
+    (terms) => terms.id === appliedFilters.termId
   );
-  const selectedAppliedSemester = (selectedAppliedTerm?.Semester || []).find(
+  const selectedAppliedSemester = (selectedappliedTerm?.Semester || []).find(
     (semester) => semester.id === appliedFilters.semesterId
   );
 
   const applyFilters = () => {
     const nextFilters = {
       ...draftFilters,
-      cycle: isBasicSciences
+      cycle: isFirstYearUG
         ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
         : "",
+      departmentName: isFirstYearUG
+        ? "First Year"
+        : draftFilters.departmentName,
     };
 
     setAppliedFilters(nextFilters);
+
     const query = createFilterQueryString(nextFilters);
-    router.replace(`${pathname}${query ? `?${query}` : ""}`, {
-      scroll: false,
-    });
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
   };
 
   const resetFilters = () => {
@@ -228,7 +409,7 @@ export const AdminCoursesView = () => {
       label: "Academic Term",
       type: "select",
       options: terms.map((term) => ({
-        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)}${term.year}`,
         value: term.id,
       })),
       hideAllOption: true,
@@ -237,7 +418,7 @@ export const AdminCoursesView = () => {
       key: "semesterId",
       label: "Semester",
       type: "select",
-      options: semesterOptions.map((semester) => ({
+      options: semesters.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
@@ -246,7 +427,7 @@ export const AdminCoursesView = () => {
         : "Select term first",
       hideAllOption: true,
     },
-    ...(isBasicSciences
+    ...(isFirstYearUG
       ? [
           {
             key: "cycle",
@@ -256,21 +437,24 @@ export const AdminCoursesView = () => {
               label: cycle,
               value: cycle,
             })),
-            hideAllOption: true,
+            hideAllOptions: true,
           } as FilterFieldConfig<AdminCoursesFilters>,
         ]
-      : []),
-    {
-      key: "departmentName",
-      label: "Department",
-      type: "select",
-      options: departments.map((department) => ({
-        label: department.name,
-        value: department.name,
-      })),
-      hideAllOption: true,
-    },
+      : [
+          {
+            key: "departmentName",
+            label: "Department (Branch)",
+            type: "select",
+            options: departments.map((department) => ({
+              label: department.name,
+              value: department.name,
+            })),
+            hideAllOption: true,
+          } as FilterFieldConfig<AdminCoursesFilters>,
+        ]),
   ];
+
+  // continue the rest of the code from here
 
   const { data: courses, isLoading: coursesLoading } = useQuery({
     queryKey: [
@@ -286,7 +470,7 @@ export const AdminCoursesView = () => {
           params: {
             departmentName: appliedFilters.departmentName,
             semesterId: appliedFilters.semesterId,
-            ...(isBasicSciences && appliedFilters.cycle
+            ...(isFirstYearUG && appliedFilters.cycle
               ? { cycle: appliedFilters.cycle }
               : {}),
           },
@@ -304,20 +488,20 @@ export const AdminCoursesView = () => {
   });
 
   const appliedCycle =
-    isBasicSciences && appliedFilters.cycle
+    isFirstYearUG && appliedFilters.cycle
       ? (appliedFilters.cycle as CourseCycle)
       : "NONE";
 
   const filteredCourses = useMemo(() => {
     const courseList = courses ?? [];
-    if (!isBasicSciences || !appliedFilters.cycle) {
+    if (!isFirstYearUG || !appliedFilters.cycle) {
       return courseList;
     }
 
     return courseList.filter(
       (course) => (course.cycle ?? "NONE") === appliedCycle
     );
-  }, [appliedCycle, appliedFilters.cycle, courses, isBasicSciences]);
+  }, [appliedCycle, appliedFilters.cycle, courses, isFirstYearUG]);
 
   const isSemesterLocked = useMemo(() => {
     return filteredCourses.some(
@@ -387,7 +571,7 @@ export const AdminCoursesView = () => {
               courses={filteredCourses}
               selectedCycle={appliedCycle}
               selectedDepartmentName={appliedFilters.departmentName}
-              isBasicSciences={isBasicSciences}
+              isBasicSciences={isFirstYearUG}
               isSemesterLocked={isSemesterLocked}
             />
           )}

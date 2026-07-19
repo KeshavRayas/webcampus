@@ -1,4 +1,5 @@
 import { AdminCourseService } from "@webcampus/api/src/services/admin/course.service";
+import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
@@ -10,6 +11,8 @@ import type {
   UpdateCourseDTO,
 } from "@webcampus/schemas/department";
 import type { Request, Response } from "express";
+
+// import { GetBucketEncryptionRequest$ } from "@aws-sdk/client-s3";
 
 export class AdminCourseController {
   static async create(req: Request, res: Response): Promise<void> {
@@ -43,8 +46,18 @@ export class AdminCourseController {
 
   static async update(req: Request, res: Response): Promise<void> {
     try {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(req.headers),
+      });
+
+      if (!session?.user?.id) throw new Error("Unauthorized");
+
       const request: UpdateCourseDTO = req.body;
-      const response = await AdminCourseService.update(request);
+      // const response = await AdminCourseService.update(request);
+      const response = await AdminCourseService.update(request, {
+        isAdmin: true,
+        adminUserId: session.user.id,
+      });
 
       if (response.status !== "success") {
         throw new Error(response.message);
@@ -72,8 +85,16 @@ export class AdminCourseController {
 
   static async delete(req: Request, res: Response): Promise<void> {
     try {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(req.headers),
+      });
+      if (!session?.user?.id) throw new Error("Unauthorized");
+
       const request: DeleteCourseDTO = req.body;
-      const response = await AdminCourseService.delete(request.id);
+      const response = await AdminCourseService.delete(request.id, {
+        isAdmin: true,
+        adminUserId: session.user.id,
+      });
 
       if (response.status !== "success") {
         throw new Error(response.message);

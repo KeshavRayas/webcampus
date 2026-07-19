@@ -33,6 +33,7 @@ model User {
   student               Student?
   accounts              Account[]
   sessions              Session[]
+  adminEditLogs         AdminEditLog[]
 
   @@map("user")
 }
@@ -931,6 +932,17 @@ enum FreezeActorRole {
 enum AttendanceStatus {
   PRESENT
   ABSENT
+}
+
+model AdminEditLog {
+  id          String   @id @default(uuid())
+  entityId    String   // courseId or courseAssignmentId
+  entityType  String   // "COURSE" | "COURSE_MAPPING"
+  adminUserId String
+  editedAt    DateTime @default(now())
+  details     String?  // JSON string describing what was changed
+  
+  adminUser   User     @relation(fields: [adminUserId], references: [id])
 }
 
 

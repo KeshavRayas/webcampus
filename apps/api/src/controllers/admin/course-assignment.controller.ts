@@ -1,4 +1,5 @@
 import { AdminCourseAssignmentService } from "@webcampus/api/src/services/admin/course-assignment.service";
+import { AdminCourseMappingExcelService } from "@webcampus/api/src/services/admin/course-mapping-excel.service";
 import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
@@ -78,13 +79,12 @@ export class AdminCourseAssignmentController {
         academicYear,
         requestingUserId,
         {
-          departmentId:
-            (req.query as AdminCourseMappingByCourseQueryType).departmentId,
-          departmentName:
-            (req.query as AdminCourseMappingByCourseQueryType).departmentId
-              ? undefined
-              : (req.query as AdminCourseMappingByCourseQueryType)
-                  .departmentName,
+          departmentId: (req.query as AdminCourseMappingByCourseQueryType)
+            .departmentId,
+          departmentName: (req.query as AdminCourseMappingByCourseQueryType)
+            .departmentId
+            ? undefined
+            : (req.query as AdminCourseMappingByCourseQueryType).departmentName,
         }
       );
 
@@ -243,6 +243,75 @@ export class AdminCourseAssignmentController {
     }
   }
 
+  static async downloadTemplate(req: Request, res: Response): Promise<void> {
+    try {
+      const { courseId, semesterId, departmentId } = req.query as {
+        courseId: string;
+        semesterId: string;
+        departmentId: string;
+      };
+      const buffer = await AdminCourseMappingExcelService.generateTemplate(
+        courseId,
+        semesterId,
+        departmentId
+      );
+
+      // not using sendResponse here because we are sending a raw binary file stream
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=course-mapping-template.xlsx"
+      );
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.send(buffer);
+    } catch (error) {
+      logger.error("Error generating Excel template", { error });
+      res.status(500).send("Failed to generate Excel template");
+    }
+  }
+
+  static async uploadTemplate(req: Request, res: Response): Promise<void> {
+    try {
+      const { courseId, semesterId, departmentId, academicYear } = req.body;
+      const file = req.file; // provided by multer middleware
+      const requestingUserId =
+        await AdminCourseAssignmentController.getRequestingUserId(req);
+
+      if (!file) throw new Error("No file uploaded");
+
+      const response =
+        await AdminCourseMappingExcelService.parseAndUpsertUpload(
+          file.buffer, // passing the raw memory buffer to our service
+          courseId,
+          semesterId,
+          departmentId,
+          academicYear,
+          requestingUserId
+        );
+
+      sendResponse({
+        res,
+        status: "success",
+        statusCode: 200,
+        message: "Excel mappings uploaded successfully",
+        data: response,
+      });
+    } catch (error: unknown) {
+      console.error(error);
+      logger.error("Error uploading excel mapping", { error });
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
   static async deleteMappings(req: Request, res: Response): Promise<void> {
     try {
       const { courseId, semesterId, academicYear } = req.body as {
@@ -279,7 +348,8 @@ export class AdminCourseAssignmentController {
         message: response.message,
         data: response.data,
       });
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error(error);
       logger.error("Error deleting admin mappings", { error });
       sendResponse({
         res,
