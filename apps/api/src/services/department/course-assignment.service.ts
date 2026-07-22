@@ -1,4 +1,9 @@
 import { ensureFreezeRowTx } from "@webcampus/api/src/services/faculty/freeze.service";
+import {
+  checkAndIncrementOptimisticVersion,
+  diffLists,
+  logChanges,
+} from "@webcampus/api/src/services/shared/audit.service";
 import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
@@ -8,6 +13,7 @@ import type {
 } from "@webcampus/schemas/department";
 import type { BaseResponse } from "@webcampus/types/api";
 import type { DepartmentRequestContext } from "@webcampus/types/request-context";
+import ExcelJS from "exceljs";
 
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 
@@ -20,6 +26,11 @@ type MappingContext = {
   departmentName?: string;
   requesterRole?: "admin" | "department";
   requestContext?: DepartmentRequestContext;
+  adminUserId?: string;
+  clientVersion?: number;
+  reason?: string;
+  ipAddress?: string;
+  userAgent?: string;
 };
 
 export class CourseAssignmentService {
@@ -362,27 +373,31 @@ export class CourseAssignmentService {
         course.approvalStatus === "PENDING" ||
         course.approvalStatus === "APPROVED"
       ) {
-        // ALLOW admins to bypass the lock for Super Edit Access
         if (context?.requesterRole !== "admin") {
           throw new Error(
             "403 Forbidden: Cannot modify faculty assignments for a locked course"
           );
         }
-
-        if (context?.requesterRole === "admin") {
-          await db.adminEditLog.create({
-            data: {
-              entityId: course.id,
-              entityType: "COURSE_MAPPING",
-              adminUserId: requestingUserId,
-              details: JSON.stringify({
-                action: "UPSERT_MAPPING",
-                courseId: course.id,
-              }),
-            },
-          });
-        }
       }
+
+      // Capture existing mappings before changes for audit diff
+      const existingAssignments =
+        context?.requesterRole === "admin"
+          ? await db.courseAssignment.findMany({
+              where: {
+                courseId: data.courseId,
+                semester: semester.semesterNumber,
+                academicYear: data.academicYear,
+                section: { semesterId: data.semesterId },
+              },
+              select: {
+                facultyId: true,
+                sectionId: true,
+                batchId: true,
+                assignmentType: true,
+              },
+            })
+          : null;
 
       // RBAC: non-BASIC_SCIENCES cannot map first-year UG semesters
       if (
@@ -545,6 +560,65 @@ export class CourseAssignmentService {
         return createdCount;
       });
 
+      // Audit + optimstic lock for admin overrides
+      if (
+        context?.requesterRole === "admin" &&
+        existingAssignments &&
+        context.adminUserId
+      ) {
+        const newAssignments = await db.courseAssignment.findMany({
+          where: {
+            courseId: data.courseId,
+            semester: semester.semesterNumber,
+            academicYear: data.academicYear,
+            section: { semesterId: data.semesterId },
+          },
+          select: {
+            facultyId: true,
+            sectionId: true,
+            batchId: true,
+            assignmentType: true,
+          },
+        });
+
+        const changes: {
+          fieldName: string;
+          oldValue: unknown;
+          newValue: unknown;
+        }[] = [];
+
+        const facultyChange = diffLists(
+          existingAssignments,
+          newAssignments,
+          "mappedFaculty",
+          (a) =>
+            `${a.facultyId}:${a.assignmentType}:${a.sectionId}:${a.batchId ?? ""}`
+        );
+        if (facultyChange) changes.push(facultyChange);
+
+        if (changes.length > 0) {
+          await logChanges({
+            entityType: "COURSE_ASSIGNMENT",
+            entityId: data.courseId,
+            courseId: data.courseId,
+            action: "UPSERT_MAPPING",
+            changes,
+            adminUserId: context.adminUserId,
+            reason: context.reason,
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          });
+        }
+
+        if (context.clientVersion != null) {
+          await checkAndIncrementOptimisticVersion(
+            data.courseId,
+            context.clientVersion,
+            context.adminUserId
+          );
+        }
+      }
+
       return {
         status: "success",
         message: `Course mapping saved successfully (${result} assignments)`,
@@ -702,19 +776,29 @@ export class CourseAssignmentService {
             "403 Forbidden: Cannot delete mappings for a locked course"
           );
         }
-
-        // logging the super admin deletion
-        if (context?.requesterRole === "admin") {
-          await db.adminEditLog.create({
-            data: {
-              entityId: courseId,
-              entityType: "COURSE_MAPPING",
-              adminUserId: requestingUserId,
-              details: JSON.stringify({ action: "DELETE_MAPPING", courseId }),
-            },
-          });
-        }
       }
+
+      // Capture existing mappings before deletion for audit
+      const existingMappings =
+        context?.requesterRole === "admin" && context.adminUserId
+          ? await db.courseAssignment.findMany({
+              where: {
+                courseId,
+                semester: semester.semesterNumber,
+                academicYear,
+                section: { semesterId },
+                course: {
+                  department: { is: { id: department.id } },
+                },
+              },
+              select: {
+                facultyId: true,
+                sectionId: true,
+                batchId: true,
+                assignmentType: true,
+              },
+            })
+          : null;
 
       const result = await db.courseAssignment.deleteMany({
         where: {
@@ -732,6 +816,42 @@ export class CourseAssignmentService {
         },
       });
 
+      // Audit the deletion
+      if (
+        existingMappings &&
+        existingMappings.length > 0 &&
+        context?.adminUserId
+      ) {
+        await logChanges({
+          entityType: "COURSE_ASSIGNMENT",
+          entityId: courseId,
+          courseId: courseId,
+          action: "DELETE_MAPPING",
+          changes: [
+            {
+              fieldName: "mappedFaculty",
+              oldValue: existingMappings.map(
+                (m) =>
+                  `${m.facultyId}:${m.assignmentType}:${m.sectionId}:${m.batchId ?? ""}`
+              ),
+              newValue: [],
+            },
+          ],
+          adminUserId: context.adminUserId,
+          reason: context.reason,
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        });
+
+        if (context.clientVersion != null) {
+          await checkAndIncrementOptimisticVersion(
+            courseId,
+            context.clientVersion,
+            context.adminUserId
+          );
+        }
+      }
+
       return {
         status: "success",
         message: `Deleted ${result.count} mappings`,
@@ -742,5 +862,114 @@ export class CourseAssignmentService {
       if (error instanceof Error) throw error;
       throw new Error("Failed to delete course mappings");
     }
+  }
+
+  static async generateMappingTemplate(
+    courseId: string,
+    semesterId: string,
+    academicYear: string,
+    requestingUserId: string,
+    context?: MappingContext
+  ): Promise<Buffer> {
+    const department = await CourseAssignmentService.getRequestingDepartment(
+      requestingUserId,
+      context
+    );
+
+    const course = await db.course.findUnique({
+      where: { id: courseId },
+      include: {
+        semester: { include: { academicTerm: true } },
+      },
+    });
+
+    if (!course) throw new Error("Course not found");
+
+    const sections = await db.section.findMany({
+      where: {
+        semesterId,
+        departmentId: department.id,
+        ...(course.cycle && course.cycle !== "NONE"
+          ? { cycle: course.cycle }
+          : {}),
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Course Mapping");
+
+    // Add Meta Data (Rows 1-5)
+    worksheet.addRow([
+      "Academic Term",
+      `${course.semester.academicTerm.type} ${course.semester.academicTerm.year}`,
+    ]);
+    worksheet.addRow(["Semester", course.semester.semesterNumber]);
+    worksheet.addRow([
+      "Department or Cycle",
+      course.cycle !== "NONE" ? course.cycle : department.name,
+    ]);
+    worksheet.addRow(["Course Name", course.name]);
+    worksheet.addRow(["Course Code", course.code]);
+    worksheet.addRow([]); // Empty row for spacing
+
+    // Add Table Headers
+    const headerRow = worksheet.addRow(["Section", "Faculty Name (Theory)"]);
+    headerRow.font = { bold: true };
+
+    // Populate Sections
+    sections.forEach((section) => {
+      worksheet.addRow([section.name, ""]);
+    });
+
+    // Formatting
+    worksheet.getColumn(1).width = 20;
+    worksheet.getColumn(2).width = 40;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return buffer as unknown as Buffer;
+  }
+
+  /**
+   * Parses an uploaded Excel mapping file
+   * Note: In a production scenario, you would map string names back to faculty IDs here.
+   */
+  static async parseMappingUpload(
+    fileBuffer: Buffer,
+    requestingUserId: string,
+    context?: MappingContext
+  ): Promise<BaseResponse<unknown>> {
+    void requestingUserId;
+    void context;
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(fileBuffer as unknown as ArrayBuffer);
+    const worksheet = workbook.getWorksheet(1);
+
+    if (!worksheet) throw new Error("Invalid Excel file format");
+
+    const parsedMappings: { section: string; facultyName: string }[] = [];
+
+    // Assuming table data starts at row 8 based on the generation template
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber >= 8) {
+        const sectionName = row.getCell(1).text;
+        const facultyName = row.getCell(2).text;
+
+        if (sectionName) {
+          parsedMappings.push({
+            section: sectionName,
+            facultyName: facultyName || "",
+          });
+        }
+      }
+    });
+
+    return {
+      status: "success",
+      message:
+        "Excel parsed successfully. Please verify mappings before saving.",
+      data: { extractedData: parsedMappings },
+    };
   }
 }

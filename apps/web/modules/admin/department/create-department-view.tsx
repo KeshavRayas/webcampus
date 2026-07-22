@@ -44,7 +44,7 @@ export const CreateDepartmentView = () => {
       title="Create Department"
       form={form}
       onSubmit={onSubmit}
-      contentClassName="sm:max-w-x1"
+      contentClassName="sm:max-w-xl"
     >
       <div className="max-h-[65vh] space-y-4 overflow-y-auto px-1 py-1">
         <FormField

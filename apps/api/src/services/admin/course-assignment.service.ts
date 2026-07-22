@@ -4,6 +4,11 @@ import { UpsertCourseMappingType } from "@webcampus/schemas/department";
 type AdminContext = {
   departmentId?: string;
   departmentName?: string;
+  adminUserId?: string;
+  clientVersion?: number;
+  reason?: string;
+  ipAddress?: string;
+  userAgent?: string;
 };
 
 export class AdminCourseAssignmentService {
@@ -56,6 +61,11 @@ export class AdminCourseAssignmentService {
       departmentId: context.departmentId,
       departmentName: context.departmentName,
       requesterRole: "admin",
+      adminUserId: context.adminUserId || requestingUserId,
+      clientVersion: context.clientVersion,
+      reason: context.reason,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
     });
   }
 
@@ -96,6 +106,47 @@ export class AdminCourseAssignmentService {
       courseId,
       semesterId,
       academicYear,
+      requestingUserId,
+      {
+        departmentId: context.departmentId,
+        departmentName: context.departmentName,
+        requesterRole: "admin",
+        adminUserId: context.adminUserId || requestingUserId,
+        clientVersion: context.clientVersion,
+        reason: context.reason,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+      }
+    );
+  }
+
+  static generateMappingTemplate(
+    courseId: string,
+    semesterId: string,
+    academicYear: string,
+    requestingUserId: string,
+    context: AdminContext
+  ) {
+    return CourseAssignmentService.generateMappingTemplate(
+      courseId,
+      semesterId,
+      academicYear,
+      requestingUserId,
+      {
+        departmentId: context.departmentId,
+        departmentName: context.departmentName,
+        requesterRole: "admin",
+      }
+    );
+  }
+
+  static parseMappingUpload(
+    fileBuffer: Buffer,
+    requestingUserId: string,
+    context: AdminContext
+  ) {
+    return CourseAssignmentService.parseMappingUpload(
+      fileBuffer,
       requestingUserId,
       {
         departmentId: context.departmentId,

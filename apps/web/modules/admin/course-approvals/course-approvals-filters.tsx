@@ -105,8 +105,11 @@ export const CourseApprovalsFilters = ({
   }, [groups]);
 
   const statusOptions = [
+    { label: "All Statuses", value: "" },
+    { label: "Draft", value: "DRAFT" },
     { label: "Pending", value: "PENDING" },
     { label: "Approved", value: "APPROVED" },
+    { label: "Needs Revision", value: "NEEDS_REVISION" },
   ];
 
   const filterFields: FilterFieldConfig<Record<string, string>>[] = [

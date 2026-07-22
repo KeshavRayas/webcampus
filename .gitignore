@@ -58,3 +58,8 @@ scripts/dev.sh
 .husky/pre-commit
 .idea
 .vscode
+
+# Generated MCP / debug artifacts
+.playwright-mcp/
+.serena/
+screenshots/

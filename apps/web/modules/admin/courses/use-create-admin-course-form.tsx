@@ -18,6 +18,7 @@ type CourseCycle = "PHYSICS" | "CHEMISTRY" | "NONE";
 export const useCreateAdminCourseForm = (
   semesterId: string,
   semesterNumber: number,
+  departmentId: string,
   departmentName: string,
   defaultCycle: CourseCycle
 ) => {
@@ -32,7 +33,8 @@ export const useCreateAdminCourseForm = (
       courseMode: undefined,
       courseType: undefined,
       cycle: "NONE",
-      departmentName: "",
+      departmentId,
+      departmentName,
       semesterId,
       semesterNumber,
       lectureCredits: 0,
@@ -85,6 +87,7 @@ export const useCreateAdminCourseForm = (
   const onSubmit = (values: CreateCourseDTO) => {
     mutate({
       ...values,
+      departmentId,
       departmentName,
       cycle: defaultCycle,
     });

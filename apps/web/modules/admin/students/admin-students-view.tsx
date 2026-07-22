@@ -169,9 +169,7 @@ export const AdminStudentsView = () => {
   const departmentOptions = useMemo(
     () =>
       departments
-        .filter(
-          (dept) => dept.type !== "BASIC_SCIENCES" && dept.name !== "First Year"
-        )
+        .filter((dept) => dept.type !== "BASIC_SCIENCES")
         .map((dept) => ({
           label: dept.name,
           value: dept.id,

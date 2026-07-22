@@ -76,9 +76,6 @@ export const CourseMappingView = () => {
 
             <div className="bg-card text-card-foreground w-full overflow-hidden rounded-xl border shadow-sm">
               <div className="p-6">
-                <h3 className="mb-4 text-lg font-semibold">
-                  Faculty Assignments
-                </h3>
                 <CourseMappingGrid
                   course={selectedCourse}
                   semesterId={appliedFilters.semesterId}

@@ -2,6 +2,7 @@ import { AdminCourseController } from "@webcampus/api/src/controllers/admin/cour
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   AdminCourseBranchQuerySchema,
+  AdminCourseByIdQuerySchema,
   AdminCreateCourseSchema,
   AdminDeleteCourseSchema,
   AdminUpdateCourseSchema,
@@ -60,6 +61,7 @@ router.get(
 
 router.get(
   "/:id",
+  validateRequest(AdminCourseByIdQuerySchema, "query"),
   protect({
     role: "admin",
     permissions: {
@@ -67,6 +69,39 @@ router.get(
     },
   }),
   AdminCourseController.getById
+);
+
+router.get(
+  "/:id/coordinators",
+  protect({
+    role: "admin",
+    permissions: {
+      courseCoordinator: ["read"],
+    },
+  }),
+  AdminCourseController.getCoordinators
+);
+
+router.put(
+  "/:id/coordinators",
+  protect({
+    role: "admin",
+    permissions: {
+      courseCoordinator: ["update"],
+    },
+  }),
+  AdminCourseController.updateCoordinators
+);
+
+router.get(
+  "/:id/mapped-faculty",
+  protect({
+    role: "admin",
+    permissions: {
+      courseCoordinator: ["read"],
+    },
+  }),
+  AdminCourseController.getMappedFaculty
 );
 
 export default router;

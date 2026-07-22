@@ -32,20 +32,21 @@ export const BaseCourseAssignmentSchema = z
 
 export const CreateCourseAssignmentSchema = BaseCourseAssignmentSchema;
 
-export const CourseAssignmentResponseSchema = BaseCourseAssignmentSchema.extend({
-  id: z.uuid("Invalid course assignment ID"),
-});
+export const CourseAssignmentResponseSchema = BaseCourseAssignmentSchema.extend(
+  {
+    id: z.uuid("Invalid course assignment ID"),
+  }
+);
 
-export const CourseMappingStatusQuerySchema = z
-  .object({
-    semesterId: z.uuid("Invalid semester ID"),
-    academicYear: z.string().min(1, "Academic year is required"),
-    cycle: z
-      .enum(["PHYSICS", "CHEMISTRY"])
-      .or(z.literal(""))
-      .transform((v) => (v === "" ? undefined : v))
-      .optional(),
-  });
+export const CourseMappingStatusQuerySchema = z.object({
+  semesterId: z.uuid("Invalid semester ID"),
+  academicYear: z.string().min(1, "Academic year is required"),
+  cycle: z
+    .enum(["PHYSICS", "CHEMISTRY"])
+    .or(z.literal(""))
+    .transform((v) => (v === "" ? undefined : v))
+    .optional(),
+});
 
 export const CourseMappingByCourseQuerySchema = z.object({
   courseId: z.uuid("Invalid course ID"),
@@ -124,6 +125,16 @@ export const CourseMappingByCourseItemSchema = z.object({
   batchName: z.string().nullable(),
 });
 
+export const DownloadMappingTemplateQuerySchema = z.object({
+  courseId: z.uuid("Invalid course ID"),
+  semesterId: z.uuid("Invalid semester ID"),
+  academicYear: z.string().min(1, "Academic year is required"),
+});
+
+export type DownloadMappingTemplateQueryType = z.infer<
+  typeof DownloadMappingTemplateQuerySchema
+>;
+
 export type BaseCourseAssignmentType = z.infer<
   typeof BaseCourseAssignmentSchema
 >;
@@ -155,9 +166,3 @@ export type CourseMappingStatusResponseType = z.infer<
 export type CourseMappingByCourseItemType = z.infer<
   typeof CourseMappingByCourseItemSchema
 >;
-
-
-
-
-
-

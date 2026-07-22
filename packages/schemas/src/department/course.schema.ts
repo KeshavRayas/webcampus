@@ -326,6 +326,11 @@ export const CourseResponseSchema = BaseCourseSchema.extend({
   revisionRequestedByRole: z.string().nullable().optional(),
   revisionNotes: z.string().nullable().optional(),
   revisionRequestedAt: z.string().nullable().optional(),
+  version: z.number().int().optional(),
+  lastOverrideAt: z.string().nullable().optional(),
+  lastOverrideById: z.string().nullable().optional(),
+  overrideCount: z.number().int().optional(),
+  hasPostApprovalEdits: z.boolean().optional(),
 });
 
 export type CreateCourseDTO = z.infer<typeof CreateCourseSchema>;

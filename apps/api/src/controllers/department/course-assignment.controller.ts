@@ -1,4 +1,5 @@
 import { CourseAssignmentService } from "@webcampus/api/src/services/department/course-assignment.service";
+import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
@@ -7,7 +8,6 @@ import type {
   CourseMappingStatusQueryType,
   UpsertCourseMappingType,
 } from "@webcampus/schemas/department";
-import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
 import type { Request, Response } from "express";
 
 export class CourseAssignmentController {
@@ -15,10 +15,7 @@ export class CourseAssignmentController {
    * GET /status
    * Returns mapping status for all courses in a semester/department.
    */
-  static async getMappingStatus(
-    req: Request,
-    res: Response
-  ): Promise<void> {
+  static async getMappingStatus(req: Request, res: Response): Promise<void> {
     try {
       const { semesterId, academicYear, cycle } =
         req.query as CourseMappingStatusQueryType;
@@ -61,10 +58,7 @@ export class CourseAssignmentController {
    * GET /by-course
    * Returns existing mappings for a specific course.
    */
-  static async getMappingByCourse(
-    req: Request,
-    res: Response
-  ): Promise<void> {
+  static async getMappingByCourse(req: Request, res: Response): Promise<void> {
     try {
       const { courseId, semesterId, academicYear } =
         req.query as CourseMappingByCourseQueryType;
@@ -107,10 +101,7 @@ export class CourseAssignmentController {
    * POST /upsert
    * Saves (upserts) course mappings.
    */
-  static async upsertMapping(
-    req: Request,
-    res: Response
-  ): Promise<void> {
+  static async upsertMapping(req: Request, res: Response): Promise<void> {
     try {
       const data: UpsertCourseMappingType = req.body;
       const departmentContext = await getDepartmentRequestContext(req);
@@ -229,6 +220,89 @@ export class CourseAssignmentController {
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: error instanceof Error ? 400 : 500,
+        error,
+      });
+    }
+  }
+
+  static async downloadTemplate(req: Request, res: Response): Promise<void> {
+    try {
+      const { courseId, semesterId, academicYear } = req.query as {
+        courseId: string;
+        semesterId: string;
+        academicYear: string;
+      };
+      const departmentContext = await getDepartmentRequestContext(req);
+
+      const buffer = await CourseAssignmentService.generateMappingTemplate(
+        courseId,
+        semesterId,
+        academicYear,
+        departmentContext.userId,
+        {
+          requesterRole: "department",
+          requestContext: departmentContext,
+        }
+      );
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=Course_Mapping_Template.xlsx`
+      );
+      res.send(buffer);
+    } catch (error) {
+      logger.error("Error generating Excel template:", { error });
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 500,
+        error,
+      });
+    }
+  }
+
+  /**
+   * POST /excel/upload
+   * Parses the uploaded mapping template
+   */
+  static async uploadTemplate(req: Request, res: Response): Promise<void> {
+    try {
+      if (!req.file) throw new Error("No file uploaded");
+
+      const departmentContext = await getDepartmentRequestContext(req);
+
+      const response = await CourseAssignmentService.parseMappingUpload(
+        req.file.buffer,
+        departmentContext.userId,
+        {
+          requesterRole: "department",
+          requestContext: departmentContext,
+        }
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error parsing Excel template:", { error });
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
         error,
       });
     }

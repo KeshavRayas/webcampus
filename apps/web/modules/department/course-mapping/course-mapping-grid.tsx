@@ -10,8 +10,8 @@ import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { Combobox } from "@webcampus/ui/molecules/combobox";
 import axios, { AxiosError } from "axios";
-import { CheckCircle2, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Download, Loader2, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 
 interface SectionData {
@@ -51,6 +51,7 @@ export const CourseMappingGrid = ({
 }: CourseMappingGridProps) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const hasTheory = ["INTEGRATED", "NON_INTEGRATED", "NCMC"].includes(
     course.courseMode
@@ -121,6 +122,7 @@ export const CourseMappingGrid = ({
 
   const [mappings, setMappings] = useState<SectionMappingState[]>([]);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Initialize mapping state when sections or existing mappings load
   useEffect(() => {
@@ -180,6 +182,98 @@ export const CourseMappingGrid = ({
     );
   };
 
+  // --- Excel Handlers ---
+  const handleDownloadExcel = async () => {
+    try {
+      const res = await axios.get(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/excel/download`,
+        {
+          params: { courseId: course.id, semesterId, academicYear },
+          responseType: "blob",
+          withCredentials: true,
+        }
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `${course.code}_Mapping_Template.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to download Excel template");
+    }
+  };
+
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await axios.post(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/excel/upload`,
+        formData,
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+
+      const extractedData = res.data.data.extractedData as {
+        section: string;
+        facultyName: string;
+      }[];
+
+      setMappings((prev) => {
+        const next = prev.map((mapping) => ({
+          ...mapping,
+          labFacultyByBatch: [...mapping.labFacultyByBatch],
+        }));
+
+        extractedData.forEach(({ section: rowLabel, facultyName }) => {
+          const cleanFacName = facultyName?.trim();
+          const facId =
+            facultyOptions.find((f) => f.label.trim() === cleanFacName)
+              ?.value ?? null;
+
+          const matchedSection = sections.find((s) => s.name === rowLabel);
+
+          if (matchedSection && hasTheory) {
+            const targetMapping = next.find(
+              (m) => m.sectionId === matchedSection.id
+            );
+            if (targetMapping) {
+              targetMapping.theoryFacultyId = facId;
+            }
+          } else if (hasLab) {
+            next.forEach((m) => {
+              const targetBatch = m.labFacultyByBatch.find(
+                (b) => b.batchName === rowLabel
+              );
+              if (targetBatch) {
+                targetBatch.facultyId = facId;
+              }
+            });
+          }
+        });
+        return next;
+      });
+
+      toast.success("Excel data populated! Please review before saving.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to parse Excel file");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -237,6 +331,35 @@ export const CourseMappingGrid = ({
 
   return (
     <div className="space-y-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Faculty Assignments</h3>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleDownloadExcel}>
+            <Download className="mr-2 h-4 w-4" /> Template
+          </Button>
+          <input
+            type="file"
+            accept=".xlsx"
+            ref={fileInputRef}
+            className="hidden"
+            onChange={handleExcelUpload}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading || isLocked}
+          >
+            {isUploading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="mr-2 h-4 w-4" />
+            )}
+            Upload Excel
+          </Button>
+        </div>
+      </div>
+
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full text-left text-sm">
           <thead className="bg-muted border-b font-medium leading-normal">

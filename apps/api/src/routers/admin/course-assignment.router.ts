@@ -6,6 +6,7 @@ import {
   AdminCourseMappingSectionsQuerySchema,
   AdminCourseMappingStatusQuerySchema,
   AdminDeleteCourseMappingSchema,
+  AdminDownloadMappingTemplateQuerySchema,
   AdminUpsertCourseMappingSchema,
 } from "@webcampus/schemas/admin";
 import { Router } from "express";
@@ -100,6 +101,7 @@ router.get(
 
 router.get(
   "/excel/template",
+  validateRequest(AdminDownloadMappingTemplateQuerySchema, "query"),
   protect({
     role: "admin",
     permissions: { courseAssignment: ["read"] },

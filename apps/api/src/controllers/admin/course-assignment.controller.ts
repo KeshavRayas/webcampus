@@ -1,9 +1,9 @@
 import { AdminCourseAssignmentService } from "@webcampus/api/src/services/admin/course-assignment.service";
-import { AdminCourseMappingExcelService } from "@webcampus/api/src/services/admin/course-mapping-excel.service";
 import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
+import { db } from "@webcampus/db";
 import type {
   AdminCourseMappingByCourseQueryType,
   AdminCourseMappingStatusQueryType,
@@ -118,12 +118,37 @@ export class AdminCourseAssignmentController {
       const requestingUserId =
         await AdminCourseAssignmentController.getRequestingUserId(req);
 
+      const course = await db.course.findUnique({
+        where: { id: data.courseId },
+        select: { approvalStatus: true },
+      });
+
+      const isCourseLocked =
+        course?.approvalStatus === "PENDING" ||
+        course?.approvalStatus === "APPROVED";
+
+      if (isCourseLocked && !data.reason?.trim()) {
+        sendResponse({
+          res,
+          status: "error",
+          statusCode: 400,
+          message:
+            "Reason is required when overriding a locked or approved course.",
+          error: "Reason is required",
+        });
+        return;
+      }
+
       const response = await AdminCourseAssignmentService.upsertMapping(
         data,
         requestingUserId,
         {
           departmentId: data.departmentId,
           departmentName: data.departmentId ? undefined : data.departmentName,
+          clientVersion: req.body.version as number | undefined,
+          reason: data.reason,
+          ipAddress: req.ip ?? req.socket.remoteAddress,
+          userAgent: req.headers["user-agent"],
         }
       );
 
@@ -245,18 +270,33 @@ export class AdminCourseAssignmentController {
 
   static async downloadTemplate(req: Request, res: Response): Promise<void> {
     try {
-      const { courseId, semesterId, departmentId } = req.query as {
-        courseId: string;
-        semesterId: string;
-        departmentId: string;
-      };
-      const buffer = await AdminCourseMappingExcelService.generateTemplate(
+      const {
         courseId,
         semesterId,
-        departmentId
+        academicYear,
+        departmentId,
+        departmentName,
+      } = req.query as {
+        courseId: string;
+        semesterId: string;
+        academicYear: string;
+        departmentId?: string;
+        departmentName?: string;
+      };
+      const requestingUserId =
+        await AdminCourseAssignmentController.getRequestingUserId(req);
+
+      const buffer = await AdminCourseAssignmentService.generateMappingTemplate(
+        courseId,
+        semesterId,
+        academicYear,
+        requestingUserId,
+        {
+          departmentId,
+          departmentName: departmentId ? undefined : departmentName,
+        }
       );
 
-      // not using sendResponse here because we are sending a raw binary file stream
       res.setHeader(
         "Content-Disposition",
         "attachment; filename=course-mapping-template.xlsx"
@@ -274,30 +314,34 @@ export class AdminCourseAssignmentController {
 
   static async uploadTemplate(req: Request, res: Response): Promise<void> {
     try {
-      const { courseId, semesterId, departmentId, academicYear } = req.body;
-      const file = req.file; // provided by multer middleware
+      const file = req.file;
       const requestingUserId =
         await AdminCourseAssignmentController.getRequestingUserId(req);
+      const { departmentId, departmentName } = req.body as {
+        departmentId?: string;
+        departmentName?: string;
+      };
 
       if (!file) throw new Error("No file uploaded");
 
-      const response =
-        await AdminCourseMappingExcelService.parseAndUpsertUpload(
-          file.buffer, // passing the raw memory buffer to our service
-          courseId,
-          semesterId,
+      const response = await AdminCourseAssignmentService.parseMappingUpload(
+        file.buffer,
+        requestingUserId,
+        {
           departmentId,
-          academicYear,
-          requestingUserId
-        );
+          departmentName: departmentId ? undefined : departmentName,
+        }
+      );
 
-      sendResponse({
-        res,
-        status: "success",
-        statusCode: 200,
-        message: "Excel mappings uploaded successfully",
-        data: response,
-      });
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
     } catch (error: unknown) {
       console.error(error);
       logger.error("Error uploading excel mapping", { error });
@@ -334,6 +378,10 @@ export class AdminCourseAssignmentController {
           departmentName: (req.body as { departmentId?: string }).departmentId
             ? undefined
             : (req.body as { departmentName?: string }).departmentName,
+          clientVersion: req.body.version as number | undefined,
+          reason: req.body.reason as string | undefined,
+          ipAddress: req.ip ?? req.socket.remoteAddress,
+          userAgent: req.headers["user-agent"],
         }
       );
 

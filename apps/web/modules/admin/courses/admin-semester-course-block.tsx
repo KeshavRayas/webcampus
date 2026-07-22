@@ -15,6 +15,7 @@ interface AdminSemesterCourseBlockProps {
   semesterNumber: number;
   courses: CourseResponseDTO[];
   selectedCycle: CourseCycle;
+  selectedDepartmentId: string;
   selectedDepartmentName: string;
   isBasicSciences: boolean;
   isSemesterLocked: boolean;
@@ -25,6 +26,7 @@ export const AdminSemesterCourseBlock = ({
   semesterNumber,
   courses,
   selectedCycle,
+  selectedDepartmentId,
   selectedDepartmentName,
   isBasicSciences,
   isSemesterLocked,
@@ -32,6 +34,7 @@ export const AdminSemesterCourseBlock = ({
   const { form, onSubmit } = useCreateAdminCourseForm(
     semesterId,
     semesterNumber,
+    selectedDepartmentId,
     selectedDepartmentName,
     selectedCycle
   );

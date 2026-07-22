@@ -4,7 +4,10 @@ import { authClient } from "@/lib/auth-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { AcademicTermResponseType } from "@webcampus/schemas/admin";
+import {
+  AcademicTermResponseType,
+  SemesterConfigResponseType,
+} from "@webcampus/schemas/admin";
 import {
   GenerateSectionsDTO,
   GenerateSectionsSchema,
@@ -117,7 +120,7 @@ export const GenerateSectionsDialog = ({
   const termOptions = Array.isArray(terms) ? terms : [];
   const selectedTerm = termOptions.find((t) => t.id === termId);
   const selectedSemester = selectedTerm?.Semester?.find(
-    (s) => s.id === semesterId
+    (s: SemesterConfigResponseType) => s.id === semesterId
   );
 
   const isBasicSciences = deptInfo?.type === "BASIC_SCIENCES";
