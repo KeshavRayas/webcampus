@@ -17,8 +17,9 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
-import { Eye, EyeOff, Upload, X } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import React, { useEffect } from "react";
+import { UserPhotoUpload } from "../shared/user-photo-upload";
 import { useCreateDepartmentForm } from "./use-create-department-form";
 
 export const CreateDepartmentView = () => {
@@ -43,6 +44,7 @@ export const CreateDepartmentView = () => {
       title="Create Department"
       form={form}
       onSubmit={onSubmit}
+      contentClassName="sm:max-w-xl"
     >
       <div className="max-h-[65vh] space-y-4 overflow-y-auto px-1 py-1">
         <FormField
@@ -166,7 +168,7 @@ export const CreateDepartmentView = () => {
             </FormItem>
           )}
         />
-        <FormItem>
+        {/* <FormItem>
           <FormLabel>Department Logo *</FormLabel>
           <FormControl>
             <div className="flex flex-col gap-4">
@@ -214,7 +216,17 @@ export const CreateDepartmentView = () => {
             </div>
           </FormControl>
           <FormMessage />
-        </FormItem>
+        </FormItem> */}
+        <UserPhotoUpload
+          label="Department Logo *"
+          personName={form.watch("name") || "Department"}
+          previewUrl={previewUrl}
+          selectedFileName={logoFile?.name || null}
+          onChange={(event) => {
+            const file = event.target.files?.[0] || null;
+            setLogoFile(file);
+          }}
+        />
       </div>
     </DialogForm>
   );

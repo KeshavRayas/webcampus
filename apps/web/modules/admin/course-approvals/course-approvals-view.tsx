@@ -23,7 +23,7 @@ export interface GroupedCourse {
     academicTerm?: { type: string; year: string };
   };
   cycle: string;
-  approvalStatus: "PENDING" | "APPROVED";
+  approvalStatus: "DRAFT" | "PENDING" | "APPROVED" | "NEEDS_REVISION";
   hasAdminApproved: boolean;
   hasCoeApproved: boolean;
   courseCount: number;
@@ -34,10 +34,14 @@ export interface GroupedCourse {
     courseType: string;
     totalCredits: number;
     courseMode: string;
-    approvalStatus: "PENDING" | "APPROVED";
+    approvalStatus: "DRAFT" | "PENDING" | "APPROVED" | "NEEDS_REVISION";
     hasAdminApproved: boolean;
     hasCoeApproved: boolean;
   }>;
+  hasPostApprovalEdits: boolean;
+  overrideCount: number;
+  lastOverrideAt: string | null;
+  lastOverrideById: string | null;
 }
 
 const EMPTY_FILTERS = {
@@ -59,6 +63,8 @@ export const CourseApprovalsView = () => {
   const {
     data: groups,
     isLoading,
+    isError,
+    error,
     refetch,
   } = useQuery({
     queryKey: ["admin-course-approvals"],
@@ -201,6 +207,25 @@ export const CourseApprovalsView = () => {
       {isLoading ? (
         <div className="text-muted-foreground p-8 text-center text-sm">
           Loading course submissions...
+        </div>
+      ) : isError ? (
+        <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-12 text-center">
+          <p className="text-destructive text-sm font-medium">
+            Failed to load course submissions
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {error instanceof Error
+              ? error.message
+              : "An unexpected error occurred"}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            onClick={() => refetch()}
+          >
+            Try Again
+          </Button>
         </div>
       ) : filteredGroups.length > 0 ? (
         <div className="bg-card rounded-md border">

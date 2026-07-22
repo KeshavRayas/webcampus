@@ -1,4 +1,9 @@
 import { ensureFreezeRowTx } from "@webcampus/api/src/services/faculty/freeze.service";
+import {
+  checkAndIncrementOptimisticVersion,
+  diffLists,
+  logChanges,
+} from "@webcampus/api/src/services/shared/audit.service";
 import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
@@ -21,6 +26,11 @@ type MappingContext = {
   departmentName?: string;
   requesterRole?: "admin" | "department";
   requestContext?: DepartmentRequestContext;
+  adminUserId?: string;
+  clientVersion?: number;
+  reason?: string;
+  ipAddress?: string;
+  userAgent?: string;
 };
 
 export class CourseAssignmentService {
@@ -371,6 +381,25 @@ export class CourseAssignmentService {
         }
       }
 
+      // Capture existing mappings before changes for audit diff
+      const existingAssignments =
+        context?.requesterRole === "admin"
+          ? await db.courseAssignment.findMany({
+              where: {
+                courseId: data.courseId,
+                semester: semester.semesterNumber,
+                academicYear: data.academicYear,
+                section: { semesterId: data.semesterId },
+              },
+              select: {
+                facultyId: true,
+                sectionId: true,
+                batchId: true,
+                assignmentType: true,
+              },
+            })
+          : null;
+
       // RBAC: non-BASIC_SCIENCES cannot map first-year UG semesters
       if (
         context?.requesterRole !== "admin" &&
@@ -543,6 +572,65 @@ export class CourseAssignmentService {
         return createdCount;
       });
 
+      // Audit + optimstic lock for admin overrides
+      if (
+        context?.requesterRole === "admin" &&
+        existingAssignments &&
+        context.adminUserId
+      ) {
+        const newAssignments = await db.courseAssignment.findMany({
+          where: {
+            courseId: data.courseId,
+            semester: semester.semesterNumber,
+            academicYear: data.academicYear,
+            section: { semesterId: data.semesterId },
+          },
+          select: {
+            facultyId: true,
+            sectionId: true,
+            batchId: true,
+            assignmentType: true,
+          },
+        });
+
+        const changes: {
+          fieldName: string;
+          oldValue: unknown;
+          newValue: unknown;
+        }[] = [];
+
+        const facultyChange = diffLists(
+          existingAssignments,
+          newAssignments,
+          "mappedFaculty",
+          (a) =>
+            `${a.facultyId}:${a.assignmentType}:${a.sectionId}:${a.batchId ?? ""}`
+        );
+        if (facultyChange) changes.push(facultyChange);
+
+        if (changes.length > 0) {
+          await logChanges({
+            entityType: "COURSE_ASSIGNMENT",
+            entityId: data.courseId,
+            courseId: data.courseId,
+            action: "UPSERT_MAPPING",
+            changes,
+            adminUserId: context.adminUserId,
+            reason: context.reason,
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          });
+        }
+
+        if (context.clientVersion != null) {
+          await checkAndIncrementOptimisticVersion(
+            data.courseId,
+            context.clientVersion,
+            context.adminUserId
+          );
+        }
+      }
+
       return {
         status: "success",
         message: `Course mapping saved successfully (${result} assignments)`,
@@ -687,6 +775,43 @@ export class CourseAssignmentService {
         throw new Error("Semester not found");
       }
 
+      // bypass and audit logic for super edit access for admins
+
+      const course = await db.course.findUnique({ where: { id: courseId } });
+      if (
+        course &&
+        (course.approvalStatus === "PENDING" ||
+          course.approvalStatus === "APPROVED")
+      ) {
+        if (context?.requesterRole !== "admin") {
+          throw new Error(
+            "403 Forbidden: Cannot delete mappings for a locked course"
+          );
+        }
+      }
+
+      // Capture existing mappings before deletion for audit
+      const existingMappings =
+        context?.requesterRole === "admin" && context.adminUserId
+          ? await db.courseAssignment.findMany({
+              where: {
+                courseId,
+                semester: semester.semesterNumber,
+                academicYear,
+                section: { semesterId },
+                course: {
+                  department: { is: { id: department.id } },
+                },
+              },
+              select: {
+                facultyId: true,
+                sectionId: true,
+                batchId: true,
+                assignmentType: true,
+              },
+            })
+          : null;
+
       const result = await db.courseAssignment.deleteMany({
         where: {
           courseId,
@@ -702,6 +827,42 @@ export class CourseAssignmentService {
           },
         },
       });
+
+      // Audit the deletion
+      if (
+        existingMappings &&
+        existingMappings.length > 0 &&
+        context?.adminUserId
+      ) {
+        await logChanges({
+          entityType: "COURSE_ASSIGNMENT",
+          entityId: courseId,
+          courseId: courseId,
+          action: "DELETE_MAPPING",
+          changes: [
+            {
+              fieldName: "mappedFaculty",
+              oldValue: existingMappings.map(
+                (m) =>
+                  `${m.facultyId}:${m.assignmentType}:${m.sectionId}:${m.batchId ?? ""}`
+              ),
+              newValue: [],
+            },
+          ],
+          adminUserId: context.adminUserId,
+          reason: context.reason,
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        });
+
+        if (context.clientVersion != null) {
+          await checkAndIncrementOptimisticVersion(
+            courseId,
+            context.clientVersion,
+            context.adminUserId
+          );
+        }
+      }
 
       return {
         status: "success",

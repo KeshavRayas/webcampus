@@ -1,5 +1,6 @@
 "use client";
 
+import { ReasonDialog } from "@/components/admin/reason-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import {
@@ -35,6 +36,8 @@ interface AdminCourseMappingGridProps {
   cycle: string;
   isBasicSciences: boolean;
   isLocked?: boolean;
+  excelExtractedData?: { section: string; facultyName: string }[] | null;
+  onExcelDataConsumed?: () => void;
 }
 
 type SectionMappingState = {
@@ -54,6 +57,8 @@ export const AdminCourseMappingGrid = ({
   cycle,
   isBasicSciences,
   isLocked = false,
+  excelExtractedData,
+  onExcelDataConsumed,
 }: AdminCourseMappingGridProps) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
@@ -138,6 +143,7 @@ export const AdminCourseMappingGrid = ({
   );
 
   const [mappings, setMappings] = useState<SectionMappingState[]>([]);
+  const [showReasonDialog, setShowReasonDialog] = useState(false);
 
   useEffect(() => {
     if (loadingSections || loadingExisting) {
@@ -175,6 +181,48 @@ export const AdminCourseMappingGrid = ({
     setMappings(initialState);
   }, [existingMappings, loadingExisting, loadingSections, sections]);
 
+  // Apply extracted Excel data to mappings when received
+  useEffect(() => {
+    if (!excelExtractedData || excelExtractedData.length === 0) return;
+
+    setMappings((prev) => {
+      const next = prev.map((mapping) => ({
+        ...mapping,
+        labFacultyByBatch: [...mapping.labFacultyByBatch],
+      }));
+
+      excelExtractedData.forEach(({ section: rowLabel, facultyName }) => {
+        const cleanFacName = facultyName?.trim();
+        const facId =
+          facultyOptions.find((f) => f.label.trim() === cleanFacName)?.value ??
+          null;
+
+        const matchedSection = sections.find((s) => s.name === rowLabel);
+
+        if (matchedSection && hasSectionFaculty) {
+          const targetMapping = next.find(
+            (m) => m.sectionId === matchedSection.id
+          );
+          if (targetMapping) {
+            targetMapping.theoryFacultyId = facId;
+          }
+        } else if (hasLab) {
+          next.forEach((m) => {
+            const targetBatch = m.labFacultyByBatch.find(
+              (b) => b.batchName === rowLabel
+            );
+            if (targetBatch) {
+              targetBatch.facultyId = facId;
+            }
+          });
+        }
+      });
+      return next;
+    });
+
+    onExcelDataConsumed?.();
+  }, [excelExtractedData]);
+
   const updateTheory = (sectionId: string, facultyId: string | null) => {
     setMappings((previous) =>
       previous.map((mapping) =>
@@ -206,32 +254,39 @@ export const AdminCourseMappingGrid = ({
     );
   };
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const payload = {
-        courseId: course.id,
-        departmentId,
-        departmentName,
-        semesterId,
-        academicYear,
-        studentsPerLabBatch: 15,
-        sectionMappings: mappings.map((mapping) => ({
-          sectionId: mapping.sectionId,
-          theoryFacultyId: hasSectionFaculty ? mapping.theoryFacultyId : null,
-          labFacultyByBatch: hasLab
-            ? mapping.labFacultyByBatch.filter(
-                (batch) => batch.facultyId !== null
-              )
-            : [],
-        })),
-      };
+  const doSave = (reason?: string) => {
+    const payload: Record<string, unknown> = {
+      courseId: course.id,
+      departmentId,
+      departmentName,
+      semesterId,
+      academicYear,
+      studentsPerLabBatch: 15,
+      version: course.version,
+      sectionMappings: mappings.map((mapping) => ({
+        sectionId: mapping.sectionId,
+        theoryFacultyId: hasSectionFaculty ? mapping.theoryFacultyId : null,
+        labFacultyByBatch: hasLab
+          ? mapping.labFacultyByBatch.filter(
+              (batch) => batch.facultyId !== null
+            )
+          : [],
+      })),
+    };
 
-      return axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/upsert`,
-        payload,
-        { withCredentials: true }
-      );
-    },
+    if (reason) {
+      payload.reason = reason;
+    }
+
+    return axios.post(
+      `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/upsert`,
+      payload,
+      { withCredentials: true }
+    );
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async (reason?: string) => doSave(reason),
     onSuccess: (res) => {
       toast.success(res.data.message);
       queryClient.invalidateQueries({ queryKey: ["admin-course-mapping"] });
@@ -240,6 +295,13 @@ export const AdminCourseMappingGrid = ({
       });
     },
     onError: (error) => {
+      if (error instanceof AxiosError && error.response?.status === 409) {
+        toast.error(
+          "This course has been modified by another administrator. Please refresh the page."
+        );
+        queryClient.invalidateQueries({ queryKey: ["admin-course-mapping"] });
+        return;
+      }
       const message =
         error instanceof AxiosError
           ? error.response?.data?.message
@@ -247,6 +309,19 @@ export const AdminCourseMappingGrid = ({
       toast.error(message || "Failed to save mappings");
     },
   });
+
+  const handleSaveClick = () => {
+    if (isLocked) {
+      setShowReasonDialog(true);
+    } else {
+      saveMutation.mutate(undefined);
+    }
+  };
+
+  const handleReasonConfirm = (reason: string) => {
+    setShowReasonDialog(false);
+    saveMutation.mutate(reason);
+  };
 
   const isLoading = loadingSections || loadingFaculty || loadingExisting;
 
@@ -267,106 +342,113 @@ export const AdminCourseMappingGrid = ({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-muted border-b font-medium leading-normal">
-            <tr>
-              <th className="border-border min-w-[100px] border-r px-4 py-3">
-                Section
-              </th>
-              {hasSectionFaculty && (
-                <th className="border-border min-w-[200px] border-r px-4 py-3">
-                  Section Faculty
+    <>
+      <div className="space-y-6">
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted border-b font-medium leading-normal">
+              <tr>
+                <th className="border-border min-w-[100px] border-r px-4 py-3">
+                  Section
                 </th>
-              )}
-              {hasLab &&
-                DEFAULT_BATCHES.map((batch) => (
-                  <th
-                    key={batch}
-                    className="border-border min-w-[200px] border-r px-4 py-3 text-center last:border-0"
-                  >
-                    Lab: {batch}
+                {hasSectionFaculty && (
+                  <th className="border-border min-w-[200px] border-r px-4 py-3">
+                    Section Faculty
                   </th>
-                ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {sections.map((section) => {
-              const state = mappings.find(
-                (mapping) => mapping.sectionId === section.id
-              );
-              if (!state) {
-                return null;
-              }
+                )}
+                {hasLab &&
+                  DEFAULT_BATCHES.map((batch) => (
+                    <th
+                      key={batch}
+                      className="border-border min-w-[200px] border-r px-4 py-3 text-center last:border-0"
+                    >
+                      Lab: {batch}
+                    </th>
+                  ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {sections.map((section) => {
+                const state = mappings.find(
+                  (mapping) => mapping.sectionId === section.id
+                );
+                if (!state) {
+                  return null;
+                }
 
-              return (
-                <tr
-                  key={section.id}
-                  className="hover:bg-muted/50 group transition-colors"
-                >
-                  <td className="border-border bg-muted/20 group-hover:bg-muted/60 border-r px-4 py-4 font-medium">
-                    {section.name}
-                  </td>
-
-                  {hasSectionFaculty && (
-                    <td className="border-border border-r px-4">
-                      <Combobox
-                        options={facultyOptions}
-                        value={state.theoryFacultyId}
-                        onValueChange={(value) =>
-                          updateTheory(section.id, value)
-                        }
-                        placeholder="Select Section Faculty"
-                        className="bg-background"
-                        disabled={isLocked}
-                      />
+                return (
+                  <tr
+                    key={section.id}
+                    className="hover:bg-muted/50 group transition-colors"
+                  >
+                    <td className="border-border bg-muted/20 group-hover:bg-muted/60 border-r px-4 py-4 font-medium">
+                      {section.name}
                     </td>
-                  )}
 
-                  {hasLab &&
-                    DEFAULT_BATCHES.map((batchName) => {
-                      const batchState = state.labFacultyByBatch.find(
-                        (batch) => batch.batchName === batchName
-                      );
+                    {hasSectionFaculty && (
+                      <td className="border-border border-r px-4">
+                        <Combobox
+                          options={facultyOptions}
+                          value={state.theoryFacultyId}
+                          onValueChange={(value) =>
+                            updateTheory(section.id, value)
+                          }
+                          placeholder="Select Section Faculty"
+                          className="bg-background"
+                        />
+                      </td>
+                    )}
 
-                      return (
-                        <td
-                          key={batchName}
-                          className="border-border border-r px-4 last:border-0"
-                        >
-                          <Combobox
-                            options={facultyOptions}
-                            value={batchState?.facultyId ?? null}
-                            onValueChange={(value) =>
-                              updateLab(section.id, batchName, value)
-                            }
-                            placeholder={`Select ${batchName} Faculty`}
-                            className="bg-background text-xs"
-                            disabled={isLocked}
-                          />
-                        </td>
-                      );
-                    })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    {hasLab &&
+                      DEFAULT_BATCHES.map((batchName) => {
+                        const batchState = state.labFacultyByBatch.find(
+                          (batch) => batch.batchName === batchName
+                        );
+
+                        return (
+                          <td
+                            key={batchName}
+                            className="border-border border-r px-4 last:border-0"
+                          >
+                            <Combobox
+                              options={facultyOptions}
+                              value={batchState?.facultyId ?? null}
+                              onValueChange={(value) =>
+                                updateLab(section.id, batchName, value)
+                              }
+                              placeholder={`Select ${batchName} Faculty`}
+                              className="bg-background text-xs"
+                            />
+                          </td>
+                        );
+                      })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex justify-end pt-4">
+          <Button
+            onClick={handleSaveClick}
+            disabled={saveMutation.isPending}
+            size="lg"
+          >
+            {saveMutation.isPending && (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            )}
+            Save Mappings
+          </Button>
+        </div>
       </div>
 
-      <div className="flex justify-end pt-4">
-        <Button
-          onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending || isLocked}
-          size="lg"
-        >
-          {saveMutation.isPending && (
-            <Loader2 className="mr-2 size-4 animate-spin" />
-          )}
-          Save Mappings
-        </Button>
-      </div>
-    </div>
+      <ReasonDialog
+        open={showReasonDialog}
+        onOpenChange={setShowReasonDialog}
+        onConfirm={handleReasonConfirm}
+        isRequired={true}
+      />
+    </>
   );
 };

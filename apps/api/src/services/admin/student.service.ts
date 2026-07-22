@@ -1,11 +1,11 @@
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
-import { UserService } from "./user.service";
 import {
   AdminStudentResponseType,
   GetAdminStudentsQueryType,
 } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
+import { UserService } from "./user.service";
 
 export class AdminStudentService {
   static async getById(studentId: string): Promise<BaseResponse<unknown>> {
@@ -42,35 +42,55 @@ export class AdminStudentService {
         where: {
           OR: [{ studentId: student.id }, { tempUsn: student.usn }],
         },
-        select: {
-          applicationId: true,
-          modeOfAdmission: true,
-          status: true,
-          firstName: true,
-          middleName: true,
-          lastName: true,
-          primaryPhoneNumber: true,
-          secondaryPhoneNumber: true,
-          primaryEmail: true,
-          photo: true,
-          categoryClaimed: true,
-          categoryAllotted: true,
-          quota: true,
-          currentAddress: true,
-          currentArea: true,
-          currentCity: true,
-          currentDistrict: true,
-          currentState: true,
-          currentCountry: true,
-          currentPincode: true,
-          permanentAddress: true,
-          permanentArea: true,
-          permanentCity: true,
-          permanentDistrict: true,
-          permanentState: true,
-          permanentCountry: true,
-          permanentPincode: true,
-          semesterId: true,
+        // select: {
+        //   applicationId: true,
+        //   modeOfAdmission: true,
+        //   status: true,
+        //   firstName: true,
+        //   middleName: true,
+        //   lastName: true,
+        //   primaryPhoneNumber: true,
+        //   secondaryPhoneNumber: true,
+        //   primaryEmail: true,
+        //   photo: true,
+        //   categoryClaimed: true,
+        //   categoryAllotted: true,
+        //   quota: true,
+        //   currentAddress: true,
+        //   currentArea: true,
+        //   currentCity: true,
+        //   currentDistrict: true,
+        //   currentState: true,
+        //   currentCountry: true,
+        //   currentPincode: true,
+        //   permanentAddress: true,
+        //   permanentArea: true,
+        //   permanentCity: true,
+        //   permanentDistrict: true,
+        //   permanentState: true,
+        //   permanentCountry: true,
+        //   permanentPincode: true,
+        //   semesterId: true,
+        //   semester: {
+        //     select: {
+        //       programType: true,
+        //       semesterNumber: true,
+        //       academicTermId: true,
+        //       academicTerm: {
+        //         select: {
+        //           type: true,
+        //           year: true,
+        //         },
+        //       },
+        //     },
+        //   },
+        //   createdAt: true,
+        //   updatedAt: true,
+        // },
+
+        // FIX: Subarno - fetches all scalar fields defined directly
+
+        include: {
           semester: {
             select: {
               programType: true,
@@ -84,8 +104,6 @@ export class AdminStudentService {
               },
             },
           },
-          createdAt: true,
-          updatedAt: true,
         },
       });
 
@@ -95,13 +113,18 @@ export class AdminStudentService {
 
       const resolvedProgramType =
         student.programType ?? admission?.semester?.programType ?? null;
-      const resolvedSemesterId = student.semesterId ?? admission?.semesterId ?? null;
+      const resolvedSemesterId =
+        student.semesterId ?? admission?.semesterId ?? null;
       const resolvedTermId =
         student.academicTermId ?? admission?.semester?.academicTermId ?? null;
       const resolvedTermType =
-        student.academicTermType ?? admission?.semester?.academicTerm?.type ?? null;
+        student.academicTermType ??
+        admission?.semester?.academicTerm?.type ??
+        null;
       const resolvedTermYear =
-        student.academicTermYear ?? admission?.semester?.academicTerm?.year ?? null;
+        student.academicTermYear ??
+        admission?.semester?.academicTerm?.year ??
+        null;
       const resolvedTermLabel = student.academicTermLabel ?? academicTermLabel;
 
       return {
@@ -241,9 +264,12 @@ export class AdminStudentService {
             departmentName: record.departmentName,
             currentSemester: record.currentSemester,
             academicYear: record.academicYear,
-            semesterId: record.semesterId ?? record.admission?.semesterId ?? null,
+            semesterId:
+              record.semesterId ?? record.admission?.semesterId ?? null,
             programType:
-              record.programType ?? record.admission?.semester?.programType ?? null,
+              record.programType ??
+              record.admission?.semester?.programType ??
+              null,
             academicTermId:
               record.academicTermId ??
               record.admission?.semester?.academicTermId ??

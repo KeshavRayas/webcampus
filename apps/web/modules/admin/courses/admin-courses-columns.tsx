@@ -77,6 +77,7 @@ const CourseRowActions = ({
       courseMode: course.courseMode,
       courseType: course.courseType,
       cycle: (course.cycle ?? selectedCycle) as CourseCycle,
+      departmentId: course.departmentId,
       departmentName,
       semesterId: course.semesterId,
       semesterNumber: course.semesterNumber,
@@ -106,7 +107,13 @@ const CourseRowActions = ({
     mutationFn: async (values: CreateCourseDTO) => {
       return axios.put(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/course`,
-        { id: course.id, ...values, departmentName, cycle: selectedCycle },
+        {
+          id: course.id,
+          ...values,
+          departmentName,
+          cycle: selectedCycle,
+          version: course.version,
+        },
         { withCredentials: true }
       );
     },
@@ -118,7 +125,16 @@ const CourseRowActions = ({
       });
       setEditOpen(false);
     },
-    onError: (error: AxiosError<ErrorResponse>) => {
+    onError: (
+      error: AxiosError<ErrorResponse & { currentVersion?: number }>
+    ) => {
+      if (error.response?.status === 409) {
+        toast.error(
+          "Course has been modified by another administrator. Please refresh the page."
+        );
+        queryClient.invalidateQueries({ queryKey: ["admin-courses"] });
+        return;
+      }
       toast.error(error.response?.data?.error || "Failed to update course");
     },
   });
@@ -126,7 +142,7 @@ const CourseRowActions = ({
   const deleteMutation = useMutation({
     mutationFn: async () => {
       return axios.delete(`${NEXT_PUBLIC_API_BASE_URL}/admin/course`, {
-        data: { id: course.id },
+        data: { id: course.id, version: course.version },
         withCredentials: true,
       });
     },
@@ -139,6 +155,13 @@ const CourseRowActions = ({
       setDeleteOpen(false);
     },
     onError: (error: AxiosError<ErrorResponse>) => {
+      if (error.response?.status === 409) {
+        toast.error(
+          "Course has been modified by another administrator. Please refresh the page."
+        );
+        queryClient.invalidateQueries({ queryKey: ["admin-courses"] });
+        return;
+      }
       toast.error(error.response?.data?.error || "Failed to delete course");
     },
   });
@@ -153,10 +176,7 @@ const CourseRowActions = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onSelect={() => setEditOpen(true)}
-            disabled={isLocked}
-          >
+          <DropdownMenuItem onSelect={() => setEditOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit
           </DropdownMenuItem>

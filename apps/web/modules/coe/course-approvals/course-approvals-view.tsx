@@ -19,7 +19,7 @@ export interface GroupedCourse {
   semesterId: string;
   semester: { semesterNumber: number };
   cycle: string;
-  approvalStatus: "PENDING" | "APPROVED";
+  approvalStatus: "DRAFT" | "PENDING" | "APPROVED" | "NEEDS_REVISION";
   hasAdminApproved: boolean;
   hasCoeApproved: boolean;
   courseCount: number;
@@ -30,10 +30,14 @@ export interface GroupedCourse {
     courseType: string;
     totalCredits: number;
     courseMode: string;
-    approvalStatus: "PENDING" | "APPROVED";
+    approvalStatus: "DRAFT" | "PENDING" | "APPROVED" | "NEEDS_REVISION";
     hasAdminApproved: boolean;
     hasCoeApproved: boolean;
   }>;
+  hasPostApprovalEdits: boolean;
+  overrideCount: number;
+  lastOverrideAt: string | null;
+  lastOverrideById: string | null;
 }
 
 export const CourseApprovalsView = () => {

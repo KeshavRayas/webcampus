@@ -12,6 +12,7 @@ import {
   SheetTitle,
 } from "@webcampus/ui/components/sheet";
 import axios, { AxiosError } from "axios";
+import { format } from "date-fns";
 import { useState } from "react";
 import { toast } from "react-toastify";
 import {
@@ -135,6 +136,13 @@ export const CourseReviewSheet = ({
                 {group.cycle !== "NONE" && ` • Cycle: ${group.cycle}`}
               </span>
               <span>Total Courses: {group.courseCount}</span>
+              {group.hasPostApprovalEdits && group.lastOverrideAt && (
+                <span className="text-xs text-amber-600 dark:text-amber-400">
+                  Last Override:{" "}
+                  {format(new Date(group.lastOverrideAt), "dd MMM yyyy")}
+                  {group.lastOverrideById && " (by admin)"}
+                </span>
+              )}
             </div>
           </SheetDescription>
         </SheetHeader>

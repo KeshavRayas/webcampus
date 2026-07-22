@@ -31,11 +31,12 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import axios, { AxiosError, AxiosResponse } from "axios";
-import { Upload } from "lucide-react";
+// import { Upload } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
+import { UserPhotoUpload } from "../shared/user-photo-upload";
 import { DepartmentTableItem } from "./admin-department-columns";
 
 interface EditDepartmentDialogProps {
@@ -122,7 +123,7 @@ export const EditDepartmentDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-xl">
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit)}
@@ -235,11 +236,11 @@ export const EditDepartmentDialog = ({
               )}
             />
 
-            <FormItem>
+            {/* <FormItem>
               <FormLabel>Update Department Logo</FormLabel>
-              <div className="space-y-3">
-                {/* visual preview logic */}
-                {department.image && !logoFile && (
+              <div className="space-y-3"> */}
+            {/* visual preview logic */}
+            {/* {department.image && !logoFile && (
                   <img
                     src={department.image}
                     alt="Department Logo"
@@ -275,8 +276,8 @@ export const EditDepartmentDialog = ({
                     )}
                   </div>
                 </FormControl>
-              </div>
-              {/* <FormControl>
+              </div> */}
+            {/* <FormControl>
                 <Input
                   type="file"
                   accept="image/*"
@@ -286,8 +287,20 @@ export const EditDepartmentDialog = ({
                   }}
                 />
               </FormControl> */}
-              <FormMessage />
-            </FormItem>
+            {/* <FormMessage />
+            </FormItem> */}
+
+            <UserPhotoUpload
+              label="Update Department Logo"
+              personName={form.watch("name") || "Department"}
+              currentImageUrl={department.image}
+              previewUrl={logoFile ? URL.createObjectURL(logoFile) : null}
+              selectedFileName={logoFile?.name || null}
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                setLogoFile(file);
+              }}
+            />
 
             <DialogFooter>
               <DialogClose asChild>

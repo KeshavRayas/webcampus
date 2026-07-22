@@ -286,7 +286,6 @@ export class CourseAssignmentController {
         }
       );
 
-      // Add the type-guard check here
       if (response.status === "success") {
         sendResponse({
           res,

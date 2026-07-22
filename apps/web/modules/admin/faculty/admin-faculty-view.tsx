@@ -30,8 +30,9 @@ import {
 } from "@webcampus/ui/components/select";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
 import axios from "axios";
-import { X } from "lucide-react";
+// import { X } from "lucide-react";
 import React, { useMemo, useState } from "react";
+import { UserPhotoUpload } from "../shared/user-photo-upload";
 import {
   AdminFacultyResponse,
   getAdminFacultyColumns,
@@ -122,7 +123,7 @@ export const AdminFacultyView = () => {
     });
   }, [faculty, selectedDepartmentId]);
 
-  const { form, onSubmit, setImageFile, previewUrl } =
+  const { form, onSubmit, imageFile, setImageFile, previewUrl } =
     useCreateAdminFacultyForm(selectedDepartmentId);
 
   const columns = useMemo(
@@ -386,7 +387,7 @@ export const AdminFacultyView = () => {
               </div>
 
               {/* FULL WIDTH - FACULTY IMAGE */}
-              <FormItem>
+              {/* <FormItem>
                 <FormLabel>Faculty Image *</FormLabel>
                 <FormControl>
                   <div className="flex flex-col gap-4">
@@ -421,7 +422,17 @@ export const AdminFacultyView = () => {
                   </div>
                 </FormControl>
                 <FormMessage />
-              </FormItem>
+              </FormItem> */}
+              <UserPhotoUpload
+                label="Faculty Image *"
+                personName={form.watch("name") || "Faculty"}
+                previewUrl={previewUrl}
+                selectedFileName={imageFile?.name || null}
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  setImageFile(file);
+                }}
+              />
             </DialogForm>
           </div>
 

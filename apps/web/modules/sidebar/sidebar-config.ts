@@ -79,6 +79,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Course Configuration", url: "/admin/courses" },
             { name: "Course Mapping", url: "/admin/course-mapping" },
+            { name: "Appoint Coordinators", url: "/admin/course-coordinators" },
             { name: "Course Approvals", url: "/admin/course-approvals" },
             {
               name: "Registration Windows",

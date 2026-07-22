@@ -29,6 +29,7 @@ const BASIC_SCIENCES_CYCLE_OPTIONS = ["PHYSICS", "CHEMISTRY"] as const;
 type CourseCycle = "PHYSICS" | "CHEMISTRY" | "NONE";
 
 type AdminCoursesFilters = {
+  departmentId: string;
   departmentName: string;
   termId: string;
   semesterId: string;
@@ -36,6 +37,7 @@ type AdminCoursesFilters = {
 };
 
 const EMPTY_FILTERS: AdminCoursesFilters = {
+  departmentId: "",
   departmentName: "",
   termId: "",
   semesterId: "",
@@ -62,46 +64,21 @@ export const AdminCoursesView = () => {
   }, [searchParams]);
 
   const { data: rawDepartments = [] } = useDepartments();
-  const departments = rawDepartments.filter(
-    (d) => d.type !== "BASIC_SCIENCES" && d.type !== "SERVICE"
-  );
+  const departments = rawDepartments.filter((d) => d.type !== "SERVICE");
+
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
-
-  useEffect(() => {
-    if (draftFilters.departmentName || departments.length === 0) {
-      return;
-    }
-
-    setDraftFilters((current) => ({
-      ...current,
-      departmentName: departments[0]!.name,
-    }));
-  }, [departments, draftFilters.departmentName]);
-
-  const selectedDepartment = departments.find(
-    (department) => department.name === draftFilters.departmentName
-  );
-  const isBasicSciences = selectedDepartment?.type === "BASIC_SCIENCES";
-
-  useEffect(() => {
-    if (isBasicSciences && !draftFilters.cycle) {
-      setDraftFilters((current) => ({
-        ...current,
-        cycle: BASIC_SCIENCES_CYCLE_OPTIONS[0],
-      }));
-      return;
-    }
-
-    if (!isBasicSciences && draftFilters.cycle) {
-      setDraftFilters((current) => ({ ...current, cycle: "" }));
-    }
-  }, [draftFilters.cycle, isBasicSciences]);
 
   const selectedDraftTerm = terms.find(
     (term) => term.id === draftFilters.termId
   );
   const allSemestersForSelectedDraftTerm = selectedDraftTerm?.Semester ?? [];
+
+  const selectedDraftDepartment = departments.find(
+    (d) => d.name === draftFilters.departmentName
+  );
+  const isFirstYearDepartment =
+    selectedDraftDepartment?.type === "BASIC_SCIENCES";
 
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
@@ -109,90 +86,46 @@ export const AdminCoursesView = () => {
   });
 
   const semesterOptions = useMemo(() => {
-    const isFirstYearUgSemester = (semester: {
-      programType: string;
-      semesterNumber: number;
-    }) =>
-      semester.programType === "UG" &&
-      FIRST_YEAR_UG_SEMESTERS.has(semester.semesterNumber);
+    if (isFirstYearDepartment) {
+      return allSemestersForSelectedDraftTerm.filter((s) =>
+        FIRST_YEAR_UG_SEMESTERS.has(s.semesterNumber)
+      );
+    }
 
-    if (isBasicSciences) {
-      return allSemestersForSelectedDraftTerm.filter((semester) =>
-        isFirstYearUgSemester(semester)
+    const termType = selectedDraftTerm?.type;
+    if (termType === "odd") {
+      return allSemestersForSelectedDraftTerm.filter(
+        (s) => s.semesterNumber >= 3 && s.semesterNumber % 2 === 1
+      );
+    }
+    if (termType === "even") {
+      return allSemestersForSelectedDraftTerm.filter(
+        (s) => s.semesterNumber >= 4 && s.semesterNumber % 2 === 0
       );
     }
 
     return allSemestersForSelectedDraftTerm.filter(
-      (semester) => !isFirstYearUgSemester(semester)
+      (s) => !FIRST_YEAR_UG_SEMESTERS.has(s.semesterNumber)
     );
-  }, [allSemestersForSelectedDraftTerm, isBasicSciences]);
-
-  useEffect(() => {
-    if (draftFilters.termId || terms.length === 0) {
-      return;
-    }
-
-    const currentTerm = terms.find((term) => term.isCurrent) ?? terms[0];
-    if (currentTerm) {
-      setDraftFilters((current) => ({
-        ...current,
-        termId: currentTerm.id,
-      }));
-    }
-  }, [draftFilters.termId, terms]);
-
-  useEffect(() => {
-    if (!draftFilters.termId || draftFilters.semesterId) {
-      return;
-    }
-
-    if (semesterOptions.length > 0) {
-      setDraftFilters((current) => ({
-        ...current,
-        semesterId: semesterOptions[0]!.id,
-      }));
-    }
-  }, [draftFilters.semesterId, draftFilters.termId, semesterOptions]);
-
-  useEffect(() => {
-    if (!draftFilters.semesterId) {
-      return;
-    }
-
-    const isSelectedSemesterAllowed = semesterOptions.some(
-      (semester) => semester.id === draftFilters.semesterId
-    );
-
-    if (!isSelectedSemesterAllowed) {
-      setDraftFilters((current) => ({ ...current, semesterId: "" }));
-    }
-  }, [draftFilters.semesterId, semesterOptions]);
-
-  useEffect(() => {
-    if (appliedFilters.termId && appliedFilters.semesterId) {
-      return;
-    }
-
-    if (
-      !draftFilters.termId ||
-      !draftFilters.semesterId ||
-      !draftFilters.departmentName
-    ) {
-      return;
-    }
-
-    setAppliedFilters({
-      ...draftFilters,
-      cycle: isBasicSciences
-        ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
-        : "",
-    });
   }, [
-    appliedFilters.semesterId,
-    appliedFilters.termId,
-    draftFilters,
-    isBasicSciences,
+    allSemestersForSelectedDraftTerm,
+    isFirstYearDepartment,
+    selectedDraftTerm?.type,
   ]);
+
+  const selectedDraftSemester = semesterOptions.find(
+    (s) => s.id === draftFilters.semesterId
+  );
+
+  const isSemesterOneOrTwo =
+    !!selectedDraftSemester &&
+    FIRST_YEAR_UG_SEMESTERS.has(selectedDraftSemester.semesterNumber);
+
+  const isApplyReady =
+    !!draftFilters.termId &&
+    !!draftFilters.semesterId &&
+    !!draftFilters.departmentId &&
+    (!isSemesterOneOrTwo || !!draftFilters.cycle);
 
   const selectedAppliedTerm = terms.find(
     (term) => term.id === appliedFilters.termId
@@ -201,19 +134,24 @@ export const AdminCoursesView = () => {
     (semester) => semester.id === appliedFilters.semesterId
   );
 
+  const appliedIsSemesterOneOrTwo =
+    !!selectedAppliedSemester &&
+    FIRST_YEAR_UG_SEMESTERS.has(selectedAppliedSemester.semesterNumber);
+
   const applyFilters = () => {
+    if (!isApplyReady) return;
+
     const nextFilters = {
       ...draftFilters,
-      cycle: isBasicSciences
+      cycle: isSemesterOneOrTwo
         ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
         : "",
     };
 
     setAppliedFilters(nextFilters);
+
     const query = createFilterQueryString(nextFilters);
-    router.replace(`${pathname}${query ? `?${query}` : ""}`, {
-      scroll: false,
-    });
+    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
   };
 
   const resetFilters = () => {
@@ -228,11 +166,24 @@ export const AdminCoursesView = () => {
       label: "Academic Term",
       type: "select",
       options: terms.map((term) => ({
-        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)}${term.year}`,
         value: term.id,
       })),
       hideAllOption: true,
     },
+    {
+      key: "departmentName",
+      label: "Department",
+      type: "select",
+      options: departments.map((department) => ({
+        label: department.name,
+        value: department.name,
+      })),
+      placeholder: draftFilters.termId
+        ? "Select department..."
+        : "Select term first",
+      hideAllOption: true,
+    } as FilterFieldConfig<AdminCoursesFilters>,
     {
       key: "semesterId",
       label: "Semester",
@@ -241,12 +192,13 @@ export const AdminCoursesView = () => {
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
-      placeholder: draftFilters.termId
-        ? "Select semester..."
-        : "Select term first",
+      placeholder:
+        draftFilters.termId && draftFilters.departmentName
+          ? "Select semester..."
+          : "Select term and department first",
       hideAllOption: true,
     },
-    ...(isBasicSciences
+    ...(isSemesterOneOrTwo
       ? [
           {
             key: "cycle",
@@ -260,21 +212,12 @@ export const AdminCoursesView = () => {
           } as FilterFieldConfig<AdminCoursesFilters>,
         ]
       : []),
-    {
-      key: "departmentName",
-      label: "Department",
-      type: "select",
-      options: departments.map((department) => ({
-        label: department.name,
-        value: department.name,
-      })),
-      hideAllOption: true,
-    },
   ];
 
   const { data: courses, isLoading: coursesLoading } = useQuery({
     queryKey: [
       "admin-courses",
+      appliedFilters.departmentId,
       appliedFilters.departmentName,
       appliedFilters.semesterId,
       appliedFilters.cycle,
@@ -284,9 +227,10 @@ export const AdminCoursesView = () => {
         `${NEXT_PUBLIC_API_BASE_URL}/admin/course/branch`,
         {
           params: {
+            departmentId: appliedFilters.departmentId,
             departmentName: appliedFilters.departmentName,
             semesterId: appliedFilters.semesterId,
-            ...(isBasicSciences && appliedFilters.cycle
+            ...(appliedIsSemesterOneOrTwo && appliedFilters.cycle
               ? { cycle: appliedFilters.cycle }
               : {}),
           },
@@ -300,24 +244,24 @@ export const AdminCoursesView = () => {
 
       return [];
     },
-    enabled: !!appliedFilters.departmentName && !!appliedFilters.semesterId,
+    enabled: !!appliedFilters.departmentId && !!appliedFilters.semesterId,
   });
 
   const appliedCycle =
-    isBasicSciences && appliedFilters.cycle
+    appliedIsSemesterOneOrTwo && appliedFilters.cycle
       ? (appliedFilters.cycle as CourseCycle)
       : "NONE";
 
   const filteredCourses = useMemo(() => {
     const courseList = courses ?? [];
-    if (!isBasicSciences || !appliedFilters.cycle) {
+    if (!appliedIsSemesterOneOrTwo || !appliedFilters.cycle) {
       return courseList;
     }
 
     return courseList.filter(
       (course) => (course.cycle ?? "NONE") === appliedCycle
     );
-  }, [appliedCycle, appliedFilters.cycle, courses, isBasicSciences]);
+  }, [appliedCycle, appliedFilters.cycle, courses, appliedIsSemesterOneOrTwo]);
 
   const isSemesterLocked = useMemo(() => {
     return filteredCourses.some(
@@ -338,7 +282,8 @@ export const AdminCoursesView = () => {
             </h5>
             <div className="text-sm">
               This semester is currently locked for review/approval. You cannot
-              add, edit, or delete courses.
+              add new courses. You can still edit existing ones — changes will
+              be audited.
             </div>
           </div>
         </div>
@@ -349,30 +294,33 @@ export const AdminCoursesView = () => {
           fields={courseFilterFields}
           draftFilters={draftFilters}
           onDraftChange={(key, value) => {
-            if (key === "departmentName") {
-              setDraftFilters((current) => ({
-                ...current,
-                departmentName: value,
-                semesterId: "",
-                cycle: "",
-              }));
-              return;
-            }
+            setDraftFilters((current) => {
+              const next = { ...current, [key]: value };
 
-            if (key === "termId") {
-              setDraftFilters((current) => ({
-                ...current,
-                termId: value,
-                semesterId: "",
-              }));
-              return;
-            }
+              if (key === "termId") {
+                next.departmentName = "";
+                next.departmentId = "";
+                next.semesterId = "";
+                next.cycle = "";
+              } else if (key === "departmentName") {
+                const selected = departments.find((d) => d.name === value);
+                next.departmentId = selected?.id ?? "";
+                next.semesterId = "";
+                next.cycle = "";
+              } else if (key === "semesterId") {
+                next.cycle = "";
+              }
 
-            setDraftFilters((current) => ({ ...current, [key]: value }));
+              return next;
+            });
           }}
           className="md:grid-cols-2 xl:grid-cols-4"
         />
-        <FilterActions onApply={applyFilters} onReset={resetFilters} />
+        <FilterActions
+          onApply={applyFilters}
+          onReset={resetFilters}
+          isApplyDisabled={!isApplyReady}
+        />
       </FilterPanel>
 
       {selectedAppliedSemester && (
@@ -386,8 +334,9 @@ export const AdminCoursesView = () => {
               semesterNumber={selectedAppliedSemester.semesterNumber}
               courses={filteredCourses}
               selectedCycle={appliedCycle}
+              selectedDepartmentId={appliedFilters.departmentId}
               selectedDepartmentName={appliedFilters.departmentName}
-              isBasicSciences={isBasicSciences}
+              isBasicSciences={appliedIsSemesterOneOrTwo}
               isSemesterLocked={isSemesterLocked}
             />
           )}

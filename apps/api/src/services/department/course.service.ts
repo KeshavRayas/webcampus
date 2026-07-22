@@ -1,3 +1,9 @@
+import {
+  checkAndIncrementOptimisticVersion,
+  diffFields,
+  diffLists,
+  logChanges,
+} from "@webcampus/api/src/services/shared/audit.service";
 import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import { logger } from "@webcampus/common/logger";
 import { Course, db, Prisma } from "@webcampus/db";
@@ -127,16 +133,20 @@ interface GroupedCourseSubmission {
     academicTerm: import("@webcampus/db").AcademicTerm;
   };
   cycle: string;
-  approvalStatus: "PENDING" | "APPROVED";
+  approvalStatus: "DRAFT" | "PENDING" | "APPROVED" | "NEEDS_REVISION";
   hasAdminApproved: boolean;
   hasCoeApproved: boolean;
   courseCount: number;
   courses: CourseWithApprovalFlags[];
+  hasPostApprovalEdits: boolean;
+  overrideCount: number;
+  lastOverrideAt: string | null;
+  lastOverrideById: string | null;
 }
 
 export class CourseService {
-  private static _ensureCourseIsEditable(status?: string) {
-    if (status === "PENDING" || status === "APPROVED") {
+  private static _ensureCourseIsEditable(status?: string, isAdmin?: boolean) {
+    if ((status === "PENDING" || status === "APPROVED") && !isAdmin) {
       throw new Error(
         "403 Forbidden: Course is locked for review/approval and cannot be modified"
       );
@@ -277,7 +287,15 @@ export class CourseService {
 
   static async update(
     data: UpdateCourseDTO,
-    requestContext?: DepartmentRequestContext
+    requestContext?: DepartmentRequestContext,
+    adminContext?: {
+      isAdmin: boolean;
+      adminUserId: string;
+      clientVersion?: number;
+      reason?: string;
+      ipAddress?: string;
+      userAgent?: string;
+    }
   ): Promise<BaseResponse<CourseWithDepartmentContext>> {
     try {
       const { id, departmentName, semesterId, cycle, ...updateFields } = data;
@@ -303,7 +321,10 @@ export class CourseService {
         throw new Error("Course not found");
       }
 
-      this._ensureCourseIsEditable(existing.approvalStatus);
+      this._ensureCourseIsEditable(
+        existing.approvalStatus,
+        adminContext?.isAdmin
+      );
 
       const merged: CreateCourseDTO = {
         code: updateFields.code ?? existing.code,
@@ -380,6 +401,77 @@ export class CourseService {
         },
       });
 
+      if (
+        adminContext?.isAdmin &&
+        (existing.approvalStatus === "PENDING" ||
+          existing.approvalStatus === "APPROVED")
+      ) {
+        const trackableFields = [
+          "code",
+          "name",
+          "courseMode",
+          "courseType",
+          "cycle",
+          "semesterNumber",
+          "lectureCredits",
+          "tutorialCredits",
+          "practicalCredits",
+          "skillCredits",
+          "totalCredits",
+          "seeMaxMarks",
+          "seeMinMarks",
+          "seeWeightage",
+          "maxNoOfCies",
+          "minNoOfCies",
+          "cieMaxMarks",
+          "cieMinMarks",
+          "cieWeightage",
+          "noOfAssignments",
+          "assignmentMaxMarks",
+          "labMaxMarks",
+          "labMinMarks",
+          "labWeightage",
+          "cumulativeMaxMarks",
+          "cumulativeMinMarks",
+          "hasLaboratoryComponent",
+        ] as const;
+
+        const changes = diffFields(
+          existing as Record<string, unknown>,
+          course as Record<string, unknown>,
+          trackableFields as unknown as readonly string[]
+        );
+
+        if (changes.length > 0) {
+          await logChanges({
+            entityType: "COURSE",
+            entityId: course.id,
+            courseId: course.id,
+            action: "SUPER_EDIT",
+            changes,
+            adminUserId: adminContext.adminUserId,
+            reason: adminContext.reason,
+            ipAddress: adminContext.ipAddress,
+            userAgent: adminContext.userAgent,
+          });
+        }
+
+        if (adminContext.clientVersion != null) {
+          await checkAndIncrementOptimisticVersion(
+            course.id,
+            adminContext.clientVersion,
+            adminContext.adminUserId
+          );
+        }
+      }
+
+      const version = adminContext?.isAdmin
+        ? await db.course.findUnique({
+            where: { id: course.id },
+            select: { version: true },
+          })
+        : undefined;
+
       const response: BaseResponse<CourseWithDepartmentContext> = {
         status: "success",
         message: "Course updated successfully",
@@ -387,6 +479,7 @@ export class CourseService {
           ...course,
           departmentId: resolvedDepartment.departmentId,
           departmentName: resolvedDepartment.departmentName,
+          ...(version ? { version: version.version } : {}),
         },
       };
       logger.info(response);
@@ -808,7 +901,9 @@ export class CourseService {
     try {
       const pendingCourses = await db.course.findMany({
         where: {
-          approvalStatus: { in: ["PENDING", "APPROVED"] },
+          approvalStatus: {
+            in: ["DRAFT", "PENDING", "APPROVED", "NEEDS_REVISION"],
+          },
         },
         include: {
           department: { select: { id: true, code: true, name: true } },
@@ -824,8 +919,6 @@ export class CourseService {
       for (const course of pendingCourses) {
         const hasAdminApproved = course.approvedByRole === "admin";
         const hasCoeApproved = course.approvedByRole === "coe";
-        const courseApprovalStatus =
-          course.approvalStatus === "APPROVED" ? "APPROVED" : "PENDING";
         const key = `${course.department.id}_${course.semesterId}_${course.cycle}`;
         if (!groupedMap.has(key)) {
           groupedMap.set(key, {
@@ -836,20 +929,49 @@ export class CourseService {
             semesterId: course.semesterId,
             semester: course.semester,
             cycle: course.cycle,
-            approvalStatus: courseApprovalStatus,
+            approvalStatus:
+              course.approvalStatus as GroupedCourseSubmission["approvalStatus"],
             hasAdminApproved,
             hasCoeApproved,
             courseCount: 0,
             courses: [],
+            hasPostApprovalEdits: course.hasPostApprovalEdits,
+            overrideCount: course.overrideCount,
+            lastOverrideAt: course.lastOverrideAt?.toISOString() ?? null,
+            lastOverrideById: course.lastOverrideById ?? null,
           });
         }
         const group = groupedMap.get(key);
         if (group) {
-          if (courseApprovalStatus !== "APPROVED") {
-            group.approvalStatus = "PENDING";
+          // Group status is the "worst" status: DRAFT < NEEDS_REVISION < PENDING < APPROVED
+          const statusPriority: Record<string, number> = {
+            DRAFT: 0,
+            NEEDS_REVISION: 1,
+            PENDING: 2,
+            APPROVED: 3,
+          };
+          const currentPriority = statusPriority[group.approvalStatus] ?? 0;
+          const coursePriority = statusPriority[course.approvalStatus] ?? 0;
+          if (coursePriority < currentPriority) {
+            group.approvalStatus =
+              course.approvalStatus as GroupedCourseSubmission["approvalStatus"];
           }
           group.hasAdminApproved = group.hasAdminApproved || hasAdminApproved;
           group.hasCoeApproved = group.hasCoeApproved || hasCoeApproved;
+          group.hasPostApprovalEdits =
+            group.hasPostApprovalEdits || course.hasPostApprovalEdits;
+          group.overrideCount = Math.max(
+            group.overrideCount,
+            course.overrideCount
+          );
+          if (
+            course.lastOverrideAt &&
+            (!group.lastOverrideAt ||
+              course.lastOverrideAt.toISOString() > group.lastOverrideAt)
+          ) {
+            group.lastOverrideAt = course.lastOverrideAt.toISOString();
+            group.lastOverrideById = course.lastOverrideById ?? null;
+          }
           group.courseCount += 1;
           group.courses.push({
             ...course,
@@ -993,26 +1115,29 @@ export class CourseService {
    */
   static async getCoordinators(
     courseId: string,
-    requestContext?: DepartmentRequestContext
+    requestContext?: DepartmentRequestContext,
+    isAdmin?: boolean
   ): Promise<BaseResponse<unknown[]>> {
     try {
-      const resolvedDepartment = await this.resolveCourseDepartmentContext({
-        source: "course.getCoordinators",
-        requestContext,
-      });
+      if (!isAdmin) {
+        const resolvedDepartment = await this.resolveCourseDepartmentContext({
+          source: "course.getCoordinators",
+          requestContext,
+        });
 
-      const course = await db.course.findFirst({
-        where: {
-          id: courseId,
-          department: {
-            is: { id: resolvedDepartment.departmentId },
+        const course = await db.course.findFirst({
+          where: {
+            id: courseId,
+            department: {
+              is: { id: resolvedDepartment.departmentId },
+            },
           },
-        },
-        select: { id: true },
-      });
+          select: { id: true },
+        });
 
-      if (!course) {
-        throw new Error("Course not found");
+        if (!course) {
+          throw new Error("Course not found");
+        }
       }
 
       const coordinators = await db.courseCoordinator.findMany({
@@ -1052,29 +1177,53 @@ export class CourseService {
   static async updateCoordinators(
     courseId: string,
     facultyIds: string[],
-    requestContext?: DepartmentRequestContext
+    requestContext?: DepartmentRequestContext,
+    adminContext?: {
+      isAdmin?: boolean;
+      adminUserId?: string;
+      clientVersion?: number;
+      reason?: string;
+      ipAddress?: string;
+      userAgent?: string;
+    }
   ): Promise<BaseResponse<{ count: number }>> {
     try {
-      const resolvedDepartment = await this.resolveCourseDepartmentContext({
-        source: "course.updateCoordinators",
-        requestContext,
-      });
+      const resolvedDepartment = adminContext?.isAdmin
+        ? null
+        : await this.resolveCourseDepartmentContext({
+            source: "course.updateCoordinators",
+            requestContext,
+          });
 
       const course = await db.course.findFirst({
         where: {
           id: courseId,
-          department: {
-            is: { id: resolvedDepartment.departmentId },
-          },
+          ...(adminContext?.isAdmin
+            ? {}
+            : {
+                department: {
+                  is: { id: resolvedDepartment!.departmentId },
+                },
+              }),
         },
-        select: { id: true, approvalStatus: true },
+        select: { id: true, approvalStatus: true, version: true },
       });
 
       if (!course) {
         throw new Error("Course not found");
       }
 
-      this._ensureCourseIsEditable(course.approvalStatus);
+      this._ensureCourseIsEditable(
+        course.approvalStatus,
+        adminContext?.isAdmin
+      );
+
+      const oldCoordinators = adminContext?.isAdmin
+        ? await db.courseCoordinator.findMany({
+            where: { courseId },
+            select: { facultyId: true },
+          })
+        : null;
 
       await db.$transaction(async (tx) => {
         await tx.courseCoordinator.deleteMany({
@@ -1090,6 +1239,38 @@ export class CourseService {
           });
         }
       });
+
+      if (adminContext?.isAdmin && adminContext.adminUserId) {
+        const change = diffLists(
+          oldCoordinators!,
+          facultyIds.map((fid) => ({ facultyId: fid })),
+          "coordinators",
+          (c) => c.facultyId,
+          (c) => c.facultyId
+        );
+
+        if (change) {
+          await logChanges({
+            entityType: "COORDINATOR",
+            entityId: courseId,
+            courseId: courseId,
+            action: "UPDATE_COORDINATOR",
+            changes: [change],
+            adminUserId: adminContext.adminUserId,
+            reason: adminContext.reason,
+            ipAddress: adminContext.ipAddress,
+            userAgent: adminContext.userAgent,
+          });
+        }
+
+        if (adminContext.clientVersion != null) {
+          await checkAndIncrementOptimisticVersion(
+            courseId,
+            adminContext.clientVersion,
+            adminContext.adminUserId
+          );
+        }
+      }
 
       return {
         status: "success",
@@ -1112,29 +1293,31 @@ export class CourseService {
    */
   static async getMappedFacultyForCourse(
     courseId: string,
-    requestContext?: DepartmentRequestContext
+    requestContext?: DepartmentRequestContext,
+    isAdmin?: boolean
   ): Promise<
     BaseResponse<{ id: string; name: string; departmentAbbreviation: string }[]>
   > {
     try {
-      const resolvedDepartment = await this.resolveCourseDepartmentContext({
-        source: "course.getMappedFacultyForCourse",
-        requestContext,
-      });
+      if (!isAdmin) {
+        const resolvedDepartment = await this.resolveCourseDepartmentContext({
+          source: "course.getMappedFacultyForCourse",
+          requestContext,
+        });
 
-      // Verify the course belongs to the requesting department
-      const course = await db.course.findFirst({
-        where: {
-          id: courseId,
-          department: {
-            is: { id: resolvedDepartment.departmentId },
+        const course = await db.course.findFirst({
+          where: {
+            id: courseId,
+            department: {
+              is: { id: resolvedDepartment.departmentId },
+            },
           },
-        },
-        select: { id: true },
-      });
+          select: { id: true },
+        });
 
-      if (!course) {
-        throw new Error("Course not found");
+        if (!course) {
+          throw new Error("Course not found");
+        }
       }
 
       const assignments = await db.courseAssignment.findMany({

@@ -3,6 +3,7 @@ import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
+import { db } from "@webcampus/db";
 import type {
   AdminCourseMappingByCourseQueryType,
   AdminCourseMappingStatusQueryType,
@@ -78,13 +79,12 @@ export class AdminCourseAssignmentController {
         academicYear,
         requestingUserId,
         {
-          departmentId:
-            (req.query as AdminCourseMappingByCourseQueryType).departmentId,
-          departmentName:
-            (req.query as AdminCourseMappingByCourseQueryType).departmentId
-              ? undefined
-              : (req.query as AdminCourseMappingByCourseQueryType)
-                  .departmentName,
+          departmentId: (req.query as AdminCourseMappingByCourseQueryType)
+            .departmentId,
+          departmentName: (req.query as AdminCourseMappingByCourseQueryType)
+            .departmentId
+            ? undefined
+            : (req.query as AdminCourseMappingByCourseQueryType).departmentName,
         }
       );
 
@@ -118,12 +118,37 @@ export class AdminCourseAssignmentController {
       const requestingUserId =
         await AdminCourseAssignmentController.getRequestingUserId(req);
 
+      const course = await db.course.findUnique({
+        where: { id: data.courseId },
+        select: { approvalStatus: true },
+      });
+
+      const isCourseLocked =
+        course?.approvalStatus === "PENDING" ||
+        course?.approvalStatus === "APPROVED";
+
+      if (isCourseLocked && !data.reason?.trim()) {
+        sendResponse({
+          res,
+          status: "error",
+          statusCode: 400,
+          message:
+            "Reason is required when overriding a locked or approved course.",
+          error: "Reason is required",
+        });
+        return;
+      }
+
       const response = await AdminCourseAssignmentService.upsertMapping(
         data,
         requestingUserId,
         {
           departmentId: data.departmentId,
           departmentName: data.departmentId ? undefined : data.departmentName,
+          clientVersion: req.body.version as number | undefined,
+          reason: data.reason,
+          ipAddress: req.ip ?? req.socket.remoteAddress,
+          userAgent: req.headers["user-agent"],
         }
       );
 
@@ -243,6 +268,94 @@ export class AdminCourseAssignmentController {
     }
   }
 
+  static async downloadTemplate(req: Request, res: Response): Promise<void> {
+    try {
+      const {
+        courseId,
+        semesterId,
+        academicYear,
+        departmentId,
+        departmentName,
+      } = req.query as {
+        courseId: string;
+        semesterId: string;
+        academicYear: string;
+        departmentId?: string;
+        departmentName?: string;
+      };
+      const requestingUserId =
+        await AdminCourseAssignmentController.getRequestingUserId(req);
+
+      const buffer = await AdminCourseAssignmentService.generateMappingTemplate(
+        courseId,
+        semesterId,
+        academicYear,
+        requestingUserId,
+        {
+          departmentId,
+          departmentName: departmentId ? undefined : departmentName,
+        }
+      );
+
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=course-mapping-template.xlsx"
+      );
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.send(buffer);
+    } catch (error) {
+      logger.error("Error generating Excel template", { error });
+      res.status(500).send("Failed to generate Excel template");
+    }
+  }
+
+  static async uploadTemplate(req: Request, res: Response): Promise<void> {
+    try {
+      const file = req.file;
+      const requestingUserId =
+        await AdminCourseAssignmentController.getRequestingUserId(req);
+      const { departmentId, departmentName } = req.body as {
+        departmentId?: string;
+        departmentName?: string;
+      };
+
+      if (!file) throw new Error("No file uploaded");
+
+      const response = await AdminCourseAssignmentService.parseMappingUpload(
+        file.buffer,
+        requestingUserId,
+        {
+          departmentId,
+          departmentName: departmentId ? undefined : departmentName,
+        }
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error: unknown) {
+      console.error(error);
+      logger.error("Error uploading excel mapping", { error });
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
   static async deleteMappings(req: Request, res: Response): Promise<void> {
     try {
       const { courseId, semesterId, academicYear } = req.body as {
@@ -265,6 +378,10 @@ export class AdminCourseAssignmentController {
           departmentName: (req.body as { departmentId?: string }).departmentId
             ? undefined
             : (req.body as { departmentName?: string }).departmentName,
+          clientVersion: req.body.version as number | undefined,
+          reason: req.body.reason as string | undefined,
+          ipAddress: req.ip ?? req.socket.remoteAddress,
+          userAgent: req.headers["user-agent"],
         }
       );
 
@@ -279,7 +396,8 @@ export class AdminCourseAssignmentController {
         message: response.message,
         data: response.data,
       });
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error(error);
       logger.error("Error deleting admin mappings", { error });
       sendResponse({
         res,

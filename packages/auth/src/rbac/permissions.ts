@@ -18,6 +18,7 @@ const statement = {
   admission: ["create", "read", "update", "delete", "port"],
   student: ["read", "delete"],
   courseCoordinator: ["create", "read", "update"],
+  courseApprovalOverride: ["read", "update"],
   registrationWindow: ["create", "read", "update"],
 } as const;
 
@@ -29,6 +30,7 @@ export const roles = {
     courses: ["create", "read", "update", "delete"],
     courseAssignment: ["create", "read"],
     courseCoordinator: ["create", "read", "update"],
+    courseApprovalOverride: ["read", "update"],
     section: ["read"],
     semester: ["create", "read", "delete", "update"],
     department: ["create", "read", "update", "delete"],

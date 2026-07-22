@@ -1,5 +1,6 @@
 "use client";
 
+import { AuditHistoryDialog } from "@/components/admin/audit-history-dialog";
 import { frontendEnv } from "@webcampus/common/env";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
@@ -12,6 +13,7 @@ import {
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
 import axios, { AxiosError } from "axios";
+import { format } from "date-fns";
 import { useState } from "react";
 import { toast } from "react-toastify";
 import {
@@ -132,9 +134,16 @@ export const CourseReviewSheet = ({
               </span>
               <span>
                 Semester: {group.semester?.semesterNumber || "N/A"}
-                {group.cycle !== "NONE" && ` • Cycle: ${group.cycle}`}
+                {group.cycle !== "NONE" && ` - Cycle: ${group.cycle}`}
               </span>
               <span>Total Courses: {group.courseCount}</span>
+              {group.hasPostApprovalEdits && group.lastOverrideAt && (
+                <span className="text-xs text-amber-600 dark:text-amber-400">
+                  Last Override:{" "}
+                  {format(new Date(group.lastOverrideAt), "dd MMM yyyy")}
+                  {group.lastOverrideById && ` (by admin)`}
+                </span>
+              )}
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -183,9 +192,15 @@ export const CourseReviewSheet = ({
                       Mode
                     </span>
                     <span className="font-medium capitalize">
-                      {course.courseMode.toLowerCase().replace("_", " ")}
+                      {course.courseMode?.toLowerCase().replace("_", " ") ??
+                        "N/A"}
                     </span>
                   </div>
+                  {isApproved && (
+                    <div className="ml-auto">
+                      <AuditHistoryDialog courseId={course.id} />
+                    </div>
+                  )}
                 </div>
               </div>
             );

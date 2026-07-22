@@ -6,11 +6,14 @@ import {
   AdminCourseMappingSectionsQuerySchema,
   AdminCourseMappingStatusQuerySchema,
   AdminDeleteCourseMappingSchema,
+  AdminDownloadMappingTemplateQuerySchema,
   AdminUpsertCourseMappingSchema,
 } from "@webcampus/schemas/admin";
 import { Router } from "express";
+import multer from "multer";
 
 const router: Router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.get(
   "/status",
@@ -94,6 +97,26 @@ router.get(
     },
   }),
   AdminCourseAssignmentController.getSectionsForMapping
+);
+
+router.get(
+  "/excel/template",
+  validateRequest(AdminDownloadMappingTemplateQuerySchema, "query"),
+  protect({
+    role: "admin",
+    permissions: { courseAssignment: ["read"] },
+  }),
+  AdminCourseAssignmentController.downloadTemplate
+);
+
+router.post(
+  "/excel/upload",
+  protect({
+    role: "admin",
+    permissions: { courseAssignment: ["create"] },
+  }),
+  upload.single("file"), // Multer grabs the file from form-data and puts it in req.file
+  AdminCourseAssignmentController.uploadTemplate
 );
 
 export default router;

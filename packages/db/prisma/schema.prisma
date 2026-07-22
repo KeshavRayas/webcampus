@@ -33,6 +33,7 @@ model User {
   student               Student?
   accounts              Account[]
   sessions              Session[]
+  adminEditLogs         AdminEditLog[]
 
   courseMappingAuditLogs CourseMappingAuditLog[]
   @@map("user")
@@ -405,6 +406,11 @@ model Course {
   revisionRequestedByRole String?
   revisionNotes           String?
   revisionRequestedAt     DateTime?
+  version                 Int                  @default(1)
+  lastOverrideAt          DateTime?
+  lastOverrideById        String?
+  overrideCount           Int                  @default(0)
+  hasPostApprovalEdits    Boolean              @default(false)
   attendances             Attendance[]
   ClassSession            ClassSession[]
   coordinators            CourseCoordinator[]
@@ -933,6 +939,47 @@ enum FreezeActorRole {
 enum AttendanceStatus {
   PRESENT
   ABSENT
+}
+
+enum AuditEntityType {
+  COURSE
+  COURSE_ASSIGNMENT
+  COORDINATOR
+  BATCH
+  ASSESSMENT
+}
+
+enum AuditAction {
+  SUPER_EDIT
+  UPSERT_MAPPING
+  DELETE_MAPPING
+  UPDATE_COORDINATOR
+}
+
+model AdminEditLog {
+  id            String          @id @default(uuid())
+  changeGroupId String          // UUID grouping all changes from one save
+  entityId      String
+  entityType    AuditEntityType // "COURSE" | "COURSE_ASSIGNMENT" | "COORDINATOR" | etc.
+  courseId      String?         // always set for new rows; nullable for backward compat
+  fieldName     String?         // per-field name: "facultyId", "credits", etc.
+  oldValue      Json?
+  newValue      Json?
+  action        AuditAction     // SUPER_EDIT, UPSERT_MAPPING, DELETE_MAPPING, UPDATE_COORDINATOR
+  reason        String?         // required when entity is locked/approved
+  ipAddress     String?
+  userAgent     String?
+  details       String?         // preserved for backward compat (existing records)
+  adminUserId   String
+  editedAt      DateTime        @default(now())
+  
+  adminUser   User     @relation(fields: [adminUserId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([changeGroupId])
+  @@index([courseId])
+  @@index([editedAt])
+  @@index([adminUserId])
 }
 
 

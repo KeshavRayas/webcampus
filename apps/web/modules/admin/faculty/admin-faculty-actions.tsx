@@ -41,10 +41,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@webcampus/ui/components/tabs";
-import { MoreHorizontal, Upload } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import React, { useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
+import { UserPhotoUpload } from "../shared/user-photo-upload";
 import { AdminFacultyResponse } from "./admin-faculty-columns";
 import {
   useCreateHodAccount,
@@ -370,7 +371,7 @@ export const AdminFacultyActions = ({
                 />
               </div>
 
-              <FormItem>
+              {/* <FormItem>
                 <FormLabel>Update Faculty Image</FormLabel>
                 <div className="space-y-3">
                   {faculty?.user?.image && !editImageFile && (
@@ -410,7 +411,20 @@ export const AdminFacultyActions = ({
                   </FormControl>
                 </div>
                 <FormMessage />
-              </FormItem>
+              </FormItem> */}
+              <UserPhotoUpload
+                label="Update Faculty Image"
+                personName={editForm.watch("name") || "Faculty"}
+                currentImageUrl={faculty?.user?.image}
+                previewUrl={
+                  editImageFile ? URL.createObjectURL(editImageFile) : null
+                }
+                selectedFileName={editImageFile?.name || null}
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  setEditImageFile(file);
+                }}
+              />
 
               <DialogFooter>
                 <Button type="submit" disabled={isUpdating}>
