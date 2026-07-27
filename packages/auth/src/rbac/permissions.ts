@@ -20,6 +20,7 @@ const statement = {
   courseCoordinator: ["create", "read", "update"],
   courseApprovalOverride: ["read", "update"],
   registrationWindow: ["create", "read", "update"],
+  finance: ["read", "update"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -66,6 +67,9 @@ export const roles = {
     freeze: ["read", "lock"],
     attendance: ["read"],
     marks: ["read"],
+  }),
+  finance: ac.newRole({
+    finance: ["read", "update"],
   }),
   department: ac.newRole({
     ...adminAc.statements,

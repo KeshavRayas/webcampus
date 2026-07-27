@@ -4,6 +4,7 @@ export const roles = [
   "coordinator",
   "hod",
   "coe",
+  "finance",
   "department",
   "admission_admin",
   "admission_reviewer",

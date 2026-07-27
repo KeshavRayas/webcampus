@@ -257,6 +257,7 @@ model Student {
   studentSections   StudentSection[]
   batches           Batch[]              @relation("BatchStudents")
   hallTickets        HallTicket[]
+  finances           Finance[]
 
   @@index([departmentName])
   @@index([departmentName, currentSemester])
@@ -996,4 +997,33 @@ model CourseMappingAuditLog {
 
   @@index([courseId])
   @@index([adminId])
+}
+
+model Finance {
+  id           String           @id @default(uuid())
+  studentId    String
+  academicYear String
+  finalFee     Float            @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  payments     FinancePayment[]
+
+  @@unique([studentId, academicYear])
+  @@index([studentId])
+  @@index([academicYear])
+}
+
+model FinancePayment {
+  id        String   @id @default(uuid())
+  financeId String
+  amount    Float
+  paidAt    DateTime @default(now())
+  reference String?
+  remarks   String?
+  createdAt DateTime @default(now())
+  finance   Finance  @relation(fields: [financeId], references: [id], onDelete: Cascade)
+
+  @@index([financeId])
+  @@index([paidAt])
 }

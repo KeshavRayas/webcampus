@@ -10,6 +10,7 @@
     "./hod": "./src/hod/index.ts",
     "./student": "./src/student/index.ts",
     "./coe": "./src/coe/index.ts",
+    "./finance": "./src/finance/index.ts",
     "./common": "./src/common.schemas.ts"
   },
   "scripts": {
