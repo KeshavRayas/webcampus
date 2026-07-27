@@ -400,23 +400,6 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     },
     navSecondary,
   },
-  admission_reviewer: {
-    navMain: {
-      items: [
-        {
-          name: "Add Admissions",
-          url: "/admission",
-          icon: LayoutDashboard,
-        },
-        {
-          name: "View Admissions",
-          url: "/admission/view-admissions",
-          icon: BookCopy,
-        },
-      ],
-    },
-    navSecondary,
-  },
 
   applicant: {
     navMain: {
