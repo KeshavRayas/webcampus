@@ -599,7 +599,6 @@ model Admission {
   diplomaInstituteType            String?
   diplomaInstituteCity            String?
   diplomaInstituteState           String?
-  diplomaInstituteCode            String?
   diplomaYearOfPassing            String?
   diplomaBranch                   String?
   diplomaMediumOfTeaching         String?
@@ -607,7 +606,6 @@ model Admission {
   diplomaAggregateTotal           Float?
   diplomaMarksPdf                 String?
   class12thInstituteCity          String?
-  class12thInstituteCode          String?
   class12thInstituteName          String?
   class12thInstituteState         String?
   class12thInstituteType          String?
@@ -632,7 +630,6 @@ model Admission {
   fatherOccupation                String?
   fatherPermanentAddress          String?
   feePaid                         Float?
-  feePayable                      Float?
   firstName                       String?
   guardianEmail                   String?
   guardianName                    String?
@@ -675,8 +672,8 @@ model Admission {
   visaValidityDetails             String?
   departmentId                    String
   studentId                       String?         @unique
-  categoryAllotted                Category
-  categoryClaimed                 Category
+  categoryAllotted                String?
+  categoryClaimed                 String?
   quota                           Quota
   department                      Department      @relation(fields: [departmentId], references: [id])
   semester                        Semester        @relation(fields: [semesterId], references: [id])
@@ -890,12 +887,6 @@ enum AdmissionStatus {
   REJECTED
 }
 
-enum Category {
-  GENERAL
-  OBC
-  SC
-  ST
-}
 
 enum Quota {
   MERIT

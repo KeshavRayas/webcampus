@@ -9,7 +9,7 @@ import {
 } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 
-const ADMISSION_ROLES = ["admission_admin", "admission_reviewer"] as const;
+const ADMISSION_ROLES = ["admission_admin"] as const;
 
 type AdmissionUserRecord = {
   id: string;
@@ -181,11 +181,7 @@ export class AdminAdmissionUserService {
         },
       });
 
-      if (
-        !existingUser ||
-        (existingUser.role !== "admission_admin" &&
-          existingUser.role !== "admission_reviewer")
-      ) {
+      if (!existingUser || existingUser.role !== "admission_admin") {
         throw new Error("Admission user not found");
       }
 
@@ -334,10 +330,7 @@ export class AdminAdmissionUserService {
       if (!user) {
         throw new Error("User not found");
       }
-      if (
-        user.role !== "admission_admin" &&
-        user.role !== "admission_reviewer"
-      ) {
+      if (user.role !== "admission_admin") {
         throw new Error("Cannot delete non-admission user via this endpoint");
       }
 

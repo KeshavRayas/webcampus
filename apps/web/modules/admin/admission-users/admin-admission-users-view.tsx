@@ -24,13 +24,6 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@webcampus/ui/components/select";
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -198,35 +191,6 @@ export const AdminAdmissionUsersView = () => {
                             {...field}
                           />
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="role"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Role *</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a role" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="admission_admin">
-                              Admission Admin (Data Entry)
-                            </SelectItem>
-                            <SelectItem value="admission_reviewer">
-                              Admission Reviewer (Approvals)
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}

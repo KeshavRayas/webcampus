@@ -66,10 +66,7 @@ export const AdminAdmissionUsersActions = ({
       name: user.name,
       username: user.username || "",
       email: user.email,
-      role:
-        user.role === "admission_admin"
-          ? "admission_admin"
-          : "admission_reviewer",
+      role: user.role,
     },
   });
 
@@ -94,10 +91,7 @@ export const AdminAdmissionUsersActions = ({
       name: user.name,
       username: user.username || "",
       email: user.email,
-      role:
-        user.role === "admission_admin"
-          ? "admission_admin"
-          : "admission_reviewer",
+      role: user.role,
     });
     setEditPhotoFile(null);
     replacePhotoPreview(null);
@@ -245,9 +239,6 @@ export const AdminAdmissionUsersActions = ({
                       <SelectContent>
                         <SelectItem value="admission_admin">
                           Admission Admin (Data Entry)
-                        </SelectItem>
-                        <SelectItem value="admission_reviewer">
-                          Admission Reviewer (Approvals)
                         </SelectItem>
                       </SelectContent>
                     </Select>

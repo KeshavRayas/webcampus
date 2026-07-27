@@ -6,7 +6,6 @@ export const roles = [
   "coe",
   "department",
   "admission_admin",
-  "admission_reviewer",
   "admin",
   "applicant",
 ] as const;

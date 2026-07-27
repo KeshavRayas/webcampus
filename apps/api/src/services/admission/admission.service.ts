@@ -668,7 +668,6 @@ export class AdmissionService {
           originalAdmissionOrderDate: data.originalAdmissionOrderDate
             ? new Date(data.originalAdmissionOrderDate)
             : null,
-          feePayable: data.feePayable ? parseFloat(data.feePayable) : null,
           feePaid: data.feePaid ? parseFloat(data.feePaid) : null,
           hostel: data.hostel === "true",
           hostelRoomNumber: data.hostelRoomNumber ?? null,
@@ -718,7 +717,6 @@ export class AdmissionService {
           class10thSchoolType: data.class10thSchoolType,
           class10thSchoolCity: data.class10thSchoolCity,
           class10thSchoolState: data.class10thSchoolState,
-          class10thSchoolCode: data.class10thSchoolCode,
           class10thYearOfPassing: data.class10thYearOfPassing,
           class10thAggregateScore: data.class10thAggregateScore
             ? parseFloat(data.class10thAggregateScore)
@@ -734,7 +732,6 @@ export class AdmissionService {
           class12thInstituteType: data.class12thInstituteType,
           class12thInstituteCity: data.class12thInstituteCity,
           class12thInstituteState: data.class12thInstituteState,
-          class12thInstituteCode: data.class12thInstituteCode,
           class12thYearOfPassing: data.class12thYearOfPassing,
           class12thBranch: data.class12thBranch,
           class12thAggregateScore: data.class12thAggregateScore
@@ -749,7 +746,6 @@ export class AdmissionService {
           diplomaInstituteType: data.diplomaInstituteType ?? null,
           diplomaInstituteCity: data.diplomaInstituteCity ?? null,
           diplomaInstituteState: data.diplomaInstituteState ?? null,
-          diplomaInstituteCode: data.diplomaInstituteCode ?? null,
           diplomaYearOfPassing: data.diplomaYearOfPassing ?? null,
           diplomaBranch: data.diplomaBranch ?? null,
           diplomaMediumOfTeaching: data.diplomaMediumOfTeaching ?? null,

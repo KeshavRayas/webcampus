@@ -28,7 +28,7 @@ export const useAdmissionUsers = () => {
       username: "",
       email: "",
       password: "password",
-      role: "admission_reviewer",
+      role: "admission_admin",
       photo: undefined,
     },
   });
@@ -40,7 +40,7 @@ export const useAdmissionUsers = () => {
       formData.append("username", data.username);
       formData.append("email", data.email);
       formData.append("password", data.password);
-      formData.append("role", data.role);
+      formData.append("role", "admission_admin");
 
       if (photoFile) {
         formData.append("photo", photoFile);

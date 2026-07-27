@@ -74,7 +74,7 @@ const DataField = ({
   return (
     <div className="space-y-1">
       <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="font-medium break-words" suppressHydrationWarning>
+      <p className="break-words font-medium" suppressHydrationWarning>
         {displayValue}
       </p>
     </div>
@@ -90,11 +90,8 @@ export const AdminAdmissionActions = ({
 }) => {
   const { data: session } = authClient.useSession();
   const role = session?.user?.role;
-  const canReview = role === "admin" || role === "admission_reviewer";
-  const canDelete =
-    role === "admin" ||
-    role === "admission_admin" ||
-    role === "admission_reviewer";
+  const canReview = role === "admin" || "admission_admin";
+  const canDelete = role === "admin" || role === "admission_admin";
 
   const isPending = admission.status === "PENDING";
   const isSubmitted = admission.status === "SUBMITTED";
@@ -223,7 +220,7 @@ export const AdminAdmissionActions = ({
 
                 <div className="w-full space-y-3 text-center">
                   <p className="text-lg font-semibold">{fullName || "-"}</p>
-                  <p className="text-muted-foreground text-sm break-all">
+                  <p className="text-muted-foreground break-all text-sm">
                     {admission.primaryEmail || "-"}
                   </p>
                   <p className="text-muted-foreground text-sm">
@@ -310,14 +307,6 @@ export const AdminAdmissionActions = ({
                         <DataField
                           label="Admission Order Date"
                           value={admission.originalAdmissionOrderDate}
-                        />
-                        <DataField
-                          label="Fee Payable"
-                          value={
-                            admission.feePayable
-                              ? `₹${admission.feePayable}`
-                              : null
-                          }
                         />
                         <DataField
                           label="Fee Paid"
@@ -427,7 +416,7 @@ export const AdminAdmissionActions = ({
                           <p className="text-muted-foreground text-sm">
                             Current Address
                           </p>
-                          <p className="font-medium break-words">
+                          <p className="break-words font-medium">
                             {currentFullAddress || "-"}
                           </p>
                         </div>
@@ -435,7 +424,7 @@ export const AdminAdmissionActions = ({
                           <p className="text-muted-foreground text-sm">
                             Permanent Address
                           </p>
-                          <p className="font-medium break-words">
+                          <p className="break-words font-medium">
                             {permanentFullAddress || "-"}
                           </p>
                         </div>

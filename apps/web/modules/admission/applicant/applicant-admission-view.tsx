@@ -7,6 +7,7 @@ import { Button } from "@webcampus/ui/components/button";
 import { Checkbox } from "@webcampus/ui/components/checkbox";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
+import { PhoneNumberInput } from "@webcampus/ui/components/phone-input";
 import { Progress } from "@webcampus/ui/components/progress";
 import {
   Select,
@@ -22,8 +23,6 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import "react-phone-number-input/style.css";
-import { PhoneNumberInput } from "@webcampus/ui/components/phone-input";
 
 type ApplicantAdmissionData = {
   applicationId: string;
@@ -108,12 +107,7 @@ export const ApplicantAdmissionView = () => {
     useState(false);
   const [class12Enabled, setClass12Enabled] = useState(true);
   const [diplomaEnabled, setDiplomaEnabled] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<
-    Record<string, File | null>
-  >({});
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [reviewPdfUrl, setReviewPdfUrl] = useState<string | null>(null);
-  const filePreviewRef = useRef<string | null>(null);
   const reviewPdfRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const sectionRefs = useRef<Record<StepKey, HTMLDivElement | null>>({
@@ -125,7 +119,6 @@ export const ApplicantAdmissionView = () => {
   });
   const [birthState, setBirthState] = useState("");
   const [birthPlace, setBirthPlace] = useState("");
-  const [filePreviews, setFilePreviews] = useState<Record<string, string>>({});
   // Class 10
   const [class10State, setClass10State] = useState("");
   const [class10City, setClass10City] = useState("");
@@ -166,7 +159,7 @@ export const ApplicantAdmissionView = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const formData = new FormData();
+    const formData = new FormData(e.currentTarget);
 
     const htmlForm = new FormData(e.currentTarget);
 
@@ -176,36 +169,6 @@ export const ApplicantAdmissionView = () => {
         formData.append(key, value);
       }
     });
-
-    // Copy every selected file from React state
-    Object.entries(selectedFiles).forEach(([key, file]) => {
-      if (file) {
-        formData.append(key, file);
-      }
-    });
-
-    const requiredFiles: [string, string][] = [
-      ["photo", "Passport Size Photo"],
-      ["aadharCard", "Aadhar Card"],
-      ["class10thMarksPdf", "10th Marks Card"],
-      ["studyCertificate", "Study Certificate"],
-    ];
-
-    if (class12Enabled) {
-      requiredFiles.push(["class12thMarksPdf", "12th Marks Card"]);
-    }
-
-    if (diplomaEnabled) {
-      requiredFiles.push(["diplomaMarksPdf", "Diploma Marks Card"]);
-    }
-    for (const [field, label] of requiredFiles) {
-      const file = selectedFiles[field];
-
-      if (!file) {
-        toast.error(`${label} is required`);
-        return;
-      }
-    }
 
     if (!class12Enabled && !diplomaEnabled) {
       toast.error("Please fill either Class 12 / PUC or Diploma details.");
@@ -278,75 +241,7 @@ export const ApplicantAdmissionView = () => {
       }
     }
 
-    // Validate required files using React state
-    const requiredFiles: Record<StepKey, string[]> = {
-      admission: [],
-      personal: ["photo", "aadharCard"],
-      education: ["class10thMarksPdf", "studyCertificate"],
-      parent: [],
-      review: [],
-    };
-
-    if (class12Enabled) {
-      requiredFiles.education.push("class12thMarksPdf");
-    }
-
-    if (diplomaEnabled) {
-      requiredFiles.education.push("diplomaMarksPdf");
-    }
-
-    for (const name of requiredFiles[step]) {
-      if (!selectedFiles[name]) {
-        toast.error(`${name} is required`);
-        return false;
-      }
-    }
-
     return true;
-  };
-
-  const clearPreview = () => {
-    if (filePreviewRef.current) {
-      URL.revokeObjectURL(filePreviewRef.current);
-      filePreviewRef.current = null;
-    }
-    setPhotoPreview(null);
-  };
-
-  const handleFileSelect = (name: string, file: File | null) => {
-    setSelectedFiles((current) => ({
-      ...current,
-      [name]: file,
-    }));
-    if (file) {
-      if (filePreviews[name]) {
-        URL.revokeObjectURL(filePreviews[name]);
-      }
-
-      setFilePreviews((current) => ({
-        ...current,
-        [name]: URL.createObjectURL(file),
-      }));
-    } else {
-      if (filePreviews[name]) {
-        URL.revokeObjectURL(filePreviews[name]);
-      }
-
-      setFilePreviews((current) => {
-        const updated = { ...current };
-        delete updated[name];
-        return updated;
-      });
-    }
-    if (name === "photo") {
-      clearPreview();
-
-      if (file) {
-        const preview = URL.createObjectURL(file);
-        filePreviewRef.current = preview;
-        setPhotoPreview(preview);
-      }
-    }
   };
   const saveAndNext = (step: StepKey) => {
     if (!validateStep(step)) {
@@ -444,7 +339,6 @@ export const ApplicantAdmissionView = () => {
           "entranceExamRank",
           "originalAdmissionOrderNumber",
           "originalAdmissionOrderDate",
-          "feePayable",
           "feePaid",
           "hostel",
           "hostelRoomNumber",
@@ -502,7 +396,6 @@ export const ApplicantAdmissionView = () => {
           "class10thSchoolType",
           "class10thSchoolCity",
           "class10thSchoolState",
-          "class10thSchoolCode",
           "class10thYearOfPassing",
           "class10thAggregateScore",
           "class10thAggregateTotal",
@@ -514,7 +407,6 @@ export const ApplicantAdmissionView = () => {
           "class12thInstituteType",
           "class12thInstituteCity",
           "class12thInstituteState",
-          "class12thInstituteCode",
           "class12thYearOfPassing",
           "class12thBranch",
           "class12thMediumOfTeaching",
@@ -525,7 +417,6 @@ export const ApplicantAdmissionView = () => {
           "diplomaInstituteType",
           "diplomaInstituteCity",
           "diplomaInstituteState",
-          "diplomaInstituteCode",
           "diplomaYearOfPassing",
           "diplomaBranch",
           "diplomaMediumOfTeaching",
@@ -654,9 +545,6 @@ export const ApplicantAdmissionView = () => {
 
   useEffect(() => {
     return () => {
-      if (filePreviewRef.current) {
-        URL.revokeObjectURL(filePreviewRef.current);
-      }
       if (reviewPdfRef.current) {
         URL.revokeObjectURL(reviewPdfRef.current);
       }
@@ -689,92 +577,9 @@ export const ApplicantAdmissionView = () => {
       .join(", ");
   };
 
-  const FilePicker = ({
-    name,
-    label,
-    accept,
-    required = false,
-    helperText,
-    disabled = false,
-    showPreview = false,
-  }: {
-    name: string;
-    label: string;
-    accept: string;
-    required?: boolean;
-    helperText?: string;
-    disabled?: boolean;
-    showPreview?: boolean;
-  }) => {
-    const selectedFile = selectedFiles[name];
-    const selectedName = selectedFile?.name || "";
-    const inputId = `${name}-input`;
-    const previewUrl = filePreviews[name];
-    return (
-      <div className="space-y-2">
-        <Label htmlFor={inputId}>
-          {label}
-          {required ? " *" : ""}
-        </Label>
-        <div className="bg-background flex flex-wrap items-center gap-3 rounded-md border p-3">
-          <Input
-            id={inputId}
-            name={name}
-            type="file"
-            accept={accept}
-            disabled={disabled}
-            onChange={(event) => {
-              console.log(event.target.files);
-              console.log(event.target.files?.length);
-              console.log(event.target.files?.[0]);
-
-              handleFileSelect(name, event.target.files?.[0] || null);
-            }}
-            className="hidden"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => document.getElementById(inputId)?.click()}
-            disabled={disabled}
-          >
-            {selectedName ? "Change File" : "Choose File"}
-          </Button>
-          <span className="text-muted-foreground min-w-0 flex-1 truncate text-sm">
-            {selectedName || "No file chosen"}
-          </span>
-        </div>
-        {showPreview && photoPreview ? (
-          <div className="mt-2">
-            <img
-              src={photoPreview}
-              alt="Uploaded preview"
-              className="h-24 w-24 rounded-lg border object-cover"
-            />
-          </div>
-        ) : null}
-        {previewUrl && accept === "application/pdf" && (
-          <div className="mt-2">
-            <iframe
-              src={previewUrl}
-              title={`${name}-preview`}
-              className="h-96 w-full rounded-lg border"
-            />
-          </div>
-        )}
-        {helperText ? (
-          <p className="text-muted-foreground text-xs">{helperText}</p>
-        ) : null}
-      </div>
-    );
-  };
-
   const handleSameAsCurrentAddress = (checked: boolean) => {
     setIsSameAddress(checked);
   };
-  useEffect(() => {
-    console.log(selectedFiles);
-  }, [selectedFiles]);
   useEffect(() => {
     if (!isSameAddress) return;
 
@@ -934,42 +739,32 @@ export const ApplicantAdmissionView = () => {
               />
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label>First Name</Label>
+              <Label htmlFor="firstName">First Name *</Label>
 
-              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
-                {admission.firstName || "-"}
-              </div>
-
-              <input
-                type="hidden"
+              <Input
+                id="firstName"
                 name="firstName"
-                value={admission.firstName ?? ""}
+                defaultValue={admission.firstName ?? ""}
+                required
               />
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label>Middle Name</Label>
+              <Label htmlFor="middleName">Middle Name</Label>
 
-              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
-                {admission.middleName || "-"}
-              </div>
-
-              <input
-                type="hidden"
+              <Input
+                id="middleName"
                 name="middleName"
-                value={admission.middleName ?? ""}
+                defaultValue={admission.middleName ?? ""}
               />
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label>Last Name</Label>
+              <Label htmlFor="lastName">Last Name *</Label>
 
-              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
-                {admission.lastName || "-"}
-              </div>
-
-              <input
-                type="hidden"
+              <Input
+                id="lastName"
                 name="lastName"
-                value={admission.lastName ?? ""}
+                defaultValue={admission.lastName ?? ""}
+                required
               />
             </div>
             <div className="space-y-2 md:col-span-4">
@@ -1029,16 +824,11 @@ export const ApplicantAdmissionView = () => {
                 required
               />
             </div>
-
-            <div className="space-y-2 md:col-span-3">
-              <Label htmlFor="feePayable">Fee Payable (₹) *</Label>
-              <Input id="feePayable" name="feePayable" type="number" required />
-            </div>
-            <div className="space-y-2 md:col-span-3">
+            <div className="space-y-2 md:col-span-4">
               <Label htmlFor="feePaid">Fee Paid (₹) *</Label>
               <Input id="feePaid" name="feePaid" type="number" required />
             </div>
-            <div className="space-y-2 md:col-span-3">
+            <div className="space-y-2 md:col-span-4">
               <Label htmlFor="hostel-toggle">Hostel Required *</Label>
               <input
                 type="hidden"
@@ -1061,7 +851,7 @@ export const ApplicantAdmissionView = () => {
                 </Label>
               </div>
             </div>
-            <div className="space-y-2 md:col-span-3">
+            <div className="space-y-2 md:col-span-4">
               <Label htmlFor="hostelRoomNumber">Hostel Room Number</Label>
               <Input
                 id="hostelRoomNumber"
@@ -1140,16 +930,6 @@ export const ApplicantAdmissionView = () => {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2 md:col-span-2 lg:col-span-3">
-              <FilePicker
-                name="photo"
-                label="Passport Size Photo (Image)"
-                accept="image/*"
-                showPreview
-              />
-            </div>
-
             {/* Contact Info */}
             <div className="space-y-2">
               <Label htmlFor="primaryPhoneNumber">Primary Phone Number *</Label>
@@ -1158,6 +938,7 @@ export const ApplicantAdmissionView = () => {
                 id="primaryPhoneNumber"
                 value={primaryPhone}
                 onChange={(value) => setPrimaryPhone(value ?? "")}
+                defaultCountry="IN"
                 required
               />
 
@@ -1176,6 +957,7 @@ export const ApplicantAdmissionView = () => {
                 id="secondaryPhoneNumber"
                 value={secondaryPhone}
                 onChange={(value) => setSecondaryPhone(value ?? "")}
+                defaultCountry="IN"
                 required
               />
 
@@ -1194,6 +976,7 @@ export const ApplicantAdmissionView = () => {
                 id="emergencyContactNumber"
                 value={emergencyPhone}
                 onChange={(value) => setEmergencyPhone(value ?? "")}
+                defaultCountry="IN"
                 required
               />
 
@@ -1628,13 +1411,6 @@ export const ApplicantAdmissionView = () => {
                   <Label htmlFor="subCaste">Sub caste</Label>
                   <Input id="subCaste" name="subCaste" />
                 </div>
-                <div className="space-y-2 md:col-span-2 lg:col-span-3">
-                  <FilePicker
-                    name="casteCertificate"
-                    label="Caste Certificate (PDF)"
-                    accept="application/pdf"
-                  />
-                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="motherTongue">Mother Tongue *</Label>
@@ -1700,15 +1476,6 @@ export const ApplicantAdmissionView = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <FilePicker
-                    name="disabilityCertificate"
-                    label="Disability Certificate"
-                    accept="application/pdf"
-                    disabled={!disabilityEnabled}
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-1 lg:col-span-1">
                   <Label htmlFor="economicallyBackward">
                     Economically Backward Status *
                   </Label>
@@ -1733,14 +1500,6 @@ export const ApplicantAdmissionView = () => {
                     </Label>
                   </div>
                 </div>
-                <div className="space-y-2 md:col-span-1 lg:col-span-2">
-                  <FilePicker
-                    name="economicallyBackwardCertificate"
-                    label="Economically Backward Status Certificate"
-                    accept="application/pdf"
-                    disabled={!economicallyBackwardEnabled}
-                  />
-                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="aadharNumber">Aadhar Number *</Label>
@@ -1752,13 +1511,6 @@ export const ApplicantAdmissionView = () => {
                     pattern="[0-9]{12}"
                     maxLength={12}
                     required
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-1 lg:col-span-2">
-                  <FilePicker
-                    name="aadharCard"
-                    label="Aadhar Card Proof"
-                    accept="application/pdf"
                   />
                 </div>
               </div>
@@ -1888,15 +1640,6 @@ export const ApplicantAdmissionView = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="class10thSchoolCode">School Code *</Label>
-              <Input
-                id="class10thSchoolCode"
-                name="class10thSchoolCode"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="class10thYearOfPassing">Year of Passing *</Label>
               <Input
                 id="class10thYearOfPassing"
@@ -1939,13 +1682,6 @@ export const ApplicantAdmissionView = () => {
                 id="class10thMediumOfTeaching"
                 name="class10thMediumOfTeaching"
                 required
-              />
-            </div>
-            <div className="space-y-2 md:col-span-1 lg:col-span-2">
-              <FilePicker
-                name="class10thMarksPdf"
-                label="10th Marks Card (PDF)"
-                accept="application/pdf"
               />
             </div>
 
@@ -2150,15 +1886,6 @@ export const ApplicantAdmissionView = () => {
                   required
                 />
               </div>
-
-              <div className="space-y-2 md:col-span-2 lg:col-span-3">
-                <FilePicker
-                  name="class12thMarksPdf"
-                  label="12th Marks Card (PDF)"
-                  accept="application/pdf"
-                  disabled={!class12Enabled}
-                />
-              </div>
             </fieldset>
 
             <fieldset className="contents" disabled={!diplomaEnabled}>
@@ -2248,14 +1975,6 @@ export const ApplicantAdmissionView = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="diplomaInstituteCode">Institute Code *</Label>
-                <Input
-                  id="diplomaInstituteCode"
-                  name="diplomaInstituteCode"
-                  required={diplomaEnabled}
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="diplomaBranch">Branch *</Label>
                 <Input
                   id="diplomaBranch"
@@ -2307,33 +2026,7 @@ export const ApplicantAdmissionView = () => {
                   required={diplomaEnabled}
                 />
               </div>
-              <div className="space-y-2 md:col-span-2 lg:col-span-3">
-                <FilePicker
-                  name="diplomaMarksPdf"
-                  label="Diploma Marks Card (PDF)"
-                  accept="application/pdf"
-                />
-              </div>
             </fieldset>
-
-            {/* Additional Documents */}
-            <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2 lg:col-span-3">
-              Additional Documents
-            </h4>
-            <div className="space-y-2 md:col-span-1 lg:col-span-1">
-              <FilePicker
-                name="studyCertificate"
-                label="Study Certificate (PDF)"
-                accept="application/pdf"
-              />
-            </div>
-            <div className="space-y-2 md:col-span-1 lg:col-span-1">
-              <FilePicker
-                name="transferCertificate"
-                label="Transfer Certificate (PDF)"
-                accept="application/pdf"
-              />
-            </div>
           </div>
           <div className="flex flex-wrap justify-between gap-3">
             <Button
@@ -2386,6 +2079,7 @@ export const ApplicantAdmissionView = () => {
                   id="fatherNumber"
                   value={fatherPhone}
                   onChange={(value) => setFatherPhone(value ?? "")}
+                  defaultCountry="IN"
                   required
                 />
 
@@ -2466,6 +2160,7 @@ export const ApplicantAdmissionView = () => {
                   id="motherNumber"
                   value={motherPhone}
                   onChange={(value) => setMotherPhone(value ?? "")}
+                  defaultCountry="IN"
                   required
                 />
 
@@ -2552,6 +2247,7 @@ export const ApplicantAdmissionView = () => {
                     id="guardianNumber"
                     value={guardianPhone}
                     onChange={(value) => setGuardianPhone(value ?? "")}
+                    defaultCountry="IN"
                   />
 
                   <input
@@ -2666,15 +2362,6 @@ export const ApplicantAdmissionView = () => {
                   {admission.modeOfAdmission}
                 </p>
               </div>
-              <div className="bg-background rounded-md border p-3">
-                <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                  Selected files
-                </p>
-                <p className="text-muted-foreground text-sm">
-                  Photo, mark sheets, and certificates added in earlier steps
-                  will be attached when you submit.
-                </p>
-              </div>
             </div>
             <div className="space-y-3">
               <div className="flex flex-wrap gap-3">
@@ -2728,7 +2415,7 @@ export const ApplicantAdmissionView = () => {
               className="w-full px-8 md:w-auto"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Uploading Documents..." : "Review and Submit"}
+              {isSubmitting ? "Submitting..." : "Review and Submit"}
             </Button>
           </div>
         </div>

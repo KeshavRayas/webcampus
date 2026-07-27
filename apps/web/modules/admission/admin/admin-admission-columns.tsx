@@ -30,7 +30,6 @@ export type AdmissionResponse = {
   entranceExamRank?: string | null;
   originalAdmissionOrderNumber?: string | null;
   originalAdmissionOrderDate?: Date | null;
-  feePayable?: number | null;
   feePaid?: number | null;
   hostel?: boolean | null;
   hostelRoomNumber?: string | null;
@@ -86,7 +85,6 @@ export type AdmissionResponse = {
   class10thSchoolType?: string | null;
   class10thSchoolCity?: string | null;
   class10thSchoolState?: string | null;
-  class10thSchoolCode?: string | null;
   class10thYearOfPassing?: string | null;
   class10thAggregateScore?: number | null;
   class10thAggregateTotal?: number | null;
@@ -97,7 +95,6 @@ export type AdmissionResponse = {
   class12thInstituteType?: string | null;
   class12thInstituteCity?: string | null;
   class12thInstituteState?: string | null;
-  class12thInstituteCode?: string | null;
   class12thYearOfPassing?: string | null;
   class12thBranch?: string | null;
   class12thAggregateScore?: number | null;
