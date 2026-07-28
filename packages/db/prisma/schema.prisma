@@ -885,6 +885,7 @@ enum AdmissionStatus {
   SUBMITTED
   APPROVED
   REJECTED
+  EXITED
 }
 
 

@@ -31,10 +31,18 @@ import { useAdmissionDelete } from "./use-admission-delete";
 import { useAdmissionReview } from "./use-admission-review";
 
 const getStatusVariant = (status: AdmissionResponse["status"]) => {
-  if (status === "APPROVED") return "default" as const;
-  if (status === "SUBMITTED") return "secondary" as const;
-  if (status === "REJECTED") return "destructive" as const;
-  return "outline" as const;
+  switch (status) {
+    case "APPROVED":
+      return "default";
+    case "SUBMITTED":
+      return "secondary";
+    case "REJECTED":
+      return "destructive";
+    case "EXITED":
+      return "outline";
+    default:
+      return "outline";
+  }
 };
 
 const getInitials = (name?: string | null) => {

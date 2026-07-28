@@ -3,7 +3,9 @@ import { AdmissionController } from "@webcampus/api/src/controllers/admission/ad
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   AdmissionActionParamSchema,
+  ChangeAdmissionModeSchema,
   CreateAdmissionShellSchema,
+  ExitAdmissionSchema,
   GetAdmissionsQuerySchema,
   PortStudentsSchema,
 } from "@webcampus/schemas/admission";
@@ -105,12 +107,35 @@ router.patch(
   }),
   AdmissionController.reject
 );
-
+router.patch(
+  "/:id/change-mode",
+  validateRequest(AdmissionActionParamSchema, "params"),
+  validateRequest(ChangeAdmissionModeSchema),
+  protect({
+    role: ["admin", "admission_admin"],
+    permissions: {
+      admission: ["update"],
+    },
+  }),
+  AdmissionController.changeAdmissionMode
+);
+router.patch(
+  "/:id/exit",
+  validateRequest(AdmissionActionParamSchema, "params"),
+  validateRequest(ExitAdmissionSchema),
+  protect({
+    role: ["admin", "admission_admin"],
+    permissions: {
+      admission: ["update"],
+    },
+  }),
+  AdmissionController.exitAdmission
+);
 router.post(
   "/port",
   validateRequest(PortStudentsSchema),
   protect({
-    role: ["admin"],
+    role: ["admin", "admission_admin"],
     permissions: {
       admission: ["port"],
     },

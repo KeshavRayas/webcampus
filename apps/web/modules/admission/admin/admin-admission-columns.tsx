@@ -8,7 +8,7 @@ export type AdmissionResponse = {
   id: string;
   applicationId: string;
   modeOfAdmission: string;
-  status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
+  status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | "EXITED";
   createdAt: string;
 
   departmentId?: string | null;

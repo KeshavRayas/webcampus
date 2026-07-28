@@ -4,6 +4,7 @@ import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
   AdmissionActionParamType,
+  ChangeAdmissionModeType,
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
   PortStudentsType,
@@ -615,6 +616,11 @@ export class AdmissionService {
         applicationId: existingAdmission.applicationId,
         departmentId: existingAdmission.departmentId,
       });
+      if (existingAdmission.status === "EXITED") {
+        throw new Error(
+          "This admission has been closed because the student has exited the college."
+        );
+      }
 
       // Department is already strictly locked to the shell
       const department = await db.department.findUnique({
@@ -860,7 +866,106 @@ export class AdmissionService {
       );
     }
   }
+  static async changeAdmissionMode(
+    id: string,
+    data: ChangeAdmissionModeType
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const admission = await db.admission.findUnique({
+        where: { id },
+      });
 
+      if (!admission) {
+        throw new Error("Admission not found");
+      }
+
+      if (admission.status === "EXITED") {
+        throw new Error(
+          "Cannot change admission mode after the student has exited."
+        );
+      }
+
+      const updatedAdmission = await db.admission.update({
+        where: { id },
+        data: {
+          modeOfAdmission: data.modeOfAdmission,
+          categoryClaimed: data.categoryClaimed,
+          categoryAllotted: data.categoryAllotted,
+          quota: data.quota,
+          entranceExamRank:
+            data.entranceExamRank != null
+              ? String(data.entranceExamRank)
+              : null,
+          originalAdmissionOrderNumber: data.originalAdmissionOrderNumber,
+          originalAdmissionOrderDate: data.originalAdmissionOrderDate
+            ? new Date(data.originalAdmissionOrderDate)
+            : null,
+        },
+        include: {
+          semester: true,
+          department: true,
+        },
+      });
+
+      return {
+        status: "success",
+        message: "Admission mode updated successfully",
+        data: updatedAdmission,
+      };
+    } catch (error) {
+      logger.error("Failed to change admission mode", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to change admission mode"
+      );
+    }
+  }
+
+  static async exitAdmission(id: string): Promise<BaseResponse<unknown>> {
+    try {
+      const admission = await db.admission.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          status: true,
+          studentId: true,
+          applicationId: true,
+        },
+      });
+
+      if (!admission) {
+        throw new Error("Admission not found");
+      }
+
+      if (admission.status === "EXITED") {
+        throw new Error("Student has already exited the college");
+      }
+
+      if (!admission.studentId) {
+        throw new Error("Only admitted students can be marked as exited");
+      }
+
+      const updatedAdmission = await db.admission.update({
+        where: { id },
+        data: {
+          status: "EXITED",
+        },
+      });
+
+      return {
+        status: "success",
+        message: "Student marked as exited successfully",
+        data: updatedAdmission,
+      };
+    } catch (error) {
+      logger.error("Failed to exit admission", error);
+
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to exit admission"
+      );
+    }
+  }
   static async portStudents(
     payload: PortStudentsType,
     headers: IncomingHttpHeaders

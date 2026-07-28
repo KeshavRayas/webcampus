@@ -66,6 +66,7 @@ export const AdmissionStatusSchema = z.enum([
   "SUBMITTED",
   "APPROVED",
   "REJECTED",
+  "EXITED",
 ]);
 
 export const AdmissionActionParamSchema = z.object({
@@ -75,6 +76,57 @@ export const AdmissionActionParamSchema = z.object({
 export const PortStudentsSchema = z.object({
   semesterId: z.string().uuid("Invalid semester ID"),
 });
+
+export const ChangeAdmissionModeSchema = z
+  .object({
+    modeOfAdmission: z.string().min(1, "Mode of Admission is required"),
+
+    categoryClaimed: z.string().min(1, "Category Claimed is required"),
+
+    categoryAllotted: z.string().min(1, "Category Allotted is required"),
+
+    quota: QuotaSchema,
+
+    entranceExamRank: z.coerce.number().nullable().optional(),
+
+    originalAdmissionOrderNumber: z.string().trim().optional(),
+
+    originalAdmissionOrderDate: z.iso.date().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const claimed =
+      categoriesClaimed[data.modeOfAdmission as keyof typeof categoriesClaimed];
+
+    if (!claimed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["modeOfAdmission"],
+        message: "Invalid admission mode",
+      });
+      return;
+    }
+
+    if (!claimed.includes(data.categoryClaimed as never)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["categoryClaimed"],
+        message: "Invalid claimed category",
+      });
+    }
+
+    const allotted =
+      categoriesAllotted[
+        data.modeOfAdmission as keyof typeof categoriesAllotted
+      ];
+
+    if (allotted && !allotted.includes(data.categoryAllotted as never)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["categoryAllotted"],
+        message: "Invalid allotted category",
+      });
+    }
+  });
 
 const optionalQueryString = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((value) => {
@@ -111,6 +163,8 @@ export const GetAdmissionsQuerySchema = z
     }
   );
 
+export const ExitAdmissionSchema = z.object({});
+
 export const SubmitApplicationSchema = z.object({
   departmentId: z.string().uuid("Invalid department ID"),
 });
@@ -126,3 +180,7 @@ export type AdmissionActionParamType = z.infer<
 >;
 
 export type PortStudentsType = z.infer<typeof PortStudentsSchema>;
+
+export type ChangeAdmissionModeType = z.infer<typeof ChangeAdmissionModeSchema>;
+
+export type ExitAdmissionType = z.infer<typeof ExitAdmissionSchema>;

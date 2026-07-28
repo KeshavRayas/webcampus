@@ -396,6 +396,16 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/admission/view-admissions",
           icon: BookCopy,
         },
+        {
+          name: "Leave College",
+          url: "/admission/leave-college",
+          icon: GraduationCap,
+        },
+        {
+          name: "Change Admission Mode",
+          url: "/admission/change-mode",
+          icon: BookCopy,
+        },
       ],
     },
     navSecondary,

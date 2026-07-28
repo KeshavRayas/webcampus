@@ -73,3 +73,4 @@ export const categoriesAllotted = {
   KCET: categoriesClaimed["KCET"],
   "COMED-K": categoriesClaimed["COMED-K"],
 } as const;
+export const quotas = ["MERIT", "MANAGEMENT", "SPORTS", "NRI", "SNQ"] as const;
