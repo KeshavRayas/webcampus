@@ -190,10 +190,11 @@ export class CourseController {
       };
       const departmentContext = await getDepartmentRequestContext(req);
 
+      // PERFECTLY ALIGNED SIGNATURE
       const response = await CourseService.getByBranch(
+        semesterId as string,
         departmentContext.departmentId,
         undefined,
-        semesterId,
         cycle,
         departmentContext
       );
@@ -226,14 +227,13 @@ export class CourseController {
     res: Response
   ): Promise<void> {
     try {
-      const { semesterId, cycle } = req.body;
+      const { courseIds } = req.body;
       const departmentContext = await getDepartmentRequestContext(req);
+      
+      // PERFECTLY ALIGNED SIGNATURE
       const response = await CourseService.bulkSubmitForApproval(
-        semesterId,
-        departmentContext.departmentId,
-        undefined,
-        cycle,
-        departmentContext
+        courseIds || [],
+        departmentContext.userId
       );
 
       if (response.status === "success") {
@@ -267,8 +267,10 @@ export class CourseController {
         headers: fromNodeHeaders(req.headers),
       });
       const role = session?.user?.role as "admin" | "coe";
+      const departmentContext = await getDepartmentRequestContext(req);
 
-      const response = await CourseService.getGroupedCourseSubmissions(role);
+      // PERFECTLY ALIGNED SIGNATURE
+      const response = await CourseService.getGroupedCourseSubmissions(role, departmentContext);
 
       if (response.status === "success") {
         sendResponse({
@@ -303,17 +305,17 @@ export class CourseController {
         throw new Error("Unauthorized");
       }
 
-      const role = session.user.role as "admin" | "coe";
-
       const { semesterId, departmentId, departmentName, cycle } = req.body;
+
+      // PERFECTLY ALIGNED SIGNATURE
       const response = await CourseService.approveSemesterCourses(
         semesterId,
         departmentId,
         departmentName,
         cycle,
-        role,
-        session.user.username,
-        session.user.displayUsername
+        session.user.id,
+        session.user.username?? undefined,
+        session.user.displayUsername?? undefined,
       );
 
       if (response.status === "success") {
@@ -350,17 +352,18 @@ export class CourseController {
         throw new Error("Unauthorized");
       }
 
-      const role = session.user.role as "admin" | "coe";
+      const { semesterId, departmentId, departmentName, reviewerNotes, cycle } = req.body;
 
-      const { semesterId, departmentId, departmentName, reviewerNotes, cycle } =
-        req.body;
+      // PERFECTLY ALIGNED SIGNATURE (reviewerNotes is 2nd argument)
       const response = await CourseService.requestRevisionForSemester(
         semesterId,
+        reviewerNotes,
         departmentId,
         departmentName,
-        reviewerNotes,
         cycle,
-        role
+        session.user.id,
+        session.user.username?? undefined,
+        session.user.displayUsername?? undefined
       );
 
       if (response.status === "success") {

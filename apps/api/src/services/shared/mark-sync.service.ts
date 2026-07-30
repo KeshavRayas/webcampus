@@ -12,7 +12,7 @@ export async function recomputeStudentMark(
     }),
     db.course.findUnique({
       where: { id: courseId },
-      select: { cumulativeMinMarks: true, code: true },
+      select: { seeEligibility: true, code: true },
     }),
   ]);
 
@@ -23,7 +23,7 @@ export async function recomputeStudentMark(
 
   const cieTotal = assessments.reduce((sum, a) => sum + a.totalMarks, 0);
   const status: EligibilityStatus =
-    cieTotal >= course.cumulativeMinMarks ? "ELIGIBLE" : "NOT_ELIGIBLE";
+    cieTotal >= (course.seeEligibility || 0) ? "ELIGIBLE" : "NOT_ELIGIBLE";
 
   await db.mark.upsert({
     where: { studentId_courseId: { studentId, courseId } },
@@ -32,7 +32,7 @@ export async function recomputeStudentMark(
   });
 
   logger.info(
-    `[MarkSync] student=${studentId} course=${course.code} cieTotal=${cieTotal} min=${course.cumulativeMinMarks} status=${status}`
+    `[MarkSync] student=${studentId} course=${course.code} cieTotal=${cieTotal} min=${course.seeEligibility} status=${status}`
   );
 }
 

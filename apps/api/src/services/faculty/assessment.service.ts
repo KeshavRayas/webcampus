@@ -3,7 +3,8 @@ import { Cycle, db, Prisma } from "@webcampus/db";
 import type { CreateAssessmentType } from "@webcampus/schemas/faculty";
 import type { BaseResponse } from "@webcampus/types/api";
 
-interface CoordinatedCourseDTO {
+
+export interface CoordinatedCourseDTO {
   id: string;
   code: string;
   name: string;
@@ -19,16 +20,26 @@ interface CoordinatedCourseDTO {
   programType: string;
   departmentName: string;
   departmentAbbreviation: string;
+
+  // ─── NEW CONFIGURATION FIELDS ───
+  seeMaxMarks: number;
+  seeEligibility: number;
+  cieCount: number;
   cieMaxMarks: number;
-  maxNoOfCies: number;
-  assessments?: { id: string; title: string }[];
+  cieEligibility: number;
+  theoryMaxMarks: number;
+  theoryMinExams: number;
+  theoryEligibility: number;
+  labCount: number;
+  labMaxMarks: number;
+  labEligibility: number;
+  aatMaxMarks: number;
+  aatEligibility: number;
+
+  assessments?: { id: string; title: string; totalMarks: number }[];
 }
 
 export class AssessmentService {
-  /**
-   * Fetch all courses where the given faculty member is designated as a coordinator.
-   * Resolves faculty from the userId (session.user.id), not a client-provided facultyId.
-   */
   static async getCoordinatedCourses(
     userId: string,
     semesterId?: string,
@@ -49,70 +60,60 @@ export class AssessmentService {
           coordinators: {
             some: { facultyId: faculty.id },
           },
-          ...(semesterId ? { semesterId } : {}),
-          ...(cycle ? { cycle: cycle as Cycle } : {}),
+          ...(semesterId && { semesterId }),
+          ...(cycle && cycle !== "NONE" && { cycle: cycle as Cycle }),
         },
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          courseMode: true,
-          courseType: true,
-          totalCredits: true,
-          lectureCredits: true,
-          tutorialCredits: true,
-          practicalCredits: true,
-          skillCredits: true,
-          semesterId: true,
-          cieMaxMarks: true,
-          maxNoOfCies: true,
-          assessments: {
-            select: {
-              id: true,
-              title: true,
-            },
-          },
+        include: {
           semester: {
-            select: {
-              semesterNumber: true,
-              programType: true,
-            },
+            include: { academicTerm: true },
           },
-          department: {
-            select: {
-              name: true,
-              abbreviation: true,
-            },
+          department: true,
+          assessments: {
+            select: { id: true, title: true, totalMarks: true },
           },
         },
         orderBy: { code: "asc" },
       });
 
-      const data: CoordinatedCourseDTO[] = courses.map((c) => ({
-        id: c.id,
-        code: c.code,
-        name: c.name,
-        courseMode: c.courseMode,
-        courseType: c.courseType,
-        totalCredits: c.totalCredits,
-        lectureCredits: c.lectureCredits,
-        tutorialCredits: c.tutorialCredits,
-        practicalCredits: c.practicalCredits,
-        skillCredits: c.skillCredits,
-        semesterNumber: c.semester.semesterNumber,
-        semesterId: c.semesterId,
-        programType: c.semester.programType,
-        departmentName: c.department.name,
-        departmentAbbreviation: c.department.abbreviation,
-        cieMaxMarks: c.cieMaxMarks,
-        maxNoOfCies: c.maxNoOfCies,
-        assessments: c.assessments,
+      const mappedCourses: CoordinatedCourseDTO[] = courses.map((course) => ({
+        id: course.id,
+        code: course.code,
+        name: course.name,
+        courseMode: course.courseMode,
+        courseType: course.courseType,
+        totalCredits: course.totalCredits,
+        lectureCredits: course.lectureCredits,
+        tutorialCredits: course.tutorialCredits,
+        practicalCredits: course.practicalCredits,
+        skillCredits: course.skillCredits,
+        semesterNumber: course.semesterNumber,
+        semesterId: course.semesterId,
+        programType: course.semester.academicTerm.type,
+        departmentName: course.department.name,
+        departmentAbbreviation: course.department.abbreviation,
+        
+        // Include all the new assessment configuration data
+        seeMaxMarks: course.seeMaxMarks,
+        seeEligibility: course.seeEligibility,
+        cieCount: course.cieCount,
+        cieMaxMarks: course.cieMaxMarks,
+        cieEligibility: course.cieEligibility,
+        theoryMaxMarks: course.theoryMaxMarks,
+        theoryMinExams: course.theoryMinExams,
+        theoryEligibility: course.theoryEligibility,
+        labCount: course.labCount,
+        labMaxMarks: course.labMaxMarks,
+        labEligibility: course.labEligibility,
+        aatMaxMarks: course.aatMaxMarks,
+        aatEligibility: course.aatEligibility,
+
+        assessments: course.assessments,
       }));
 
       return {
         status: "success",
-        message: `Found ${data.length} coordinated course(s)`,
-        data,
+        message: "Coordinated courses fetched successfully",
+        data: mappedCourses,
       };
     } catch (error) {
       logger.error("Error fetching coordinated courses", error);

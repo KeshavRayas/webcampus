@@ -371,34 +371,54 @@ model Course {
   code                    String               @unique
   name                    String
   departmentName          String?
+  departmentId            String
   semesterId              String
   semesterNumber          Int
-  assignmentMaxMarks      Int                  @default(0)
-  cieMaxMarks             Int                  @default(0)
-  cieMinMarks             Int                  @default(0)
-  cieWeightage            Int                  @default(0)
   courseMode              CourseMode
   courseType              CourseType
-  cumulativeMaxMarks      Int                  @default(0)
-  cumulativeMinMarks      Int                  @default(0)
-  hasLaboratoryComponent  Boolean              @default(false)
-  labMaxMarks             Int                  @default(0)
-  labMinMarks             Int                  @default(0)
-  labWeightage            Int                  @default(0)
+  cycle                   Cycle                @default(NONE)
+
+  // Credit fields (L-T-P-S)
   lectureCredits          Int                  @default(0)
-  maxNoOfCies             Int                  @default(0)
-  minNoOfCies             Int                  @default(0)
-  noOfAssignments         Int                  @default(0)
+  tutorialCredits         Int                  @default(0)
   practicalCredits        Int                  @default(0)
-  seeMaxMarks             Int                  @default(0)
-  seeMinMarks             Int                  @default(0)
-  seeWeightage            Int                  @default(0)
   skillCredits            Int                  @default(0)
   totalCredits            Int
-  tutorialCredits         Int                  @default(0)
-  cycle                   Cycle                @default(NONE)
+
+  // Computed Field
+  hasLaboratoryComponent  Boolean              @default(false)
+
+  // ─── NEW CONFIGURATION FIELDS ───
+
+  // SEE
+  seeMaxMarks             Int                  @default(0)
+  seeEligibility          Int                  @default(40)
+
+  // CIE
+  cieCount                Int                  @default(0)
+  cieMaxMarks             Int                  @default(0)
+  cieEligibility          Int                  @default(40)
+
+  // Theory Exam
+  theoryMaxMarks          Int                  @default(0)
+  theoryMinExams          Int                  @default(0)
+  theoryEligibility       Int                  @default(40)
+
+  // Lab
+  labCount                Int                  @default(0)
+  labMaxMarks             Int                  @default(0)
+  labEligibility          Int                  @default(40)
+
+  // AAT
+  aatMaxMarks             Int                  @default(0)
+  aatEligibility          Int                  @default(40)
+
+  // Settings
+  allowFeedback           Boolean              @default(false)
+  attendanceRequired      Boolean              @default(true)
+
+  // ─── APPROVAL & TRACKING FIELDS ───
   approvalStatus          CourseApprovalStatus @default(DRAFT)
-  departmentId            String
   approvedByRole          String?
   approvedByUsername      String?
   approvedByDisplay       String?
@@ -411,18 +431,21 @@ model Course {
   lastOverrideById        String?
   overrideCount           Int                  @default(0)
   hasPostApprovalEdits    Boolean              @default(false)
+
+  // ─── RELATIONS ───
+  department              Department           @relation(fields: [departmentId], references: [id])
+  semester                Semester             @relation(fields: [semesterId], references: [id])
   attendances             Attendance[]
   ClassSession            ClassSession[]
   coordinators            CourseCoordinator[]
   assessments             AssessmentTemplate[]
-  department              Department           @relation(fields: [departmentId], references: [id])
-  semester                Semester             @relation(fields: [semesterId], references: [id])
   assignments             CourseAssignment[]
   registrations           CourseRegistration[]
   marks                   Mark[]
   studentAssessments      StudentAssessment[]
-  mappingAuditLogs       CourseMappingAuditLog[]
+  mappingAuditLogs        CourseMappingAuditLog[]
 
+  // ─── INDEXES ───
   @@unique([id, departmentId])
   @@index([code])
   @@index([departmentId, semesterId])
