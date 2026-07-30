@@ -767,7 +767,7 @@ export class Mark {
           id: course.id,
           code: course.code,
           name: course.name,
-          cumulativeMinMarks: course.cumulativeMinMarks,
+          cumulativeMinMarks: course.seeEligibility,
         },
         assessments: assessments.map((a) => ({
           id: a.id,

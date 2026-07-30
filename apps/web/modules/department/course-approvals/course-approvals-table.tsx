@@ -486,154 +486,34 @@ const CourseDetailContent = ({
                 </div>
               </div>
 
-              {/* SEE */}
+              {/* NEW ASSESSMENT METRICS GRID */}
               <div>
                 <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-                  SEE (Semester End Exam)
+                  Assessment Metrics
                 </h4>
-                <div className="overflow-hidden rounded-md border">
-                  <Table className="text-xs">
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Max Marks
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.seeMaxMarks}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Min Marks
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.seeMinMarks}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Weightage
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.seeWeightage}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-
-              {/* CIE */}
-              <div>
-                <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-                  CIE (Continuous Internal)
-                </h4>
-                <div className="overflow-hidden rounded-md border">
-                  <Table className="text-xs">
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Max / Min CIEs
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.maxNoOfCies} / {course.minNoOfCies}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Max / Min Marks
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.cieMaxMarks} / {course.cieMinMarks}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Weightage
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.cieWeightage}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-
-              {/* Lab & Assignments combined into one visual column block */}
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-                    Lab & Assignments
-                  </h4>
-                  <div className="overflow-hidden rounded-md border">
-                    <Table className="text-xs">
-                      <TableBody>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 py-2 font-medium">
-                            Lab Max/Min Marks
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {course.labMaxMarks} / {course.labMinMarks}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 py-2 font-medium">
-                            Lab Weightage
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {course.labWeightage}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 border-t py-2 font-medium">
-                            # Assignments
-                          </TableCell>
-                          <TableCell className="border-t py-2">
-                            {course.noOfAssignments}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 py-2 font-medium">
-                            Assignment Max
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {course.assignmentMaxMarks}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-                    Cumulative (SEE + CIE)
-                  </h4>
-                  <div className="overflow-hidden rounded-md border">
-                    <Table className="text-xs">
-                      <TableBody>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 py-2 font-medium">
-                            Max Marks
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {course.cumulativeMaxMarks}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 py-2 font-medium">
-                            Min Marks
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {course.cumulativeMinMarks}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
+                <div className="overflow-hidden rounded-md border p-3">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="text-muted-foreground font-medium">SEE:</div>
+                    <div>{course.seeMaxMarks} (Min: {course.seeEligibility}%)</div>
+                    
+                    <div className="text-muted-foreground font-medium">CIE:</div>
+                    <div>{course.cieCount} Exams | {course.cieMaxMarks} (Min: {course.cieEligibility}%)</div>
+                    
+                    <div className="text-muted-foreground font-medium">Theory:</div>
+                    <div>{course.theoryMinExams} Exams | {course.theoryMaxMarks} (Min: {course.theoryEligibility}%)</div>
+                    
+                    <div className="text-muted-foreground font-medium">AAT:</div>
+                    <div>{course.aatMaxMarks} (Min: {course.aatEligibility}%)</div>
+                    
+                    <div className="text-muted-foreground font-medium">Lab:</div>
+                    <div>{course.labCount} Sessions | {course.labMaxMarks} (Min: {course.labEligibility}%)</div>
+                    
+                    <div className="text-muted-foreground font-medium border-t pt-2 mt-1">Cumulative Max:</div>
+                    <div className="border-t pt-2 mt-1">{(course.cieMaxMarks || 0) + (course.seeMaxMarks || 0)}</div>
                   </div>
                 </div>
               </div>
+
             </div>
           </AccordionContent>
         </AccordionItem>

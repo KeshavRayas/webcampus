@@ -5,7 +5,6 @@ import {
   UpdateCourseDTO,
 } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
-import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 
 export class AdminCourseService {
   static create(data: CreateCourseDTO) {
@@ -23,18 +22,16 @@ export class AdminCourseService {
       userAgent?: string;
     }
   ) {
-    return CourseService.update(data, undefined, adminContext);
+    return CourseService.update(data, adminContext);
   }
 
   static delete(id: string) {
     return CourseService.delete(id);
   }
 
-  static getById(id: string, departmentId?: string, departmentName?: string) {
-    return CourseService.getById(id, {
-      departmentId,
-      departmentName,
-    } as DepartmentRequestContext);
+  // Updated to accept optional department filters as passed by the controller
+  static getById(id: string, _departmentId?: string, _departmentName?: string) {
+    return CourseService.getById(id);
   }
 
   static getByDepartment(
@@ -55,22 +52,35 @@ export class AdminCourseService {
       >
     >
   > {
+    // CourseService.getByBranch expects (semesterId, departmentId, departmentName, cycle)
     return CourseService.getByBranch(
+      semesterId as string,
       departmentId,
       departmentName,
-      semesterId,
       cycle
-    );
+    ) as unknown as Promise<
+      BaseResponse<
+        Array<
+          Course & {
+            departmentId: string;
+            departmentName: string;
+            isFullyMapped: boolean;
+            isPartiallyMapped: boolean;
+            isUnmapped: boolean;
+          }
+        >
+      >
+    >;
   }
 
   static getCoordinators(courseId: string) {
-    return CourseService.getCoordinators(courseId, undefined, true);
+    return CourseService.getCoordinators(courseId);
   }
 
   static updateCoordinators(
     courseId: string,
     facultyIds: string[],
-    adminContext: {
+    _adminContext?: {
       isAdmin: boolean;
       adminUserId: string;
       clientVersion?: number;
@@ -79,15 +89,10 @@ export class AdminCourseService {
       userAgent?: string;
     }
   ) {
-    return CourseService.updateCoordinators(
-      courseId,
-      facultyIds,
-      undefined,
-      adminContext
-    );
+    return CourseService.updateCoordinators(courseId, facultyIds);
   }
 
   static getMappedFacultyForCourse(courseId: string) {
-    return CourseService.getMappedFacultyForCourse(courseId, undefined, true);
+    return CourseService.getMappedFacultyForCourse(courseId);
   }
 }

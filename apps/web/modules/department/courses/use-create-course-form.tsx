@@ -3,10 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import {
-  CreateCourseDTO,
-  CreateCourseSchema,
-} from "@webcampus/schemas/department";
+import { CreateCourseDTO, CreateCourseSchema } from "@webcampus/schemas/department";
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
 import axios, { AxiosError, AxiosResponse } from "axios";
 import { useEffect } from "react";
@@ -22,7 +19,7 @@ export const useCreateCourseForm = (
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
   const form = useForm<CreateCourseDTO>({
-    resolver: zodResolver(CreateCourseSchema),
+    resolver: zodResolver(CreateCourseSchema) as any,
     defaultValues: {
       code: "",
       name: "",
@@ -33,32 +30,27 @@ export const useCreateCourseForm = (
       semesterId: semesterId,
       semesterNumber: semesterNumber,
 
-      // Credit fields (L-T-P-S)
       lectureCredits: 0,
       tutorialCredits: 0,
       practicalCredits: 0,
       skillCredits: 0,
 
-      // SEE Assessment
+      // Defaulting all Eligibility to 40% as per requirements
       seeMaxMarks: 0,
-      seeMinMarks: 0,
-      seeWeightage: 0,
-
-      // CIE Assessment
-      maxNoOfCies: 0,
-      minNoOfCies: 0,
+      seeEligibility: 40,
+      cieCount: 0,
       cieMaxMarks: 0,
-      cieMinMarks: 0,
-      cieWeightage: 0,
-
-      // Other Assessment
-      noOfAssignments: 0,
-      assignmentMaxMarks: 0,
+      cieEligibility: 40,
+      theoryMaxMarks: 0,
+      theoryMinExams: 0,
+      theoryEligibility: 40,
+      labCount: 0,
       labMaxMarks: 0,
-      labMinMarks: 0,
-      labWeightage: 0,
-      cumulativeMaxMarks: 0,
-      cumulativeMinMarks: 0,
+      labEligibility: 40,
+      aatMaxMarks: 0,
+      aatEligibility: 40,
+      allowFeedback: false,
+      attendanceRequired: true,
     },
   });
 
@@ -68,13 +60,7 @@ export const useCreateCourseForm = (
     form.setValue("semesterId", semesterId, { shouldValidate: true });
     form.setValue("semesterNumber", semesterNumber, { shouldValidate: true });
     form.setValue("cycle", defaultCycle, { shouldValidate: true });
-  }, [
-    form,
-    isSubmitSuccessful,
-    semesterId,
-    semesterNumber,
-    defaultCycle,
-  ]);
+  }, [form, isSubmitSuccessful, semesterId, semesterNumber, defaultCycle]);
 
   const { mutate } = useMutation({
     mutationFn: async (values: CreateCourseDTO) => {
