@@ -10,7 +10,8 @@
     "./hod": "./src/hod/index.ts",
     "./student": "./src/student/index.ts",
     "./coe": "./src/coe/index.ts",
-    "./common": "./src/common.schemas.ts"
+    "./common": "./src/common.schemas.ts",
+    "./constants": "./src/constants/index.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit --pretty"

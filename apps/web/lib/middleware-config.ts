@@ -8,7 +8,6 @@ export const AUTH_ROUTES = [
 export const DASHBOARD_REDIRECTS: Record<Role, string> = {
   ...Object.fromEntries(roles.map((role) => [role, `/${role}`])),
   admission_admin: "/admission",
-  admission_reviewer: "/admission",
 } as Record<Role, string>;
 
 export const getRoleFromPathname = (

@@ -20,7 +20,13 @@ export type StudentProfilePayload = {
   departmentName: string;
   programType?: "UG" | "PG" | null;
   semesterNumber?: number | null;
-  admissionStatus?: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | null;
+  admissionStatus?:
+    | "PENDING"
+    | "SUBMITTED"
+    | "APPROVED"
+    | "REJECTED"
+    | "EXITED"
+    | null;
   user: {
     id: string;
     name: string;
@@ -98,7 +104,9 @@ const unwrapSuccess = <T>(response: BaseResponse<T>) => {
   return response.data;
 };
 
-const invalidateStudentProfile = (queryClient: ReturnType<typeof useQueryClient>) => {
+const invalidateStudentProfile = (
+  queryClient: ReturnType<typeof useQueryClient>
+) => {
   queryClient.invalidateQueries({ queryKey: studentProfileQueryKey });
 };
 
@@ -106,9 +114,10 @@ export const useStudentProfile = () => {
   return useQuery({
     queryKey: studentProfileQueryKey,
     queryFn: async () => {
-      const response = await apiClient.get<BaseResponse<StudentProfilePayload>>(
-        "/student/profile"
-      );
+      const response =
+        await apiClient.get<BaseResponse<StudentProfilePayload>>(
+          "/student/profile"
+        );
       return unwrapSuccess(response.data);
     },
   });
@@ -153,7 +162,9 @@ export const useRequestStudentProfileApproval = () => {
       invalidateStudentProfile(queryClient);
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, "Failed to submit approval request"));
+      toast.error(
+        getApiErrorMessage(error, "Failed to submit approval request")
+      );
     },
   });
 };

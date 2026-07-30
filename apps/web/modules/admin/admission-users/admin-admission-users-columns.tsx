@@ -11,7 +11,7 @@ export type AdminAdmissionUserResponse = {
   email: string;
   username: string | null;
   image?: string | null;
-  role: string;
+  role: "admission_admin";
   photo?: string; // <-- Added photo to the type
 };
 
@@ -28,11 +28,7 @@ export const AdminAdmissionUserColumns: ColumnDef<AdminAdmissionUserResponse>[] 
     {
       accessorKey: "role",
       header: "Role",
-      cell: ({ row }) => (
-        <Badge variant="outline">
-          {row.original.role === "admission_admin" ? "Admin" : "Reviewer"}
-        </Badge>
-      ),
+      cell: () => <Badge variant="outline">Admission Admin</Badge>,
     },
     // <-- Created At column completely removed here
     {

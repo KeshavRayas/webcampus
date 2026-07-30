@@ -1,6 +1,5 @@
 import { z } from "zod";
-
-export const CategorySchema = z.enum(["GENERAL", "OBC", "SC", "ST"]);
+import { categoriesAllotted, categoriesClaimed } from "../constants";
 
 export const QuotaSchema = z.enum([
   "MERIT",
@@ -10,24 +9,64 @@ export const QuotaSchema = z.enum([
   "SNQ",
 ]);
 
-export const CreateAdmissionShellSchema = z.object({
-  applicationId: z.string().min(1, "Application ID is required"),
-  firstName: z.string().min(1, "First Name is required"),
-  middleName: z.string().optional(),
-  lastName: z.string().min(1, "Last Name is required"),
-  modeOfAdmission: z.string().min(1, "Mode of Admission is required"),
-  semesterId: z.string().uuid("Invalid Semester ID"),
-  departmentId: z.string().uuid("Invalid Department ID"),
-  categoryClaimed: CategorySchema,
-  categoryAllotted: CategorySchema,
-  quota: QuotaSchema,
-});
+export const CreateAdmissionShellSchema = z
+  .object({
+    applicationId: z.string().min(1, "Application ID is required"),
+    firstName: z.string().min(1, "First Name is required"),
+    middleName: z.string().optional(),
+    lastName: z.string().min(1, "Last Name is required"),
+
+    modeOfAdmission: z.string().min(1, "Mode of Admission is required"),
+
+    semesterId: z.string().uuid("Invalid Semester ID"),
+    departmentId: z.string().uuid("Invalid Department ID"),
+
+    categoryClaimed: z.string().min(1, "Category Claimed is required"),
+    categoryAllotted: z.string().min(1, "Category Allotted is required"),
+
+    quota: QuotaSchema,
+  })
+  .superRefine((data, ctx) => {
+    const claimed =
+      categoriesClaimed[data.modeOfAdmission as keyof typeof categoriesClaimed];
+
+    if (!claimed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["modeOfAdmission"],
+        message: "Invalid admission mode",
+      });
+      return;
+    }
+
+    if (!claimed.includes(data.categoryClaimed as never)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["categoryClaimed"],
+        message: "Invalid claimed category",
+      });
+    }
+
+    const allotted =
+      categoriesAllotted[
+        data.modeOfAdmission as keyof typeof categoriesAllotted
+      ];
+
+    if (allotted && !allotted.includes(data.categoryAllotted as never)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["categoryAllotted"],
+        message: "Invalid allotted category",
+      });
+    }
+  });
 
 export const AdmissionStatusSchema = z.enum([
   "PENDING",
   "SUBMITTED",
   "APPROVED",
   "REJECTED",
+  "EXITED",
 ]);
 
 export const AdmissionActionParamSchema = z.object({
@@ -37,6 +76,57 @@ export const AdmissionActionParamSchema = z.object({
 export const PortStudentsSchema = z.object({
   semesterId: z.string().uuid("Invalid semester ID"),
 });
+
+export const ChangeAdmissionModeSchema = z
+  .object({
+    modeOfAdmission: z.string().min(1, "Mode of Admission is required"),
+
+    categoryClaimed: z.string().min(1, "Category Claimed is required"),
+
+    categoryAllotted: z.string().min(1, "Category Allotted is required"),
+
+    quota: QuotaSchema,
+
+    entranceExamRank: z.coerce.number().nullable().optional(),
+
+    originalAdmissionOrderNumber: z.string().trim().optional(),
+
+    originalAdmissionOrderDate: z.iso.date().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const claimed =
+      categoriesClaimed[data.modeOfAdmission as keyof typeof categoriesClaimed];
+
+    if (!claimed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["modeOfAdmission"],
+        message: "Invalid admission mode",
+      });
+      return;
+    }
+
+    if (!claimed.includes(data.categoryClaimed as never)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["categoryClaimed"],
+        message: "Invalid claimed category",
+      });
+    }
+
+    const allotted =
+      categoriesAllotted[
+        data.modeOfAdmission as keyof typeof categoriesAllotted
+      ];
+
+    if (allotted && !allotted.includes(data.categoryAllotted as never)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["categoryAllotted"],
+        message: "Invalid allotted category",
+      });
+    }
+  });
 
 const optionalQueryString = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((value) => {
@@ -73,14 +163,24 @@ export const GetAdmissionsQuerySchema = z
     }
   );
 
+export const ExitAdmissionSchema = z.object({});
+
 export const SubmitApplicationSchema = z.object({
   departmentId: z.string().uuid("Invalid department ID"),
 });
+
 export type CreateAdmissionShellType = z.infer<
   typeof CreateAdmissionShellSchema
 >;
+
 export type GetAdmissionsQueryType = z.infer<typeof GetAdmissionsQuerySchema>;
+
 export type AdmissionActionParamType = z.infer<
   typeof AdmissionActionParamSchema
 >;
+
 export type PortStudentsType = z.infer<typeof PortStudentsSchema>;
+
+export type ChangeAdmissionModeType = z.infer<typeof ChangeAdmissionModeSchema>;
+
+export type ExitAdmissionType = z.infer<typeof ExitAdmissionSchema>;

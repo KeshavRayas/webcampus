@@ -10,6 +10,11 @@ import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAdmissionDepartments, useDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
+import {
+  admissionModes,
+  categoriesAllotted,
+  categoriesClaimed,
+} from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -59,14 +64,14 @@ import {
 import { useCreateAdmissionShellForm } from "./use-create-admission-shell-form";
 import { usePortStudents } from "./use-port-students";
 
-const ADMISSION_MODES = [
-  "KCET",
-  "COMEDK",
-  "Management",
-  "SNQ Quota",
-  "Other",
-] as const;
-const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
+// const ADMISSION_MODES = [
+//   "KCET",
+//   "COMEDK",
+//   "Management",
+//   "SNQ Quota",
+//   "Other",
+// ] as const;
+// const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
 const ADMISSION_QUOTAS = [
   "MERIT",
   "MANAGEMENT",
@@ -116,8 +121,7 @@ export const AdminAdmissionView = ({
   const role = session?.user?.role;
   const canCreate =
     isMounted && (role === "admin" || role === "admission_admin");
-  const canPort =
-    isMounted && (role === "admin" || role === "admission_reviewer");
+  const canPort = isMounted && (role === "admin" || role === "admission_admin");
 
   const router = useRouter();
   const pathname = usePathname();
@@ -179,7 +183,24 @@ export const AdminAdmissionView = ({
   const selectedSemester = nestedSemesters.find(
     (semester) => semester.id === selectedSemesterId
   );
+  // Currently selected admission mode
+  const selectedAdmissionMode = form.watch("modeOfAdmission");
 
+  // Categories for the selected admission mode (Claimed)
+  const claimedCategoryOptions =
+    selectedAdmissionMode && selectedAdmissionMode in categoriesClaimed
+      ? categoriesClaimed[
+          selectedAdmissionMode as keyof typeof categoriesClaimed
+        ]
+      : [];
+
+  // Categories for the selected admission mode (Allotted)
+  const allottedCategoryOptions =
+    selectedAdmissionMode && selectedAdmissionMode in categoriesAllotted
+      ? categoriesAllotted[
+          selectedAdmissionMode as keyof typeof categoriesAllotted
+        ]
+      : [];
   const { data: semesterAdmissions, isFetching: isFetchingSemesterAdmissions } =
     useQuery({
       queryKey: ["admissions", "semester", selectedSemesterId],
@@ -298,7 +319,7 @@ export const AdminAdmissionView = ({
       type: "select",
       placeholder: "All modes",
       allOptionLabel: "All modes",
-      options: ADMISSION_MODES.map((mode) => ({
+      options: admissionModes.map((mode) => ({
         label: mode,
         value: mode,
       })),
@@ -446,7 +467,7 @@ export const AdminAdmissionView = ({
                               className={`w-full justify-between ${!field.value ? "text-muted-foreground" : ""}`}
                             >
                               {field.value
-                                ? ADMISSION_MODES.find(
+                                ? admissionModes.find(
                                     (mode) => mode === field.value
                                   )
                                 : "Select admission mode"}
@@ -460,7 +481,7 @@ export const AdminAdmissionView = ({
                             <CommandList>
                               <CommandEmpty>No mode found.</CommandEmpty>
                               <CommandGroup>
-                                {ADMISSION_MODES.map((mode) => (
+                                {admissionModes.map((mode) => (
                                   <CommandItem
                                     value={mode}
                                     key={mode}
@@ -536,7 +557,65 @@ export const AdminAdmissionView = ({
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="categoryClaimed"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Category Claimed *</FormLabel>
 
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={`w-full justify-between ${
+                                !field.value ? "text-muted-foreground" : ""
+                              }`}
+                            >
+                              {field.value || "Select category"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+
+                        <PopoverContent className="w-full p-0">
+                          <Command>
+                            <CommandInput placeholder="Search category..." />
+
+                            <CommandList>
+                              <CommandEmpty>No category found.</CommandEmpty>
+
+                              <CommandGroup>
+                                {claimedCategoryOptions.map((cat) => (
+                                  <CommandItem
+                                    key={cat}
+                                    value={cat}
+                                    onSelect={() =>
+                                      form.setValue("categoryClaimed", cat)
+                                    }
+                                  >
+                                    <Check
+                                      className={`mr-2 h-4 w-4 ${
+                                        cat === field.value
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      }`}
+                                    />
+                                    {cat}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="categoryAllotted"
@@ -562,7 +641,7 @@ export const AdminAdmissionView = ({
                             <CommandList>
                               <CommandEmpty>No category found.</CommandEmpty>
                               <CommandGroup>
-                                {ADMISSION_CATEGORIES.map((cat) => (
+                                {allottedCategoryOptions.map((cat) => (
                                   <CommandItem
                                     value={cat}
                                     key={cat}

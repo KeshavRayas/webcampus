@@ -73,6 +73,7 @@ export const protect =
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
+      console.log("Session: ", session);
       console.log("protect: after getSession", {
         hasSession: !!session?.user,
         userId: session?.user?.id,

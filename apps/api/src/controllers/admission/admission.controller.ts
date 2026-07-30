@@ -6,6 +6,7 @@ import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import {
   AdmissionActionParamType,
+  ChangeAdmissionModeType,
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
   PortStudentsType,
@@ -320,7 +321,80 @@ export class AdmissionController {
       });
     }
   }
+  static async changeAdmissionMode(req: Request, res: Response): Promise<void> {
+    try {
+      const response = await AdmissionService.changeAdmissionMode(
+        req.params.id as string,
+        req.body as ChangeAdmissionModeType
+      );
 
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          statusCode: 400,
+          message: response.message,
+          error: response.error,
+        });
+      }
+    } catch (error) {
+      logger.error("Error changing admission mode", error);
+
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 400,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        error,
+      });
+    }
+  }
+
+  static async exitAdmission(req: Request, res: Response): Promise<void> {
+    try {
+      const response = await AdmissionService.exitAdmission(
+        req.params.id as string
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          statusCode: 400,
+          message: response.message,
+          error: response.error,
+        });
+      }
+    } catch (error) {
+      logger.error("Error exiting admission", error);
+
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 400,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        error,
+      });
+    }
+  }
   static async portStudents(req: Request, res: Response): Promise<void> {
     try {
       const response = await AdmissionService.portStudents(

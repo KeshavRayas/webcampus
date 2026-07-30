@@ -4,6 +4,7 @@ import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
   AdmissionActionParamType,
+  ChangeAdmissionModeType,
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
   PortStudentsType,
@@ -615,6 +616,11 @@ export class AdmissionService {
         applicationId: existingAdmission.applicationId,
         departmentId: existingAdmission.departmentId,
       });
+      if (existingAdmission.status === "EXITED") {
+        throw new Error(
+          "This admission has been closed because the student has exited the college."
+        );
+      }
 
       // Department is already strictly locked to the shell
       const department = await db.department.findUnique({
@@ -668,7 +674,6 @@ export class AdmissionService {
           originalAdmissionOrderDate: data.originalAdmissionOrderDate
             ? new Date(data.originalAdmissionOrderDate)
             : null,
-          feePayable: data.feePayable ? parseFloat(data.feePayable) : null,
           feePaid: data.feePaid ? parseFloat(data.feePaid) : null,
           hostel: data.hostel === "true",
           hostelRoomNumber: data.hostelRoomNumber ?? null,
@@ -718,7 +723,6 @@ export class AdmissionService {
           class10thSchoolType: data.class10thSchoolType,
           class10thSchoolCity: data.class10thSchoolCity,
           class10thSchoolState: data.class10thSchoolState,
-          class10thSchoolCode: data.class10thSchoolCode,
           class10thYearOfPassing: data.class10thYearOfPassing,
           class10thAggregateScore: data.class10thAggregateScore
             ? parseFloat(data.class10thAggregateScore)
@@ -734,7 +738,6 @@ export class AdmissionService {
           class12thInstituteType: data.class12thInstituteType,
           class12thInstituteCity: data.class12thInstituteCity,
           class12thInstituteState: data.class12thInstituteState,
-          class12thInstituteCode: data.class12thInstituteCode,
           class12thYearOfPassing: data.class12thYearOfPassing,
           class12thBranch: data.class12thBranch,
           class12thAggregateScore: data.class12thAggregateScore
@@ -749,7 +752,6 @@ export class AdmissionService {
           diplomaInstituteType: data.diplomaInstituteType ?? null,
           diplomaInstituteCity: data.diplomaInstituteCity ?? null,
           diplomaInstituteState: data.diplomaInstituteState ?? null,
-          diplomaInstituteCode: data.diplomaInstituteCode ?? null,
           diplomaYearOfPassing: data.diplomaYearOfPassing ?? null,
           diplomaBranch: data.diplomaBranch ?? null,
           diplomaMediumOfTeaching: data.diplomaMediumOfTeaching ?? null,
@@ -864,7 +866,106 @@ export class AdmissionService {
       );
     }
   }
+  static async changeAdmissionMode(
+    id: string,
+    data: ChangeAdmissionModeType
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const admission = await db.admission.findUnique({
+        where: { id },
+      });
 
+      if (!admission) {
+        throw new Error("Admission not found");
+      }
+
+      if (admission.status === "EXITED") {
+        throw new Error(
+          "Cannot change admission mode after the student has exited."
+        );
+      }
+
+      const updatedAdmission = await db.admission.update({
+        where: { id },
+        data: {
+          modeOfAdmission: data.modeOfAdmission,
+          categoryClaimed: data.categoryClaimed,
+          categoryAllotted: data.categoryAllotted,
+          quota: data.quota,
+          entranceExamRank:
+            data.entranceExamRank != null
+              ? String(data.entranceExamRank)
+              : null,
+          originalAdmissionOrderNumber: data.originalAdmissionOrderNumber,
+          originalAdmissionOrderDate: data.originalAdmissionOrderDate
+            ? new Date(data.originalAdmissionOrderDate)
+            : null,
+        },
+        include: {
+          semester: true,
+          department: true,
+        },
+      });
+
+      return {
+        status: "success",
+        message: "Admission mode updated successfully",
+        data: updatedAdmission,
+      };
+    } catch (error) {
+      logger.error("Failed to change admission mode", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to change admission mode"
+      );
+    }
+  }
+
+  static async exitAdmission(id: string): Promise<BaseResponse<unknown>> {
+    try {
+      const admission = await db.admission.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          status: true,
+          studentId: true,
+          applicationId: true,
+        },
+      });
+
+      if (!admission) {
+        throw new Error("Admission not found");
+      }
+
+      if (admission.status === "EXITED") {
+        throw new Error("Student has already exited the college");
+      }
+
+      if (!admission.studentId) {
+        throw new Error("Only admitted students can be marked as exited");
+      }
+
+      const updatedAdmission = await db.admission.update({
+        where: { id },
+        data: {
+          status: "EXITED",
+        },
+      });
+
+      return {
+        status: "success",
+        message: "Student marked as exited successfully",
+        data: updatedAdmission,
+      };
+    } catch (error) {
+      logger.error("Failed to exit admission", error);
+
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to exit admission"
+      );
+    }
+  }
   static async portStudents(
     payload: PortStudentsType,
     headers: IncomingHttpHeaders
