@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --env-file=.env src/index.ts",
+    "dev": "bun --bun src/index.ts",
     "lint": "eslint .",
     "build": "tsup",
     "start": "bun run dist/index.js",
