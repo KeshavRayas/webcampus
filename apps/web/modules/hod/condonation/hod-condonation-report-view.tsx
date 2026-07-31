@@ -1,10 +1,10 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
-import { AdminMarksReportView } from "@/modules/admin/academics/reports/admin-marks-report-view";
+import { AdminCondonationReportView } from "@/modules/admin/academics/reports/admin-condonation-report-view";
 import { Loader2 } from "lucide-react";
 
-export const HodMarksReportView = () => {
+export const HodCondonationReportView = () => {
   const { data: session, isPending } = authClient.useSession();
   const user = session?.user as unknown as {
     faculty?: { departmentId?: string; department?: { name?: string } };
@@ -30,7 +30,7 @@ export const HodMarksReportView = () => {
   }
 
   return (
-    <AdminMarksReportView
+    <AdminCondonationReportView
       fixedDepartmentId={departmentId}
       fixedDepartmentName={departmentName}
     />

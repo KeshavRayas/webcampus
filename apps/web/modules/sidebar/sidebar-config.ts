@@ -103,14 +103,32 @@ export const sidebarConfig: Record<Role, SidebarData> = {
             {
               name: "Attendance",
               url: "/admin/academics/attendance",
+              children: [
+                {
+                  name: "Attendance Report",
+                  url: "/admin/academics/attendance",
+                },
+              ],
             },
             {
               name: "Marks",
               url: "/admin/academics/marks",
+              children: [
+                {
+                  name: "Marks Report",
+                  url: "/admin/academics/marks",
+                },
+              ],
             },
             {
               name: "Condonation",
               url: "/admin/academics/condonation",
+              children: [
+                {
+                  name: "Condonation Report",
+                  url: "/admin/academics/condonation",
+                },
+              ],
             },
             {
               name: "Hall Tickets",
@@ -141,6 +159,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: GraduationCap,
         },
         {
+          name: "Sections",
+          url: "/department/sections",
+          icon: UserSearch,
+        },
+        {
           name: "Courses",
           url: "/department/courses",
           icon: Library,
@@ -153,11 +176,6 @@ export const sidebarConfig: Record<Role, SidebarData> = {
             },
             { name: "Approvals", url: "/department/course-approvals" },
           ],
-        },
-        {
-          name: "Sections",
-          url: "/department/sections",
-          icon: UserSearch,
         },
       ],
     },
@@ -279,25 +297,44 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: GraduationCap,
         },
         {
-          name: "Academics",
-          url: "/hod/academics/freezing",
-          icon: GraduationCap,
+          name: "Freezing",
+          url: "/hod/freezing",
+          icon: Lock,
+        },
+        {
+          name: "Attendance",
+          url: "/hod/attendance/report",
+          icon: Fingerprint,
           children: [
             {
-              name: "Freezing",
-              url: "/hod/academics/freezing",
+              name: "Attendance Report",
+              url: "/hod/attendance/report",
+            },
+          ],
+        },
+        {
+          name: "Marks",
+          url: "/hod/marks/report",
+          icon: BookOpenText,
+          children: [
+            {
+              name: "Marks Report",
+              url: "/hod/marks/report",
+            },
+          ],
+        },
+        {
+          name: "Condonation",
+          url: "/hod/condonation/approve",
+          icon: FileText,
+          children: [
+            {
+              name: "Approve Condonation",
+              url: "/hod/condonation/approve",
             },
             {
-              name: "Attendance",
-              url: "/hod/academics/attendance",
-            },
-            {
-              name: "Marks",
-              url: "/hod/academics/marks",
-            },
-            {
-              name: "Condonation",
-              url: "/hod/academics/condonation",
+              name: "Condonation Report",
+              url: "/hod/condonation/report",
             },
           ],
         },

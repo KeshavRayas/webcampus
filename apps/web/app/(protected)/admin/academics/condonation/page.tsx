@@ -1,9 +1,15 @@
-const Page = () => {
-  return (
-    <div className="flex h-96 items-center justify-center">
-      <p className="text-muted-foreground text-sm">Condonation</p>
-    </div>
-  );
+import { AdminCondonationReportView } from "@/modules/admin/academics/reports/admin-condonation-report-view";
+import { Metadata } from "next";
+import { Suspense } from "react";
+
+export const metadata: Metadata = {
+  title: "Admin - Condonation Report | WebCampus",
 };
 
-export default Page;
+export default function AdminCondonationReportPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AdminCondonationReportView />
+    </Suspense>
+  );
+}

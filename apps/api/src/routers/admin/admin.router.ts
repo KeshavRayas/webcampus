@@ -1,3 +1,4 @@
+import AcademicsReportRouter from "@webcampus/api/src/routers/admin/academics-report.router";
 import AdmissionUserRouter from "@webcampus/api/src/routers/admin/admission-user.router";
 import AttendanceWindowRouter from "@webcampus/api/src/routers/admin/attendance-window.router";
 import AuditRouter from "@webcampus/api/src/routers/admin/audit.router";
@@ -22,6 +23,7 @@ router.use("/coe", CoeRouter);
 router.use("/admission-users", AdmissionUserRouter);
 
 router.use("/department", DepartmentRouter);
+router.use("/academics/reports", AcademicsReportRouter);
 
 router.use("/semester", SemesterRouter);
 

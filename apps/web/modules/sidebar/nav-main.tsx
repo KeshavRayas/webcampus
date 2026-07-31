@@ -52,18 +52,61 @@ export function NavMain({ items }: NavMainProps) {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
-                      {item.children.map((child) => (
-                        <SidebarMenuSubItem key={child.name}>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={pathname === child.url}
-                          >
-                            <Link href={child.url}>
-                              <span>{child.name}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
+                      {item.children.map((child) => {
+                        if (child.children && child.children.length > 0) {
+                          const isChildActive =
+                            pathname === child.url ||
+                            child.children.some((c) => pathname === c.url);
+                          return (
+                            <Collapsible
+                              key={child.name}
+                              asChild
+                              defaultOpen={isChildActive}
+                              className="group/subcollapsible"
+                            >
+                              <SidebarMenuSubItem>
+                                <CollapsibleTrigger asChild>
+                                  <SidebarMenuSubButton
+                                    isActive={isChildActive}
+                                    className="flex w-full cursor-pointer justify-between"
+                                  >
+                                    <span>{child.name}</span>
+                                    <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/subcollapsible:rotate-90" />
+                                  </SidebarMenuSubButton>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <SidebarMenuSub className="ml-2 border-l pl-2">
+                                    {child.children.map((grandchild) => (
+                                      <SidebarMenuSubItem key={grandchild.name}>
+                                        <SidebarMenuSubButton
+                                          asChild
+                                          isActive={pathname === grandchild.url}
+                                        >
+                                          <Link href={grandchild.url}>
+                                            <span>{grandchild.name}</span>
+                                          </Link>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    ))}
+                                  </SidebarMenuSub>
+                                </CollapsibleContent>
+                              </SidebarMenuSubItem>
+                            </Collapsible>
+                          );
+                        }
+                        return (
+                          <SidebarMenuSubItem key={child.name}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={pathname === child.url}
+                            >
+                              <Link href={child.url}>
+                                <span>{child.name}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
                     </SidebarMenuSub>
                   </CollapsibleContent>
                 </SidebarMenuItem>
