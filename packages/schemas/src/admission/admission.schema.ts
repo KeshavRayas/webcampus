@@ -1,13 +1,7 @@
 import { z } from "zod";
-import { categoriesAllotted, categoriesClaimed } from "../constants";
+import { categoriesAllotted, categoriesClaimed, quotas } from "../constants";
 
-export const QuotaSchema = z.enum([
-  "MERIT",
-  "MANAGEMENT",
-  "SPORTS",
-  "NRI",
-  "SNQ",
-]);
+export const QuotaSchema = z.enum(quotas);
 
 export const CreateAdmissionShellSchema = z
   .object({
@@ -24,7 +18,7 @@ export const CreateAdmissionShellSchema = z
     categoryClaimed: z.string().min(1, "Category Claimed is required"),
     categoryAllotted: z.string().min(1, "Category Allotted is required"),
 
-    quota: QuotaSchema,
+    quota: QuotaSchema.optional(),
   })
   .superRefine((data, ctx) => {
     const claimed =
@@ -57,6 +51,14 @@ export const CreateAdmissionShellSchema = z
         code: z.ZodIssueCode.custom,
         path: ["categoryAllotted"],
         message: "Invalid allotted category",
+      });
+    }
+
+    if (data.modeOfAdmission === "KCET" && !data.quota) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["quota"],
+        message: "Quota is required for KCET admissions",
       });
     }
   });

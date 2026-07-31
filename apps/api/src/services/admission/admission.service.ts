@@ -330,7 +330,7 @@ export class AdmissionService {
           departmentId: data.departmentId,
           categoryClaimed: data.categoryClaimed,
           categoryAllotted: data.categoryAllotted,
-          quota: data.quota,
+          quota: data.modeOfAdmission === "KCET" ? data.quota : null,
           status: "PENDING", // Explicitly setting the initial status
         },
         include: {
@@ -891,7 +891,7 @@ export class AdmissionService {
           modeOfAdmission: data.modeOfAdmission,
           categoryClaimed: data.categoryClaimed,
           categoryAllotted: data.categoryAllotted,
-          quota: data.quota,
+          quota: data.modeOfAdmission ? data.quota : undefined,
           entranceExamRank:
             data.entranceExamRank != null
               ? String(data.entranceExamRank)

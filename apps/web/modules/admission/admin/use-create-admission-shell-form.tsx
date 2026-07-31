@@ -29,7 +29,7 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
       departmentId: "",
       categoryClaimed: "GM",
       categoryAllotted: "GM",
-      quota: "MERIT",
+      quota: "CET-AIDED",
     },
   });
 
@@ -48,7 +48,7 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
         departmentId: "",
         categoryClaimed: "GM",
         categoryAllotted: "GM",
-        quota: "MERIT",
+        quota: "CET-AIDED",
       });
     }
   }, [semesterId, form, isSubmitSuccessful]);

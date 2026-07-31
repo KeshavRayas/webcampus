@@ -11,6 +11,8 @@ export const CreateAdmissionUserSchema = z.object({
 
 export const UpdateAdmissionUserSchema = CreateAdmissionUserSchema.omit({
   password: true,
+  photo: true,
+  role: true,
 });
 
 export type CreateAdmissionUserType = z.infer<typeof CreateAdmissionUserSchema>;

@@ -14,6 +14,7 @@ import {
   admissionModes,
   categoriesAllotted,
   categoriesClaimed,
+  quotas,
 } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
@@ -72,13 +73,7 @@ import { usePortStudents } from "./use-port-students";
 //   "Other",
 // ] as const;
 // const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
-const ADMISSION_QUOTAS = [
-  "MERIT",
-  "MANAGEMENT",
-  "SPORTS",
-  "NRI",
-  "SNQ",
-] as const;
+const ADMISSION_QUOTAS = quotas;
 const ADMISSION_STATUSES = [
   "PENDING",
   "SUBMITTED",
@@ -185,6 +180,15 @@ export const AdminAdmissionView = ({
   );
   // Currently selected admission mode
   const selectedAdmissionMode = form.watch("modeOfAdmission");
+  const isKCET = selectedAdmissionMode === "KCET";
+  useEffect(() => {
+    if (!isKCET) {
+      form.setValue("quota", undefined, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+  }, [isKCET, form]);
 
   // Categories for the selected admission mode (Claimed)
   const claimedCategoryOptions =
@@ -671,15 +675,18 @@ export const AdminAdmissionView = ({
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Quota *</FormLabel>
-                      <Popover>
+                      <Popover open={isKCET ? undefined : false}>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
                               variant="outline"
                               role="combobox"
+                              disabled={!isKCET}
                               className={`w-full justify-between ${!field.value ? "text-muted-foreground" : ""}`}
                             >
-                              {field.value || "Select quota"}
+                              {!isKCET
+                                ? "Not applicable"
+                                : field.value || "Select quota"}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>

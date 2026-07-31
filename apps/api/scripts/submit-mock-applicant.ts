@@ -299,7 +299,7 @@ async function main() {
           departmentId: context.departmentId,
           categoryClaimed: "GENERAL",
           categoryAllotted: "GENERAL",
-          quota: "MERIT",
+          quota: "CET-AIDED",
         },
         context.headers
       );

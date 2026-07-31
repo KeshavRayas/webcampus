@@ -165,19 +165,16 @@ export class AdminAdmissionUserService {
 
   static async update(
     id: string,
-    data: UpdateAdmissionUserType,
-    headers: IncomingHttpHeaders,
-    photoFile?: Express.Multer.File
+    data: UpdateAdmissionUserType
+    // headers: IncomingHttpHeaders
+    // photoFile?: Express.Multer.File
   ): Promise<BaseResponse<AdmissionUserRecord>> {
-    let uploadedImageUrl: string | null = null;
-
     try {
       const existingUser = await db.user.findUnique({
         where: { id },
         select: {
           id: true,
           role: true,
-          image: true,
         },
       });
 
@@ -186,17 +183,17 @@ export class AdminAdmissionUserService {
       }
 
       // Safely handle S3 File Uploads
-      if (photoFile) {
-        uploadedImageUrl = await this.uploadPhoto(
-          photoFile,
-          "admission_user_photo_"
-        );
-      }
+      // if (photoFile) {
+      //   uploadedImageUrl = await this.uploadPhoto(
+      //     photoFile,
+      //     "admission_user_photo_"
+      //   );
+      // }
 
       // Safely Sync Roles with external Auth provider
-      if (data.role && existingUser.role !== data.role) {
-        await this.syncRole(id, data.role, headers);
-      }
+      // if (data.role && existingUser.role !== data.role) {
+      //   await this.syncRole(id, data.role, headers);
+      // }
 
       // Only updates fields that are explicitly provided, preventing undefined crashes
       const updateData: Prisma.UserUpdateInput = {};
@@ -211,12 +208,12 @@ export class AdminAdmissionUserService {
       if (data.username) {
         updateData.username = this.normalizeUsername(data.username);
       }
-      if (data.role) {
-        updateData.role = data.role;
-      }
-      if (uploadedImageUrl) {
-        updateData.image = uploadedImageUrl;
-      }
+      // if (data.role) {
+      //   updateData.role = data.role;
+      // }
+      // if (uploadedImageUrl) {
+      //   updateData.image = uploadedImageUrl;
+      // }
 
       // 4. Execute the safe database update
       const updatedUser = await db.user.update({
@@ -235,16 +232,16 @@ export class AdminAdmissionUserService {
       });
 
       // 5. Cleanup the old S3 photo if a new one was uploaded
-      if (uploadedImageUrl && existingUser.image) {
-        try {
-          await this.deletePhoto(existingUser.image);
-        } catch (cleanupError) {
-          logger.warn("Failed to delete previous admission user photo", {
-            previousImageUrl: existingUser.image,
-            cleanupError,
-          });
-        }
-      }
+      // if (uploadedImageUrl && existingUser.image) {
+      //   try {
+      //     await this.deletePhoto(existingUser.image);
+      //   } catch (cleanupError) {
+      //     logger.warn("Failed to delete previous admission user photo", {
+      //       previousImageUrl: existingUser.image,
+      //       cleanupError,
+      //     });
+      //   }
+      // }
 
       return {
         status: "success",
@@ -253,16 +250,16 @@ export class AdminAdmissionUserService {
       };
     } catch (error) {
       // Revert the S3 upload if the database update failed
-      if (uploadedImageUrl) {
-        try {
-          await this.deletePhoto(uploadedImageUrl);
-        } catch (cleanupError) {
-          logger.warn("Failed to clean up new admission user photo", {
-            uploadedImageUrl,
-            cleanupError,
-          });
-        }
-      }
+      // if (uploadedImageUrl) {
+      //   try {
+      //     await this.deletePhoto(uploadedImageUrl);
+      //   } catch (cleanupError) {
+      //     logger.warn("Failed to clean up new admission user photo", {
+      //       uploadedImageUrl,
+      //       cleanupError,
+      //     });
+      //   }
+      // }
 
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&

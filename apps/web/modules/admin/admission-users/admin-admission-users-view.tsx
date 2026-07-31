@@ -197,7 +197,7 @@ export const AdminAdmissionUsersView = () => {
                   />
 
                   <UserPhotoUpload
-                    label="Profile Photo"
+                    label="Profile Photo *"
                     personName={form.watch("name") || "Admission User"}
                     previewUrl={photoPreview}
                     selectedFileName={photoFile?.name || null}

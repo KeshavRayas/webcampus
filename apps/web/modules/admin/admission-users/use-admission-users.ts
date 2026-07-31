@@ -94,7 +94,6 @@ export const useAdmissionUserUpdate = () => {
       formData.append("name", data.name);
       formData.append("username", data.username);
       formData.append("email", data.email);
-      formData.append("role", data.role);
 
       if (photoFile) {
         formData.append("photo", photoFile);
