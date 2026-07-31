@@ -27,8 +27,8 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
       modeOfAdmission: "KCET", // Default value
       semesterId: semesterId,
       departmentId: "",
-      categoryClaimed: "GENERAL",
-      categoryAllotted: "GENERAL",
+      categoryClaimed: "GM",
+      categoryAllotted: "GM",
       quota: "MERIT",
     },
   });
@@ -46,8 +46,8 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
         modeOfAdmission: "KCET",
         semesterId,
         departmentId: "",
-        categoryClaimed: "GENERAL",
-        categoryAllotted: "GENERAL",
+        categoryClaimed: "GM",
+        categoryAllotted: "GM",
         quota: "MERIT",
       });
     }
