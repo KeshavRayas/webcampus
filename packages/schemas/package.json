@@ -12,6 +12,8 @@
     "./coe": "./src/coe/index.ts",
     "./finance": "./src/finance/index.ts",
     "./common": "./src/common.schemas.ts"
+    "./constants": "./src/constants/index.ts"
+
   },
   "scripts": {
     "check-types": "tsc --noEmit --pretty"

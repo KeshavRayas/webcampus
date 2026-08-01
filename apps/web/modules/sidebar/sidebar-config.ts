@@ -410,21 +410,14 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/admission/view-admissions",
           icon: BookCopy,
         },
-      ],
-    },
-    navSecondary,
-  },
-  admission_reviewer: {
-    navMain: {
-      items: [
         {
-          name: "Add Admissions",
-          url: "/admission",
-          icon: LayoutDashboard,
+          name: "Leave College",
+          url: "/admission/leave-college",
+          icon: GraduationCap,
         },
         {
-          name: "View Admissions",
-          url: "/admission/view-admissions",
+          name: "Change Admission Mode",
+          url: "/admission/change-mode",
           icon: BookCopy,
         },
       ],

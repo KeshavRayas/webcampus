@@ -86,13 +86,8 @@ export const roles = {
   }),
   admission_admin: ac.newRole({
     semester: ["read"],
-    admission: ["create", "read", "delete"],
+    admission: ["create", "read", "delete", "update", "port"],
     user: ["set-role"],
-    department: ["read"],
-  }),
-  admission_reviewer: ac.newRole({
-    semester: ["read"],
-    admission: ["read", "update", "port", "delete"],
     department: ["read"],
   }),
 } satisfies Record<Role, unknown>;

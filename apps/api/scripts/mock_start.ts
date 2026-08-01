@@ -479,12 +479,6 @@ const ADMISSION_USERS = [
     email: "admission.admin@webcampus.com",
     role: "admission_admin" as const,
   },
-  {
-    name: "Admission Reviewer",
-    username: "admission.reviewer",
-    email: "admission.reviewer@webcampus.com",
-    role: "admission_reviewer" as const,
-  },
 ];
 
 const ODD_2026_SEMESTERS = [
