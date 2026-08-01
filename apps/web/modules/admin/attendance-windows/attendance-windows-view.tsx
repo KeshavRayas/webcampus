@@ -77,7 +77,7 @@ const getStatusBadge = (row: AttendanceWindowRow) => {
 };
 
 export const AttendanceWindowsView = () => {
-  const { data: termsData } = useAcademicTerms({ status: "ACTIVE" });
+  const { data: termsData } = useAcademicTerms({ isCurrent: true });
   const { data: departmentsData } = useDepartments();
   const terms = termsData ?? [];
   const departments = departmentsData ?? [];

@@ -13,6 +13,7 @@ import React from "react";
 export interface CondonationStudentData {
   usn: string;
   name: string;
+  section?: string | null;
   totalSessions: number;
   presentSessions: number;
   absentSessions: number;
@@ -100,6 +101,7 @@ export const CondonationReportTable: React.FC<CondonationReportTableProps> = ({
               <TableHead className="w-16">Sl No.</TableHead>
               <TableHead className="w-32">USN</TableHead>
               <TableHead>Student Name</TableHead>
+              <TableHead>Section</TableHead>
               <TableHead className="text-center">Total Sessions</TableHead>
               <TableHead className="text-center">Present (Actual)</TableHead>
               <TableHead className="text-center">Condoned Added</TableHead>
@@ -120,6 +122,7 @@ export const CondonationReportTable: React.FC<CondonationReportTableProps> = ({
                 <TableCell className="capitalize">
                   {student.name.toLowerCase()}
                 </TableCell>
+                <TableCell>{student.section ?? "-"}</TableCell>
                 <TableCell className="text-center">
                   {student.totalSessions}
                 </TableCell>

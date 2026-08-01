@@ -47,7 +47,7 @@ export class AdminAttendanceReportService {
         ...(cycle && department.type === "BASIC_SCIENCES"
           ? { cycle: cycle as Cycle }
           : {}),
-        courses: { some: { id: courseId } },
+        courses: { some: { courseId } },
       },
       select: { id: true, name: true },
     });

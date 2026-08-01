@@ -404,7 +404,7 @@ export const AttendanceReportView = () => {
   }, [detailedReportData, percentageFrom, percentageTo]);
 
   const updateDraftFilter = useCallback(
-    (key: keyof ExtendedFilters, value: string) => {
+    (key: string, value: string) => {
       setDraftFilters((current) => {
         const updated = { ...current, [key]: value };
         if (key === "academicTermId") {

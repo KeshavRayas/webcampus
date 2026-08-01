@@ -12,6 +12,7 @@ import {
   UpdateFacultyType,
 } from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
+import { resolveFacultyIdForUser } from "./resolve-faculty-for-user";
 
 const ADMIN_ONLY_UPDATE_KEYS = ["staffType", "dob"] as const;
 
@@ -156,10 +157,13 @@ export class Faculty {
     }
   }
 
-  static async getProfileByUserId(userId: string): Promise<BaseResponse<unknown>> {
+  static async getProfileByUserId(
+    userId: string
+  ): Promise<BaseResponse<unknown>> {
     try {
+      const facultyId = await resolveFacultyIdForUser(userId);
       const faculty = await db.faculty.findUnique({
-        where: { userId },
+        where: { id: facultyId },
         include: {
           user: {
             select: {
@@ -204,7 +208,10 @@ export class Faculty {
         ...faculty,
         experiences: faculty.experiences.map((experience) => ({
           ...experience,
-          durationLabel: toDurationLabel(experience.startDate, experience.endDate),
+          durationLabel: toDurationLabel(
+            experience.startDate,
+            experience.endDate
+          ),
         })),
       };
 
@@ -225,7 +232,8 @@ export class Faculty {
     isAdmin: boolean
   ): Promise<BaseResponse<unknown>> {
     try {
-      const faculty = await db.faculty.findUnique({ where: { userId } });
+      const facultyId = await resolveFacultyIdForUser(userId);
+      const faculty = await db.faculty.findUnique({ where: { id: facultyId } });
       if (!faculty) {
         throw new Error("Faculty profile not found");
       }
@@ -243,14 +251,16 @@ export class Faculty {
       };
 
       if (data.sameAsPresentAddress) {
-        nextData.permanentAddressLine = data.presentAddressLine ?? faculty.presentAddressLine;
+        nextData.permanentAddressLine =
+          data.presentAddressLine ?? faculty.presentAddressLine;
         nextData.permanentCity = data.presentCity ?? faculty.presentCity;
         nextData.permanentState = data.presentState ?? faculty.presentState;
-        nextData.permanentPincode = data.presentPincode ?? faculty.presentPincode;
+        nextData.permanentPincode =
+          data.presentPincode ?? faculty.presentPincode;
       }
 
       const updated = await db.faculty.update({
-        where: { userId },
+        where: { id: facultyId },
         data: nextData,
       });
 
@@ -269,14 +279,11 @@ export class Faculty {
     userId: string,
     data: CreateFacultyQualificationType
   ): Promise<BaseResponse<unknown>> {
-    const faculty = await db.faculty.findUnique({ where: { userId } });
-    if (!faculty) {
-      throw new Error("Faculty profile not found");
-    }
+    const facultyId = await resolveFacultyIdForUser(userId);
 
     const created = await db.facultyQualification.create({
       data: {
-        facultyId: faculty.id,
+        facultyId,
         ...data,
       },
     });
@@ -293,15 +300,12 @@ export class Faculty {
     qualificationId: string,
     data: UpdateFacultyQualificationType
   ): Promise<BaseResponse<unknown>> {
-    const faculty = await db.faculty.findUnique({ where: { userId } });
-    if (!faculty) {
-      throw new Error("Faculty profile not found");
-    }
+    const facultyId = await resolveFacultyIdForUser(userId);
 
     const ownedRecord = await db.facultyQualification.findFirst({
       where: {
         id: qualificationId,
-        facultyId: faculty.id,
+        facultyId,
       },
       select: { id: true },
     });
@@ -327,15 +331,12 @@ export class Faculty {
     userId: string,
     qualificationId: string
   ): Promise<BaseResponse<unknown>> {
-    const faculty = await db.faculty.findUnique({ where: { userId } });
-    if (!faculty) {
-      throw new Error("Faculty profile not found");
-    }
+    const facultyId = await resolveFacultyIdForUser(userId);
 
     const ownedRecord = await db.facultyQualification.findFirst({
       where: {
         id: qualificationId,
-        facultyId: faculty.id,
+        facultyId,
       },
       select: { id: true },
     });
@@ -360,14 +361,11 @@ export class Faculty {
     userId: string,
     data: CreateFacultyPublicationType
   ): Promise<BaseResponse<unknown>> {
-    const faculty = await db.faculty.findUnique({ where: { userId } });
-    if (!faculty) {
-      throw new Error("Faculty profile not found");
-    }
+    const facultyId = await resolveFacultyIdForUser(userId);
 
     const created = await db.facultyPublication.create({
       data: {
-        facultyId: faculty.id,
+        facultyId,
         ...data,
       },
     });
@@ -384,15 +382,12 @@ export class Faculty {
     publicationId: string,
     data: UpdateFacultyPublicationType
   ): Promise<BaseResponse<unknown>> {
-    const faculty = await db.faculty.findUnique({ where: { userId } });
-    if (!faculty) {
-      throw new Error("Faculty profile not found");
-    }
+    const facultyId = await resolveFacultyIdForUser(userId);
 
     const ownedRecord = await db.facultyPublication.findFirst({
       where: {
         id: publicationId,
-        facultyId: faculty.id,
+        facultyId,
       },
       select: { id: true },
     });
@@ -418,15 +413,12 @@ export class Faculty {
     userId: string,
     publicationId: string
   ): Promise<BaseResponse<unknown>> {
-    const faculty = await db.faculty.findUnique({ where: { userId } });
-    if (!faculty) {
-      throw new Error("Faculty profile not found");
-    }
+    const facultyId = await resolveFacultyIdForUser(userId);
 
     const ownedRecord = await db.facultyPublication.findFirst({
       where: {
         id: publicationId,
-        facultyId: faculty.id,
+        facultyId,
       },
       select: { id: true },
     });
@@ -451,14 +443,11 @@ export class Faculty {
     userId: string,
     data: CreateFacultyExperienceType
   ): Promise<BaseResponse<unknown>> {
-    const faculty = await db.faculty.findUnique({ where: { userId } });
-    if (!faculty) {
-      throw new Error("Faculty profile not found");
-    }
+    const facultyId = await resolveFacultyIdForUser(userId);
 
     const created = await db.facultyExperience.create({
       data: {
-        facultyId: faculty.id,
+        facultyId,
         ...data,
       },
     });
@@ -475,15 +464,12 @@ export class Faculty {
     experienceId: string,
     data: UpdateFacultyExperienceType
   ): Promise<BaseResponse<unknown>> {
-    const faculty = await db.faculty.findUnique({ where: { userId } });
-    if (!faculty) {
-      throw new Error("Faculty profile not found");
-    }
+    const facultyId = await resolveFacultyIdForUser(userId);
 
     const ownedRecord = await db.facultyExperience.findFirst({
       where: {
         id: experienceId,
-        facultyId: faculty.id,
+        facultyId,
       },
       select: { id: true },
     });
@@ -509,15 +495,12 @@ export class Faculty {
     userId: string,
     experienceId: string
   ): Promise<BaseResponse<unknown>> {
-    const faculty = await db.faculty.findUnique({ where: { userId } });
-    if (!faculty) {
-      throw new Error("Faculty profile not found");
-    }
+    const facultyId = await resolveFacultyIdForUser(userId);
 
     const ownedRecord = await db.facultyExperience.findFirst({
       where: {
         id: experienceId,
-        facultyId: faculty.id,
+        facultyId,
       },
       select: { id: true },
     });

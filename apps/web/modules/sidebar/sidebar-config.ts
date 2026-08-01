@@ -339,11 +339,6 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           ],
         },
         {
-          name: "Reports",
-          url: "/hod/reports",
-          icon: BookOpenText,
-        },
-        {
           name: "Profile",
           url: "/hod/profile",
           icon: User,

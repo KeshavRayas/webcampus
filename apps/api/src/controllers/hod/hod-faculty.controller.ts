@@ -1,8 +1,9 @@
 import { auth } from "@webcampus/auth";
 import { logger } from "@webcampus/common/logger";
-import { db } from "@webcampus/db";
+import { db, Designation } from "@webcampus/db";
 import { fromNodeHeaders } from "better-auth/node";
 import { Request, Response } from "express";
+import { resolveHODDepartment } from "../../services/hod/resolve-hod-department";
 
 const monthDiff = (startDate: Date, endDate: Date) => {
   const years = endDate.getFullYear() - startDate.getFullYear();
@@ -36,19 +37,48 @@ export const getDepartmentFaculty = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const facultyUser = await db.faculty.findUnique({
-      where: { userId: session.user.id },
-    });
-
-    const departmentId = facultyUser?.departmentId;
-    if (!departmentId) {
+    const hodDepartment = await resolveHODDepartment(session.user.id);
+    if (!hodDepartment) {
       return res
         .status(403)
         .json({ error: "Unauthorized: No department attached to HOD" });
     }
 
+    const { departmentId } = hodDepartment;
+
+    const { search } = req.query as { search?: string };
+
+    const matchingDesignations = search
+      ? (Object.values(Designation) as Designation[]).filter(
+          (designation) =>
+            designation.toLowerCase().includes(search.toLowerCase()) ||
+            designation
+              .replace(/_/g, " ")
+              .toLowerCase()
+              .includes(search.toLowerCase())
+        )
+      : [];
+
+    const searchConditions = search
+      ? [
+          {
+            user: { name: { contains: search, mode: "insensitive" as const } },
+          },
+          { employeeId: { contains: search, mode: "insensitive" as const } },
+          {
+            user: { email: { contains: search, mode: "insensitive" as const } },
+          },
+          ...(matchingDesignations.length > 0
+            ? [{ designation: { in: matchingDesignations } }]
+            : []),
+        ]
+      : undefined;
+
     const faculties = await db.faculty.findMany({
-      where: { departmentId },
+      where: {
+        departmentId,
+        ...(searchConditions ? { OR: searchConditions } : {}),
+      },
       include: {
         user: { select: { name: true, email: true } },
       },
@@ -82,16 +112,14 @@ export const getFacultyProfile = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const facultyUser = await db.faculty.findUnique({
-      where: { userId: session.user.id },
-    });
-
-    const departmentId = facultyUser?.departmentId;
-    if (!departmentId) {
+    const hodDepartment = await resolveHODDepartment(session.user.id);
+    if (!hodDepartment) {
       return res
         .status(403)
         .json({ error: "Unauthorized: No department attached to HOD" });
     }
+
+    const { departmentId } = hodDepartment;
 
     const { id: facultyId } = req.params;
 

@@ -84,7 +84,7 @@ export class HODAttendanceReportService {
         ...(cycle && hod.departmentType === "BASIC_SCIENCES"
           ? { cycle: cycle as Cycle }
           : {}),
-        courses: { some: { id: courseId } },
+        courses: { some: { courseId } },
       },
       select: { id: true, name: true },
     });

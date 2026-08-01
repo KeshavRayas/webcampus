@@ -65,13 +65,14 @@ type AttendanceReportFilters = {
   semesterId: string;
   courseId: string;
   sectionId: string;
+  cycle?: string;
 };
 
 type AttendanceReportShellProps = {
   activeTab: "status" | "detailed" | "percentage";
   onTabChange: (tab: "status" | "detailed" | "percentage") => void;
   draftFilters: AttendanceReportFilters;
-  onDraftChange: (key: keyof AttendanceReportFilters, value: string) => void;
+  onDraftChange: (key: string, value: string) => void;
   academicTerms: AcademicTermOption[];
   semesters: SemesterOption[];
   courses: CourseOption[];
@@ -98,6 +99,8 @@ type AttendanceReportShellProps = {
   ) => void;
   onDownloadPercentagePDF?: () => void;
   onDownloadPercentageExcel?: () => void; // New Prop
+  showCycleFilter?: boolean;
+  cycleOptions?: Array<{ label: string; value: string }>;
 };
 
 export const AttendanceReportShell = ({
@@ -128,6 +131,8 @@ export const AttendanceReportShell = ({
   onPercentageFilterChange,
   onDownloadPercentagePDF,
   onDownloadPercentageExcel,
+  showCycleFilter = false,
+  cycleOptions = [],
 }: AttendanceReportShellProps) => {
   const getStatusEmptyMessage = () => {
     if (!hasRequiredFilters) {
@@ -226,6 +231,18 @@ export const AttendanceReportShell = ({
             value: sem.id,
           })),
         },
+        ...(showCycleFilter
+          ? [
+              {
+                key: "cycle" as const,
+                label: "Cycle",
+                type: "select" as const,
+                hideAllOption: true,
+                placeholder: "Select cycle...",
+                options: cycleOptions,
+              } satisfies FilterFieldConfig<AttendanceReportFilters>,
+            ]
+          : []),
         {
           key: "courseId",
           label: "Course",
@@ -251,7 +268,15 @@ export const AttendanceReportShell = ({
           })),
         },
       ];
-    }, [academicTerms, semesters, courses, sections, draftFilters]);
+    }, [
+      academicTerms,
+      semesters,
+      courses,
+      sections,
+      draftFilters,
+      showCycleFilter,
+      cycleOptions,
+    ]);
 
   return (
     <div

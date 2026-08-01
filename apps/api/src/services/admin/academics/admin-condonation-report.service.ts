@@ -5,7 +5,7 @@ import { BaseResponse } from "@webcampus/types/api";
 export class AdminCondonationReportService {
   static async getCondonationReport(
     courseId: string,
-    sectionId: string,
+    sectionId?: string,
     batchId?: string
   ): Promise<BaseResponse<unknown>> {
     try {
@@ -26,7 +26,9 @@ export class AdminCondonationReportService {
 
       const studentSections = await db.studentSection.findMany({
         where: {
-          sectionId,
+          ...(sectionId
+            ? { sectionId }
+            : { section: { courses: { some: { courseId } } } }),
           ...(batchId
             ? { student: { batches: { some: { id: batchId } } } }
             : {}),
@@ -39,7 +41,11 @@ export class AdminCondonationReportService {
       });
 
       const classSessions = await db.classSession.findMany({
-        where: { courseId, sectionId, ...(batchId ? { batchId } : {}) },
+        where: {
+          courseId,
+          ...(sectionId ? { sectionId } : {}),
+          ...(batchId ? { batchId } : {}),
+        },
         select: { id: true },
       });
 

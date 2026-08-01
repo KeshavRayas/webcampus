@@ -1,13 +1,12 @@
 "use client";
 
-import type { MarksReportData } from "@/modules/faculty/marks-report/marks-report-types";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import axios from "axios";
 
 const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
-export type HODMarksFilterOptions = {
+export type HODAttendanceFilterOptions = {
   academicTerms: { id: string; year: string; type: "odd" | "even" }[];
   semesters: {
     id: string;
@@ -18,18 +17,26 @@ export type HODMarksFilterOptions = {
   departmentType: string;
 };
 
-export type HODMarksAssessment = {
-  id: string;
-  title: string;
-  totalMarks: number;
+export type HODAttendanceDetailedRaw = {
+  sessions: { id: string; sessionDate: string; timingMode: string }[];
+  students: {
+    studentId: string;
+    usn: string;
+    name: string;
+    presentCount: number;
+    absentCount: number;
+    totalCount: number;
+    percentage: number;
+    attendanceBySession: { sessionId: string; status: string | null }[];
+  }[];
 };
 
-export const useHODMarksFilterOptions = () => {
+export const useHODAttendanceFilterOptions = () => {
   return useQuery({
-    queryKey: ["hod-marks-filter-options"],
-    queryFn: async (): Promise<HODMarksFilterOptions> => {
+    queryKey: ["hod-attendance-filter-options"],
+    queryFn: async (): Promise<HODAttendanceFilterOptions> => {
       const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/marks-report/filter-options`,
+        `${NEXT_PUBLIC_API_BASE_URL}/hod/attendance-report/filter-options`,
         { withCredentials: true }
       );
       return res.data.data;
@@ -37,13 +44,13 @@ export const useHODMarksFilterOptions = () => {
   });
 };
 
-export const useHODMarksCourses = (semesterId: string, cycle: string) => {
+export const useHODAttendanceCourses = (semesterId: string, cycle: string) => {
   return useQuery({
-    queryKey: ["hod-marks-courses", semesterId, cycle],
+    queryKey: ["hod-attendance-courses", semesterId, cycle],
     queryFn: async () => {
       if (!semesterId) return [];
       const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/marks-report/courses`,
+        `${NEXT_PUBLIC_API_BASE_URL}/hod/attendance-report/courses`,
         {
           params: { semesterId, ...(cycle ? { cycle } : {}) },
           withCredentials: true,
@@ -55,17 +62,17 @@ export const useHODMarksCourses = (semesterId: string, cycle: string) => {
   });
 };
 
-export const useHODMarksSections = (
+export const useHODAttendanceSections = (
   semesterId: string,
   courseId: string,
   cycle: string
 ) => {
   return useQuery({
-    queryKey: ["hod-marks-sections", semesterId, courseId, cycle],
+    queryKey: ["hod-attendance-sections", semesterId, courseId, cycle],
     queryFn: async () => {
       if (!courseId) return [];
       const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/marks-report/sections`,
+        `${NEXT_PUBLIC_API_BASE_URL}/hod/attendance-report/sections`,
         {
           params: {
             semesterId,
@@ -81,47 +88,22 @@ export const useHODMarksSections = (
   });
 };
 
-export const useHODMarksAssessments = (courseId: string) => {
-  return useQuery({
-    queryKey: ["hod-marks-assessments", courseId],
-    queryFn: async (): Promise<HODMarksAssessment[]> => {
-      if (!courseId) return [];
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/marks-report/assessments`,
-        {
-          params: { courseId },
-          withCredentials: true,
-        }
-      );
-      return res.data.data;
-    },
-    enabled: !!courseId,
-  });
-};
-
-export const useHODMarksReportData = (
-  filters: {
-    courseId: string;
-    sectionId: string;
-    assessmentId?: string;
-  } | null,
+export const useHODAttendanceDetailedReport = (
+  filters: { courseId: string; sectionId: string } | null,
   enabled: boolean
 ) => {
   return useQuery({
-    queryKey: ["hod-marks-report-data", filters],
-    queryFn: async (): Promise<MarksReportData> => {
+    queryKey: ["hod-attendance-detailed-report", filters],
+    queryFn: async (): Promise<HODAttendanceDetailedRaw> => {
       if (!filters) {
         throw new Error("Missing report filters");
       }
       const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/marks-report/report`,
+        `${NEXT_PUBLIC_API_BASE_URL}/hod/attendance-report/detailed`,
         {
           params: {
             courseId: filters.courseId,
             sectionId: filters.sectionId,
-            ...(filters.assessmentId
-              ? { assessmentId: filters.assessmentId }
-              : {}),
           },
           withCredentials: true,
         }

@@ -3,6 +3,7 @@ import { logger } from "@webcampus/common/logger";
 import { Cycle, db } from "@webcampus/db";
 import { fromNodeHeaders } from "better-auth/node";
 import { Request, Response } from "express";
+import { resolveHODDepartment } from "../../services/hod/resolve-hod-department";
 
 export const getDepartmentCourses = async (req: Request, res: Response) => {
   try {
@@ -13,48 +14,44 @@ export const getDepartmentCourses = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const facultyUser = await db.faculty.findUnique({
-      where: { userId: session.user.id },
-    });
-
-    const departmentId = facultyUser?.departmentId;
-    if (!departmentId) {
+    const hodDepartment = await resolveHODDepartment(session.user.id);
+    if (!hodDepartment) {
       return res
         .status(403)
         .json({ error: "Unauthorized: No department attached to HOD" });
     }
 
-    const { semesterId, cycle, sectionId } = req.query as Record<
-      string,
-      string
-    >;
+    const { departmentId, departmentType } = hodDepartment;
 
-    const department = await db.department.findUnique({
-      where: { id: departmentId },
-    });
-    if (!department) {
-      return res.status(404).json({ error: "Department not found" });
-    }
+    const { semesterId, cycle, sectionId, academicTermId } = req.query as {
+      semesterId?: string;
+      cycle?: string;
+      sectionId?: string;
+      academicTermId?: string;
+    };
 
-    // Base query for courses
     const whereClause: {
       departmentId: string;
       semesterId?: string;
+      semester?: { academicTermId: string };
       cycle?: Cycle;
-      sections?: { some: { id: string } };
+      assignments?: { some: { sectionId: string } };
     } = { departmentId };
+
+    if (academicTermId) {
+      whereClause.semester = { academicTermId };
+    }
 
     if (semesterId) {
       whereClause.semesterId = semesterId;
     }
 
-    if (cycle && department.type === "BASIC_SCIENCES") {
+    if (cycle && departmentType === "BASIC_SCIENCES") {
       whereClause.cycle = cycle as Cycle;
     }
 
-    // If sectionId is provided, we only want courses mapped to this section
     if (sectionId) {
-      whereClause.sections = { some: { id: sectionId } };
+      whereClause.assignments = { some: { sectionId } };
     }
 
     const courses = await db.course.findMany({
@@ -94,43 +91,34 @@ export const getDepartmentSections = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const facultyUser = await db.faculty.findUnique({
-      where: { userId: session.user.id },
-    });
-
-    const departmentId = facultyUser?.departmentId;
-    if (!departmentId) {
+    const hodDepartment = await resolveHODDepartment(session.user.id);
+    if (!hodDepartment) {
       return res
         .status(403)
         .json({ error: "Unauthorized: No department attached to HOD" });
     }
 
-    const { semesterId, cycle, courseId } = req.query as Record<string, string>;
+    const { departmentId, departmentType } = hodDepartment;
 
-    const department = await db.department.findUnique({
-      where: { id: departmentId },
-    });
-    if (!department) {
-      return res.status(404).json({ error: "Department not found" });
-    }
+    const { semesterId, cycle, courseId } = req.query as Record<string, string>;
 
     const whereClause: {
       departmentId: string;
       semesterId?: string;
       cycle?: Cycle;
-      courses?: { some: { id: string } };
+      courses?: { some: { courseId: string } };
     } = { departmentId };
 
     if (semesterId) {
       whereClause.semesterId = semesterId;
     }
 
-    if (cycle && department.type === "BASIC_SCIENCES") {
+    if (cycle && departmentType === "BASIC_SCIENCES") {
       whereClause.cycle = cycle as Cycle;
     }
 
     if (courseId) {
-      whereClause.courses = { some: { id: courseId } };
+      whereClause.courses = { some: { courseId } };
     }
 
     const sections = await db.section.findMany({

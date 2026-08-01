@@ -16,7 +16,7 @@ interface SelectOption {
 
 interface MarksReportShellProps {
   draftFilters: MarksReportFilters;
-  onDraftChange: (key: keyof MarksReportFilters, value: string) => void;
+  onDraftChange: (key: string, value: string) => void;
   academicTerms: SelectOption[];
   programTypes: SelectOption[];
   semesters: SelectOption[];
@@ -31,6 +31,10 @@ interface MarksReportShellProps {
   onResetFilters: () => void;
   onDownloadPDF: () => void;
   onDownloadExcel: () => void;
+  showCycleFilter?: boolean;
+  cycleOptions?: SelectOption[];
+  showAssessmentFilter?: boolean;
+  assessmentOptions?: SelectOption[];
 }
 
 export const MarksReportShell = ({
@@ -50,6 +54,10 @@ export const MarksReportShell = ({
   onResetFilters,
   onDownloadPDF,
   onDownloadExcel,
+  showCycleFilter = false,
+  cycleOptions = [],
+  showAssessmentFilter = false,
+  assessmentOptions = [],
 }: MarksReportShellProps) => {
   const filterFields: FilterFieldConfig<MarksReportFilters>[] = useMemo(
     () => [
@@ -81,6 +89,18 @@ export const MarksReportShell = ({
           : "Select term first",
         options: semesters,
       },
+      ...(showCycleFilter
+        ? [
+            {
+              key: "cycle",
+              label: "Cycle",
+              type: "select",
+              hideAllOption: true,
+              placeholder: "Select cycle...",
+              options: cycleOptions,
+            } satisfies FilterFieldConfig<MarksReportFilters>,
+          ]
+        : []),
       {
         key: "courseId",
         label: "Course",
@@ -93,14 +113,39 @@ export const MarksReportShell = ({
         key: "sectionId",
         label: "Section",
         type: "select",
-        allOptionLabel: "All sections",
+        hideAllOption: true,
         placeholder: draftFilters.courseId
           ? "Select section..."
           : "Select course first",
         options: sections,
       },
+      ...(showAssessmentFilter
+        ? [
+            {
+              key: "assessmentId",
+              label: "Assessment",
+              type: "select",
+              allOptionLabel: "All assessments",
+              placeholder: draftFilters.courseId
+                ? "All assessments"
+                : "Select course first",
+              options: assessmentOptions,
+            } satisfies FilterFieldConfig<MarksReportFilters>,
+          ]
+        : []),
     ],
-    [academicTerms, programTypes, semesters, courses, sections, draftFilters]
+    [
+      academicTerms,
+      programTypes,
+      semesters,
+      courses,
+      sections,
+      draftFilters,
+      showCycleFilter,
+      cycleOptions,
+      showAssessmentFilter,
+      assessmentOptions,
+    ]
   );
 
   const getEmptyMessage = () => {

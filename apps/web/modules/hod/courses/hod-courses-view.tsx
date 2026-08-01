@@ -1,12 +1,12 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
 import {
   createFilterQueryString,
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
+import { useHODDepartment } from "@/modules/hod/department/use-hod-department";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
@@ -55,8 +55,7 @@ export const HodCoursesView = () => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { data: session } = authClient.useSession();
-  const user = session?.user;
+  const { data: hodDepartment } = useHODDepartment();
 
   const [draftFilters, setDraftFilters] = useState<HodCoursesFiltersState>(() =>
     getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
@@ -80,8 +79,7 @@ export const HodCoursesView = () => {
   const allSemestersForSelectedDraftTerm = selectedDraftTerm?.Semester ?? [];
 
   const isFirstYearDepartment =
-    (user as unknown as { faculty?: { department?: { type?: string } } })
-      ?.faculty?.department?.type === "BASIC_SCIENCES";
+    hodDepartment?.departmentType === "BASIC_SCIENCES";
 
   // Use the standard hook for term -> semester cascading
   useCascadingFilterSync(

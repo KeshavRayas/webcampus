@@ -110,7 +110,7 @@ export const getCondonationDetailedReport = async (
 ) => {
   try {
     const { courseId, sectionId, batchId } = req.query;
-    if (!courseId || !sectionId) {
+    if (!courseId) {
       return res
         .status(400)
         .json({ error: "Missing required query parameters" });

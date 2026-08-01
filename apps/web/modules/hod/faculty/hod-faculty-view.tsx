@@ -5,12 +5,17 @@ import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
-import { Input } from "@webcampus/ui/components/input";
+import {
+  FilterActions,
+  FilterBuilder,
+  FilterPanel,
+  type FilterFieldConfig,
+} from "@webcampus/ui/components/filter-builder";
 import { Page, PageContent, PageHeader } from "@webcampus/ui/components/page";
 import axios from "axios";
-import { Eye, Loader2, Search } from "lucide-react";
+import { Eye, Loader2 } from "lucide-react";
 import Link from "next/link";
-import React, { useMemo, useState } from "react";
+import { useState } from "react";
 
 type HodFacultyItem = {
   id: string;
@@ -20,16 +25,37 @@ type HodFacultyItem = {
   designation: string;
 };
 
+type FacultyFilters = {
+  search: string;
+};
+
+const EMPTY_FILTERS: FacultyFilters = { search: "" };
+
+const FACULTY_FILTER_FIELDS: FilterFieldConfig<FacultyFilters>[] = [
+  {
+    key: "search",
+    label: "Search",
+    type: "text",
+    placeholder: "Name, Employee ID, Email or Designation",
+    className: "md:col-span-3",
+  },
+];
+
 export const HodFacultyView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [draftFilters, setDraftFilters] =
+    useState<FacultyFilters>(EMPTY_FILTERS);
+  const [appliedSearch, setAppliedSearch] = useState("");
 
   const { data: response, isLoading } = useQuery({
-    queryKey: ["hod-faculty-list"],
+    queryKey: ["hod-faculty-list", appliedSearch],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<HodFacultyItem[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/hod/faculty`,
-        { withCredentials: true }
+        {
+          params: appliedSearch ? { search: appliedSearch } : undefined,
+          withCredentials: true,
+        }
       );
       return res.data;
     },
@@ -37,18 +63,6 @@ export const HodFacultyView = () => {
 
   const facultyData =
     response?.status === "success" ? (response.data as HodFacultyItem[]) : [];
-
-  const filteredData = useMemo(() => {
-    return facultyData.filter((f) => {
-      const term = searchTerm.toLowerCase();
-      return (
-        f.name.toLowerCase().includes(term) ||
-        (f.employeeId || "").toLowerCase().includes(term) ||
-        f.officialEmail.toLowerCase().includes(term) ||
-        f.designation.toLowerCase().includes(term)
-      );
-    });
-  }, [facultyData, searchTerm]);
 
   const columns = [
     {
@@ -92,24 +106,33 @@ export const HodFacultyView = () => {
       </PageHeader>
       <PageContent>
         <div className="space-y-4">
-          <div className="flex items-center space-x-2">
-            <div className="relative max-w-sm flex-1">
-              <Search className="text-muted-foreground absolute left-2 top-2.5 h-4 w-4" />
-              <Input
-                placeholder="Search faculty..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-          </div>
+          <FilterPanel>
+            <FilterBuilder<FacultyFilters>
+              fields={FACULTY_FILTER_FIELDS}
+              draftFilters={draftFilters}
+              onDraftChange={(key, value) =>
+                setDraftFilters((prev) => ({ ...prev, [key]: value }))
+              }
+            />
+            <FilterActions
+              onApply={() => {
+                setAppliedSearch(draftFilters.search);
+              }}
+              onReset={() => {
+                setDraftFilters(EMPTY_FILTERS);
+                setAppliedSearch("");
+              }}
+              applyLabel="Search"
+              resetLabel="Reset"
+            />
+          </FilterPanel>
           {isLoading ? (
             <div className="text-muted-foreground flex flex-col items-center justify-center p-8">
               <Loader2 className="mb-2 h-8 w-8 animate-spin" />
               <p>Loading faculty list...</p>
             </div>
           ) : (
-            <DataTable columns={columns} data={filteredData} />
+            <DataTable columns={columns} data={facultyData} />
           )}
         </div>
       </PageContent>

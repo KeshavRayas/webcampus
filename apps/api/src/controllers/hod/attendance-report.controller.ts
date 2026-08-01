@@ -25,7 +25,7 @@ export class HODAttendanceReportController {
   static async getFilterOptions(req: Request, res: Response): Promise<void> {
     try {
       const response = await HODAttendanceReportService.getFilterOptions(
-        await this.getUserId(req)
+        await HODAttendanceReportController.getUserId(req)
       );
       sendResponse({ res, ...response, statusCode: 200 });
     } catch (error) {
@@ -46,7 +46,7 @@ export class HODAttendanceReportController {
       if (!semesterId) throw new Error("Missing semesterId");
 
       const response = await HODAttendanceReportService.getCourses(
-        await this.getUserId(req),
+        await HODAttendanceReportController.getUserId(req),
         semesterId,
         cycle
       );
@@ -70,7 +70,7 @@ export class HODAttendanceReportController {
         throw new Error("Missing semesterId or courseId");
 
       const response = await HODAttendanceReportService.getSections(
-        await this.getUserId(req),
+        await HODAttendanceReportController.getUserId(req),
         semesterId,
         courseId,
         cycle
@@ -95,7 +95,7 @@ export class HODAttendanceReportController {
         throw new Error("Missing courseId or sectionId");
 
       const response = await HODAttendanceReportService.getDetailedReport(
-        await this.getUserId(req),
+        await HODAttendanceReportController.getUserId(req),
         courseId,
         sectionId,
         batchId

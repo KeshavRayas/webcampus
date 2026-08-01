@@ -147,11 +147,16 @@ export class SemesterService {
     query: AcademicTermQueryType
   ): Promise<BaseResponse<AcademicTermResponseType[]>> {
     try {
-      const { status, ...whereQuery } = query;
+      const { status, isCurrent, ...whereQuery } = query;
       const now = new Date();
 
       const terms = await db.academicTerm.findMany({
-        where: whereQuery,
+        where: {
+          ...whereQuery,
+          ...(isCurrent !== undefined
+            ? { isCurrent: String(isCurrent) === "true" }
+            : {}),
+        },
         orderBy: { year: "desc" },
         include: { Semester: true },
       });
