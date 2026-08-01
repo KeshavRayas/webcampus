@@ -13,6 +13,10 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 
+type CreateAdmissionShellPayload = CreateAdmissionShellType & {
+  semesterId: string;
+};
+
 export const useCreateAdmissionShellForm = (semesterId: string) => {
   const queryClient = useQueryClient();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
@@ -20,41 +24,33 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
   const form = useForm<CreateAdmissionShellType>({
     resolver: zodResolver(CreateAdmissionShellSchema),
     defaultValues: {
-      applicationId: "",
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      modeOfAdmission: "KCET", // Default value
-      semesterId: semesterId,
-      departmentId: "",
-      categoryClaimed: "GM",
-      categoryAllotted: "GM",
-      quota: "CET-AIDED",
+      primaryEmail: "",
+      password: "",
+      semesterId,
     },
   });
+
+  useEffect(() => {
+    form.reset({
+      primaryEmail: form.getValues("primaryEmail"),
+      password: form.getValues("password"),
+      semesterId,
+    });
+  }, [semesterId]);
 
   const { isSubmitSuccessful } = form.formState;
 
   useEffect(() => {
-    form.setValue("semesterId", semesterId, { shouldValidate: true });
     if (isSubmitSuccessful) {
       form.reset({
-        applicationId: "",
-        firstName: "",
-        middleName: "",
-        lastName: "",
-        modeOfAdmission: "KCET",
-        semesterId,
-        departmentId: "",
-        categoryClaimed: "GM",
-        categoryAllotted: "GM",
-        quota: "CET-AIDED",
+        primaryEmail: "",
+        password: "",
       });
     }
-  }, [semesterId, form, isSubmitSuccessful]);
+  }, [form, isSubmitSuccessful]);
 
   const { mutate } = useMutation({
-    mutationFn: async (values: CreateAdmissionShellType) => {
+    mutationFn: async (values: CreateAdmissionShellPayload) => {
       return await axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/admission/shell`,
         values,

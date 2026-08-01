@@ -102,36 +102,51 @@ export class AdmissionController {
 
   static async getMe(req: Request, res: Response): Promise<void> {
     try {
-      // 1. FOOLPROOF WAY: Get session directly from Better Auth
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
+
       const userId = session?.user?.id;
 
-      if (!userId) throw new Error("Unauthorized: User session not found");
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: {
+          email: true,
+        },
+      });
 
-      // 2. Fetch the user from the DB to get their Application ID
-      const user = await db.user.findUnique({ where: { id: userId } });
-      const applicationId = user?.username;
-
-      if (!applicationId) {
-        throw new Error("Unauthorized: Applicant ID not found");
+      if (!user) {
+        throw new Error("User not found");
       }
 
-      // 3. Fetch their admission shell
-      const response = await AdmissionService.getByApplicationId(applicationId);
+      const admission = await db.admission.findFirst({
+        where: {
+          primaryEmail: user.email,
+        },
+        include: {
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
 
-      if (response.status === "success") {
-        sendResponse({
-          res,
-          status: "success",
-          statusCode: 200,
-          message: response.message,
-          data: response.data,
-        });
+      if (!admission) {
+        throw new Error("Admission not found");
       }
+
+      sendResponse({
+        res,
+        status: "success",
+        statusCode: 200,
+        message: "Fetched applicant",
+        data: admission,
+      });
     } catch (error) {
       logger.error("Error fetching applicant profile", error);
+
       sendResponse({
         res,
         status: "error",
@@ -145,7 +160,6 @@ export class AdmissionController {
       });
     }
   }
-
   static async deleteAdmission(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
@@ -180,17 +194,11 @@ export class AdmissionController {
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
-      const userId = session?.user?.id;
+      const email = session?.user?.email;
 
-      if (!userId) throw new Error("Unauthorized: User session not found");
-
-      const user = await db.user.findUnique({ where: { id: userId } });
-      const applicationId = user?.username;
-
-      if (!applicationId)
-        throw new Error("Unauthorized: Applicant ID not found");
-
-      // 2. Process the Multer files
+      if (!email) {
+        throw new Error("Unauthorized");
+      }
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
       const fileUrls: { [key: string]: string } = {};
 
@@ -222,7 +230,7 @@ export class AdmissionController {
 
       // 3. Submit to the service
       const response = await AdmissionService.submitApplication(
-        applicationId,
+        email,
         req.body,
         fileUrls
       );
@@ -234,6 +242,14 @@ export class AdmissionController {
           statusCode: 200,
           message: response.message,
           data: response.data,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          statusCode: 400,
+          message: response.message,
+          error: response.error,
         });
       }
     } catch (error) {

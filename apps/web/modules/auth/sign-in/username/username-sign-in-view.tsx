@@ -13,10 +13,10 @@ import { Input } from "@webcampus/ui/components/input";
 import { PasswordInput } from "@webcampus/ui/components/password-input";
 import Link from "next/link";
 import React from "react";
-import { useUsernameSignInForm } from "./use-username-sign-in-form";
+import { useEmailSignInForm } from "../email/use-email-sign-in-form";
 
 export const UsernameSignIn = ({ role }: { role: "applicant" }) => {
-  const { form, onSubmit } = useUsernameSignInForm(role);
+  const { form, onSubmit } = useEmailSignInForm({ role });
 
   return (
     <Form {...form}>
@@ -26,19 +26,23 @@ export const UsernameSignIn = ({ role }: { role: "applicant" }) => {
       >
         <div className="flex flex-col items-center gap-2 text-center">
           <h1 className="text-2xl font-bold">Applicant sign in</h1>
-          <p className="text-muted-foreground text-sm text-balance">
+          <p className="text-muted-foreground text-balance text-sm">
             Welcome back! Please sign in to continue.
           </p>
         </div>
         <div className="grid gap-6">
           <FormField
             control={form.control}
-            name="username"
+            name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Application ID</FormLabel>
+                <FormLabel>Primary Email/College Email</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Enter your Application ID" />
+                  <Input
+                    {...field}
+                    type="email"
+                    placeholder="Enter your primary email"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

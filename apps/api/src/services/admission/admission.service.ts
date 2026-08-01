@@ -240,126 +240,82 @@ export class AdmissionService {
     headers: IncomingHttpHeaders
   ): Promise<BaseResponse<unknown>> {
     try {
-      const applicationId = data.applicationId.trim();
-      const applicantEmail = `${applicationId.toLowerCase()}@applicant.local`;
+      const applicantEmail = data.primaryEmail.trim().toLowerCase();
 
-      // Guard against duplicate admission shells first.
-      const existingAdmission = await db.admission.findFirst({
-        where: {
-          applicationId: {
-            equals: applicationId,
-            mode: "insensitive",
-          },
-        },
-      });
-
-      if (existingAdmission) {
-        throw new Error("An admission with this Application ID already exists");
-      }
-
-      // Ensure an applicant auth user exists for this application ID.
-      // Reuse it if it already exists (for idempotent retries).
       const existingApplicantUser = await db.user.findFirst({
         where: {
-          OR: [
-            {
-              username: {
-                equals: applicationId,
-                mode: "insensitive",
-              },
-            },
-            { email: applicantEmail },
-          ],
+          email: applicantEmail,
         },
         select: {
           id: true,
-          role: true,
         },
       });
 
-      let createdNewApplicantUser = false;
+      if (existingApplicantUser) {
+        throw new Error("An account with this email already exists");
+      }
 
-      if (existingApplicantUser && existingApplicantUser.role !== "applicant") {
+      const userService = new UserService({
+        request: {
+          email: applicantEmail,
+          name: "Applicant",
+          username: applicantEmail,
+          password: data.password,
+          role: "applicant",
+        },
+        headers,
+      });
+
+      const authUser = await userService.create();
+
+      if (authUser.status === "error" || !authUser.data?.id) {
         throw new Error(
-          "This Application ID is already linked to a non-applicant user"
+          authUser.message || "Failed to create applicant account"
         );
       }
 
-      if (!existingApplicantUser) {
-        const applicantFullName = [
-          data.firstName,
-          data.middleName,
-          data.lastName,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .trim();
-        // We generate a dummy email and name since the applicant has not filled it out yet.
-        // Username is normalized to lowercase for Better Auth compatibility.
-        const userService = new UserService({
-          request: {
-            email: applicantEmail,
-            name: applicantFullName,
-            username: AdmissionService.normalizeApplicationId(applicationId),
-            password: "password", // Dummy password
-            role: "applicant",
-          },
-          headers,
-        });
+      const placeholderDepartment = await db.department.findFirst({
+        select: { id: true },
+      });
 
-        const authUser = await userService.create();
-
-        if (authUser.status === "error" || !authUser.data?.id) {
-          throw new Error(
-            authUser.message || "Failed to create applicant user account"
-          );
-        }
-
-        createdNewApplicantUser = true;
+      if (!placeholderDepartment) {
+        throw new Error("No departments found to use as placeholder");
       }
 
-      // 3. Create the Admission Shell in the database.
-      const admission = await db.admission.create({
+      await db.admission.create({
         data: {
-          applicationId,
-          firstName: data.firstName,
-          middleName: data.middleName,
-          lastName: data.lastName,
-          modeOfAdmission: data.modeOfAdmission,
+          applicationId: crypto.randomUUID(), // or primaryEmail for now
+          primaryEmail: data.primaryEmail,
+
+          firstName: "",
+          middleName: "",
+          lastName: "",
+
+          modeOfAdmission: "KCET",
+
           semesterId: data.semesterId,
-          departmentId: data.departmentId,
-          categoryClaimed: data.categoryClaimed,
-          categoryAllotted: data.categoryAllotted,
-          quota: data.modeOfAdmission === "KCET" ? data.quota : null,
-          status: "PENDING", // Explicitly setting the initial status
-        },
-        include: {
-          semester: true,
+          departmentId: placeholderDepartment.id,
+
+          categoryClaimed: "GM",
+          categoryAllotted: "GM",
+          quota: "GM",
+
+          status: "PENDING",
         },
       });
 
-      const response: BaseResponse<unknown> = {
+      return {
         status: "success",
-        message: createdNewApplicantUser
-          ? "Admission shell and applicant account created successfully"
-          : "Admission shell created successfully",
-        data: admission,
+        message: "Applicant account created successfully",
+        data: authUser.data,
       };
-
-      logger.info(response);
-      return response;
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        throw new Error("An admission with this Application ID already exists");
-      }
-      logger.error("Failed to create admission shell", error);
+      logger.error("Failed to create applicant account", error);
+
       throw new Error(
         error instanceof Error
           ? error.message
-          : "Failed to create admission shell"
+          : "Failed to create applicant account"
       );
     }
   }
@@ -488,17 +444,12 @@ export class AdmissionService {
       );
 
       await Promise.all(fileUrls.map((url) => deleteFromS3(url)));
-
-      const applicationId = admission.applicationId;
-      const applicantEmail = `${applicationId.toLowerCase()}@applicant.local`;
+      const applicantEmail = admission.primaryEmail?.trim().toLowerCase();
 
       // Delete the database record
       const applicantUser = await db.user.findFirst({
         where: {
-          OR: [
-            { username: { equals: applicationId, mode: "insensitive" } },
-            { email: applicantEmail },
-          ],
+          OR: [{ email: applicantEmail, role: "applicant" }],
           role: "applicant", // Safety check: Ensure we only delete if they are still an 'applicant'
         },
         select: { id: true },
@@ -580,87 +531,54 @@ export class AdmissionService {
   }
 
   static async submitApplication(
-    applicationId: string,
-    data: Record<string, string>, // Text fields
-    fileUrls: { [key: string]: string } // S3 URLs
+    primaryEmail: string,
+    data: Record<string, string>,
+    fileUrls: { [key: string]: string }
   ): Promise<BaseResponse<unknown>> {
     try {
-      // Log the incoming applicationId for debugging
       logger.info("submitApplication called", {
-        applicationId,
+        primaryEmail,
         receivedFields: Object.keys(data),
       });
+      logger.info({
+        primaryEmail,
+      });
 
-      // Find the existing shell case-insensitively
-      const existingAdmission = await db.admission.findFirst({
+      const admission = await db.admission.findUnique({
         where: {
-          applicationId: {
-            equals: applicationId,
-            mode: "insensitive",
-          },
+          primaryEmail,
         },
       });
 
-      if (!existingAdmission) {
-        logger.error("Admission shell not found", {
-          applicationId,
-          searchMode: "case-insensitive",
-        });
-        throw new Error(
-          `Admission shell not found for application ID: ${applicationId}. Please ensure the admin created the admission shell.`
-        );
+      if (!admission) {
+        throw new Error("Admission application not found.");
       }
 
-      logger.info("Admission shell found", {
-        id: existingAdmission.id,
-        applicationId: existingAdmission.applicationId,
-        departmentId: existingAdmission.departmentId,
-      });
-      if (existingAdmission.status === "EXITED") {
-        throw new Error(
-          "This admission has been closed because the student has exited the college."
-        );
+      if (admission.status === "SUBMITTED") {
+        throw new Error("Application has already been submitted.");
       }
 
-      // Department is already strictly locked to the shell
-      const department = await db.department.findUnique({
-        where: { id: existingAdmission.departmentId },
-      });
-
-      if (!department) {
-        logger.error("Department not found", {
-          departmentId: existingAdmission.departmentId,
-        });
-        throw new Error(
-          `Assigned department does not exist (ID: ${existingAdmission.departmentId}).`
-        );
-      }
-
-      logger.info("Department found", { name: department.name });
-
-      // Validate aadharNumber uniqueness: allow if same record or if aadhar doesn't exist elsewhere
-      if (
-        data.aadharNumber &&
-        data.aadharNumber !== existingAdmission.aadharNumber
-      ) {
-        const existingAadhar = await db.admission.findUnique({
-          where: { aadharNumber: data.aadharNumber },
-        });
-        if (existingAadhar && existingAadhar.id !== existingAdmission.id) {
-          logger.error("Aadhar number already in use by different applicant", {
+      if (data.aadharNumber && data.aadharNumber !== admission.aadharNumber) {
+        const existingAadhar = await db.admission.findFirst({
+          where: {
             aadharNumber: data.aadharNumber,
-            existingAdmissionId: existingAadhar.id,
-            currentAdmissionId: existingAdmission.id,
-          });
+            NOT: {
+              id: admission.id,
+            },
+          },
+        });
+
+        if (existingAadhar) {
           throw new Error(
-            `Aadhar number ${data.aadharNumber} is already registered with another applicant. Please verify and submit again.`
+            `Aadhar number ${data.aadharNumber} is already registered.`
           );
         }
       }
 
-      // Update the record using its exact unique database ID
       const updatedAdmission = await db.admission.update({
-        where: { id: existingAdmission.id }, // Update by ID instead of applicationId
+        where: {
+          id: admission.id,
+        },
         data: {
           status: "SUBMITTED",
 
@@ -668,7 +586,13 @@ export class AdmissionService {
           firstName: data.firstName,
           middleName: data.middleName,
           lastName: data.lastName,
-          // Quota, Category, and Department are preserved securely from initial shell creation
+          modeOfAdmission: data.modeOfAdmission,
+          semesterId: data.semesterId,
+          departmentId: data.departmentId,
+          categoryClaimed: data.categoryClaimed,
+          categoryAllotted: data.categoryAllotted,
+          quota: data.modeOfAdmission === "KCET" ? data.quota : null,
+
           entranceExamRank: data.entranceExamRank,
           originalAdmissionOrderNumber: data.originalAdmissionOrderNumber,
           originalAdmissionOrderDate: data.originalAdmissionOrderDate
@@ -686,7 +610,7 @@ export class AdmissionService {
           primaryPhoneNumber: data.primaryPhoneNumber,
           secondaryPhoneNumber: data.secondaryPhoneNumber,
           emergencyContactNumber: data.emergencyContactNumber,
-          primaryEmail: data.primaryEmail,
+          primaryEmail,
           secondaryEmail: data.secondaryEmail,
 
           currentAddress: data.currentAddress,
@@ -718,7 +642,6 @@ export class AdmissionService {
           economicallyBackward: data.economicallyBackward === "true",
           aadharNumber: data.aadharNumber,
 
-          // Education Details
           class10thSchoolName: data.class10thSchoolName,
           class10thSchoolType: data.class10thSchoolType,
           class10thSchoolCity: data.class10thSchoolCity,
@@ -762,7 +685,6 @@ export class AdmissionService {
             ? parseFloat(data.diplomaAggregateTotal)
             : null,
 
-          // Parent Details
           fatherName: data.fatherName,
           fatherEmail: data.fatherEmail,
           fatherNumber: data.fatherNumber,
@@ -781,38 +703,7 @@ export class AdmissionService {
           guardianPermanentAddress: data.guardianPermanentAddress ?? null,
           guardianOccupation: data.guardianOccupation ?? null,
 
-          // Inject the S3 URLs if they were successfully uploaded
-          ...(fileUrls.class10thMarksPdf && {
-            class10thMarksPdf: fileUrls.class10thMarksPdf,
-          }),
-          ...(fileUrls.class12thMarksPdf && {
-            class12thMarksPdf: fileUrls.class12thMarksPdf,
-          }),
-          ...(fileUrls.diplomaMarksPdf && {
-            diplomaMarksPdf: fileUrls.diplomaMarksPdf,
-          }),
-          ...(fileUrls.casteCertificate && {
-            casteCertificate: fileUrls.casteCertificate,
-          }),
-          ...(fileUrls.photo && {
-            photo: fileUrls.photo,
-          }),
-          ...(fileUrls.disabilityCertificate && {
-            disabilityCertificate: fileUrls.disabilityCertificate,
-          }),
-          ...(fileUrls.economicallyBackwardCertificate && {
-            economicallyBackwardCertificate:
-              fileUrls.economicallyBackwardCertificate,
-          }),
-          ...(fileUrls.aadharCard && {
-            aadharCard: fileUrls.aadharCard,
-          }),
-          ...(fileUrls.transferCertificate && {
-            transferCertificate: fileUrls.transferCertificate,
-          }),
-          ...(fileUrls.studyCertificate && {
-            studyCertificate: fileUrls.studyCertificate,
-          }),
+          ...fileUrls,
         },
       });
 
@@ -822,15 +713,10 @@ export class AdmissionService {
         data: updatedAdmission,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error("Failed to submit application", {
-        applicationId,
-        error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
-      });
+      logger.error("Failed to submit application", error);
+
       throw new Error(
-        errorMessage || "Failed to submit application. Please contact support."
+        error instanceof Error ? error.message : "Failed to submit application"
       );
     }
   }
