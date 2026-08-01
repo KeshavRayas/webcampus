@@ -33,12 +33,7 @@ export class AdminAdmissionUserController {
   static async update(req: Request, res: Response) {
     try {
       const id = req.params.id as string;
-      const response = await AdminAdmissionUserService.update(
-        id,
-        req.body,
-        req.headers,
-        req.file
-      );
+      const response = await AdminAdmissionUserService.update(id, req.body);
       return res.status(200).json(response);
     } catch (error) {
       const response: ErrorResponseBody = {

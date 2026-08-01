@@ -680,7 +680,7 @@ model Admission {
   studentId                       String?         @unique
   categoryAllotted                String?
   categoryClaimed                 String?
-  quota                           Quota
+  quota                           String?
   department                      Department      @relation(fields: [departmentId], references: [id])
   semester                        Semester        @relation(fields: [semesterId], references: [id])
   student                         Student?        @relation(fields: [studentId], references: [id])
@@ -894,14 +894,6 @@ enum AdmissionStatus {
   EXITED
 }
 
-
-enum Quota {
-  MERIT
-  MANAGEMENT
-  SPORTS
-  NRI
-  SNQ
-}
 
 enum DepartmentType {
   DEGREE_GRANTING

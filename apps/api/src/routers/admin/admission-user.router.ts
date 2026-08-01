@@ -50,7 +50,7 @@ router.get(
 // --- UPDATE/EDIT ROUTE (Newly Added!) ---
 router.patch(
   "/:id",
-  upload.single("photo"), // <-- Catch the "photo" file on edits
+  upload.single("photo"), //<-- Catch the "photo" file on edits
   // Added missing Zod val idation request for the UpdateAdmissionUserSchema
   validateRequest(UpdateAdmissionUserSchema),
   protect({

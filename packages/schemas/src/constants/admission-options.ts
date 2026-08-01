@@ -4,9 +4,9 @@ export const admissionModes = [
   "MANAGEMENT",
   "PIO/Foreign/Gulf",
   "PMSSS",
-  // "DCET",
-  // "PGCET",
-  // "GOI",
+  "DCET",
+  "PGCET",
+  "GOI",
 ] as const;
 
 export const categoriesClaimed = {
@@ -171,4 +171,29 @@ export const categoriesAllotted = {
   PMSSS: ["GM"],
   GOI: ["GM"],
 } as const;
-export const quotas = ["MERIT", "MANAGEMENT", "SPORTS", "NRI", "SNQ"] as const;
+export const quotas = [
+  "CET-AIDED",
+  "CET-AIDED-SNQ",
+  "CET-UNAIDED",
+  "CET-UNAIDED-SNQ",
+  "CET-AIDED SC-ST",
+  "CET-UNAIDED SC-ST",
+  "SNQ",
+  "COMED-K",
+  "Management",
+  "PMSSS",
+  "NRI",
+  "GOI",
+  "DCET-AIDED",
+  "DCET-AIDED SC-ST",
+  "DCET-UNAIDED",
+  "DCET-UNAIDED SC-ST",
+  "PGCET",
+  "PGCET-AIDED",
+  "PGCET-UN-AIDED",
+  "PGCET-AIDED-SC-ST",
+  "PGCET-UNAIDED-SC-ST",
+  "PIO",
+  "Foreign",
+  "Gulf",
+] as const;

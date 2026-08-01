@@ -1,7 +1,14 @@
 "use client";
 
+import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
+import {
+  admissionModes,
+  categoriesAllotted,
+  categoriesClaimed,
+  quotas,
+} from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { Checkbox } from "@webcampus/ui/components/checkbox";
@@ -28,13 +35,14 @@ type ApplicantAdmissionData = {
   applicationId: string;
   modeOfAdmission: string;
   status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
-  department?: { name: string };
+  department?: { id: string; name: string };
   firstName?: string;
   middleName?: string;
   lastName?: string;
   categoryClaimed?: string;
   categoryAllotted?: string;
   quota?: string;
+  primaryEmail: string;
 };
 
 type StepKey = "admission" | "personal" | "education" | "parent" | "review";
@@ -131,6 +139,12 @@ export const ApplicantAdmissionView = () => {
   const [diplomaState, setDiplomaState] = useState("");
   const [diplomaCity, setDiplomaCity] = useState("");
 
+  const [selectedMode, setSelectedMode] =
+    useState<keyof typeof categoriesClaimed>("KCET");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [selectedQuota, setSelectedQuota] = useState("");
+  const { data: departments } = useAdmissionDepartments();
+
   // Fetch the applicant's existing shell
   const {
     data: admission,
@@ -149,6 +163,9 @@ export const ApplicantAdmissionView = () => {
     },
     retry: false,
   });
+  console.log("Admission:", admission);
+  console.log("Primary Email:", admission?.primaryEmail);
+
   const fullName = [
     admission?.firstName,
     admission?.middleName,
@@ -160,15 +177,6 @@ export const ApplicantAdmissionView = () => {
     e.preventDefault();
 
     const formData = new FormData(e.currentTarget);
-
-    const htmlForm = new FormData(e.currentTarget);
-
-    // Copy every non-file field
-    htmlForm.forEach((value, key) => {
-      if (!(value instanceof File)) {
-        formData.append(key, value);
-      }
-    });
 
     if (!class12Enabled && !diplomaEnabled) {
       toast.error("Please fill either Class 12 / PUC or Diploma details.");
@@ -186,7 +194,9 @@ export const ApplicantAdmissionView = () => {
     );
     formData.set("hasClass12", class12Enabled ? "true" : "false");
     formData.set("hasDiploma", diplomaEnabled ? "true" : "false");
-
+    for (const [key, value] of formData.entries()) {
+      console.log(key, value);
+    }
     try {
       await axios.put(
         `${NEXT_PUBLIC_API_BASE_URL}/admission/submit`,
@@ -253,7 +263,16 @@ export const ApplicantAdmissionView = () => {
     const nextStep = STEP_ORDER[
       Math.min(nextIndex, STEP_ORDER.length - 1)
     ] as StepKey;
+    const form = formRef.current;
 
+    if (form) {
+      const fd = new FormData(form);
+
+      console.log("====== FORM DATA ======");
+      for (const [k, v] of fd.entries()) {
+        console.log(k, v);
+      }
+    }
     setActiveStep(nextStep);
   };
 
@@ -581,6 +600,11 @@ export const ApplicantAdmissionView = () => {
     setIsSameAddress(checked);
   };
   useEffect(() => {
+    if (admission?.department?.id) {
+      setSelectedDepartment(admission.department.id);
+    }
+  }, [admission]);
+  useEffect(() => {
     if (!isSameAddress) return;
 
     setPermanentCountry(currentCountry);
@@ -715,28 +739,31 @@ export const ApplicantAdmissionView = () => {
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
             <div className="space-y-2 md:col-span-4">
-              <Label>Application ID</Label>
-              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
-                {admission.applicationId}
-              </div>
+              <Label htmlFor="applicationId">Application ID *</Label>
 
-              <input
-                type="hidden"
-                name="applicationId"
-                value={admission.applicationId}
-              />
+              <Input id="applicationId" name="applicationId" required />
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label>Mode</Label>
-              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
-                {admission.modeOfAdmission}
-              </div>
-
-              <input
-                type="hidden"
+              <Label htmlFor="modeOfAdmission">Mode of Admission *</Label>
+              <Select
                 name="modeOfAdmission"
-                value={admission.modeOfAdmission}
-              />
+                value={selectedMode}
+                onValueChange={(val) =>
+                  setSelectedMode(val as keyof typeof categoriesClaimed)
+                }
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  {admissionModes.map((mode) => (
+                    <SelectItem key={mode} value={mode}>
+                      {mode}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2 md:col-span-4">
               <Label htmlFor="firstName">First Name *</Label>
@@ -768,31 +795,79 @@ export const ApplicantAdmissionView = () => {
               />
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label>Branch</Label>
-              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center truncate rounded-md border px-3 py-2 text-sm">
-                {admission.department?.name || "Assigned Branch"}
-              </div>
+              <Label htmlFor="departmentId">Branch *</Label>
+              <Select
+                name="departmentId"
+                value={selectedDepartment}
+                onValueChange={setSelectedDepartment}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments?.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
             <div className="space-y-2 md:col-span-4">
-              <Label>Category Claimed</Label>
-              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
-                {admission.categoryClaimed || "Not Set"}
-              </div>
+              <Label htmlFor="categoryClaimed">Category Claimed *</Label>
+              <Select name="categoryClaimed" required>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(categoriesClaimed[selectedMode] ?? []).map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label>Category Allotted</Label>
-              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
-                {admission.categoryAllotted || "Not Set"}
-              </div>
+              <Label htmlFor="categoryAllotted">Category Allotted *</Label>
+              <Select name="categoryAllotted" required>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(categoriesAllotted[selectedMode] ?? []).map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="space-y-2 md:col-span-4">
-              <Label>Quota</Label>
-              <div className="bg-muted text-muted-foreground border-input flex h-10 w-full items-center rounded-md border px-3 py-2 text-sm">
-                {admission.quota || "Not Set"}
+            {selectedMode === "KCET" && (
+              <div className="space-y-2 md:col-span-4">
+                <Label htmlFor="quota">Quota *</Label>
+                <Select
+                  name="quota"
+                  value={selectedQuota}
+                  onValueChange={setSelectedQuota}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select quota" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {quotas.map((quota) => (
+                      <SelectItem key={quota} value={quota}>
+                        {quota}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
+            )}
 
             <div className="space-y-2 md:col-span-4">
               <Label htmlFor="entranceExamRank">Entrance Exam Rank *</Label>
@@ -992,6 +1067,7 @@ export const ApplicantAdmissionView = () => {
                 id="primaryEmail"
                 name="primaryEmail"
                 type="email"
+                defaultValue={admission.primaryEmail ?? ""}
                 required
                 placeholder="@bmsce.ac.in"
               />

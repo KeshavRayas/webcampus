@@ -1,65 +1,13 @@
 import { z } from "zod";
-import { categoriesAllotted, categoriesClaimed } from "../constants";
+import { categoriesAllotted, categoriesClaimed, quotas } from "../constants";
 
-export const QuotaSchema = z.enum([
-  "MERIT",
-  "MANAGEMENT",
-  "SPORTS",
-  "NRI",
-  "SNQ",
-]);
+export const QuotaSchema = z.enum(quotas);
 
-export const CreateAdmissionShellSchema = z
-  .object({
-    applicationId: z.string().min(1, "Application ID is required"),
-    firstName: z.string().min(1, "First Name is required"),
-    middleName: z.string().optional(),
-    lastName: z.string().min(1, "Last Name is required"),
-
-    modeOfAdmission: z.string().min(1, "Mode of Admission is required"),
-
-    semesterId: z.string().uuid("Invalid Semester ID"),
-    departmentId: z.string().uuid("Invalid Department ID"),
-
-    categoryClaimed: z.string().min(1, "Category Claimed is required"),
-    categoryAllotted: z.string().min(1, "Category Allotted is required"),
-
-    quota: QuotaSchema,
-  })
-  .superRefine((data, ctx) => {
-    const claimed =
-      categoriesClaimed[data.modeOfAdmission as keyof typeof categoriesClaimed];
-
-    if (!claimed) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["modeOfAdmission"],
-        message: "Invalid admission mode",
-      });
-      return;
-    }
-
-    if (!claimed.includes(data.categoryClaimed as never)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["categoryClaimed"],
-        message: "Invalid claimed category",
-      });
-    }
-
-    const allotted =
-      categoriesAllotted[
-        data.modeOfAdmission as keyof typeof categoriesAllotted
-      ];
-
-    if (allotted && !allotted.includes(data.categoryAllotted as never)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["categoryAllotted"],
-        message: "Invalid allotted category",
-      });
-    }
-  });
+export const CreateAdmissionShellSchema = z.object({
+  primaryEmail: z.email().min(1, "Email is required"),
+  password: z.string().min(8),
+  semesterId: z.string().uuid("Invalid semester ID"),
+});
 
 export const AdmissionStatusSchema = z.enum([
   "PENDING",
@@ -165,9 +113,66 @@ export const GetAdmissionsQuerySchema = z
 
 export const ExitAdmissionSchema = z.object({});
 
-export const SubmitApplicationSchema = z.object({
-  departmentId: z.string().uuid("Invalid department ID"),
-});
+export const SubmitApplicationSchema = z
+  .object({
+    applicationId: z.string().min(1, "Application ID is required"),
+
+    firstName: z.string().min(1, "First Name is required"),
+    middleName: z.string().optional(),
+    lastName: z.string().min(1, "Last Name is required"),
+
+    modeOfAdmission: z.string().min(1, "Mode of Admission is required"),
+
+    semesterId: z.string().uuid("Invalid Semester ID"),
+    departmentId: z.string().uuid("Invalid Department ID"),
+
+    categoryClaimed: z.string().min(1, "Category Claimed is required"),
+    categoryAllotted: z.string().min(1, "Category Allotted is required"),
+
+    quota: QuotaSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    const claimed =
+      categoriesClaimed[data.modeOfAdmission as keyof typeof categoriesClaimed];
+
+    if (!claimed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["modeOfAdmission"],
+        message: "Invalid admission mode",
+      });
+      return;
+    }
+
+    if (!claimed.includes(data.categoryClaimed as never)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["categoryClaimed"],
+        message: "Invalid claimed category",
+      });
+    }
+
+    const allotted =
+      categoriesAllotted[
+        data.modeOfAdmission as keyof typeof categoriesAllotted
+      ];
+
+    if (allotted && !allotted.includes(data.categoryAllotted as never)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["categoryAllotted"],
+        message: "Invalid allotted category",
+      });
+    }
+
+    if (data.modeOfAdmission === "KCET" && !data.quota) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["quota"],
+        message: "Quota is required for KCET admissions",
+      });
+    }
+  });
 
 export type CreateAdmissionShellType = z.infer<
   typeof CreateAdmissionShellSchema
@@ -178,6 +183,8 @@ export type GetAdmissionsQueryType = z.infer<typeof GetAdmissionsQuerySchema>;
 export type AdmissionActionParamType = z.infer<
   typeof AdmissionActionParamSchema
 >;
+
+export type SubmitApplicationType = z.infer<typeof SubmitApplicationSchema>;
 
 export type PortStudentsType = z.infer<typeof PortStudentsSchema>;
 

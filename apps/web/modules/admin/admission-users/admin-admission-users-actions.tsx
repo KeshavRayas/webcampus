@@ -27,18 +27,10 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@webcampus/ui/components/select";
 import { MoreHorizontal, Trash } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { UserPhotoUpload } from "../shared/user-photo-upload";
 import { AdminAdmissionUserResponse } from "./admin-admission-users-columns";
 import {
   useAdmissionUserDelete,
@@ -54,9 +46,6 @@ export const AdminAdmissionUsersActions = ({
 }) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
-  const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
-  const previewUrlRef = useRef<string | null>(null);
   const { onDelete, isDeleting } = useAdmissionUserDelete();
   const { updateUser, isUpdating } = useAdmissionUserUpdate();
 
@@ -66,51 +55,24 @@ export const AdminAdmissionUsersActions = ({
       name: user.name,
       username: user.username || "",
       email: user.email,
-      role: user.role,
     },
   });
 
-  const replacePhotoPreview = (file: File | null) => {
-    if (previewUrlRef.current) {
-      URL.revokeObjectURL(previewUrlRef.current);
-      previewUrlRef.current = null;
-    }
-
-    if (!file) {
-      setEditPhotoPreview(null);
-      return;
-    }
-
-    const nextPreviewUrl = URL.createObjectURL(file);
-    previewUrlRef.current = nextPreviewUrl;
-    setEditPhotoPreview(nextPreviewUrl);
-  };
-
+  console.log(editForm.formState);
   const resetEditState = () => {
     editForm.reset({
       name: user.name,
       username: user.username || "",
       email: user.email,
-      role: user.role,
     });
-    setEditPhotoFile(null);
-    replacePhotoPreview(null);
-  };
-
-  const handleEditPhotoChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0] || null;
-    setEditPhotoFile(file);
-    replacePhotoPreview(file);
   };
 
   const handleEditSubmit = async (data: UpdateAdmissionUserFormValues) => {
+    console.log("submitted");
     try {
       await updateUser({
         id: user.id,
         data,
-        photoFile: editPhotoFile,
       });
       setIsEditOpen(false);
       resetEditState();
@@ -122,14 +84,6 @@ export const AdminAdmissionUsersActions = ({
       resetEditState();
     }
   }, [isEditOpen, user.email, user.name, user.role, user.username]);
-
-  useEffect(() => {
-    return () => {
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current);
-      }
-    };
-  }, []);
 
   return (
     <>
@@ -167,10 +121,7 @@ export const AdminAdmissionUsersActions = ({
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Edit Admission User</DialogTitle>
-            <DialogDescription>
-              Update login details and replace the current profile photo if
-              needed.
-            </DialogDescription>
+            <DialogDescription>Update login details.</DialogDescription>
           </DialogHeader>
 
           <Form {...editForm}>
@@ -222,38 +173,6 @@ export const AdminAdmissionUsersActions = ({
                     <FormMessage />
                   </FormItem>
                 )}
-              />
-
-              <FormField
-                control={editForm.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="admission_admin">
-                          Admission Admin (Data Entry)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <UserPhotoUpload
-                label="Profile Photo"
-                personName={editForm.watch("name") || user.name}
-                previewUrl={editPhotoPreview}
-                currentImageUrl={user.image}
-                selectedFileName={editPhotoFile?.name || null}
-                onChange={handleEditPhotoChange}
               />
 
               <DialogFooter>

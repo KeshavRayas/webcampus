@@ -32,7 +32,7 @@ router.post(
   "/shell",
   validateRequest(CreateAdmissionShellSchema),
   protect({
-    role: ["admin"],
+    role: ["admin", "admission_admin"],
     permissions: {
       admission: ["create"],
       user: ["set-role"], // Needed to create the applicant user

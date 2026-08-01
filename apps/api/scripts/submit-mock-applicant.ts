@@ -81,38 +81,30 @@ const deterministicAadhar = (serial: number): string => {
   return `9${tail}`;
 };
 
-const extractNumericId = (applicationId: string): number | null => {
-  const match = applicationId.match(/^APP(\d+)$/i);
-  if (!match || !match[1]) {
-    return null;
-  }
-  return Number.parseInt(match[1], 10);
-};
+// const getNextApplicationNumber = async (): Promise<number> => {
+//   const rows = await db.admission.findMany({
+//     select: { applicationId: true },
+//     where: {
+//       applicationId: {
+//         startsWith: "APP",
+//       },
+//     },
+//     orderBy: {
+//       createdAt: "desc",
+//     },
+//     take: 500,
+//   });
 
-const getNextApplicationNumber = async (): Promise<number> => {
-  const rows = await db.admission.findMany({
-    select: { applicationId: true },
-    where: {
-      applicationId: {
-        startsWith: "APP",
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 500,
-  });
+//   let maxNumber = 2026000;
+//   for (const row of rows) {
+//     const parsed = extractNumericId(row.applicationId);
+//     if (parsed && parsed > maxNumber) {
+//       maxNumber = parsed;
+//     }
+//   }
 
-  let maxNumber = 2026000;
-  for (const row of rows) {
-    const parsed = extractNumericId(row.applicationId);
-    if (parsed && parsed > maxNumber) {
-      maxNumber = parsed;
-    }
-  }
-
-  return maxNumber + 1;
-};
+//   return maxNumber + 1;
+// };
 
 const resolveContext = async (departmentCode: string) => {
   const { ADMIN_USER_EMAIL, ADMIN_USER_PASSWORD } = backendEnv();
@@ -183,11 +175,13 @@ const resolveContext = async (departmentCode: string) => {
 };
 
 const submitAndApprove = async (
-  applicationId: string,
+  email: string,
   serial: number,
   admissionId: string,
   firstName: string,
-  lastName: string
+  lastName: string,
+  departmentId: string,
+  semesterId: string
 ): Promise<void> => {
   const fullName = `${firstName} ${lastName}`;
 
@@ -195,7 +189,9 @@ const submitAndApprove = async (
     firstName,
     lastName,
     nameAsPer10th: fullName,
-    primaryEmail: `${applicationId.toLowerCase()}@example.edu`,
+    primaryEmail: email,
+    semesterId,
+    departmentId,
     primaryPhoneNumber: randomPhone(serial),
     aadharNumber: deterministicAadhar(serial),
     dob: faker.date
@@ -217,14 +213,14 @@ const submitAndApprove = async (
   };
 
   const submitResponse = await AdmissionService.submitApplication(
-    applicationId,
+    email,
     data,
     fileUrls
   );
 
   if (submitResponse.status !== "success") {
     throw new Error(
-      submitResponse.message || `Failed to submit application ${applicationId}`
+      submitResponse.message || `Failed to submit application ${email}`
     );
   }
 
@@ -234,8 +230,7 @@ const submitAndApprove = async (
 
   if (approveResponse.status !== "success") {
     throw new Error(
-      approveResponse.message ||
-        `Failed to approve application ${applicationId}`
+      approveResponse.message || `Failed to approve application ${email}`
     );
   }
 };
@@ -250,7 +245,7 @@ async function main() {
   }
 
   const context = await resolveContext(args.departmentCode);
-  let nextApplicationNumber = await getNextApplicationNumber();
+  // let nextApplicationNumber = await getNextApplicationNumber();
   let approvedCreated = 0;
 
   logger.info("Starting bulk applicant generation", {
@@ -265,15 +260,13 @@ async function main() {
   });
 
   while (approvedCreated < args.count) {
-    const applicationId = `APP${nextApplicationNumber}`;
-    nextApplicationNumber += 1;
+    const email = `mock${approvedCreated + 1}@bmsce.ac.in`;
+    const password = "password";
+    // nextApplicationNumber += 1;
 
-    const existing = await db.admission.findFirst({
+    const existing = await db.admission.findUnique({
       where: {
-        applicationId: {
-          equals: applicationId,
-          mode: "insensitive",
-        },
+        primaryEmail: email,
       },
       select: {
         id: true,
@@ -291,22 +284,16 @@ async function main() {
 
       const shellResponse = await AdmissionService.createShell(
         {
-          applicationId,
-          firstName, // Pass the new required field
-          lastName, // Pass the new required field
-          modeOfAdmission: "KCET",
+          primaryEmail: email,
+          password,
           semesterId: context.semesterId,
-          departmentId: context.departmentId,
-          categoryClaimed: "GENERAL",
-          categoryAllotted: "GENERAL",
-          quota: "MERIT",
         },
         context.headers
       );
 
       if (shellResponse.status !== "success") {
         throw new Error(
-          shellResponse.message || `Failed to create shell for ${applicationId}`
+          shellResponse.message || `Failed to create shell for ${email}`
         );
       }
 
@@ -315,25 +302,24 @@ async function main() {
         (
           await db.admission.findFirst({
             where: {
-              applicationId: {
-                equals: applicationId,
-                mode: "insensitive",
-              },
+              primaryEmail: email,
             },
             select: { id: true },
           })
         )?.id;
 
       if (!admissionId) {
-        throw new Error(`Admission id not found for ${applicationId}`);
+        throw new Error(`Admission id not found for ${email}`);
       }
 
       await submitAndApprove(
-        applicationId,
-        nextApplicationNumber,
+        email,
+        approvedCreated + 1,
         admissionId,
         firstName,
-        lastName
+        lastName,
+        context.departmentId,
+        context.semesterId
       );
       approvedCreated += 1;
 
@@ -341,12 +327,12 @@ async function main() {
         logger.info("Bulk progress", {
           approvedCreated,
           targetCount: args.count,
-          latestApplicationId: applicationId,
+          latestEmail: email,
         });
       }
     } catch (error) {
       logger.warn("Skipping failed applicant and continuing", {
-        applicationId,
+        email,
         error: error instanceof Error ? error.message : String(error),
       });
     }

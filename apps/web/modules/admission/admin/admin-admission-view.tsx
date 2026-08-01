@@ -7,24 +7,12 @@ import {
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
-import { useAdmissionDepartments, useDepartments } from "@/lib/use-departments";
+import { useDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import {
-  admissionModes,
-  categoriesAllotted,
-  categoriesClaimed,
-} from "@webcampus/schemas/constants";
+import { admissionModes } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@webcampus/ui/components/command";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import {
   Dialog,
@@ -47,13 +35,8 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@webcampus/ui/components/popover";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
@@ -72,13 +55,6 @@ import { usePortStudents } from "./use-port-students";
 //   "Other",
 // ] as const;
 // const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
-const ADMISSION_QUOTAS = [
-  "MERIT",
-  "MANAGEMENT",
-  "SPORTS",
-  "NRI",
-  "SNQ",
-] as const;
 const ADMISSION_STATUSES = [
   "PENDING",
   "SUBMITTED",
@@ -148,7 +124,6 @@ export const AdminAdmissionView = ({
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
   const { data: departments = [] } = useDepartments();
-  const { data: admissionDepartments = [] } = useAdmissionDepartments();
 
   // Sync filters when data changes (auto-clear if value no longer exists)
   const selectedTerm = terms.find((t) => t.id === draftFilters.academicTerm);
@@ -176,31 +151,18 @@ export const AdminAdmissionView = ({
       return [];
     },
   });
-
-  const { form, onSubmit } = useCreateAdmissionShellForm(draftFilters.semester);
+  const selectedSemesterId = draftFilters.semester;
+  console.log("showFilters =", showFilters);
+  console.log("semester =", draftFilters.semester);
+  console.log("selectedSemesterId =", showFilters ? draftFilters.semester : "");
+  console.log("pathname:", pathname);
+  console.log("showFilters:", showFilters);
+  const { form, onSubmit } = useCreateAdmissionShellForm(selectedSemesterId);
   const { onPortStudents, isPorting } = usePortStudents();
-  const selectedSemesterId = showFilters ? draftFilters.semester : "";
+
   const selectedSemester = nestedSemesters.find(
     (semester) => semester.id === selectedSemesterId
   );
-  // Currently selected admission mode
-  const selectedAdmissionMode = form.watch("modeOfAdmission");
-
-  // Categories for the selected admission mode (Claimed)
-  const claimedCategoryOptions =
-    selectedAdmissionMode && selectedAdmissionMode in categoriesClaimed
-      ? categoriesClaimed[
-          selectedAdmissionMode as keyof typeof categoriesClaimed
-        ]
-      : [];
-
-  // Categories for the selected admission mode (Allotted)
-  const allottedCategoryOptions =
-    selectedAdmissionMode && selectedAdmissionMode in categoriesAllotted
-      ? categoriesAllotted[
-          selectedAdmissionMode as keyof typeof categoriesAllotted
-        ]
-      : [];
   const { data: semesterAdmissions, isFetching: isFetchingSemesterAdmissions } =
     useQuery({
       queryKey: ["admissions", "semester", selectedSemesterId],
@@ -395,320 +357,36 @@ export const AdminAdmissionView = ({
               >
                 <FormField
                   control={form.control}
-                  name="applicationId"
+                  name="primaryEmail"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Application ID *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., APP-2026-001" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="First Name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="middleName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Middle Name</FormLabel>
+                      <FormLabel>Primary Email *</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Middle Name"
+                          type="email"
+                          placeholder="student@bmsce.ac.in"
                           {...field}
-                          value={field.value || ""}
+                          value={field.value ?? ""}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
-                  name="lastName"
+                  name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Last Name *</FormLabel>
+                      <FormLabel>Password *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Last Name" {...field} />
+                        <Input
+                          type="password"
+                          placeholder="Enter initial password"
+                          {...field}
+                          value={field.value ?? ""}
+                        />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="modeOfAdmission"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Mode of Admission *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={`w-full justify-between ${!field.value ? "text-muted-foreground" : ""}`}
-                            >
-                              {field.value
-                                ? admissionModes.find(
-                                    (mode) => mode === field.value
-                                  )
-                                : "Select admission mode"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search mode..." />
-                            <CommandList>
-                              <CommandEmpty>No mode found.</CommandEmpty>
-                              <CommandGroup>
-                                {admissionModes.map((mode) => (
-                                  <CommandItem
-                                    value={mode}
-                                    key={mode}
-                                    onSelect={() => {
-                                      form.setValue("modeOfAdmission", mode);
-                                    }}
-                                  >
-                                    <Check
-                                      className={`mr-2 h-4 w-4 ${mode === field.value ? "opacity-100" : "opacity-0"}`}
-                                    />
-                                    {mode}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="departmentId"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Department / Branch *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={`w-full justify-between ${!field.value ? "text-muted-foreground" : ""}`}
-                            >
-                              {field.value
-                                ? admissionDepartments.find(
-                                    (dept) => dept.id === field.value
-                                  )?.name
-                                : "Select branch"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search branch..." />
-                            <CommandList>
-                              <CommandEmpty>No branch found.</CommandEmpty>
-                              <CommandGroup>
-                                {admissionDepartments.map((dept) => (
-                                  <CommandItem
-                                    value={dept.name}
-                                    key={dept.id}
-                                    onSelect={() => {
-                                      form.setValue("departmentId", dept.id);
-                                    }}
-                                  >
-                                    <Check
-                                      className={`mr-2 h-4 w-4 ${dept.id === field.value ? "opacity-100" : "opacity-0"}`}
-                                    />
-                                    {dept.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="categoryClaimed"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Category Claimed *</FormLabel>
-
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={`w-full justify-between ${
-                                !field.value ? "text-muted-foreground" : ""
-                              }`}
-                            >
-                              {field.value || "Select category"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search category..." />
-
-                            <CommandList>
-                              <CommandEmpty>No category found.</CommandEmpty>
-
-                              <CommandGroup>
-                                {claimedCategoryOptions.map((cat) => (
-                                  <CommandItem
-                                    key={cat}
-                                    value={cat}
-                                    onSelect={() =>
-                                      form.setValue("categoryClaimed", cat)
-                                    }
-                                  >
-                                    <Check
-                                      className={`mr-2 h-4 w-4 ${
-                                        cat === field.value
-                                          ? "opacity-100"
-                                          : "opacity-0"
-                                      }`}
-                                    />
-                                    {cat}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="categoryAllotted"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Category Allotted *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={`w-full justify-between ${!field.value ? "text-muted-foreground" : ""}`}
-                            >
-                              {field.value || "Select category"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search category..." />
-                            <CommandList>
-                              <CommandEmpty>No category found.</CommandEmpty>
-                              <CommandGroup>
-                                {allottedCategoryOptions.map((cat) => (
-                                  <CommandItem
-                                    value={cat}
-                                    key={cat}
-                                    onSelect={() => {
-                                      form.setValue("categoryAllotted", cat);
-                                    }}
-                                  >
-                                    <Check
-                                      className={`mr-2 h-4 w-4 ${cat === field.value ? "opacity-100" : "opacity-0"}`}
-                                    />
-                                    {cat}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="quota"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Quota *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={`w-full justify-between ${!field.value ? "text-muted-foreground" : ""}`}
-                            >
-                              {field.value || "Select quota"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search quota..." />
-                            <CommandList>
-                              <CommandEmpty>No quota found.</CommandEmpty>
-                              <CommandGroup>
-                                {ADMISSION_QUOTAS.map((q) => (
-                                  <CommandItem
-                                    value={q}
-                                    key={q}
-                                    onSelect={() => {
-                                      form.setValue("quota", q);
-                                    }}
-                                  >
-                                    <Check
-                                      className={`mr-2 h-4 w-4 ${q === field.value ? "opacity-100" : "opacity-0"}`}
-                                    />
-                                    {q}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
