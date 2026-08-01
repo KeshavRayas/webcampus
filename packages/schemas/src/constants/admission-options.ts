@@ -4,9 +4,9 @@ export const admissionModes = [
   "MANAGEMENT",
   "PIO/Foreign/Gulf",
   "PMSSS",
-  // "DCET",
-  // "PGCET",
-  // "GOI",
+  "DCET",
+  "PGCET",
+  "GOI",
 ] as const;
 
 export const categoriesClaimed = {
