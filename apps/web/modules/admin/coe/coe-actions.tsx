@@ -47,6 +47,7 @@ export const CoeActions = ({ user }: { user: CoeUser }) => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
 
   const editForm = useForm<UpdateCoeFormValues>({
@@ -278,7 +279,7 @@ export const CoeActions = ({ user }: { user: CoeUser }) => {
                   }}
                 />
                 {photoError && (
-                  <p className="text-destructive text-sm font-medium mt-1">
+                  <p className="text-destructive mt-1 text-sm font-medium">
                     {photoError}
                   </p>
                 )}

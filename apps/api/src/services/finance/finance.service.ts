@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { db, Prisma, Quota } from "@webcampus/db";
+import { db, Prisma } from "@webcampus/db";
 import type {
   AddFinancePaymentInput,
   FinanceStudentSearchQuery,
@@ -102,9 +102,9 @@ export class FinanceService {
   static async searchStudents(query: FinanceStudentSearchQuery) {
     const groupWhere: Prisma.StudentWhereInput =
       query.group === "trustee"
-        ? { admission: { is: { quota: Quota.MANAGEMENT } } }
+        ? { admission: { is: { quota: "MANAGEMENT" } } }
         : query.group === "accounts"
-          ? { admission: { is: { quota: { not: Quota.MANAGEMENT } } } }
+          ? { admission: { is: { quota: { not: "MANAGEMENT" } } } }
           : {};
 
     const students = await db.student.findMany({

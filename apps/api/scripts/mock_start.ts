@@ -884,9 +884,10 @@ class MockStarter {
   public async seedCoeUser(): Promise<void> {
     const coeData = {
       name: "COE User",
-      email: "coe@bmsce.ac.in",
+      email: "coe@webcampus.com",
       username: "coe",
       password: DEFAULT_PASSWORD,
+      role: "coe",
     };
 
     const existing = await db.user.findFirst({
