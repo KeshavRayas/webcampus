@@ -317,13 +317,14 @@ export const ApplicantAdmissionView = () => {
 
     return trimmed;
   };
+  type JsPDFWithAutoTable = jsPDF & {
+    lastAutoTable?: {
+      finalY: number;
+    };
+  };
 
   const generateReviewPdf = () => {
-    const currentAdmission = admission;
-
-    if (!formRef.current || !currentAdmission) {
-      return null;
-    }
+    if (!formRef.current) return null;
 
     if (reviewPdfRef.current) {
       URL.revokeObjectURL(reviewPdfRef.current);
@@ -331,30 +332,45 @@ export const ApplicantAdmissionView = () => {
     }
 
     const formData = new FormData(formRef.current);
-    const doc = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
+
+    const doc = new jsPDF({
+      orientation: "p",
+      unit: "pt",
+      format: "a4",
+    });
+
+    const pdf = doc as JsPDFWithAutoTable;
+
     const margin = 40;
     let cursorY = 44;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.text("Application Review Summary", margin, cursorY);
+
     cursorY += 16;
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.text(`Generated on ${new Date().toLocaleString()}`, margin, cursorY);
+
     cursorY += 20;
 
-    const reviewSections: Array<{
-      title: string;
-      fields: string[];
-      includeAdmissionSummary?: boolean;
-    }> = [
+    const get = (key: string) => formatReviewValue(key, formData.get(key));
+
+    const reviewSections = [
       {
         title: "Admission Details",
-        includeAdmissionSummary: true,
         fields: [
           "applicationId",
           "modeOfAdmission",
+          "firstName",
+          "middleName",
+          "lastName",
+          "departmentId",
+          "categoryClaimed",
+          "categoryAllotted",
+          "quota",
           "entranceExamRank",
           "originalAdmissionOrderNumber",
           "originalAdmissionOrderDate",
@@ -370,7 +386,6 @@ export const ApplicantAdmissionView = () => {
           "dob",
           "bloodGroup",
           "gender",
-          "photo",
           "primaryPhoneNumber",
           "secondaryPhoneNumber",
           "emergencyContactNumber",
@@ -378,14 +393,12 @@ export const ApplicantAdmissionView = () => {
           "secondaryEmail",
           "currentAddress",
           "currentArea",
-          "currentCity",
           "currentDistrict",
           "currentState",
           "currentCountry",
           "currentPincode",
           "permanentAddress",
           "permanentArea",
-          "permanentCity",
           "permanentDistrict",
           "permanentState",
           "permanentCountry",
@@ -395,17 +408,13 @@ export const ApplicantAdmissionView = () => {
           "religion",
           "caste",
           "subCaste",
-          "casteCertificate",
           "motherTongue",
           "nationality",
           "nri",
           "disability",
           "disabilityType",
-          "disabilityCertificate",
           "economicallyBackward",
-          "economicallyBackwardCertificate",
           "aadharNumber",
-          "aadharCard",
         ],
       },
       {
@@ -419,9 +428,8 @@ export const ApplicantAdmissionView = () => {
           "class10thAggregateScore",
           "class10thAggregateTotal",
           "class10thMediumOfTeaching",
-          "class10thMarksPdf",
+
           "hasClass12",
-          "hasDiploma",
           "class12thInstituteName",
           "class12thInstituteType",
           "class12thInstituteCity",
@@ -431,7 +439,8 @@ export const ApplicantAdmissionView = () => {
           "class12thMediumOfTeaching",
           "class12thAggregateScore",
           "class12thAggregateTotal",
-          "class12thMarksPdf",
+
+          "hasDiploma",
           "diplomaInstituteName",
           "diplomaInstituteType",
           "diplomaInstituteCity",
@@ -441,9 +450,6 @@ export const ApplicantAdmissionView = () => {
           "diplomaMediumOfTeaching",
           "diplomaAggregateScore",
           "diplomaAggregateTotal",
-          "diplomaMarksPdf",
-          "studyCertificate",
-          "transferCertificate",
         ],
       },
       {
@@ -454,11 +460,13 @@ export const ApplicantAdmissionView = () => {
           "fatherNumber",
           "fatherOccupation",
           "fatherPermanentAddress",
+
           "motherName",
           "motherEmail",
           "motherNumber",
           "motherOccupation",
           "motherPermanentAddress",
+
           "guardianName",
           "guardianEmail",
           "guardianNumber",
@@ -468,31 +476,15 @@ export const ApplicantAdmissionView = () => {
       },
     ];
 
-    const addRows = (section: (typeof reviewSections)[number]) => {
-      const body: string[][] = [];
-
-      if (section.includeAdmissionSummary) {
-        body.push(
-          ["Branch", currentAdmission.department?.name || "Assigned Branch"],
-          ["First Name", currentAdmission.firstName || "-"],
-          ["Middle Name", currentAdmission.middleName || "-"],
-          ["Last Name", currentAdmission.lastName || "-"],
-          ["Category Claimed", currentAdmission.categoryClaimed || "Not Set"],
-          ["Category Allotted", currentAdmission.categoryAllotted || "Not Set"],
-          ["Quota", currentAdmission.quota || "Not Set"],
-          ["Application Status", currentAdmission.status]
-        );
-      }
-
-      for (const key of section.fields) {
-        body.push([
-          formatReviewKey(key),
-          formatReviewValue(key, formData.get(key)),
-        ]);
-      }
+    for (const section of reviewSections) {
+      const body = section.fields.map((field) => [
+        formatReviewKey(field),
+        get(field),
+      ]);
 
       doc.setFont("helvetica", "bold");
       doc.text(section.title, margin, cursorY);
+
       cursorY += 8;
 
       autoTable(doc, {
@@ -511,26 +503,27 @@ export const ApplicantAdmissionView = () => {
           textColor: 255,
           fontStyle: "bold",
         },
-        margin: { left: margin, right: margin },
+        margin: {
+          left: margin,
+          right: margin,
+        },
         columnStyles: {
-          0: { cellWidth: 160 },
-          1: { cellWidth: 335 },
+          0: { cellWidth: 170 },
+          1: { cellWidth: 325 },
         },
       });
 
-      const finalY = (
-        doc as typeof doc & { lastAutoTable?: { finalY?: number } }
-      ).lastAutoTable?.finalY;
-      cursorY = (finalY ?? cursorY) + 16;
-    };
-
-    reviewSections.forEach(addRows);
+      cursorY = (pdf.lastAutoTable?.finalY ?? cursorY) + 18;
+    }
 
     const blob = doc.output("blob");
-    const nextUrl = URL.createObjectURL(blob);
-    reviewPdfRef.current = nextUrl;
-    setReviewPdfUrl(nextUrl);
-    return nextUrl;
+
+    const url = URL.createObjectURL(blob);
+
+    reviewPdfRef.current = url;
+    setReviewPdfUrl(url);
+
+    return url;
   };
 
   const handleReviewStep = () => {
@@ -1063,13 +1056,14 @@ export const ApplicantAdmissionView = () => {
             </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-1">
               <Label htmlFor="primaryEmail">Primary Email Address *</Label>
-              <Input
-                id="primaryEmail"
+              <div className="border-input bg-background text-muted-foreground flex h-9 w-full items-center rounded-md border px-3 py-1 text-sm">
+                {admission.primaryEmail}
+              </div>
+
+              <input
+                type="hidden"
                 name="primaryEmail"
-                type="email"
-                defaultValue={admission.primaryEmail ?? ""}
-                required
-                placeholder="@bmsce.ac.in"
+                value={admission.primaryEmail ?? ""}
               />
             </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-1">
@@ -1324,7 +1318,6 @@ export const ApplicantAdmissionView = () => {
                       countries.find((c) => c.isoCode === permanentCountry)
                         ?.name ?? ""
                     }
-                    disabled={isSameAddress}
                     required
                   />
                 </div>
@@ -1360,7 +1353,6 @@ export const ApplicantAdmissionView = () => {
                       permanentStates.find((s) => s.isoCode === permanentState)
                         ?.name ?? ""
                     }
-                    disabled={isSameAddress}
                     required
                   />
                 </div>
@@ -1390,7 +1382,6 @@ export const ApplicantAdmissionView = () => {
                     type="hidden"
                     name="permanentDistrict"
                     value={permanentDistrict}
-                    disabled={isSameAddress}
                     required
                   />
                 </div>
