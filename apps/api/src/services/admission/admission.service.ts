@@ -583,6 +583,7 @@ export class AdmissionService {
           status: "SUBMITTED",
 
           // Admission Details
+          applicationId: data.applicationId,
           firstName: data.firstName,
           middleName: data.middleName,
           lastName: data.lastName,
