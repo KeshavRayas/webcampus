@@ -42,7 +42,7 @@ export type AdmissionResponse = {
   primaryPhoneNumber?: string | null;
   secondaryPhoneNumber?: string | null;
   emergencyContactNumber?: string | null;
-  primaryEmail?: string | null;
+  primaryEmail: string;
   secondaryEmail?: string | null;
 
   currentAddress?: string | null;
@@ -129,37 +129,11 @@ export type AdmissionResponse = {
 
 const baseColumns: ColumnDef<AdmissionResponse>[] = [
   {
-    accessorKey: "applicationId",
-    header: "Application ID",
+    accessorKey: "primaryEmail",
+    header: "College Email",
     cell: ({ row }) => (
-      <div className="font-medium">{row.original.applicationId}</div>
+      <div className="font-medium">{row.original.primaryEmail}</div>
     ),
-  },
-  {
-    id: "name",
-    header: "Name",
-    cell: ({ row }) => {
-      const studentName = row.original.student?.user?.name?.trim();
-      const admissionName = [
-        row.original.firstName?.trim(),
-        row.original.middleName?.trim(),
-        row.original.lastName?.trim(),
-      ]
-        .filter((value): value is string => Boolean(value))
-        .join(" ")
-        .trim();
-
-      return <div>{studentName || admissionName || "-"}</div>;
-    },
-  },
-  {
-    accessorKey: "tempUsn",
-    header: "Temp USN",
-    cell: ({ row }) => <div>{row.original.tempUsn || "-"}</div>,
-  },
-  {
-    accessorKey: "modeOfAdmission",
-    header: "Mode",
   },
   {
     accessorKey: "status",
@@ -183,9 +157,30 @@ const baseColumns: ColumnDef<AdmissionResponse>[] = [
 export const getAdminAdmissionColumns = (
   showViewDetails: boolean
 ): ColumnDef<AdmissionResponse>[] => [
-  ...baseColumns,
   ...(showViewDetails
     ? [
+        {
+          id: "name",
+          header: "Name",
+          cell: ({ row }: { row: { original: AdmissionResponse } }) => {
+            const studentName = row.original.student?.user?.name?.trim();
+            const admissionName = [
+              row.original.firstName?.trim(),
+              row.original.middleName?.trim(),
+              row.original.lastName?.trim(),
+            ]
+              .filter((value): value is string => Boolean(value))
+              .join(" ")
+              .trim();
+
+            return <div>{studentName || admissionName || "-"}</div>;
+          },
+        },
+        {
+          accessorKey: "modeOfAdmission",
+          header: "Mode",
+        },
+        ...baseColumns,
         {
           id: "actions",
           header: "Actions",
