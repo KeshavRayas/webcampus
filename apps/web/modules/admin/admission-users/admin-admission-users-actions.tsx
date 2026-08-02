@@ -99,7 +99,13 @@ export const AdminAdmissionUsersActions = ({
   };
 
   const handleEditSubmit = async (data: UpdateAdmissionUserFormValues) => {
-    console.log("submitted");
+    if (!photoFile) {
+      editForm.setError("root", {
+        message: "Please upload a profile photo.",
+      });
+      return;
+    }
+
     try {
       await updateUser({
         id: user.id,
@@ -214,12 +220,19 @@ export const AdminAdmissionUsersActions = ({
                 )}
               />
               <UserPhotoUpload
-                label="Profile Photo"
+                label="Profile Photo*"
                 personName={editForm.watch("name") || "Admission User"}
                 previewUrl={photoPreview}
                 selectedFileName={photoFile?.name || null}
                 onChange={handlePhotoChange}
               />
+
+              {editForm.formState.errors.root && (
+                <p className="text-destructive text-sm">
+                  {editForm.formState.errors.root.message}
+                </p>
+              )}
+
               <DialogFooter>
                 <Button
                   type="button"
