@@ -8,6 +8,7 @@ import adminRouter from "./routers/admin/admin.router";
 import admissionRouter from "./routers/admission/admission.router";
 import coeRouter from "./routers/coe/coe.router";
 import facultyRouter from "./routers/faculty/faculty-domain.router";
+import financeRouter from "./routers/finance/finance.router";
 import hodRouter from "./routers/hod/hod.router";
 import studentRouter from "./routers/student/student-domain.router";
 
@@ -36,6 +37,8 @@ app.use("/department", DepartmentRouter);
 app.use("/coe", coeRouter);
 
 app.use("/faculty", facultyRouter);
+
+app.use("/finance", financeRouter);
 
 app.use("/admission", admissionRouter);
 
