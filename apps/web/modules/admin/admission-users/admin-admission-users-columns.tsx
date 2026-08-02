@@ -1,7 +1,6 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@webcampus/ui/components/badge";
 import React from "react";
 import { AdminAdmissionUsersActions } from "./admin-admission-users-actions";
 
@@ -11,7 +10,6 @@ export type AdminAdmissionUserResponse = {
   email: string;
   username: string | null;
   image?: string | null;
-  role: "admission_admin";
   photo?: string; // <-- Added photo to the type
 };
 
@@ -24,11 +22,6 @@ export const AdminAdmissionUserColumns: ColumnDef<AdminAdmissionUserResponse>[] 
     {
       accessorKey: "email",
       header: "Email",
-    },
-    {
-      accessorKey: "role",
-      header: "Role",
-      cell: () => <Badge variant="outline">Admission Admin</Badge>,
     },
     // <-- Created At column completely removed here
     {

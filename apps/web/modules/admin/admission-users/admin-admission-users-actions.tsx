@@ -28,9 +28,10 @@ import {
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
 import { MoreHorizontal, Trash } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { UserPhotoUpload } from "../shared/user-photo-upload";
 import { AdminAdmissionUserResponse } from "./admin-admission-users-columns";
 import {
   useAdmissionUserDelete,
@@ -46,8 +47,14 @@ export const AdminAdmissionUsersActions = ({
 }) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(
+    user.photo ?? null
+  );
+
+  const previewUrlRef = useRef<string | null>(null);
   const { onDelete, isDeleting } = useAdmissionUserDelete();
-  const { updateUser, isUpdating } = useAdmissionUserUpdate();
+  const { updateUser, isUpdating, photoFile, setPhotoFile } =
+    useAdmissionUserUpdate();
 
   const editForm = useForm<UpdateAdmissionUserFormValues>({
     resolver: zodResolver(UpdateAdmissionUserSchema),
@@ -59,12 +66,36 @@ export const AdminAdmissionUsersActions = ({
   });
 
   console.log(editForm.formState);
+  const replacePhotoPreview = (file: File | null) => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+
+    if (!file) {
+      setPhotoPreview(user.photo ?? null);
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    previewUrlRef.current = preview;
+    setPhotoPreview(preview);
+  };
+
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setPhotoFile(file);
+    replacePhotoPreview(file);
+  };
   const resetEditState = () => {
     editForm.reset({
       name: user.name,
       username: user.username || "",
       email: user.email,
     });
+
+    setPhotoFile(null);
+    replacePhotoPreview(null);
   };
 
   const handleEditSubmit = async (data: UpdateAdmissionUserFormValues) => {
@@ -73,6 +104,7 @@ export const AdminAdmissionUsersActions = ({
       await updateUser({
         id: user.id,
         data,
+        photoFile,
       });
       setIsEditOpen(false);
       resetEditState();
@@ -83,7 +115,14 @@ export const AdminAdmissionUsersActions = ({
     if (isEditOpen) {
       resetEditState();
     }
-  }, [isEditOpen, user.email, user.name, user.role, user.username]);
+  }, [isEditOpen, user]);
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
 
   return (
     <>
@@ -174,7 +213,13 @@ export const AdminAdmissionUsersActions = ({
                   </FormItem>
                 )}
               />
-
+              <UserPhotoUpload
+                label="Profile Photo"
+                personName={editForm.watch("name") || "Admission User"}
+                previewUrl={photoPreview}
+                selectedFileName={photoFile?.name || null}
+                onChange={handlePhotoChange}
+              />
               <DialogFooter>
                 <Button
                   type="button"
@@ -201,8 +246,8 @@ export const AdminAdmissionUsersActions = ({
           <DialogHeader>
             <DialogTitle>Delete Admission User</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {user.name} ({user.role})? This
-              action cannot be undone and will permanently remove their access.
+              Are you sure you want to delete {user.name})? This action cannot
+              be undone and will permanently remove their access.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

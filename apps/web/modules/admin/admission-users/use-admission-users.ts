@@ -35,16 +35,16 @@ export const useAdmissionUsers = () => {
 
   const { mutateAsync: create, isPending: isCreating } = useMutation({
     mutationFn: async (data: CreateAdmissionUserFormValues) => {
+      if (!photoFile) {
+        throw new Error("Profile Picture is required");
+      }
       const formData = new FormData();
       formData.append("name", data.name);
       formData.append("username", data.username);
       formData.append("email", data.email);
       formData.append("password", data.password);
       formData.append("role", "admission_admin");
-
-      if (photoFile) {
-        formData.append("photo", photoFile);
-      }
+      formData.append("photo", photoFile);
 
       const response = await axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users`,
@@ -64,8 +64,14 @@ export const useAdmissionUsers = () => {
       form.reset();
       setPhotoFile(null);
     },
-    onError: (error: AxiosError<{ message?: string }>) => {
-      toast.error(error.response?.data?.message || "Failed to create user");
+    onError: (error: unknown) => {
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to create user");
+      } else if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Failed to create user");
+      }
     },
   });
 
@@ -79,6 +85,7 @@ export const useAdmissionUsers = () => {
 export const useAdmissionUserUpdate = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   const { mutateAsync: updateUser, isPending: isUpdating } = useMutation({
     mutationFn: async ({
@@ -121,7 +128,7 @@ export const useAdmissionUserUpdate = () => {
     },
   });
 
-  return { updateUser, isUpdating };
+  return { updateUser, isUpdating, photoFile, setPhotoFile };
 };
 
 export const useAdmissionUserEdit = () => {
