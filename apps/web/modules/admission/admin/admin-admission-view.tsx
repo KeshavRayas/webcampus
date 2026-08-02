@@ -7,7 +7,7 @@ import {
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
-import { useDepartments } from "@/lib/use-departments";
+import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { admissionModes } from "@webcampus/schemas/constants";
@@ -123,7 +123,7 @@ export const AdminAdmissionView = ({
   // Use standardized hooks for fresh data
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
-  const { data: departments = [] } = useDepartments();
+  const { data: departments = [] } = useAdmissionDepartments();
 
   // Sync filters when data changes (auto-clear if value no longer exists)
   const selectedTerm = terms.find((t) => t.id === draftFilters.academicTerm);

@@ -88,7 +88,7 @@ router.patch(
   "/:id/approve",
   validateRequest(AdmissionActionParamSchema, "params"),
   protect({
-    role: ["admin"],
+    role: ["admin", "admission"],
     permissions: {
       admission: ["update"],
     },
@@ -100,7 +100,7 @@ router.patch(
   "/:id/reject",
   validateRequest(AdmissionActionParamSchema, "params"),
   protect({
-    role: ["admin"],
+    role: ["admin", "admission"],
     permissions: {
       admission: ["update"],
     },

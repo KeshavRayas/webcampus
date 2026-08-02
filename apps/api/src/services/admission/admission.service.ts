@@ -284,21 +284,11 @@ export class AdmissionService {
 
       await db.admission.create({
         data: {
-          applicationId: crypto.randomUUID(), // or primaryEmail for now
+          // applicationId: crypto.randomUUID(), // or primaryEmail for now
           primaryEmail: data.primaryEmail,
-
-          firstName: "",
-          middleName: "",
-          lastName: "",
-
-          modeOfAdmission: "KCET",
 
           semesterId: data.semesterId,
           departmentId: placeholderDepartment.id,
-
-          categoryClaimed: "GM",
-          categoryAllotted: "GM",
-          quota: "GM",
 
           status: "PENDING",
         },
@@ -921,7 +911,7 @@ export class AdmissionService {
           return leftName.localeCompare(rightName);
         }
 
-        return left.applicationId.localeCompare(right.applicationId);
+        return left.primaryEmail.localeCompare(right.primaryEmail);
       });
 
       const studentEmailCollisionCountsByDepartmentId = new Map<
@@ -983,7 +973,7 @@ export class AdmissionService {
       );
 
       const allApprovedApplicationIds = approvedAdmissions.map(
-        (admission) => admission.applicationId
+        (admission) => admission.primaryEmail
       );
 
       const { userIdByApplicationId, autoCreatedUsers } =
@@ -999,7 +989,7 @@ export class AdmissionService {
       for (const admission of approvedUnportedAdmissions) {
         try {
           const userId = userIdByApplicationId.get(
-            AdmissionService.normalizeApplicationId(admission.applicationId)
+            AdmissionService.normalizeApplicationId(admission.primaryEmail)
           );
           if (!userId) {
             throw new Error(
@@ -1218,7 +1208,7 @@ export class AdmissionService {
               ? studentError.message
               : "Failed to port student";
           failedPorts.push({
-            applicationId: admission.applicationId,
+            applicationId: admission.primaryEmail,
             reason,
           });
         }
