@@ -1,18 +1,18 @@
 /**
  * Diagnostic script to identify and report username/admission-shell issues
- * 
+ *
  * This script helps identify:
  * 1. Applicants without proper username set
  * 2. Mismatched usernames vs application IDs
  * 3. Missing admission shells
  * 4. Suggests fixes for identified issues
- * 
+ *
  * Usage:
  * bunx tsx apps/api/scripts/diagnose-applicant-issues.ts
  */
 
-import { db } from "@webcampus/db";
 import { logger } from "@webcampus/common/logger";
+import { db } from "@webcampus/db";
 
 async function diagnoseApplicantIssues() {
   console.log("\n========================================");
@@ -88,14 +88,14 @@ async function diagnoseApplicantIssues() {
       // Try to find admission shell
       const admission = await db.admission.findFirst({
         where: {
-          applicationId: {
-            equals: user.username,
-            mode: "insensitive",
+          primaryEmail: {
+            equals: user.email,
           },
         },
         select: {
           id: true,
           applicationId: true,
+          primaryEmail: true,
           status: true,
           departmentId: true,
           department: {
@@ -105,9 +105,7 @@ async function diagnoseApplicantIssues() {
       });
 
       if (!admission) {
-        console.log(
-          "  ✗ CRITICAL: No admission shell found for this user!"
-        );
+        console.log("  ✗ CRITICAL: No admission shell found for this user!");
         issues.push({
           userId: user.id,
           email: user.email,
@@ -118,13 +116,12 @@ async function diagnoseApplicantIssues() {
         console.log(`  ✓ Admission shell found`);
         console.log(`    Application ID: ${admission.applicationId}`);
         console.log(`    Status: ${admission.status}`);
-        console.log(`    Department: ${admission.department?.name || "UNKNOWN"}`);
+        console.log(
+          `    Department: ${admission.department?.name || "UNKNOWN"}`
+        );
 
         // Check if applicationId matches username exactly (case-insensitive)
-        if (
-          admission.applicationId.toLowerCase() !==
-          user.username.toLowerCase()
-        ) {
+        if (admission.primaryEmail !== user.username.toLowerCase()) {
           console.log(
             `  ⚠️  ISSUE: Mismatch - admission has "${admission.applicationId}" but user has "${user.username}"`
           );
@@ -144,7 +141,9 @@ async function diagnoseApplicantIssues() {
     console.log("========================================\n");
 
     if (issues.length === 0) {
-      console.log("✓ No issues found! All applicants are properly configured.\n");
+      console.log(
+        "✓ No issues found! All applicants are properly configured.\n"
+      );
     } else {
       console.log(`Found ${issues.length} issue(s):\n`);
 
@@ -184,9 +183,7 @@ async function diagnoseApplicantIssues() {
       }
 
       console.log("\nRECOMMENDED NEXT STEPS:");
-      console.log(
-        "1. Back up your database before running any SQL updates"
-      );
+      console.log("1. Back up your database before running any SQL updates");
       console.log(
         "2. Run: bunx tsx apps/api/scripts/backfill-applicant-usernames.ts --dry-run"
       );

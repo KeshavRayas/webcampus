@@ -474,10 +474,10 @@ const FACULTY: FacultySeed[] = [
 
 const ADMISSION_USERS = [
   {
-    name: "Admission Admin",
-    username: "admission.admin",
-    email: "admission.admin@webcampus.com",
-    role: "admission_admin" as const,
+    name: "Admission",
+    username: "admission",
+    email: "admission@webcampus.com",
+    role: "admission" as const,
   },
 ];
 

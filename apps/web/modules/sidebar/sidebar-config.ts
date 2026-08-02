@@ -397,7 +397,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     },
     navSecondary,
   },
-  admission_admin: {
+  admission: {
     navMain: {
       items: [
         {

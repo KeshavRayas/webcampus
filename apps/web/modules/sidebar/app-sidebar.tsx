@@ -23,6 +23,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   if (isPending || !session) {
     return <SidebarSkeleton />;
   }
+  console.log("Role:", session?.user.role);
+  console.log("Sidebar config:", sidebarConfig);
   const { navMain, navSecondary } = sidebarConfig[session?.user.role as Role];
 
   return (

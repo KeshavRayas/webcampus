@@ -75,7 +75,7 @@ async function cleanupMockApplicants() {
   const normalizedApplicationIds = Array.from(
     new Set(
       admissionsToDelete.map((admission) =>
-        admission.applicationId.trim().toLowerCase()
+        admission.primaryEmail.trim().toLowerCase()
       )
     )
   );
@@ -208,7 +208,7 @@ async function cleanupMockApplicants() {
   let deletedStudents = 0;
   let deletedAdmissions = 0;
   let deletedUsers = 0;
-  const deleteErrors: { applicationId: string; reason: string }[] = [];
+  const deleteErrors: { primaryEmail: string; reason: string }[] = [];
 
   for (const admission of admissionsToDelete) {
     try {
@@ -231,11 +231,11 @@ async function cleanupMockApplicants() {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       logger.warn("Failed to delete admission", {
-        applicationId: admission.applicationId,
+        applicationId: admission.primaryEmail,
         error: errorMsg,
       });
       deleteErrors.push({
-        applicationId: admission.applicationId,
+        primaryEmail: admission.primaryEmail,
         reason: errorMsg,
       });
     }

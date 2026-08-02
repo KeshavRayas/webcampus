@@ -25,6 +25,7 @@ import {
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
 import axios from "axios";
+import { Eye, EyeOff } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
@@ -42,6 +43,7 @@ export const AdminAdmissionUsersView = () => {
     useAdmissionUsers();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const previewUrlRef = useRef<string | null>(null);
 
   const { data: users = [], isLoading } = useQuery({
@@ -185,11 +187,28 @@ export const AdminAdmissionUsersView = () => {
                       <FormItem>
                         <FormLabel>Password *</FormLabel>
                         <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Minimum 6 characters"
-                            {...field}
-                          />
+                          <div className="relative">
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Minimum 6 characters"
+                              {...field}
+                              className="pr-10"
+                            />
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                              onClick={() => setShowPassword((prev) => !prev)}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>

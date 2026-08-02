@@ -84,7 +84,7 @@ export const roles = {
     courseCoordinator: ["create", "read", "update"],
     freeze: ["read", "lock"],
   }),
-  admission_admin: ac.newRole({
+  admission: ac.newRole({
     semester: ["read"],
     admission: ["create", "read", "delete", "update", "port"],
     user: ["set-role"],

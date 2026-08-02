@@ -579,10 +579,10 @@ model Admission {
   hasClass12                      Boolean?
   hasDiploma                      Boolean?
   class10thSchoolName             String?
-  modeOfAdmission                 String
+  modeOfAdmission                 String?
   photo                           String?
   createdAt                       DateTime        @default(now())
-  applicationId                   String          @unique
+  applicationId                   String?          @unique
   casteCertificate                String?
   semesterId                      String
   status                          AdmissionStatus @default(PENDING)
@@ -665,7 +665,7 @@ model Admission {
   permanentPincode                String?
   permanentState                  String?
   placeOfBirth                    String?
-  primaryEmail                    String?         @unique
+  primaryEmail                    String         @unique
   primaryPhoneNumber              String?
   religion                        String?
   secondaryEmail                  String?

@@ -158,7 +158,7 @@ export class StudentProfileService {
             bloodGroup: admission?.bloodGroup ?? null,
             aidedStatus: modeToAidedStatus(admission?.modeOfAdmission),
             category: admission?.caste ?? null,
-            personalEmail: admission?.primaryEmail ?? null,
+            personalEmail: admission?.primaryEmail,
             alternatePhone:
               admission?.secondaryPhoneNumber ??
               admission?.emergencyContactNumber ??
@@ -315,7 +315,7 @@ export class StudentProfileService {
           modeOfAdmission: payload.aidedStatus ?? undefined,
           caste: payload.category,
           quota: normalizedQuota,
-          primaryEmail: payload.personalEmail,
+          // primaryEmail: payload.personalEmail,//primaryEmail is the primary Key so no updating it
           secondaryEmail: payload.personalEmail,
           secondaryPhoneNumber: payload.alternatePhone,
           aadharNumber: payload.aadhaarNumber,
