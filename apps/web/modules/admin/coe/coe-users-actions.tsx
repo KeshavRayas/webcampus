@@ -124,7 +124,9 @@ export const CoeUsersActions = ({ user }: { user: CoeUserResponse }) => {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full Name</FormLabel>
+                    <FormLabel>
+                      Full Name <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -138,7 +140,9 @@ export const CoeUsersActions = ({ user }: { user: CoeUserResponse }) => {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel>
+                      Username <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -152,7 +156,9 @@ export const CoeUsersActions = ({ user }: { user: CoeUserResponse }) => {
                 name="photo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Update Profile Photo</FormLabel>
+                    <FormLabel>
+                      Profile Photo <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type="file"
