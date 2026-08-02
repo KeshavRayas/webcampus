@@ -19,7 +19,7 @@ router.get(
   "/",
   validateRequest(GetAdmissionsQuerySchema, "query"),
   protect({
-    role: ["admin", "admission_admin"],
+    role: ["admin", "admission"],
     permissions: {
       admission: ["read"],
     },
@@ -32,7 +32,7 @@ router.post(
   "/shell",
   validateRequest(CreateAdmissionShellSchema),
   protect({
-    role: ["admin", "admission_admin"],
+    role: ["admin", "admission"],
     permissions: {
       admission: ["create"],
       user: ["set-role"], // Needed to create the applicant user
@@ -45,7 +45,7 @@ router.post(
 router.get(
   "/semester/:semesterId",
   protect({
-    role: ["admin", "admission_admin"],
+    role: ["admin", "admission"],
     permissions: {
       admission: ["read"],
     },
@@ -66,7 +66,7 @@ router.get(
 router.get(
   "/departments",
   protect({
-    role: ["applicant", "admin", "admission_admin"],
+    role: ["applicant", "admin", "admission"],
     permissions: { department: ["read"] },
   }),
   DepartmentController.getPublicDepartments
@@ -76,7 +76,7 @@ router.get(
 router.delete(
   "/:id",
   protect({
-    role: ["admin", "admission_admin"],
+    role: ["admin", "admission"],
     permissions: {
       admission: ["delete"],
     },
@@ -112,7 +112,7 @@ router.patch(
   validateRequest(AdmissionActionParamSchema, "params"),
   validateRequest(ChangeAdmissionModeSchema),
   protect({
-    role: ["admin", "admission_admin"],
+    role: ["admin", "admission"],
     permissions: {
       admission: ["update"],
     },
@@ -124,7 +124,7 @@ router.patch(
   validateRequest(AdmissionActionParamSchema, "params"),
   validateRequest(ExitAdmissionSchema),
   protect({
-    role: ["admin", "admission_admin"],
+    role: ["admin", "admission"],
     permissions: {
       admission: ["update"],
     },
@@ -135,7 +135,7 @@ router.post(
   "/port",
   validateRequest(PortStudentsSchema),
   protect({
-    role: ["admin", "admission_admin"],
+    role: ["admin", "admission"],
     permissions: {
       admission: ["port"],
     },

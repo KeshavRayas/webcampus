@@ -51,7 +51,7 @@ export async function middleware(request: NextRequest) {
   if (session && roleFromPath) {
     if (
       roleFromPath === "admission" &&
-      !["admission_admin"].includes(session.user?.role as string)
+      !["admission"].includes(session.user?.role as string)
     ) {
       url.pathname = "/403";
       return NextResponse.redirect(url);

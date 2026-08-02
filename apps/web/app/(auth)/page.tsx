@@ -15,7 +15,7 @@ const HomePage = () => {
       </div>
       <div className="flex flex-col gap-2.5">
         {roles
-          .filter((r) => r !== "admission_admin")
+          .filter((r) => r !== "admission")
           .map((role) => (
             <Button key={role} size={"lg"} variant={"outline"} asChild>
               <Link href={`/${role}/sign-in`}>{capitalize(role)} Sign In</Link>

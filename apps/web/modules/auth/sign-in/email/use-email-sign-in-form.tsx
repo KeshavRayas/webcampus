@@ -30,7 +30,7 @@ export const useEmailSignInForm = ({ role }: { role: Role }) => {
       },
       onSuccess: () => {
         toast.success("Signed in successfully!");
-        const redirectTo = role === "admission_admin" ? "admission" : role;
+        const redirectTo = role === "admission" ? "admission" : role;
         router.push(`/${redirectTo}`);
       },
       onRetry: () => {
