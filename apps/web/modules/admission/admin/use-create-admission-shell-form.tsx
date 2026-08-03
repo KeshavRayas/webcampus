@@ -25,7 +25,7 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
     resolver: zodResolver(CreateAdmissionShellSchema),
     defaultValues: {
       primaryEmail: "",
-      password: "",
+      password: "password",
       semesterId,
     },
   });
@@ -44,7 +44,7 @@ export const useCreateAdmissionShellForm = (semesterId: string) => {
     if (isSubmitSuccessful) {
       form.reset({
         primaryEmail: "",
-        password: "",
+        password: "password",
       });
     }
   }, [form, isSubmitSuccessful]);
