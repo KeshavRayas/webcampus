@@ -240,6 +240,7 @@ export const AdminAdmissionUsersActions = ({
                         <SelectItem value="admission_admin">
                           Admission Admin (Data Entry)
                         </SelectItem>
+                        <SelectItem value="finance">Finance</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -11,9 +11,8 @@
     "./student": "./src/student/index.ts",
     "./coe": "./src/coe/index.ts",
     "./finance": "./src/finance/index.ts",
-    "./common": "./src/common.schemas.ts"
+    "./common": "./src/common.schemas.ts",
     "./constants": "./src/constants/index.ts"
-
   },
   "scripts": {
     "check-types": "tsc --noEmit --pretty"
@@ -26,7 +25,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "zod": "^4.0.5",
+    "zod": "^3.23.8",
     "@webcampus/types": "*"
   }
 }
