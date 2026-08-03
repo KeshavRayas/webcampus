@@ -2,6 +2,10 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
+import {
+  RegistrationWindowCycleSchema,
+  type AcademicTermResponseType,
+} from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
@@ -17,6 +21,7 @@ import {
   FilterFieldConfig,
   FilterPanel,
 } from "@webcampus/ui/components/filter-builder";
+import { capitalize } from "@webcampus/ui/lib/utils";
 import axios from "axios";
 import { ClipboardList, Loader2, PlusCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -65,12 +70,30 @@ export type SetupContext = {
   maxMarks: number;
 };
 
-// Define the exact shape of our filters for the generic component
 type DashboardFilters = {
   termId: string;
   semesterId: string;
   cycle: string;
 };
+
+const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
+const TEACHING_CYCLE_OPTIONS = RegistrationWindowCycleSchema.options;
+
+const EMPTY_FILTERS: DashboardFilters = {
+  termId: "",
+  semesterId: "",
+  cycle: "",
+};
+
+const formatAcademicTerm = (term: AcademicTermResponseType) =>
+  `${capitalize(term.type)} ${term.year}`;
+
+const isFirstYearUgSemester = (semester?: {
+  programType: string;
+  semesterNumber: number;
+}) =>
+  semester?.programType === "UG" &&
+  FIRST_YEAR_UG_SEMESTERS.has(semester.semesterNumber);
 
 export const QuestionPaperDashboard = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
@@ -84,17 +107,10 @@ export const QuestionPaperDashboard = () => {
 
   const { data: terms, isLoading: termsLoading } = useFacultyAcademicTerms();
 
-  const [draftFilters, setDraftFilters] = useState<DashboardFilters>({
-    termId: "",
-    semesterId: "",
-    cycle: "",
-  });
-
-  const [appliedFilters, setAppliedFilters] = useState<DashboardFilters>({
-    termId: "",
-    semesterId: "",
-    cycle: "",
-  });
+  const [draftFilters, setDraftFilters] =
+    useState<DashboardFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] =
+    useState<DashboardFilters>(EMPTY_FILTERS);
 
   const selectedTermSemesters = useMemo(() => {
     if (!terms || !draftFilters.termId) return [];
@@ -102,82 +118,119 @@ export const QuestionPaperDashboard = () => {
     return term?.Semester || [];
   }, [terms, draftFilters.termId]);
 
+  const selectedSemester = useMemo(
+    () => selectedTermSemesters.find((s) => s.id === draftFilters.semesterId),
+    [selectedTermSemesters, draftFilters.semesterId]
+  );
+
+  const isFirstYearUg = isFirstYearUgSemester(selectedSemester);
+
+  const appliedTermSemesters = useMemo(() => {
+    if (!terms || !appliedFilters.termId) return [];
+    const term = terms.find((t) => t.id === appliedFilters.termId);
+    return term?.Semester || [];
+  }, [terms, appliedFilters.termId]);
+
+  const appliedSemester = useMemo(
+    () => appliedTermSemesters.find((s) => s.id === appliedFilters.semesterId),
+    [appliedTermSemesters, appliedFilters.semesterId]
+  );
+
+  const appliedIsFirstYearUg = isFirstYearUgSemester(appliedSemester);
+
+  const appliedCycle =
+    appliedIsFirstYearUg && appliedFilters.cycle ? appliedFilters.cycle : "";
+
   useEffect(() => {
     if (terms?.length && !draftFilters.termId) {
       const currentTerm = terms.find((t) => t.isCurrent) || terms[0];
-      // Fixed: Safety check for undefined
       if (currentTerm) {
         setDraftFilters((prev) => ({ ...prev, termId: currentTerm.id }));
       }
     }
   }, [terms, draftFilters.termId]);
 
-  // Fixed: Passed generic DashboardFilters and changed 'id' to 'key'
-  const filterFields: FilterFieldConfig<DashboardFilters>[] = [
-    {
-      key: "termId",
-      label: "Academic Term",
-      type: "select",
-      options:
-        terms?.map((t) => ({
-          label: `${t.type} ${t.year}`,
-          value: t.id,
-        })) || [],
-      placeholder: termsLoading ? "Loading terms..." : "Select Term",
-    },
-    {
-      key: "semesterId",
-      label: "Semester",
-      type: "select",
-      options: selectedTermSemesters.map((s) => ({
-        label: `Semester ${s.semesterNumber}`,
-        value: s.id,
-      })),
-      placeholder: draftFilters.termId
-        ? "Select Semester"
-        : "Select Term First",
-    },
-    {
-      key: "cycle",
-      label: "Cycle",
-      type: "select",
-      options: [
-        { label: "Physics", value: "PHYSICS" },
-        { label: "Chemistry", value: "CHEMISTRY" },
-        { label: "None", value: "NONE" },
-      ],
-      placeholder: "Select Cycle (Optional)",
-    },
-  ];
+  useEffect(() => {
+    if (!isFirstYearUg && (draftFilters.cycle || appliedFilters.cycle)) {
+      setDraftFilters((prev) => ({ ...prev, cycle: "" }));
+      setAppliedFilters((prev) => ({ ...prev, cycle: "" }));
+    }
+  }, [isFirstYearUg, draftFilters.cycle, appliedFilters.cycle]);
+
+  const filterFields: FilterFieldConfig<DashboardFilters>[] = useMemo(
+    () => [
+      {
+        key: "termId",
+        label: "Academic Term",
+        type: "select",
+        hideAllOption: true,
+        options:
+          terms?.map((t) => ({
+            label: formatAcademicTerm(t),
+            value: t.id,
+          })) || [],
+        placeholder: termsLoading ? "Loading terms..." : "Select term...",
+      },
+      {
+        key: "semesterId",
+        label: "Semester",
+        type: "select",
+        hideAllOption: true,
+        options: selectedTermSemesters.map((s) => ({
+          label: `${s.programType} - Semester ${s.semesterNumber}`,
+          value: s.id,
+        })),
+        placeholder: draftFilters.termId
+          ? "Select semester..."
+          : "Select term first",
+      },
+      ...(isFirstYearUg
+        ? [
+            {
+              key: "cycle",
+              label: "Cycle",
+              type: "select",
+              allOptionLabel: "All cycles",
+              placeholder: "All cycles",
+              options: TEACHING_CYCLE_OPTIONS.map((cycle) => ({
+                label: cycle,
+                value: cycle,
+              })),
+            } as FilterFieldConfig<DashboardFilters>,
+          ]
+        : []),
+    ],
+    [
+      terms,
+      termsLoading,
+      selectedTermSemesters,
+      draftFilters.termId,
+      isFirstYearUg,
+    ]
+  );
 
   const handleApplyFilters = () => {
     setAppliedFilters(draftFilters);
   };
 
   const handleResetFilters = () => {
-    const resetState = { termId: draftFilters.termId, semesterId: "", cycle: "" };
-    setDraftFilters(resetState);
-    setAppliedFilters(resetState);
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
   };
 
   const { data: courses, isLoading: coursesLoading } = useQuery({
-    queryKey: [
-      "coordinated-courses",
-      appliedFilters.semesterId,
-      appliedFilters.cycle,
-    ],
+    queryKey: ["coordinated-courses", appliedFilters.semesterId, appliedCycle],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<CoordinatedCourse[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment/coordinated-courses`,
         {
           params: {
             semesterId: appliedFilters.semesterId,
-            cycle: appliedFilters.cycle,
+            ...(appliedCycle && { cycle: appliedCycle }),
           },
           withCredentials: true,
         }
       );
-      // Fixed: TypeScript Union check for BaseResponse
       if (res.data.status === "success" && "data" in res.data) {
         return res.data.data;
       }
@@ -189,7 +242,11 @@ export const QuestionPaperDashboard = () => {
   const creditString = (course: CoordinatedCourse) =>
     `${course.lectureCredits}-${course.tutorialCredits}-${course.practicalCredits}-${course.skillCredits}`;
 
-  const renderAssessmentButton = (course: CoordinatedCourse, title: string, maxMarks: number) => {
+  const renderAssessmentButton = (
+    course: CoordinatedCourse,
+    title: string,
+    maxMarks: number
+  ) => {
     const existing = course.assessments?.find((a) => a.title === title);
 
     if (existing) {
@@ -211,7 +268,9 @@ export const QuestionPaperDashboard = () => {
       <Button
         key={title}
         size="sm"
-        onClick={() => setSetupContext({ course, assessmentTitle: title, maxMarks })}
+        onClick={() =>
+          setSetupContext({ course, assessmentTitle: title, maxMarks })
+        }
       >
         <PlusCircle className="mr-2 h-4 w-4" /> Setup {title}
       </Button>
@@ -241,12 +300,24 @@ export const QuestionPaperDashboard = () => {
                 ...current,
                 termId: value,
                 semesterId: "",
+                cycle: "",
+              }));
+              return;
+            }
+            if (key === "semesterId") {
+              const nextSemester = selectedTermSemesters.find(
+                (s) => s.id === value
+              );
+              setDraftFilters((current) => ({
+                ...current,
+                semesterId: value,
+                cycle: isFirstYearUgSemester(nextSemester) ? current.cycle : "",
               }));
               return;
             }
             setDraftFilters((prev) => ({ ...prev, [key]: value }));
           }}
-          className="md:grid-cols-3"
+          className={isFirstYearUg ? "md:grid-cols-3" : "md:grid-cols-2"}
         />
         <FilterActions
           onApply={handleApplyFilters}
@@ -266,7 +337,6 @@ export const QuestionPaperDashboard = () => {
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {/* Fixed: Explicit typing applied to course */}
               {courses.map((course: CoordinatedCourse) => (
                 <Card key={course.id} className="flex flex-col">
                   <CardHeader className="bg-muted/10 border-b pb-3">
@@ -293,17 +363,37 @@ export const QuestionPaperDashboard = () => {
                         Assessments Configuration
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {Array.from({ length: course.cieCount || 0 }).map((_, i) =>
-                          renderAssessmentButton(course, `CIE ${i + 1}`, course.cieMaxMarks)
+                        {Array.from({ length: course.cieCount || 0 }).map(
+                          (_, i) =>
+                            renderAssessmentButton(
+                              course,
+                              `CIE ${i + 1}`,
+                              course.cieMaxMarks
+                            )
                         )}
-                        {Array.from({ length: course.labCount || 0 }).map((_, i) =>
-                          renderAssessmentButton(course, `Lab ${i + 1}`, course.labMaxMarks)
+                        {Array.from({ length: course.labCount || 0 }).map(
+                          (_, i) =>
+                            renderAssessmentButton(
+                              course,
+                              `Lab ${i + 1}`,
+                              course.labMaxMarks
+                            )
                         )}
-                        {Array.from({ length: course.theoryMinExams || 0 }).map((_, i) =>
-                          renderAssessmentButton(course, `Theory Exam ${i + 1}`, course.theoryMaxMarks)
+                        {Array.from({
+                          length: course.theoryMinExams || 0,
+                        }).map((_, i) =>
+                          renderAssessmentButton(
+                            course,
+                            `Theory Exam ${i + 1}`,
+                            course.theoryMaxMarks
+                          )
                         )}
                         {(course.aatMaxMarks || 0) > 0 &&
-                          renderAssessmentButton(course, `AAT`, course.aatMaxMarks)}
+                          renderAssessmentButton(
+                            course,
+                            `AAT`,
+                            course.aatMaxMarks
+                          )}
                       </div>
                     </div>
                   </CardContent>
@@ -314,7 +404,6 @@ export const QuestionPaperDashboard = () => {
         </div>
       )}
 
-      {/* Dialogs */}
       {setupContext && (
         <QPSetupDialog
           open={!!setupContext}

@@ -31,7 +31,7 @@ import { Form } from "@webcampus/ui/components/form";
 import axios, { AxiosError, AxiosResponse } from "axios";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { CourseFormFields } from "./course-form-fields";
 
@@ -64,7 +64,7 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
 
   // ── Edit Form ──
   const form = useForm<CreateCourseDTO>({
-    resolver: zodResolver(CreateCourseSchema) as any,
+    resolver: zodResolver(CreateCourseSchema) as Resolver<CreateCourseDTO>,
     defaultValues: {
       code: course.code,
       name: course.name,

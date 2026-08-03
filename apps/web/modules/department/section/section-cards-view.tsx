@@ -31,7 +31,7 @@ import {
   TableRow,
 } from "@webcampus/ui/components/table";
 import axios, { AxiosError } from "axios";
-import { Plus, Trash2, Users } from "lucide-react";
+import { Plus, Trash2, Users, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { AssignStudentDialog } from "./assign-student-dialog";
@@ -97,6 +97,11 @@ export const SectionCardsView = ({
     sectionId: string;
     sectionName: string;
   } | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<{
+    assignmentId: string;
+    studentName: string;
+    sectionName: string;
+  } | null>(null);
 
   // Fetch sections with students
   const { data: sections, isLoading } = useQuery({
@@ -139,6 +144,27 @@ export const SectionCardsView = ({
       toast.error(
         err.response?.data?.message ||
           "Failed to delete section. It may have mapped students."
+      );
+    },
+  });
+
+  const removeStudentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      return axios.delete(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/section-assignment/${assignmentId}`,
+        { withCredentials: true }
+      );
+    },
+    onSuccess: (res) => {
+      toast.success(res.data.message || "Student removed from section");
+      queryClient.invalidateQueries({ queryKey: ["sections-with-students"] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-students"] });
+      setRemoveTarget(null);
+    },
+    onError: (err: AxiosError<{ message?: string }>) => {
+      toast.error(
+        err.response?.data?.message || "Failed to remove student from section"
       );
     },
   });
@@ -218,6 +244,9 @@ export const SectionCardsView = ({
                         <TableHead className="text-xs">USN</TableHead>
                         <TableHead className="text-xs">Name</TableHead>
                         <TableHead className="text-xs">Email</TableHead>
+                        {!isUgFirstYearReadOnly && (
+                          <TableHead className="w-10" />
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -232,12 +261,33 @@ export const SectionCardsView = ({
                           <TableCell className="text-muted-foreground text-xs">
                             {ss.student.user.email}
                           </TableCell>
+                          {!isUgFirstYearReadOnly && (
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-muted-foreground hover:text-destructive h-6 w-6"
+                                onClick={() =>
+                                  setRemoveTarget({
+                                    assignmentId: ss.id,
+                                    studentName: ss.student.user.name,
+                                    sectionName: section.name,
+                                  })
+                                }
+                              >
+                                <X className="h-3.5 w-3.5" />
+                                <span className="sr-only">
+                                  Remove from section
+                                </span>
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                       {section.studentSections.length === 0 && (
                         <TableRow>
                           <TableCell
-                            colSpan={3}
+                            colSpan={!isUgFirstYearReadOnly ? 4 : 3}
                             className="text-muted-foreground text-center text-xs"
                           >
                             No students assigned
@@ -304,6 +354,39 @@ export const SectionCardsView = ({
               disabled={deleteSectionMutation.isPending}
             >
               {deleteSectionMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={!!removeTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemoveTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Student from Section</AlertDialogTitle>
+            <AlertDialogDescription>
+              {`Are you sure you want to remove ${removeTarget?.studentName ?? ""} from Section ${removeTarget?.sectionName ?? ""}?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                if (!removeTarget?.assignmentId) {
+                  return;
+                }
+                removeStudentMutation.mutate(removeTarget.assignmentId);
+              }}
+              disabled={removeStudentMutation.isPending}
+            >
+              {removeStudentMutation.isPending ? "Removing..." : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

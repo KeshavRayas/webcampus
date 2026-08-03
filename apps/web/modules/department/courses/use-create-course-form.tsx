@@ -3,11 +3,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import { CreateCourseDTO, CreateCourseSchema } from "@webcampus/schemas/department";
+import {
+  CreateCourseDTO,
+  CreateCourseSchema,
+} from "@webcampus/schemas/department";
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
 import axios, { AxiosError, AxiosResponse } from "axios";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 
 export const useCreateCourseForm = (
@@ -19,7 +22,7 @@ export const useCreateCourseForm = (
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
   const form = useForm<CreateCourseDTO>({
-    resolver: zodResolver(CreateCourseSchema) as any,
+    resolver: zodResolver(CreateCourseSchema) as Resolver<CreateCourseDTO>,
     defaultValues: {
       code: "",
       name: "",

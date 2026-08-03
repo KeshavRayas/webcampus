@@ -16,9 +16,9 @@ export const useStudentTerms = () => {
   return useQuery({
     queryKey: ["student-academic-terms"],
     queryFn: async () => {
-      // Reusing the faculty assessment terms endpoint or student equivalent
+      // Reusing the student attendance terms endpoint
       const res = await axios.get<BaseResponse<AcademicTermResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment/terms`,
+        `${NEXT_PUBLIC_API_BASE_URL}/student/attendance/terms`,
         { withCredentials: true }
       );
       if (res.data.status === "success" && "data" in res.data) {

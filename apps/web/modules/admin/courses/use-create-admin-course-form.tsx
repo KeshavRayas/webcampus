@@ -10,9 +10,8 @@ import {
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
 import axios, { AxiosError, AxiosResponse } from "axios";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
-import { z } from "zod";
 
 type CourseCycle = "PHYSICS" | "CHEMISTRY" | "NONE";
 
@@ -26,8 +25,8 @@ export const useCreateAdminCourseForm = (
   const queryClient = useQueryClient();
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
-  const form = useForm<z.infer<typeof CreateCourseSchema>>({
-    resolver: zodResolver(CreateCourseSchema) as any,
+  const form = useForm<CreateCourseDTO>({
+    resolver: zodResolver(CreateCourseSchema) as Resolver<CreateCourseDTO>,
     defaultValues: {
       code: "",
       name: "",
