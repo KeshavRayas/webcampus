@@ -1,9 +1,15 @@
-const Page = () => {
-  return (
-    <div className="flex h-96 items-center justify-center">
-      <p className="text-muted-foreground text-sm">Attendance</p>
-    </div>
-  );
+import { AdminAttendanceReportView } from "@/modules/admin/academics/reports/admin-attendance-report-view";
+import { Metadata } from "next";
+import { Suspense } from "react";
+
+export const metadata: Metadata = {
+  title: "Admin - Attendance Report | WebCampus",
 };
 
-export default Page;
+export default function AdminAttendanceReportPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AdminAttendanceReportView />
+    </Suspense>
+  );
+}

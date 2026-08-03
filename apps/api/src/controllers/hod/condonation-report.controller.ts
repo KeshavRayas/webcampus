@@ -8,7 +8,13 @@ import { HODCondonationReportService } from "../../services/hod/condonation-repo
 
 const getStatusCode = (error: unknown): number => {
   if (!(error instanceof Error)) return 500;
-  if (error.message === "HOD profile not found") return 404;
+  if (
+    error.message.includes("not found") ||
+    error.message === "HOD profile not found or department not assigned"
+  ) {
+    return 404;
+  }
+  if (error.message.includes("your department")) return 404;
   return 500;
 };
 
@@ -38,19 +44,18 @@ export class HODCondonationReportController {
       // Extract filters from query parameters
       const filters = {
         semesterId: req.query.semesterId as string,
-        courseId: req.query.courseId as string | undefined,
+        courseId: req.query.courseId as string,
         sectionId: req.query.sectionId as string | undefined,
         cycle: req.query.cycle as string | undefined,
       };
 
-      if (!filters.semesterId) {
+      if (!filters.semesterId || !filters.courseId) {
         sendResponse({
           res,
           status: "error",
           statusCode: 400,
-          message: "Semester ID is required",
-          // Add this property to satisfy the strict type requirement
-          error: new Error("Semester ID is required"),
+          message: "Semester ID and course ID are required",
+          error: new Error("Semester ID and course ID are required"),
         });
         return;
       }

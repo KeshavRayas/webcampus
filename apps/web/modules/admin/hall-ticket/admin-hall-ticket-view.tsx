@@ -122,7 +122,7 @@ export const AdminHallTicketView = () => {
     };
   }, [previewData, previewTarget]);
 
-  const { data: termsData } = useAcademicTerms({ status: "ACTIVE" });
+  const { data: termsData } = useAcademicTerms();
   const { data: departmentsData } = useDepartments();
   const terms = termsData ?? [];
   const departments = departmentsData ?? [];

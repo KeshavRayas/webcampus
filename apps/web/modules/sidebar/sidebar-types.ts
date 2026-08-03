@@ -8,6 +8,10 @@ export interface NavMainProps {
     children?: {
       name: string;
       url: string;
+      children?: {
+        name: string;
+        url: string;
+      }[];
     }[];
   }[];
 }

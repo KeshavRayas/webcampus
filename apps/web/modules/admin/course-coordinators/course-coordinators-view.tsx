@@ -46,10 +46,17 @@ export const AdminCourseCoordinatorsView = () => {
 
       {selectedCourse && appliedFilters?.semesterId && (
         <div className="flex w-full flex-col gap-6">
-          <div className="flex items-center justify-between">
-            <CourseDetailsCard course={selectedCourse} />
-            <AuditHistoryDialog courseId={selectedCourse.id} />
-          </div>
+          <CourseDetailsCard course={selectedCourse}>
+            <div className="flex flex-col items-start gap-2 md:items-end">
+              <AuditHistoryDialog courseId={selectedCourse.id} />
+              {selectedCourse.lastOverrideAt && (
+                <span className="text-muted-foreground text-left text-xs md:text-right">
+                  Last override:{" "}
+                  {new Date(selectedCourse.lastOverrideAt).toLocaleString()}
+                </span>
+              )}
+            </div>
+          </CourseDetailsCard>
 
           <ManageCoordinatorsCard course={selectedCourse} />
         </div>

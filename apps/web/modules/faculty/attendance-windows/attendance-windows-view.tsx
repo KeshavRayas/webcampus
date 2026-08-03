@@ -77,7 +77,7 @@ const formatFrozenAt = (iso: string | null): string => {
 };
 
 export const AttendanceWindowsView = () => {
-  const { data: termsData } = useAcademicTerms({ status: "ACTIVE" });
+  const { data: termsData } = useAcademicTerms({ isCurrent: true });
   const terms = termsData ?? [];
 
   const [draftFilters, setDraftFilters] = useState<FilterState>(EMPTY_FILTERS);

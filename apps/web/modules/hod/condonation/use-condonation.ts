@@ -1,5 +1,6 @@
 "use client";
 
+import type { CondonationReportData } from "@/components/academics/reports/condonation-tables";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import type {
@@ -100,6 +101,49 @@ const invalidateCondonationQueries = (
   queryClient: ReturnType<typeof useQueryClient>
 ) => {
   queryClient.invalidateQueries({ queryKey: ["hod-condonation"] });
+  queryClient.invalidateQueries({ queryKey: ["hod-condonation-report"] });
+};
+
+export const useHODCondonationReport = (
+  filters: {
+    academicTermId: string;
+    semesterId: string;
+    courseId: string;
+    sectionId?: string;
+    cycle?: string;
+  } | null,
+  enabled: boolean
+) => {
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+
+  return useQuery({
+    queryKey: ["hod-condonation-report", filters],
+    queryFn: async (): Promise<CondonationReportData> => {
+      if (!filters) {
+        throw new Error("Missing report filters");
+      }
+      const res = await axios.get<BaseResponse<CondonationReportData>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/hod/condonation/report`,
+        {
+          params: {
+            academicTermId: filters.academicTermId,
+            semesterId: filters.semesterId,
+            courseId: filters.courseId,
+            ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+            ...(filters.cycle ? { cycle: filters.cycle } : {}),
+          },
+          withCredentials: true,
+        }
+      );
+      if (res.data.status === "success" && res.data.data) {
+        return res.data.data;
+      }
+      throw new Error(res.data.message || "Failed to fetch condonation report");
+    },
+    enabled:
+      enabled && Boolean(filters?.semesterId) && Boolean(filters?.courseId),
+    retry: false,
+  });
 };
 
 export const useHODApproveCondonation = () => {

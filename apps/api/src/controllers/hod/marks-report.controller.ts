@@ -1,12 +1,26 @@
 import { auth } from "@webcampus/auth";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
+import { logger } from "@webcampus/common/logger";
 import { Cycle } from "@webcampus/db";
 import { fromNodeHeaders } from "better-auth/node";
 import { Request, Response } from "express";
 import { HODMarksReportService } from "../../services/hod/marks-report.service";
 
+const getStatusCode = (error: unknown): number => {
+  if (!(error instanceof Error)) return 500;
+  if (error.message === "Unauthorized") return 401;
+  if (
+    error.message.includes("not found") ||
+    error.message === "HOD profile not found or department not assigned"
+  ) {
+    return 404;
+  }
+  if (error.message.includes("your department")) return 404;
+  return 500;
+};
+
 export class HODMarksReportController {
-  private static async getUserId(req: Request) {
+  private static async getUserId(req: Request): Promise<string> {
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),
     });
@@ -21,11 +35,15 @@ export class HODMarksReportController {
       );
       sendResponse({ res, ...response, statusCode: 200 });
     } catch (error) {
+      logger.error("Controller Error (getFilterOptions):", error);
       sendResponse({
         res,
         status: "error",
-        message: "Failed",
-        statusCode: 500,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch filter options",
+        statusCode: getStatusCode(error),
         error,
       });
     }
@@ -37,18 +55,21 @@ export class HODMarksReportController {
         semesterId: string;
         cycle?: string;
       };
+      if (!semesterId) throw new Error("Missing semesterId");
       const response = await HODMarksReportService.getCourses(
         await HODMarksReportController.getUserId(req),
         semesterId,
-        cycle as Cycle
+        cycle
       );
       sendResponse({ res, ...response, statusCode: 200 });
     } catch (error) {
+      logger.error("Controller Error (getCourses):", error);
       sendResponse({
         res,
         status: "error",
-        message: "Failed",
-        statusCode: 500,
+        message:
+          error instanceof Error ? error.message : "Failed to fetch courses",
+        statusCode: getStatusCode(error),
         error,
       });
     }
@@ -61,6 +82,9 @@ export class HODMarksReportController {
         courseId: string;
         cycle?: string;
       };
+      if (!semesterId || !courseId) {
+        throw new Error("Missing semesterId or courseId");
+      }
       const response = await HODMarksReportService.getSections(
         await HODMarksReportController.getUserId(req),
         semesterId,
@@ -69,11 +93,13 @@ export class HODMarksReportController {
       );
       sendResponse({ res, ...response, statusCode: 200 });
     } catch (error) {
+      logger.error("Controller Error (getSections):", error);
       sendResponse({
         res,
         status: "error",
-        message: "Failed",
-        statusCode: 500,
+        message:
+          error instanceof Error ? error.message : "Failed to fetch sections",
+        statusCode: getStatusCode(error),
         error,
       });
     }
@@ -82,14 +108,22 @@ export class HODMarksReportController {
   static async getAssessments(req: Request, res: Response) {
     try {
       const { courseId } = req.query as { courseId: string };
-      const response = await HODMarksReportService.getAssessments(courseId);
+      if (!courseId) throw new Error("Missing courseId");
+      const response = await HODMarksReportService.getAssessments(
+        await HODMarksReportController.getUserId(req),
+        courseId
+      );
       sendResponse({ res, ...response, statusCode: 200 });
     } catch (error) {
+      logger.error("Controller Error (getAssessments):", error);
       sendResponse({
         res,
         status: "error",
-        message: "Failed",
-        statusCode: 500,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch assessments",
+        statusCode: getStatusCode(error),
         error,
       });
     }
@@ -97,21 +131,31 @@ export class HODMarksReportController {
 
   static async getMarksReport(req: Request, res: Response) {
     try {
-      const { sectionId, assessmentId } = req.query as {
+      const { courseId, sectionId, assessmentId } = req.query as {
+        courseId: string;
         sectionId: string;
-        assessmentId: string;
+        assessmentId?: string;
       };
+      if (!courseId || !sectionId) {
+        throw new Error("Missing courseId or sectionId");
+      }
       const response = await HODMarksReportService.getMarksReport(
+        await HODMarksReportController.getUserId(req),
+        courseId,
         sectionId,
         assessmentId
       );
       sendResponse({ res, ...response, statusCode: 200 });
     } catch (error) {
+      logger.error("Controller Error (getMarksReport):", error);
       sendResponse({
         res,
         status: "error",
-        message: "Failed",
-        statusCode: 500,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch marks report",
+        statusCode: getStatusCode(error),
         error,
       });
     }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useHODSections } from "@/modules/hod/attendance-windows/use-attendance-windows";
+import { useHODAttendanceFilterOptions } from "@/modules/hod/attendance/use-hod-attendance-report";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -168,11 +168,11 @@ const EmptyState = ({ message }: { message: string }) => (
 
 export const CondonationView = () => {
   const {
-    data: termsData,
+    data: optionsData,
     isLoading: termsLoading,
     isError: termsError,
-  } = useAcademicTerms({ status: "ACTIVE" });
-  const terms = termsData ?? [];
+  } = useHODAttendanceFilterOptions();
+  const terms = optionsData?.academicTerms ?? [];
 
   const [draftFilters, setDraftFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] =
@@ -189,10 +189,12 @@ export const CondonationView = () => {
   const [revokeRecalculatedPercentage, setRevokeRecalculatedPercentage] =
     useState<number>(0);
 
-  const selectedDraftTerm = terms.find(
-    (term) => term.id === draftFilters.academicTermId
-  );
-  const semesterOptions = selectedDraftTerm?.Semester ?? [];
+  const semesterOptions = useMemo(() => {
+    if (!draftFilters.academicTermId) return [];
+    return (optionsData?.semesters ?? []).filter(
+      (semester) => semester.academicTermId === draftFilters.academicTermId
+    );
+  }, [optionsData?.semesters, draftFilters.academicTermId]);
 
   const coursesEnabled = !!draftFilters.semesterId;
   const {
@@ -278,7 +280,7 @@ export const CondonationView = () => {
         type: "select",
         hideAllOption: true,
         options: terms.map((term) => ({
-          label: `${term.type.toUpperCase()} ${term.year}`,
+          label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
           value: term.id,
         })),
       },

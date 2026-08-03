@@ -3,12 +3,17 @@
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Card, CardContent } from "@webcampus/ui/components/card";
+import React from "react";
 
 interface CourseDetailsCardProps {
   course: CourseResponseDTO;
+  children?: React.ReactNode;
 }
 
-export const CourseDetailsCard = ({ course }: CourseDetailsCardProps) => {
+export const CourseDetailsCard = ({
+  course,
+  children,
+}: CourseDetailsCardProps) => {
   const hasLaboratory = course.practicalCredits > 0;
   const hasTheory = course.lectureCredits > 0 || course.tutorialCredits > 0;
 
@@ -82,7 +87,7 @@ export const CourseDetailsCard = ({ course }: CourseDetailsCardProps) => {
         </div>
 
         {/* Right: Credits */}
-        <div className="flex flex-col items-start gap-1 md:w-1/3 md:items-end">
+        <div className="flex flex-col items-start gap-1 md:w-1/3 md:items-start">
           <span className="text-muted-foreground mb-0.5 text-xs font-medium">
             Credits
           </span>
@@ -104,6 +109,13 @@ export const CourseDetailsCard = ({ course }: CourseDetailsCardProps) => {
             Total: {course.totalCredits}
           </span>
         </div>
+
+        {/* Extra Actions */}
+        {children && (
+          <div className="flex flex-1 flex-col items-start gap-2 border-t pt-4 md:items-end md:border-l md:border-t-0 md:pl-4 md:pt-0">
+            {children}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

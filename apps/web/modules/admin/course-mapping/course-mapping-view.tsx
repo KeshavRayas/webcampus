@@ -459,18 +459,17 @@ export const AdminCourseMappingView = () => {
         appliedFilters.semesterId &&
         academicYear && (
           <div className="flex w-full flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <CourseDetailsCard course={selectedCourse} />
+            <CourseDetailsCard course={selectedCourse}>
+              <div className="flex flex-col items-start gap-2 md:items-end">
+                <AuditHistoryDialog courseId={selectedCourse.id} />
                 {selectedCourse.lastOverrideAt && (
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-muted-foreground text-left text-xs md:text-right">
                     Last override:{" "}
                     {new Date(selectedCourse.lastOverrideAt).toLocaleString()}
                   </span>
                 )}
               </div>
-              <AuditHistoryDialog courseId={selectedCourse.id} />
-            </div>
+            </CourseDetailsCard>
 
             <div className="bg-card text-card-foreground w-full overflow-hidden rounded-xl border shadow-sm">
               <div className="p-6">
