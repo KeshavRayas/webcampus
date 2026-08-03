@@ -84,5 +84,12 @@ export const useCreateAdminCourseForm = (
     },
   });
 
-  return { form, mutate };
+  const onSubmit = (values: CreateCourseDTO) => {
+    mutate({
+      ...values,
+      cycle: defaultCycle,
+    });
+  };
+
+  return { form, onSubmit };
 };
