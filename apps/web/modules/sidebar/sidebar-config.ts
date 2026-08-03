@@ -8,6 +8,7 @@ import {
   FileText,
   Fingerprint,
   GraduationCap,
+  IndianRupee,
   LayoutDashboard,
   Library,
   LifeBuoy,
@@ -379,6 +380,18 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Profile",
           url: "/coe/profile",
           icon: User,
+        },
+      ],
+    },
+    navSecondary,
+  },
+  finance: {
+    navMain: {
+      items: [
+        {
+          name: "Finance",
+          url: "/finance",
+          icon: IndianRupee,
         },
       ],
     },

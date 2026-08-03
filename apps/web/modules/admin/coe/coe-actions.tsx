@@ -47,6 +47,7 @@ export const CoeActions = ({ user }: { user: CoeUser }) => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
 
   const editForm = useForm<UpdateCoeFormValues>({
@@ -137,6 +138,11 @@ export const CoeActions = ({ user }: { user: CoeUser }) => {
   });
 
   const handleEditSubmit = async (data: UpdateCoeFormValues) => {
+    if (!user.image && !photoFile) {
+      setPhotoError("Profile photo is required");
+      toast.error("Profile photo is required");
+      return;
+    }
     try {
       await updateCoe(data);
       setIsEditOpen(false);
@@ -211,7 +217,9 @@ export const CoeActions = ({ user }: { user: CoeUser }) => {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full Name *</FormLabel>
+                    <FormLabel>
+                      Full Name <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="e.g., Jane Doe" />
                     </FormControl>
@@ -225,7 +233,9 @@ export const CoeActions = ({ user }: { user: CoeUser }) => {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username *</FormLabel>
+                    <FormLabel>
+                      Username <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="e.g., jane.doe" />
                     </FormControl>
@@ -239,7 +249,9 @@ export const CoeActions = ({ user }: { user: CoeUser }) => {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email *</FormLabel>
+                    <FormLabel>
+                      Email <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Input
                         {...field}
@@ -252,18 +264,26 @@ export const CoeActions = ({ user }: { user: CoeUser }) => {
                 )}
               />
 
-              <UserPhotoUpload
-                label="Profile Photo"
-                personName={editForm.watch("name") || user.name}
-                previewUrl={photoPreview}
-                currentImageUrl={user.image}
-                selectedFileName={photoFile?.name || null}
-                onChange={(event) => {
-                  const file = event.target.files?.[0] || null;
-                  setPhotoFile(file);
-                  replacePhotoPreview(file);
-                }}
-              />
+              <div>
+                <UserPhotoUpload
+                  label="Profile Photo *"
+                  personName={editForm.watch("name") || user.name}
+                  previewUrl={photoPreview}
+                  currentImageUrl={user.image}
+                  selectedFileName={photoFile?.name || null}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    setPhotoFile(file);
+                    if (file) setPhotoError(null);
+                    replacePhotoPreview(file);
+                  }}
+                />
+                {photoError && (
+                  <p className="text-destructive mt-1 text-sm font-medium">
+                    {photoError}
+                  </p>
+                )}
+              </div>
 
               <DialogFooter>
                 <Button

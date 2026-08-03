@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { AdminAdmissionUserService } from "@webcampus/api/src/services/admin/admission-user.service";
+import { CoeService } from "@webcampus/api/src/services/admin/coe.service";
 import { AdminFacultyService } from "@webcampus/api/src/services/admin/faculty.service";
 import { SemesterService } from "@webcampus/api/src/services/admin/semester.service";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
@@ -880,12 +881,64 @@ class MockStarter {
     }
   }
 
+  public async seedCoeUser(): Promise<void> {
+    const coeData = {
+      name: "COE User",
+      email: "coe@webcampus.com",
+      username: "coe",
+      password: DEFAULT_PASSWORD,
+      role: "coe",
+    };
+
+    const existing = await db.user.findFirst({
+      where: {
+        OR: [{ email: coeData.email }, { username: coeData.username }],
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await db.user.update({
+        where: { id: existing.id },
+        data: {
+          name: coeData.name,
+          email: coeData.email,
+          username: coeData.username,
+          displayUsername: coeData.name,
+          role: "coe",
+        },
+      });
+
+      const existingCoe = await db.coe.findUnique({
+        where: { userId: existing.id },
+      });
+      if (!existingCoe) {
+        await db.coe.create({
+          data: { userId: existing.id },
+        });
+      }
+      logger.info(`Updated COE user ${coeData.email}`);
+      return;
+    }
+
+    try {
+      await CoeService.create({
+        ...coeData,
+        headers: this.getHeaders(),
+      });
+      logger.info(`Created COE user ${coeData.email}`);
+    } catch (error) {
+      logger.error(`Failed to seed COE user: ${(error as Error).message}`);
+    }
+  }
+
   public async run(): Promise<void> {
     await this.signIn();
     const departmentIdByCode = await this.seedDepartments();
     await this.seedAcademicTermAndSemesters();
     await this.seedFaculty(departmentIdByCode);
     await this.seedAdmissionUsers();
+    await this.seedCoeUser();
     logger.info("mock_start script completed successfully.");
   }
 }

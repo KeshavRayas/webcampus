@@ -21,6 +21,7 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
+import { PasswordInput } from "@webcampus/ui/components/password-input";
 import axios, { AxiosError } from "axios";
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -30,9 +31,9 @@ import { UserPhotoUpload } from "../shared/user-photo-upload";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
+  username: z.string().min(1, "Username is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  username: z.string().min(1, "Username is required"),
 });
 
 export const CoeForm = () => {
@@ -40,6 +41,7 @@ export const CoeForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
@@ -48,9 +50,9 @@ export const CoeForm = () => {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      email: "",
-      password: "",
       username: "",
+      email: "",
+      password: "password",
     },
   });
 
@@ -71,14 +73,21 @@ export const CoeForm = () => {
   };
 
   const resetFormState = () => {
-    form.reset();
+    form.reset({
+      name: "",
+      username: "",
+      email: "",
+      password: "password",
+    });
     setPhotoFile(null);
+    setPhotoError(null);
     replacePhotoPreview(null);
   };
 
   const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
     setPhotoFile(file);
+    if (file) setPhotoError(null);
     replacePhotoPreview(file);
   };
 
@@ -91,17 +100,20 @@ export const CoeForm = () => {
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!photoFile) {
+      setPhotoError("Profile photo is required");
+      toast.error("Profile photo is required");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const formData = new FormData();
       formData.append("name", values.name);
+      formData.append("username", values.username);
       formData.append("email", values.email);
       formData.append("password", values.password);
-      formData.append("username", values.username);
-
-      if (photoFile) {
-        formData.append("photo", photoFile);
-      }
+      formData.append("photo", photoFile);
 
       const res = await axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/coe`,
@@ -158,22 +170,11 @@ export const CoeForm = () => {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Full Name</FormLabel>
+                  <FormLabel>
+                    Full Name <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input placeholder="John Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="john.doe@example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -184,9 +185,26 @@ export const CoeForm = () => {
               name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Username</FormLabel>
+                  <FormLabel>
+                    Username <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input placeholder="johndoe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Email <span className="text-red-500">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="john.doe@example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -197,22 +215,31 @@ export const CoeForm = () => {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>
+                    Password <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="******" {...field} />
+                    <PasswordInput placeholder="******" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <UserPhotoUpload
-              label="Profile Photo"
-              personName={form.watch("name") || "COE User"}
-              previewUrl={photoPreview}
-              selectedFileName={photoFile?.name || null}
-              onChange={handlePhotoChange}
-            />
+            <div>
+              <UserPhotoUpload
+                label="Profile Photo *"
+                personName={form.watch("name") || "COE User"}
+                previewUrl={photoPreview}
+                selectedFileName={photoFile?.name || null}
+                onChange={handlePhotoChange}
+              />
+              {photoError && (
+                <p className="text-destructive text-sm font-medium mt-1">
+                  {photoError}
+                </p>
+              )}
+            </div>
 
             <DialogFooter>
               <Button
@@ -233,3 +260,4 @@ export const CoeForm = () => {
     </Dialog>
   );
 };
+
