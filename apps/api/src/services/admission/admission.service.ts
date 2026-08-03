@@ -972,15 +972,22 @@ export class AdmissionService {
         semester.academicTerm.year
       );
 
-      const allApprovedApplicationIds = approvedAdmissions.map(
+      const unportedApplicationIds = approvedUnportedAdmissions.map(
         (admission) => admission.primaryEmail
       );
 
-      const { userIdByApplicationId, autoCreatedUsers } =
-        await AdmissionService.resolveApplicantUsersForPort(
-          allApprovedApplicationIds,
-          headers
-        );
+      let userIdByApplicationId = new Map<string, string>();
+      let autoCreatedUsers = 0;
+
+      if (unportedApplicationIds.length > 0) {
+        const resolvedApplicantUsers =
+          await AdmissionService.resolveApplicantUsersForPort(
+            unportedApplicationIds,
+            headers
+          );
+        userIdByApplicationId = resolvedApplicantUsers.userIdByApplicationId;
+        autoCreatedUsers = resolvedApplicantUsers.autoCreatedUsers;
+      }
 
       let newlyPorted = 0;
       let alreadyPorted = 0;

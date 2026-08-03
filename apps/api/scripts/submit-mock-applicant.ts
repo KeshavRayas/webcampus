@@ -15,11 +15,12 @@ const PDF_URL =
 interface ParsedArgs {
   count: number;
   departmentCode: string;
+  port: boolean;
 }
 
 const parseCliArguments = (): ParsedArgs => {
   const args = process.argv.slice(2);
-  const result: Partial<ParsedArgs> = {};
+  const result: Partial<ParsedArgs> = { port: false };
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--count") {
@@ -31,11 +32,11 @@ const parseCliArguments = (): ParsedArgs => {
       }
 
       const parsed = Number.parseInt(countValue, 10);
-      if (Number.isFinite(parsed) && parsed > 0) {
+      if (Number.isFinite(parsed) && parsed >= 0) {
         result.count = parsed;
       } else {
         throw new Error(
-          `Invalid --count value: "${countValue}". Must be a positive integer.`
+          `Invalid --count value: "${countValue}". Must be a non-negative integer.`
         );
       }
       i++;
@@ -49,10 +50,24 @@ const parseCliArguments = (): ParsedArgs => {
 
       result.departmentCode = departmentValue;
       i++;
+    } else if (args[i] === "--port" || args[i]?.startsWith("--port=")) {
+      const portFlag = args[i]!;
+      const inlineValue = portFlag.split("=")[1];
+      if (inlineValue !== undefined) {
+        result.port = /^(on|1|true|yes)$/i.test(inlineValue);
+      } else {
+        const next = args[i + 1];
+        if (next && /^(on|off|1|0|true|false|yes|no)$/i.test(next)) {
+          result.port = /^(on|1|true|yes)$/i.test(next);
+          i++;
+        } else {
+          result.port = true;
+        }
+      }
     }
   }
 
-  if (!result.count) {
+  if (result.count === undefined) {
     throw new Error(
       "Missing required parameter --count.\n" +
         "Usage: npm run submit-mock-applicant --count <number> --dept <code>\n" +
@@ -189,6 +204,10 @@ const submitAndApprove = async (
     firstName,
     lastName,
     nameAsPer10th: fullName,
+    modeOfAdmission: "KCET",
+    categoryClaimed: "GM",
+    categoryAllotted: "GM",
+    quota: "CET-AIDED",
     primaryEmail: email,
     semesterId,
     departmentId,
@@ -245,8 +264,8 @@ async function main() {
   }
 
   const context = await resolveContext(args.departmentCode);
-  // let nextApplicationNumber = await getNextApplicationNumber();
   let approvedCreated = 0;
+  const failedApplicants: { email: string; error: string }[] = [];
 
   logger.info("Starting bulk applicant generation", {
     targetCount: args.count,
@@ -254,15 +273,14 @@ async function main() {
     department: args.departmentCode,
     term: "odd 2026",
     semester: "UG 1",
-    quota: "MERIT",
-    category: "GENERAL",
-    porting: false,
+    quota: "CET-AIDED",
+    category: "GM",
+    porting: args.port,
   });
 
-  while (approvedCreated < args.count) {
-    const email = `mock${approvedCreated + 1}@bmsce.ac.in`;
+  for (let attempt = 1; attempt <= args.count; attempt++) {
+    const email = `mock${attempt}@bmsce.ac.in`;
     const password = "password";
-    // nextApplicationNumber += 1;
 
     const existing = await db.admission.findUnique({
       where: {
@@ -274,11 +292,11 @@ async function main() {
     });
 
     if (existing) {
+      logger.info("Skipping existing applicant", { email });
       continue;
     }
 
     try {
-      // Generate the names BEFORE creating the shell
       const firstName = faker.person.firstName();
       const lastName = faker.person.lastName();
 
@@ -297,25 +315,27 @@ async function main() {
         );
       }
 
-      const admissionId =
-        (shellResponse.data as { id?: string } | null)?.id ??
-        (
-          await db.admission.findFirst({
-            where: {
-              primaryEmail: email,
-            },
-            select: { id: true },
-          })
-        )?.id;
+      const admission = await db.admission.findFirst({
+        where: {
+          primaryEmail: email,
+          semesterId: context.semesterId,
+        },
+        select: { id: true },
+      });
 
-      if (!admissionId) {
+      if (!admission?.id) {
         throw new Error(`Admission id not found for ${email}`);
       }
 
+      logger.info("Resolved admission", {
+        email,
+        admissionId: admission.id,
+      });
+
       await submitAndApprove(
         email,
-        approvedCreated + 1,
-        admissionId,
+        attempt,
+        admission.id,
         firstName,
         lastName,
         context.departmentId,
@@ -323,16 +343,47 @@ async function main() {
       );
       approvedCreated += 1;
 
-      if (approvedCreated % 50 === 0 || approvedCreated === args.count) {
+      if (approvedCreated % 50 === 0 || attempt === args.count) {
         logger.info("Bulk progress", {
           approvedCreated,
+          attempt,
           targetCount: args.count,
           latestEmail: email,
         });
       }
     } catch (error) {
-      logger.warn("Skipping failed applicant and continuing", {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error("Applicant processing failed", {
         email,
+        error: errorMsg,
+      });
+      failedApplicants.push({ email, error: errorMsg });
+    }
+  }
+
+  if (failedApplicants.length > 0) {
+    logger.error("Applicant failures summary", {
+      failedCount: failedApplicants.length,
+      failures: failedApplicants.slice(0, 10),
+    });
+  }
+
+  if (args.port) {
+    logger.warn(
+      "Porting is semester-wide: all APPROVED admissions in this semester will be ported to students, not only the mock applicants created by this script."
+    );
+
+    try {
+      const portResponse = await AdmissionService.portStudents(
+        { semesterId: context.semesterId },
+        context.headers
+      );
+
+      logger.info("Port result", {
+        data: (portResponse as { data?: unknown }).data,
+      });
+    } catch (error) {
+      logger.error("Failed to port applicants to students", {
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -342,8 +393,13 @@ async function main() {
     approvedCreated,
     targetCount: args.count,
     status: "APPROVED",
-    portingTriggered: false,
+    porting: args.port,
+    failedCount: failedApplicants.length,
   });
+
+  if (failedApplicants.length > 0) {
+    process.exitCode = 1;
+  }
 }
 
 main()
