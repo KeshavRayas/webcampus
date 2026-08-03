@@ -227,13 +227,14 @@ export class CourseController {
     res: Response
   ): Promise<void> {
     try {
-      const { courseIds } = req.body;
+      const { semesterId, cycle } = req.body;
       const departmentContext = await getDepartmentRequestContext(req);
-      
-      // PERFECTLY ALIGNED SIGNATURE
+
       const response = await CourseService.bulkSubmitForApproval(
-        courseIds || [],
-        departmentContext.userId
+        semesterId,
+        departmentContext.departmentId,
+        undefined,
+        cycle
       );
 
       if (response.status === "success") {
@@ -267,10 +268,8 @@ export class CourseController {
         headers: fromNodeHeaders(req.headers),
       });
       const role = session?.user?.role as "admin" | "coe";
-      const departmentContext = await getDepartmentRequestContext(req);
 
-      // PERFECTLY ALIGNED SIGNATURE
-      const response = await CourseService.getGroupedCourseSubmissions(role, departmentContext);
+      const response = await CourseService.getGroupedCourseSubmissions(role);
 
       if (response.status === "success") {
         sendResponse({
@@ -313,9 +312,9 @@ export class CourseController {
         departmentId,
         departmentName,
         cycle,
-        session.user.id,
-        session.user.username?? undefined,
-        session.user.displayUsername?? undefined,
+        session.user.role as "admin" | "coe",
+        session.user.username ?? undefined,
+        session.user.displayUsername ?? undefined
       );
 
       if (response.status === "success") {
@@ -352,18 +351,17 @@ export class CourseController {
         throw new Error("Unauthorized");
       }
 
-      const { semesterId, departmentId, departmentName, reviewerNotes, cycle } = req.body;
+      const { semesterId, departmentId, departmentName, reviewerNotes, cycle } =
+        req.body;
 
       // PERFECTLY ALIGNED SIGNATURE (reviewerNotes is 2nd argument)
       const response = await CourseService.requestRevisionForSemester(
         semesterId,
-        reviewerNotes,
         departmentId,
         departmentName,
+        reviewerNotes,
         cycle,
-        session.user.id,
-        session.user.username?? undefined,
-        session.user.displayUsername?? undefined
+        session.user.role as "admin" | "coe"
       );
 
       if (response.status === "success") {

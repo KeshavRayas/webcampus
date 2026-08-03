@@ -22,8 +22,16 @@ import {
 } from "@webcampus/ui/components/table";
 import axios, { AxiosError } from "axios";
 import { UserPlus } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+
+interface AssignableStudent {
+  id: string;
+  usn: string;
+  user: { name: string; email: string };
+  department: { id: string; name: string };
+  currentSection: { id: string; name: string } | null;
+}
 
 interface AssignStudentDialogProps {
   open: boolean;
@@ -47,6 +55,12 @@ export const AssignStudentDialog = ({
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  useEffect(() => {
+    if (open) {
+      setSelectedIds(new Set());
+    }
+  }, [open]);
+
   const { data: studentList = [], isLoading } = useQuery({
     queryKey: ["unassigned-students", sectionId, semesterId, academicYear],
     queryFn: async () => {
@@ -63,13 +77,19 @@ export const AssignStudentDialog = ({
     enabled: open && !!semesterId && !!academicYear, // Ensure dialog is open and params exist
   });
 
-  const toggleStudent = (id: string) => {
+  const isInThisSection = (student: AssignableStudent) =>
+    student.currentSection?.id === sectionId;
+
+  const toggleStudent = (student: AssignableStudent) => {
+    if (isInThisSection(student)) {
+      return;
+    }
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
+      if (next.has(student.id)) {
+        next.delete(student.id);
       } else {
-        next.add(id);
+        next.add(student.id);
       }
       return next;
     });
@@ -77,10 +97,13 @@ export const AssignStudentDialog = ({
 
   const toggleAll = () => {
     if (!studentList) return;
-    if (selectedIds.size === studentList.length) {
+    const selectable = studentList.filter(
+      (s: AssignableStudent) => !isInThisSection(s)
+    );
+    if (selectedIds.size === selectable.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(studentList.map((s: { id: string }) => s.id)));
+      setSelectedIds(new Set(selectable.map((s: AssignableStudent) => s.id)));
     }
   };
 
@@ -127,14 +150,14 @@ export const AssignStudentDialog = ({
 
         {isLoading && (
           <p className="text-muted-foreground py-4 text-center text-sm">
-            Loading unassigned students...
+            Loading students...
           </p>
         )}
 
         {!isLoading && studentList.length === 0 && (
           <div className="text-muted-foreground py-8 text-center">
             <p className="text-sm">
-              No unassigned students found for this semester.
+              No students found for this department and semester.
             </p>
           </div>
         )}
@@ -143,7 +166,13 @@ export const AssignStudentDialog = ({
           <>
             <div className="flex items-center justify-between">
               <p className="text-muted-foreground text-sm">
-                {selectedIds.size} of {studentList.length} selected
+                {selectedIds.size} of{" "}
+                {
+                  studentList.filter(
+                    (s: AssignableStudent) => !isInThisSection(s)
+                  ).length
+                }{" "}
+                selected
               </p>
               <Button
                 type="button"
@@ -151,7 +180,10 @@ export const AssignStudentDialog = ({
                 size="sm"
                 onClick={toggleAll}
               >
-                {selectedIds.size === studentList.length
+                {selectedIds.size ===
+                studentList.filter(
+                  (s: AssignableStudent) => !isInThisSection(s)
+                ).length
                   ? "Deselect All"
                   : "Select All"}
               </Button>
@@ -163,24 +195,26 @@ export const AssignStudentDialog = ({
                     <TableHead className="w-10" />
                     <TableHead className="text-xs">USN</TableHead>
                     <TableHead className="text-xs">Name</TableHead>
+                    <TableHead className="text-xs">Department</TableHead>
+                    <TableHead className="text-xs">Current Section</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {studentList.map(
-                    (student: {
-                      id: string;
-                      usn: string;
-                      user: { name: string };
-                    }) => (
+                  {studentList.map((student: AssignableStudent) => {
+                    const inThisSection = isInThisSection(student);
+                    return (
                       <TableRow
                         key={student.id}
-                        className="cursor-pointer"
-                        onClick={() => toggleStudent(student.id)}
+                        className={
+                          inThisSection ? "opacity-60" : "cursor-pointer"
+                        }
+                        onClick={() => toggleStudent(student)}
                       >
                         <TableCell>
                           <Checkbox
                             checked={selectedIds.has(student.id)}
-                            onCheckedChange={() => toggleStudent(student.id)}
+                            disabled={inThisSection}
+                            onCheckedChange={() => toggleStudent(student)}
                           />
                         </TableCell>
                         <TableCell className="font-mono text-xs">
@@ -189,9 +223,25 @@ export const AssignStudentDialog = ({
                         <TableCell className="text-xs">
                           {student.user.name}
                         </TableCell>
+                        <TableCell className="text-xs">
+                          {student.department.name}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {inThisSection ? (
+                            <span className="text-muted-foreground">
+                              In this section
+                            </span>
+                          ) : student.currentSection ? (
+                            `Section ${student.currentSection.name}`
+                          ) : (
+                            <span className="text-muted-foreground">
+                              Unassigned
+                            </span>
+                          )}
+                        </TableCell>
                       </TableRow>
-                    )
-                  )}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

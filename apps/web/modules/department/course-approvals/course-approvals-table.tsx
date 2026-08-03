@@ -339,6 +339,8 @@ export const CourseApprovalsTable = ({
             <CourseDetailContent
               courseId={detailCourse.id}
               course={detailCourse}
+              semesterId={detailCourse.semesterId}
+              academicYear={appliedFilters?.academicYear ?? ""}
             />
           )}
         </DialogContent>
@@ -359,15 +361,19 @@ interface MappingInfo {
 interface CoordinatorInfo {
   id: string;
   facultyId: string;
-  faculty: { name: string };
+  faculty: { name?: string; user?: { name: string } };
 }
 
 const CourseDetailContent = ({
   courseId,
   course,
+  semesterId,
+  academicYear,
 }: {
   courseId: string;
   course: CourseResponseDTO;
+  semesterId: string;
+  academicYear: string;
 }) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
@@ -376,13 +382,16 @@ const CourseDetailContent = ({
     queryFn: async () => {
       const res = await axios.get<BaseResponse<MappingInfo[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/by-course`,
-        { params: { courseId }, withCredentials: true }
+        {
+          params: { courseId, semesterId, academicYear },
+          withCredentials: true,
+        }
       );
       return res.data.status === "success" && res.data.data
         ? res.data.data
         : [];
     },
-    enabled: !!courseId,
+    enabled: !!courseId && !!semesterId && !!academicYear,
   });
 
   const { data: coordinators, isLoading: loadingCoords } = useQuery({
@@ -493,27 +502,53 @@ const CourseDetailContent = ({
                 </h4>
                 <div className="overflow-hidden rounded-md border p-3">
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    <div className="text-muted-foreground font-medium">SEE:</div>
-                    <div>{course.seeMaxMarks} (Min: {course.seeEligibility}%)</div>
-                    
-                    <div className="text-muted-foreground font-medium">CIE:</div>
-                    <div>{course.cieCount} Exams | {course.cieMaxMarks} (Min: {course.cieEligibility}%)</div>
-                    
-                    <div className="text-muted-foreground font-medium">Theory:</div>
-                    <div>{course.theoryMinExams} Exams | {course.theoryMaxMarks} (Min: {course.theoryEligibility}%)</div>
-                    
-                    <div className="text-muted-foreground font-medium">AAT:</div>
-                    <div>{course.aatMaxMarks} (Min: {course.aatEligibility}%)</div>
-                    
-                    <div className="text-muted-foreground font-medium">Lab:</div>
-                    <div>{course.labCount} Sessions | {course.labMaxMarks} (Min: {course.labEligibility}%)</div>
-                    
-                    <div className="text-muted-foreground font-medium border-t pt-2 mt-1">Cumulative Max:</div>
-                    <div className="border-t pt-2 mt-1">{(course.cieMaxMarks || 0) + (course.seeMaxMarks || 0)}</div>
+                    <div className="text-muted-foreground font-medium">
+                      SEE:
+                    </div>
+                    <div>
+                      {course.seeMaxMarks} (Min: {course.seeEligibility}%)
+                    </div>
+
+                    <div className="text-muted-foreground font-medium">
+                      CIE:
+                    </div>
+                    <div>
+                      {course.cieCount} Exams | {course.cieMaxMarks} (Min:{" "}
+                      {course.cieEligibility}%)
+                    </div>
+
+                    <div className="text-muted-foreground font-medium">
+                      Theory:
+                    </div>
+                    <div>
+                      {course.theoryMinExams} Exams | {course.theoryMaxMarks}{" "}
+                      (Min: {course.theoryEligibility}%)
+                    </div>
+
+                    <div className="text-muted-foreground font-medium">
+                      AAT:
+                    </div>
+                    <div>
+                      {course.aatMaxMarks} (Min: {course.aatEligibility}%)
+                    </div>
+
+                    <div className="text-muted-foreground font-medium">
+                      Lab:
+                    </div>
+                    <div>
+                      {course.labCount} Sessions | {course.labMaxMarks} (Min:{" "}
+                      {course.labEligibility}%)
+                    </div>
+
+                    <div className="text-muted-foreground mt-1 border-t pt-2 font-medium">
+                      Cumulative Max:
+                    </div>
+                    <div className="mt-1 border-t pt-2">
+                      {(course.cieMaxMarks || 0) + (course.seeMaxMarks || 0)}
+                    </div>
                   </div>
                 </div>
               </div>
-
             </div>
           </AccordionContent>
         </AccordionItem>
@@ -576,7 +611,7 @@ const CourseDetailContent = ({
                 <div className="flex flex-wrap gap-2">
                   {coordinators.map((c) => (
                     <Badge key={c.id} variant="secondary" className="px-3 py-1">
-                      {c.faculty.name}
+                      {c.faculty?.user?.name ?? c.faculty?.name ?? "Unknown"}
                     </Badge>
                   ))}
                 </div>

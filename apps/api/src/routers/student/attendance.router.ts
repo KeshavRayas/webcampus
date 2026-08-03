@@ -13,5 +13,6 @@ router.use(
 
 router.get("/summary", StudentAttendanceController.getSummary);
 router.get("/course/:courseId", StudentAttendanceController.getCourseDetails);
+router.get("/terms", StudentAttendanceController.getAcademicTerms);
 
 export default router;

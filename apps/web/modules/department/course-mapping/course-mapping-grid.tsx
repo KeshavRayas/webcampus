@@ -313,6 +313,9 @@ export const CourseMappingGrid = ({
       setLastSaved(new Date().toLocaleTimeString());
       queryClient.invalidateQueries({ queryKey: ["course-mapping"] });
       queryClient.invalidateQueries({ queryKey: ["course-mapping-status"] });
+      queryClient.invalidateQueries({
+        queryKey: ["department-courses-approvals"],
+      });
     },
     onError: (err) => {
       console.error(err);

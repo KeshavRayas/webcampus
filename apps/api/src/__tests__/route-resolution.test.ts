@@ -65,6 +65,9 @@ mock.module("@webcampus/db", () => ({
       code = "";
     },
   },
+  PrismaClient: class PrismaClient {},
+  CourseApprovalStatus: {},
+  Cycle: {},
 }));
 
 mock.module("@webcampus/common/logger", () => ({
@@ -240,6 +243,45 @@ describe("Route Resolution Tests", () => {
       const res = await fetchWithTimeout(url, { method: "GET" });
       expect(res.status).toBeGreaterThanOrEqual(200);
       expect(res.status).toBeLessThan(600);
+    });
+
+    it("GET /student/attendance/summary resolves (router mounted)", async () => {
+      const url = `${BASE_URL}/student/attendance/summary`;
+      const res = await fetchWithTimeout(url, { method: "GET" });
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(600);
+      expect(res.status).not.toBe(404);
+    });
+
+    it("GET /student/attendance/terms resolves (router mounted)", async () => {
+      const url = `${BASE_URL}/student/attendance/terms`;
+      const res = await fetchWithTimeout(url, { method: "GET" });
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(600);
+      expect(res.status).not.toBe(404);
+    });
+
+    it("GET /student/attendance/course/:courseId resolves (router mounted)", async () => {
+      const url = `${BASE_URL}/student/attendance/course/test-course`;
+      const res = await fetchWithTimeout(url, { method: "GET" });
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(600);
+      expect(res.status).not.toBe(404);
+    });
+
+    it("GET /student/attendance/summary does not shadow existing student routes", async () => {
+      const urls = [
+        `${BASE_URL}/student/profile`,
+        `${BASE_URL}/student/hall-ticket`,
+        `${BASE_URL}/student/course-registration/dashboard`,
+      ];
+
+      for (const url of urls) {
+        const res = await fetchWithTimeout(url, { method: "GET" });
+        expect(res.status).toBeGreaterThanOrEqual(200);
+        expect(res.status).toBeLessThan(600);
+        expect(res.status).not.toBe(404);
+      }
     });
   });
 

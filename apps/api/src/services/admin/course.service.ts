@@ -22,7 +22,7 @@ export class AdminCourseService {
       userAgent?: string;
     }
   ) {
-    return CourseService.update(data, adminContext);
+    return CourseService.update(data, undefined, adminContext);
   }
 
   static delete(id: string) {
@@ -30,8 +30,8 @@ export class AdminCourseService {
   }
 
   // Updated to accept optional department filters as passed by the controller
-  static getById(id: string, _departmentId?: string, _departmentName?: string) {
-    return CourseService.getById(id);
+  static getById(id: string, departmentId?: string, departmentName?: string) {
+    return CourseService.getById(id, { departmentId, departmentName });
   }
 
   static getByDepartment(
@@ -74,13 +74,13 @@ export class AdminCourseService {
   }
 
   static getCoordinators(courseId: string) {
-    return CourseService.getCoordinators(courseId);
+    return CourseService.getCoordinators(courseId, undefined, true);
   }
 
   static updateCoordinators(
     courseId: string,
     facultyIds: string[],
-    _adminContext?: {
+    adminContext?: {
       isAdmin: boolean;
       adminUserId: string;
       clientVersion?: number;
@@ -89,7 +89,12 @@ export class AdminCourseService {
       userAgent?: string;
     }
   ) {
-    return CourseService.updateCoordinators(courseId, facultyIds);
+    return CourseService.updateCoordinators(
+      courseId,
+      facultyIds,
+      undefined,
+      adminContext
+    );
   }
 
   static getMappedFacultyForCourse(courseId: string) {
