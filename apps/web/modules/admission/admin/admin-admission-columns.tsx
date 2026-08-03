@@ -157,6 +157,7 @@ const baseColumns: ColumnDef<AdmissionResponse>[] = [
 export const getAdminAdmissionColumns = (
   showViewDetails: boolean
 ): ColumnDef<AdmissionResponse>[] => [
+  ...baseColumns,
   ...(showViewDetails
     ? [
         {
@@ -176,11 +177,6 @@ export const getAdminAdmissionColumns = (
             return <div>{studentName || admissionName || "-"}</div>;
           },
         },
-        {
-          accessorKey: "modeOfAdmission",
-          header: "Mode",
-        },
-        ...baseColumns,
         {
           id: "actions",
           header: "Actions",
