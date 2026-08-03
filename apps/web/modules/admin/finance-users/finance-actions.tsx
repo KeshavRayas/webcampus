@@ -27,46 +27,36 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@webcampus/ui/components/select";
 import { MoreHorizontal, Trash } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
-import { AdminAdmissionUserResponse } from "./admin-admission-users-columns";
-import {
-  useAdmissionUserDelete,
-  useAdmissionUserUpdate,
-} from "./use-admission-users";
+import { useFinanceUserDelete, useFinanceUserEdit } from "./use-finance-users";
+import { FinanceUser } from "./finance-types";
 
-type UpdateAdmissionUserFormValues = z.infer<typeof UpdateAdmissionUserSchema>;
+type UpdateFinanceUserFormValues = z.infer<typeof UpdateAdmissionUserSchema>;
 
-export const AdminAdmissionUsersActions = ({
+export const FinanceActions = ({
   user,
 }: {
-  user: AdminAdmissionUserResponse;
+  user: FinanceUser;
 }) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
   const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
-  const { onDelete, isDeleting } = useAdmissionUserDelete();
-  const { updateUser, isUpdating } = useAdmissionUserUpdate();
+  const { onDelete, isDeleting } = useFinanceUserDelete();
+  const { onEdit, isEditing } = useFinanceUserEdit();
 
-  const editForm = useForm<UpdateAdmissionUserFormValues>({
+  const editForm = useForm<UpdateFinanceUserFormValues>({
     resolver: zodResolver(UpdateAdmissionUserSchema),
     defaultValues: {
       name: user.name,
       username: user.username || "",
       email: user.email,
-      role: user.role,
+      role: "finance",
     },
   });
 
@@ -91,7 +81,7 @@ export const AdminAdmissionUsersActions = ({
       name: user.name,
       username: user.username || "",
       email: user.email,
-      role: user.role,
+      role: "finance",
     });
     setEditPhotoFile(null);
     replacePhotoPreview(null);
@@ -105,13 +95,16 @@ export const AdminAdmissionUsersActions = ({
     replacePhotoPreview(file);
   };
 
-  const handleEditSubmit = async (data: UpdateAdmissionUserFormValues) => {
+  const handleEditSubmit = async (data: UpdateFinanceUserFormValues) => {
     try {
-      await updateUser({
-        id: user.id,
-        data,
-        photoFile: editPhotoFile,
+      const formData = new FormData();
+      Object.entries(data).forEach(([key, value]) => {
+        formData.append(key, String(value));
       });
+      if (editPhotoFile instanceof File) {
+        formData.append("photo", editPhotoFile);
+      }
+      await onEdit({ id: user.id, formData });
       setIsEditOpen(false);
       resetEditState();
     } catch {}
@@ -121,7 +114,7 @@ export const AdminAdmissionUsersActions = ({
     if (isEditOpen) {
       resetEditState();
     }
-  }, [isEditOpen, user.email, user.name, user.role, user.username]);
+  }, [isEditOpen, user.email, user.name, user.username]);
 
   useEffect(() => {
     return () => {
@@ -166,10 +159,9 @@ export const AdminAdmissionUsersActions = ({
       >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Edit Admission User</DialogTitle>
+            <DialogTitle>Edit Finance User</DialogTitle>
             <DialogDescription>
-              Update login details and replace the current profile photo if
-              needed.
+              Update user details and optionally replace the profile photo.
             </DialogDescription>
           </DialogHeader>
 
@@ -185,7 +177,7 @@ export const AdminAdmissionUsersActions = ({
                   <FormItem>
                     <FormLabel>Full Name *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g., John Doe" />
+                      <Input {...field} placeholder="e.g., Jane Doe" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -199,7 +191,7 @@ export const AdminAdmissionUsersActions = ({
                   <FormItem>
                     <FormLabel>Username *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g., john.doe" />
+                      <Input {...field} placeholder="e.g., finance.manager" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -215,8 +207,8 @@ export const AdminAdmissionUsersActions = ({
                     <FormControl>
                       <Input
                         type="email"
+                        placeholder="finance@webcampus.edu"
                         {...field}
-                        placeholder="john@example.com"
                       />
                     </FormControl>
                     <FormMessage />
@@ -224,37 +216,21 @@ export const AdminAdmissionUsersActions = ({
                 )}
               />
 
-              <FormField
-                control={editForm.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="admission_admin">
-                          Admission Admin (Data Entry)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium">Role</p>
+                  <p className="text-sm text-muted-foreground">Finance</p>
+                </div>
 
-              <UserPhotoUpload
-                label="Profile Photo"
-                personName={editForm.watch("name") || user.name}
-                previewUrl={editPhotoPreview}
-                currentImageUrl={user.image}
-                selectedFileName={editPhotoFile?.name || null}
-                onChange={handleEditPhotoChange}
-              />
+                <UserPhotoUpload
+                  label="Profile Photo"
+                  personName={editForm.watch("name") || user.name}
+                  previewUrl={editPhotoPreview}
+                  currentImageUrl={user.image}
+                  selectedFileName={editPhotoFile?.name || null}
+                  onChange={handleEditPhotoChange}
+                />
+              </div>
 
               <DialogFooter>
                 <Button
@@ -264,12 +240,12 @@ export const AdminAdmissionUsersActions = ({
                     setIsEditOpen(false);
                     resetEditState();
                   }}
-                  disabled={isUpdating}
+                  disabled={isEditing}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isUpdating}>
-                  {isUpdating ? "Saving..." : "Save Changes"}
+                <Button type="submit" disabled={isEditing}>
+                  {isEditing ? "Saving..." : "Save Changes"}
                 </Button>
               </DialogFooter>
             </form>
@@ -280,10 +256,10 @@ export const AdminAdmissionUsersActions = ({
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Admission User</DialogTitle>
+            <DialogTitle>Delete Finance User</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {user.name} ({user.role})? This
-              action cannot be undone and will permanently remove their access.
+              Are you sure you want to delete {user.name} ({user.email})? This
+              action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
