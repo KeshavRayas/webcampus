@@ -23,7 +23,7 @@ import { NavSecondaryProps, SidebarData } from "./sidebar-types";
 const navSecondary: NavSecondaryProps = {
   items: [
     {
-      title: "Support",
+      title: "Raise an issue",
       url: "/support",
       icon: LifeBuoy,
     },

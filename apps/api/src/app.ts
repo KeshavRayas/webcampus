@@ -11,6 +11,7 @@ import facultyRouter from "./routers/faculty/faculty-domain.router";
 import financeRouter from "./routers/finance/finance.router";
 import hodRouter from "./routers/hod/hod.router";
 import studentRouter from "./routers/student/student-domain.router";
+import supportRouter from "./routers/support/support.router";
 
 const app: Express = express();
 
@@ -39,6 +40,8 @@ app.use("/coe", coeRouter);
 app.use("/faculty", facultyRouter);
 
 app.use("/finance", financeRouter);
+
+app.use("/support", supportRouter);
 
 app.use("/admission", admissionRouter);
 
