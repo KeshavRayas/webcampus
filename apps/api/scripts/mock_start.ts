@@ -41,10 +41,10 @@ type FacultySeed = {
 const DEFAULT_PASSWORD = "password";
 
 const MOCK_FINANCE_USER: MockUserInput = {
-  email: "finance@webcampus.edu",
-  username: "finance.manager",
+  email: "finance@webcampus.com",
+  username: "finance",
   password: DEFAULT_PASSWORD,
-  name: "Finance Manager",
+  name: "Finance",
   role: "finance" as const,
 };
 
