@@ -130,14 +130,17 @@ export const ApplicantAdmissionView = () => {
   // Class 10
   const [class10State, setClass10State] = useState("");
   const [class10City, setClass10City] = useState("");
+  const [class10Country, setClass10Country] = useState("IN");
 
   // Class 12
   const [class12State, setClass12State] = useState("");
   const [class12City, setClass12City] = useState("");
+  const [class12Country, setClass12Country] = useState("IN");
 
   // Diploma
   const [diplomaState, setDiplomaState] = useState("");
   const [diplomaCity, setDiplomaCity] = useState("");
+  const [diplomaCountry, setDiplomaCountry] = useState("IN");
 
   const [selectedMode, setSelectedMode] =
     useState<keyof typeof categoriesClaimed>("KCET");
@@ -422,6 +425,7 @@ export const ApplicantAdmissionView = () => {
         fields: [
           "class10thSchoolName",
           "class10thSchoolType",
+          "schoolCountry",
           "class10thSchoolCity",
           "class10thSchoolState",
           "class10thYearOfPassing",
@@ -432,6 +436,7 @@ export const ApplicantAdmissionView = () => {
           "hasClass12",
           "class12thInstituteName",
           "class12thInstituteType",
+          "instituteCountry",
           "class12thInstituteCity",
           "class12thInstituteState",
           "class12thYearOfPassing",
@@ -443,6 +448,7 @@ export const ApplicantAdmissionView = () => {
           "hasDiploma",
           "diplomaInstituteName",
           "diplomaInstituteType",
+          "diplomaCountry",
           "diplomaInstituteCity",
           "diplomaInstituteState",
           "diplomaYearOfPassing",
@@ -597,6 +603,13 @@ export const ApplicantAdmissionView = () => {
       setSelectedDepartment(admission.department.id);
     }
   }, [admission]);
+
+  useEffect(() => {
+    if (selectedMode !== "KCET") {
+      setSelectedQuota("");
+    }
+  }, [selectedMode]);
+
   useEffect(() => {
     if (!isSameAddress) return;
 
@@ -839,7 +852,7 @@ export const ApplicantAdmissionView = () => {
                 </SelectContent>
               </Select>
             </div>
-            {selectedMode === "KCET" && (
+            {selectedMode === "KCET" ? (
               <div className="space-y-2 md:col-span-4">
                 <Label htmlFor="quota">Quota *</Label>
                 <Select
@@ -860,6 +873,8 @@ export const ApplicantAdmissionView = () => {
                   </SelectContent>
                 </Select>
               </div>
+            ) : (
+              <div className="space-y-2 md:col-span-4" />
             )}
 
             <div className="space-y-2 md:col-span-4">
@@ -1649,6 +1664,31 @@ export const ApplicantAdmissionView = () => {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="class10thSchoolCountry">School Country *</Label>
+
+              <Select value={class10Country} onValueChange={setClass10Country}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Country" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {countries.map((country) => (
+                    <SelectItem key={country.isoCode} value={country.isoCode}>
+                      {country.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <input
+                type="hidden"
+                name="schoolCountry"
+                value={class10Country}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="class10thSchoolState">School State *</Label>
 
               <Select
@@ -1838,6 +1878,35 @@ export const ApplicantAdmissionView = () => {
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="class12thInstituteCountry">
+                  Institute Country *
+                </Label>
+
+                <Select
+                  value={class12Country}
+                  onValueChange={setClass12Country}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Country" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country.isoCode} value={country.isoCode}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <input
+                  type="hidden"
+                  name="instituteCountry"
+                  value={class12Country}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="class12thInstituteState">
                   Institute State *
                 </Label>
@@ -1983,6 +2052,35 @@ export const ApplicantAdmissionView = () => {
                     )}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="diplomaInstituteCountry">
+                  Institute Country *
+                </Label>
+
+                <Select
+                  value={diplomaCountry}
+                  onValueChange={setDiplomaCountry}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Country" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country.isoCode} value={country.isoCode}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <input
+                  type="hidden"
+                  name="diplomaCountry"
+                  value={diplomaCountry}
+                  required={diplomaEnabled}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="diplomaInstituteState">Institute State *</Label>

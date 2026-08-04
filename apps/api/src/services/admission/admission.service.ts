@@ -635,6 +635,7 @@ export class AdmissionService {
 
           class10thSchoolName: data.class10thSchoolName,
           class10thSchoolType: data.class10thSchoolType,
+          schoolCountry: data.schoolCountry ?? null,
           class10thSchoolCity: data.class10thSchoolCity,
           class10thSchoolState: data.class10thSchoolState,
           class10thYearOfPassing: data.class10thYearOfPassing,
@@ -650,6 +651,7 @@ export class AdmissionService {
           hasDiploma: data.hasDiploma === "true",
           class12thInstituteName: data.class12thInstituteName,
           class12thInstituteType: data.class12thInstituteType,
+          instituteCountry: data.instituteCountry ?? null,
           class12thInstituteCity: data.class12thInstituteCity,
           class12thInstituteState: data.class12thInstituteState,
           class12thYearOfPassing: data.class12thYearOfPassing,
@@ -664,6 +666,7 @@ export class AdmissionService {
 
           diplomaInstituteName: data.diplomaInstituteName ?? null,
           diplomaInstituteType: data.diplomaInstituteType ?? null,
+          diplomaCountry: data.diplomaCountry ?? null,
           diplomaInstituteCity: data.diplomaInstituteCity ?? null,
           diplomaInstituteState: data.diplomaInstituteState ?? null,
           diplomaYearOfPassing: data.diplomaYearOfPassing ?? null,
@@ -768,7 +771,7 @@ export class AdmissionService {
           modeOfAdmission: data.modeOfAdmission,
           categoryClaimed: data.categoryClaimed,
           categoryAllotted: data.categoryAllotted,
-          quota: data.modeOfAdmission ? data.quota : undefined,
+          quota: data.modeOfAdmission === "KCET" ? (data.quota ?? null) : null,
           entranceExamRank:
             data.entranceExamRank != null
               ? String(data.entranceExamRank)
