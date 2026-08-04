@@ -1,6 +1,8 @@
 import { Role, roles } from "@webcampus/types/rbac";
 import { z } from "zod";
 
+const allowedAdminRoles = ["admission_admin", "finance"] as const;
+
 export const BaseUserSchema = z.object({
   email: z.email("Invalid email address"),
   username: z.string().min(1, "This field is required").nullable(),
@@ -8,7 +10,7 @@ export const BaseUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   role: z
     .string()
-    .refine((val) => roles.includes(val as Role), {
+    .refine((val) => roles.includes(val as Role) || allowedAdminRoles.includes(val as (typeof allowedAdminRoles)[number]), {
       message: "Invalid role",
     })
     .nullable(),

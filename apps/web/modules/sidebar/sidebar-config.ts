@@ -66,6 +66,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Admission Users", url: "/admin/admission-users" },
             { name: "COE Users", url: "/admin/coe" },
+            { name: "Finance Users", url: "/admin/finance" },
           ],
         },
         {
