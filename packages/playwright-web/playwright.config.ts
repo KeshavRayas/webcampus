@@ -58,9 +58,14 @@ export default defineConfig({
       testDir: "tests/workflow",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "protected",
+      testDir: "tests/protected",
+      use: { ...devices["Desktop Chrome"], storageState: ".auth/admin.json" },
+    },
   ],
   webServer: {
-    command: "bun run start",
+    command: "cd ../../apps/web && bun run start",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
   },

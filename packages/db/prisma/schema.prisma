@@ -36,6 +36,8 @@ model User {
   adminEditLogs AdminEditLog[]
 
   courseMappingAuditLogs CourseMappingAuditLog[]
+  supportTicketsCreated SupportTicket[]        @relation("SupportTicketCreator")
+  supportMessages       SupportTicketMessage[] @relation("SupportMessageAuthor")
 
   @@map("user")
 }
@@ -259,7 +261,6 @@ model Student {
   batches           Batch[]              @relation("BatchStudents")
   hallTickets       HallTicket[]
   finances          Finance[]
-
   @@index([departmentName])
   @@index([departmentName, currentSemester])
   @@index([semesterId])
@@ -1047,4 +1048,78 @@ model FinancePayment {
 
   @@index([financeId])
   @@index([paidAt])
+}
+
+model SupportTicket {
+  id           String                @id @default(uuid())
+  ticketNumber String                @unique
+  createdById  String
+  category     SupportTicketCategory
+  priority     SupportTicketPriority @default(MEDIUM)
+  status       SupportTicketStatus   @default(OPEN)
+  subject      String
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  resolvedAt   DateTime?
+  closedAt     DateTime?
+
+  createdBy User                  @relation("SupportTicketCreator", fields: [createdById], references: [id])
+  messages  SupportTicketMessage[]
+
+  @@index([createdById])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SupportTicketMessage {
+  id          String   @id @default(uuid())
+  ticketId    String
+  authorId    String
+  body        String
+  createdAt   DateTime @default(now())
+
+  ticket      SupportTicket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author      User                      @relation("SupportMessageAuthor", fields: [authorId], references: [id])
+  attachments SupportTicketAttachment[]
+
+  @@index([ticketId, createdAt])
+  @@index([authorId])
+}
+
+model SupportTicketAttachment {
+  id        String   @id @default(uuid())
+  messageId String
+  fileName  String
+  storageKey String  @unique
+  mimeType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+
+  message SupportTicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SupportTicketCategory {
+  ACADEMICS
+  ATTENDANCE
+  MARKS
+  ADMISSIONS
+  FINANCE
+  TECHNICAL
+  OTHER
 }

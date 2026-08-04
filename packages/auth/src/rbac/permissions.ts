@@ -21,6 +21,7 @@ const statement = {
   courseApprovalOverride: ["read", "update"],
   registrationWindow: ["create", "read", "update"],
   finance: ["read", "update"],
+  support: ["create", "read", "reply", "updateStatus"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -41,35 +42,43 @@ export const roles = {
     student: ["read", "delete"],
     registrationWindow: ["create", "read", "update"],
     freeze: ["read", "lock"],
+    support: ["create", "read", "reply", "updateStatus"],
   }),
   applicant: ac.newRole({
     admission: ["read", "update"],
     department: ["read"],
+    support: ["create", "read", "reply"],
   }),
   student: ac.newRole({
     user: [],
+    support: ["create", "read", "reply"],
   }),
   faculty: ac.newRole({
     attendance: ["create"],
     freeze: ["read", "lock"],
     semester: ["read"],
+    support: ["create", "read", "reply"],
   }),
   coordinator: ac.newRole({
     attendance: ["create"],
+    support: ["create", "read", "reply"],
   }),
   hod: ac.newRole({
     ...adminAc.statements,
     semester: ["read"],
     courseAssignment: ["create"],
     freeze: ["read", "lock"],
+    support: ["create", "read", "reply"],
   }),
   coe: ac.newRole({
     freeze: ["read", "lock"],
     attendance: ["read"],
     marks: ["read"],
+    support: ["create", "read", "reply"],
   }),
   finance: ac.newRole({
     finance: ["read", "update"],
+    support: ["create", "read", "reply"],
   }),
   department: ac.newRole({
     ...adminAc.statements,
@@ -83,12 +92,14 @@ export const roles = {
     courseAssignment: ["create", "read"],
     courseCoordinator: ["create", "read", "update"],
     freeze: ["read", "lock"],
+    support: ["create", "read", "reply"],
   }),
   admission: ac.newRole({
     semester: ["read"],
     admission: ["create", "read", "delete", "update", "port"],
     user: ["set-role"],
     department: ["read"],
+    support: ["create", "read", "reply"],
   }),
 } satisfies Record<Role, unknown>;
 
