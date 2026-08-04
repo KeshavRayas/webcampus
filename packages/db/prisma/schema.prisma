@@ -28,48 +28,49 @@ model User {
   departmentMemberships DepartmentUser[]
   faculty               Faculty?
 
-  hod                   Hod?
-  Semester              Semester[]
-  student               Student?
-  accounts              Account[]
-  sessions              Session[]
-  adminEditLogs         AdminEditLog[]
+  hod           Hod?
+  Semester      Semester[]
+  student       Student?
+  accounts      Account[]
+  sessions      Session[]
+  adminEditLogs AdminEditLog[]
 
   courseMappingAuditLogs CourseMappingAuditLog[]
+
   @@map("user")
 }
 
 model AcademicTerm {
-  id        String       @id @default(uuid())
-  type      SemesterType
-  year      String
-  isCurrent Boolean      @default(false)
-  Semester  Semester[]
+  id                  String               @id @default(uuid())
+  type                SemesterType
+  year                String
+  isCurrent           Boolean              @default(false)
+  Semester            Semester[]
   registrationWindows RegistrationWindow[]
-  courseRegistrations   CourseRegistration[]
-  hallTickets           HallTicket[]
+  courseRegistrations CourseRegistration[]
+  hallTickets         HallTicket[]
 
   @@unique([type, year])
 }
 
 model Semester {
-  id             String       @id @default(uuid())
-  startDate      DateTime
-  endDate        DateTime
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  userId         String
-  semesterNumber Int
-  academicTermId String
-  programType    ProgramType
-  Admission      Admission[]
-  Course         Course[]
+  id                  String               @id @default(uuid())
+  startDate           DateTime
+  endDate             DateTime
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  userId              String
+  semesterNumber      Int
+  academicTermId      String
+  programType         ProgramType
+  Admission           Admission[]
+  Course              Course[]
   registrationWindows RegistrationWindow[]
-  courseRegistrations   CourseRegistration[]
-  Section        Section[]
-  hallTickets    HallTicket[]
-  academicTerm   AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
-  createdBy      User         @relation(fields: [userId], references: [id])
+  courseRegistrations CourseRegistration[]
+  Section             Section[]
+  hallTickets         HallTicket[]
+  academicTerm        AcademicTerm         @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+  createdBy           User                 @relation(fields: [userId], references: [id])
 
   @@unique([academicTermId, programType, semesterNumber])
 }
@@ -120,33 +121,33 @@ model Verification {
 }
 
 model Department {
-  id                String             @id @default(uuid())
-  userId            String
-  name              String             @unique
-  abbreviation      String
-  code              String             @unique
-  type              DepartmentType     @default(DEGREE_GRANTING)
-  Admissions        Admission[]
-  Course            Course[]
-  courseAssignments CourseAssignment[]
-  user              User               @relation(fields: [userId], references: [id])
-  userMemberships   DepartmentUser[]
-  faculties         Faculty[]
-  hods              Hod[]
-  sections          Section[]
-  students          Student[]
+  id                  String               @id @default(uuid())
+  userId              String
+  name                String               @unique
+  abbreviation        String
+  code                String               @unique
+  type                DepartmentType       @default(DEGREE_GRANTING)
+  Admissions          Admission[]
+  Course              Course[]
+  courseAssignments   CourseAssignment[]
+  user                User                 @relation(fields: [userId], references: [id])
+  userMemberships     DepartmentUser[]
+  faculties           Faculty[]
+  hods                Hod[]
+  sections            Section[]
+  students            Student[]
   registrationWindows RegistrationWindow[]
 
   @@index([name])
 }
 
 model RegistrationWindow {
-  id             String   @id @default(uuid())
+  id             String  @id @default(uuid())
   academicTermId String
   semesterId     String
   departmentId   String?
   cycle          Cycle?
-  isOpen         Boolean  @default(false)
+  isOpen         Boolean @default(false)
 
   academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
   semester     Semester     @relation(fields: [semesterId], references: [id], onDelete: Cascade)
@@ -210,7 +211,7 @@ model Batch {
   CourseAssignment CourseAssignment[]
   students         Student[]          @relation("BatchStudents")
 
-  attendances       Attendance[]       // <-- NEW: Back-relation
+  attendances       Attendance[] // <-- NEW: Back-relation
   attendanceRecords AttendanceRecord[] // <-- NEW: Back-relation
 
   @@unique([name, sectionId])
@@ -256,8 +257,8 @@ model Student {
   user              User                 @relation(fields: [userId], references: [id])
   studentSections   StudentSection[]
   batches           Batch[]              @relation("BatchStudents")
-  hallTickets        HallTicket[]
-  finances           Finance[]
+  hallTickets       HallTicket[]
+  finances          Finance[]
 
   @@index([departmentName])
   @@index([departmentName, currentSemester])
@@ -368,55 +369,55 @@ model Admin {
 }
 
 model Course {
-  id                      String               @id @default(uuid())
-  code                    String               @unique
-  name                    String
-  departmentName          String?
-  departmentId            String
-  semesterId              String
-  semesterNumber          Int
-  courseMode              CourseMode
-  courseType              CourseType
-  cycle                   Cycle                @default(NONE)
+  id             String     @id @default(uuid())
+  code           String     @unique
+  name           String
+  departmentName String?
+  departmentId   String
+  semesterId     String
+  semesterNumber Int
+  courseMode     CourseMode
+  courseType     CourseType
+  cycle          Cycle      @default(NONE)
 
   // Credit fields (L-T-P-S)
-  lectureCredits          Int                  @default(0)
-  tutorialCredits         Int                  @default(0)
-  practicalCredits        Int                  @default(0)
-  skillCredits            Int                  @default(0)
-  totalCredits            Int
+  lectureCredits   Int @default(0)
+  tutorialCredits  Int @default(0)
+  practicalCredits Int @default(0)
+  skillCredits     Int @default(0)
+  totalCredits     Int
 
   // Computed Field
-  hasLaboratoryComponent  Boolean              @default(false)
+  hasLaboratoryComponent Boolean @default(false)
 
   // ─── NEW CONFIGURATION FIELDS ───
 
   // SEE
-  seeMaxMarks             Int                  @default(0)
-  seeEligibility          Int                  @default(40)
+  seeMaxMarks    Int @default(0)
+  seeEligibility Int @default(40)
 
   // CIE
-  cieCount                Int                  @default(0)
-  cieMaxMarks             Int                  @default(0)
-  cieEligibility          Int                  @default(40)
+  cieMaxMarks          Int                  @default(0)
+  cieEligibility       Int                  @default(40)
+  cieEligibilityPolicy CieEligibilityPolicy @default(COMPONENT_AND_OVERALL)
 
   // Theory Exam
-  theoryMaxMarks          Int                  @default(0)
-  theoryMinExams          Int                  @default(0)
-  theoryEligibility       Int                  @default(40)
+  theoryExamMaxMarks Int @default(0)
+  theoryMaxExams     Int @default(0)
+  theoryMinExams     Int @default(0)
+  theoryEligibility  Int @default(40)
 
   // Lab
-  labCount                Int                  @default(0)
-  labMaxMarks             Int                  @default(0)
-  labEligibility          Int                  @default(40)
+  labMaxMarks    Int @default(0)
+  labEligibility Int @default(40)
 
   // AAT
-  aatMaxMarks             Int                  @default(0)
-  aatEligibility          Int                  @default(40)
+  aatMaxMarks    Int @default(0)
+  aatEligibility Int @default(40)
 
   // Settings
-  allowFeedback           Boolean              @default(false)
-  attendanceRequired      Boolean              @default(true)
+  allowFeedback      Boolean @default(false)
+  attendanceRequired Boolean @default(true)
 
   // ─── APPROVAL & TRACKING FIELDS ───
   approvalStatus          CourseApprovalStatus @default(DRAFT)
@@ -434,17 +435,17 @@ model Course {
   hasPostApprovalEdits    Boolean              @default(false)
 
   // ─── RELATIONS ───
-  department              Department           @relation(fields: [departmentId], references: [id])
-  semester                Semester             @relation(fields: [semesterId], references: [id])
-  attendances             Attendance[]
-  ClassSession            ClassSession[]
-  coordinators            CourseCoordinator[]
-  assessments             AssessmentTemplate[]
-  assignments             CourseAssignment[]
-  registrations           CourseRegistration[]
-  marks                   Mark[]
-  studentAssessments      StudentAssessment[]
-  mappingAuditLogs        CourseMappingAuditLog[]
+  department         Department              @relation(fields: [departmentId], references: [id])
+  semester           Semester                @relation(fields: [semesterId], references: [id])
+  attendances        Attendance[]
+  ClassSession       ClassSession[]
+  coordinators       CourseCoordinator[]
+  assessments        AssessmentTemplate[]
+  assignments        CourseAssignment[]
+  registrations      CourseRegistration[]
+  marks              Mark[]
+  studentAssessments StudentAssessment[]
+  mappingAuditLogs   CourseMappingAuditLog[]
 
   // ─── INDEXES ───
   @@unique([id, departmentId])
@@ -503,7 +504,7 @@ model Attendance {
   id                String            @id @default(uuid())
   studentId         String
   courseId          String
-  batchId           String?           // <-- NEW: Added to track lab vs theory
+  batchId           String? // <-- NEW: Added to track lab vs theory
   total             Int
   present           Int
   absent            Int
@@ -514,7 +515,7 @@ model Attendance {
   batch             Batch?            @relation(fields: [batchId], references: [id]) // <-- NEW: Relation to Batch
 
   // Updated unique constraint to allow separate aggregates for theory and lab
-  @@unique([studentId, courseId, batchId]) 
+  @@unique([studentId, courseId, batchId])
   @@index([courseId])
   @@index([batchId])
 }
@@ -570,11 +571,11 @@ model Freeze {
 }
 
 model HallTicket {
-  id             String  @id @default(uuid())
+  id             String    @id @default(uuid())
   studentId      String
   academicTermId String
   semesterId     String
-  isSent         Boolean @default(false)
+  isSent         Boolean   @default(false)
   sentAt         DateTime?
   sentBy         String?
 
@@ -605,7 +606,7 @@ model Admission {
   modeOfAdmission                 String?
   photo                           String?
   createdAt                       DateTime        @default(now())
-  applicationId                   String?          @unique
+  applicationId                   String?         @unique
   casteCertificate                String?
   semesterId                      String
   status                          AdmissionStatus @default(PENDING)
@@ -688,7 +689,7 @@ model Admission {
   permanentPincode                String?
   permanentState                  String?
   placeOfBirth                    String?
-  primaryEmail                    String         @unique
+  primaryEmail                    String          @unique
   primaryPhoneNumber              String?
   religion                        String?
   secondaryEmail                  String?
@@ -717,7 +718,7 @@ model AttendanceRecord {
   id           String           @id
   sessionId    String
   studentId    String
-  batchId      String?          // <-- NEW: Added to link individual records to a batch
+  batchId      String? // <-- NEW: Added to link individual records to a batch
   status       AttendanceStatus
   markedAt     DateTime         @default(now())
   ClassSession ClassSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -754,7 +755,7 @@ model ClassSession {
 }
 
 model CourseCoordinator {
-  id        String  @id @default(uuid())
+  id        String @id @default(uuid())
   courseId  String
   facultyId String
 
@@ -766,19 +767,23 @@ model CourseCoordinator {
 }
 
 model AssessmentTemplate {
-  id         String   @id @default(uuid())
-  courseId   String
-  semesterId String
-  title      String
-  totalMarks Int
+  id            String                  @id @default(uuid())
+  courseId      String
+  semesterId    String
+  title         String
+  totalMarks    Int
+  componentType AssessmentComponentType
+  sequence      Int                     @default(1)
 
-  questions AssessmentQuestion[]
+  questions      AssessmentQuestion[]
   studentRecords StudentAssessment[]
-  course    Course              @relation(fields: [courseId], references: [id])
+  course         Course               @relation(fields: [courseId], references: [id])
+
+  @@unique([courseId, componentType, sequence])
 }
 
 model AssessmentQuestion {
-  id           String @id @default(uuid())
+  id           String  @id @default(uuid())
   assessmentId String
   part         String
   qNumber      String
@@ -788,28 +793,28 @@ model AssessmentQuestion {
   bl           String?
   orGroupId    String?
 
-  assessment AssessmentTemplate @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assessment   AssessmentTemplate    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   studentMarks StudentQuestionMark[]
 }
 
 model StudentAssessment {
-  id              String   @id @default(uuid())
-  studentId       String
-  assessmentId    String
-  courseId        String
-  totalMarks      Float
-  status          String   @default("PRESENT")
+  id           String @id @default(uuid())
+  studentId    String
+  assessmentId String
+  courseId     String
+  totalMarks   Float
+  status       String @default("PRESENT")
 
-  student       Student             @relation(fields: [studentId], references: [id])
-  assessment    AssessmentTemplate  @relation(fields: [assessmentId], references: [id])
-  course        Course              @relation(fields: [courseId], references: [id])
+  student       Student               @relation(fields: [studentId], references: [id])
+  assessment    AssessmentTemplate    @relation(fields: [assessmentId], references: [id])
+  course        Course                @relation(fields: [courseId], references: [id])
   questionMarks StudentQuestionMark[]
 
   @@unique([studentId, assessmentId])
 }
 
 model StudentQuestionMark {
-  id            String   @id @default(uuid())
+  id            String @id @default(uuid())
   recordId      String
   questionId    String
   marksObtained Float
@@ -850,6 +855,17 @@ enum CourseType {
   PE
   OE
   NCMC
+}
+
+enum AssessmentComponentType {
+  THEORY
+  LAB
+  AAT
+}
+
+enum CieEligibilityPolicy {
+  OVERALL_ONLY
+  COMPONENT_AND_OVERALL
 }
 
 enum CondonationStatus {
@@ -918,7 +934,6 @@ enum AdmissionStatus {
   EXITED
 }
 
-
 enum DepartmentType {
   DEGREE_GRANTING
   BASIC_SCIENCES
@@ -966,22 +981,22 @@ enum AuditAction {
 
 model AdminEditLog {
   id            String          @id @default(uuid())
-  changeGroupId String          // UUID grouping all changes from one save
+  changeGroupId String // UUID grouping all changes from one save
   entityId      String
   entityType    AuditEntityType // "COURSE" | "COURSE_ASSIGNMENT" | "COORDINATOR" | etc.
-  courseId      String?         // always set for new rows; nullable for backward compat
-  fieldName     String?         // per-field name: "facultyId", "credits", etc.
+  courseId      String? // always set for new rows; nullable for backward compat
+  fieldName     String? // per-field name: "facultyId", "credits", etc.
   oldValue      Json?
   newValue      Json?
-  action        AuditAction     // SUPER_EDIT, UPSERT_MAPPING, DELETE_MAPPING, UPDATE_COORDINATOR
-  reason        String?         // required when entity is locked/approved
+  action        AuditAction // SUPER_EDIT, UPSERT_MAPPING, DELETE_MAPPING, UPDATE_COORDINATOR
+  reason        String? // required when entity is locked/approved
   ipAddress     String?
   userAgent     String?
-  details       String?         // preserved for backward compat (existing records)
+  details       String? // preserved for backward compat (existing records)
   adminUserId   String
   editedAt      DateTime        @default(now())
-  
-  adminUser   User     @relation(fields: [adminUserId], references: [id])
+
+  adminUser User @relation(fields: [adminUserId], references: [id])
 
   @@index([entityType, entityId])
   @@index([changeGroupId])
@@ -990,17 +1005,16 @@ model AdminEditLog {
   @@index([adminUserId])
 }
 
-
 model CourseMappingAuditLog {
-  id           String   @id @default(uuid())
-  courseId     String
-  adminId      String
-  action       String   // e.g., "SUPER_EDIT_MAPPING"
-  details      String?  // JSON string storing the exact changes made
-  createdAt    DateTime @default(now())
+  id        String   @id @default(uuid())
+  courseId  String
+  adminId   String
+  action    String // e.g., "SUPER_EDIT_MAPPING"
+  details   String? // JSON string storing the exact changes made
+  createdAt DateTime @default(now())
 
-  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  admin        User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  admin  User   @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([courseId])
   @@index([adminId])

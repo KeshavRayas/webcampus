@@ -513,7 +513,7 @@ const CourseDetailContent = ({
                       CIE:
                     </div>
                     <div>
-                      {course.cieCount} Exams | {course.cieMaxMarks} (Min:{" "}
+                      {course.theoryMaxExams} Exams | {course.cieMaxMarks} (Min:{" "}
                       {course.cieEligibility}%)
                     </div>
 
@@ -521,8 +521,9 @@ const CourseDetailContent = ({
                       Theory:
                     </div>
                     <div>
-                      {course.theoryMinExams} Exams | {course.theoryMaxMarks}{" "}
-                      (Min: {course.theoryEligibility}%)
+                      {course.theoryMinExams} Exams |{" "}
+                      {course.theoryExamMaxMarks} (Min:{" "}
+                      {course.theoryEligibility}%)
                     </div>
 
                     <div className="text-muted-foreground font-medium">
@@ -536,8 +537,8 @@ const CourseDetailContent = ({
                       Lab:
                     </div>
                     <div>
-                      {course.labCount} Sessions | {course.labMaxMarks} (Min:{" "}
-                      {course.labEligibility}%)
+                      {course.labMaxMarks > 0 ? 1 : 0} Sessions |{" "}
+                      {course.labMaxMarks} (Min: {course.labEligibility}%)
                     </div>
 
                     <div className="text-muted-foreground mt-1 border-t pt-2 font-medium">

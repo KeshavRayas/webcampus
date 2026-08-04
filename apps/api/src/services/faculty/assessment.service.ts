@@ -3,7 +3,6 @@ import { Cycle, db, Prisma } from "@webcampus/db";
 import type { CreateAssessmentType } from "@webcampus/schemas/faculty";
 import type { BaseResponse } from "@webcampus/types/api";
 
-
 export interface CoordinatedCourseDTO {
   id: string;
   code: string;
@@ -24,19 +23,24 @@ export interface CoordinatedCourseDTO {
   // ─── NEW CONFIGURATION FIELDS ───
   seeMaxMarks: number;
   seeEligibility: number;
-  cieCount: number;
   cieMaxMarks: number;
   cieEligibility: number;
-  theoryMaxMarks: number;
+  theoryMaxExams: number;
+  theoryExamMaxMarks: number;
   theoryMinExams: number;
   theoryEligibility: number;
-  labCount: number;
   labMaxMarks: number;
   labEligibility: number;
   aatMaxMarks: number;
   aatEligibility: number;
 
-  assessments?: { id: string; title: string; totalMarks: number }[];
+  assessments?: {
+    id: string;
+    title: string;
+    totalMarks: number;
+    componentType?: string | null;
+    sequence?: number | null;
+  }[];
 }
 
 export class AssessmentService {
@@ -69,7 +73,13 @@ export class AssessmentService {
           },
           department: true,
           assessments: {
-            select: { id: true, title: true, totalMarks: true },
+            select: {
+              id: true,
+              title: true,
+              totalMarks: true,
+              componentType: true,
+              sequence: true,
+            },
           },
         },
         orderBy: { code: "asc" },
@@ -91,17 +101,16 @@ export class AssessmentService {
         programType: course.semester.academicTerm.type,
         departmentName: course.department.name,
         departmentAbbreviation: course.department.abbreviation,
-        
+
         // Include all the new assessment configuration data
         seeMaxMarks: course.seeMaxMarks,
         seeEligibility: course.seeEligibility,
-        cieCount: course.cieCount,
         cieMaxMarks: course.cieMaxMarks,
         cieEligibility: course.cieEligibility,
-        theoryMaxMarks: course.theoryMaxMarks,
+        theoryMaxExams: course.theoryMaxExams,
+        theoryExamMaxMarks: course.theoryExamMaxMarks,
         theoryMinExams: course.theoryMinExams,
         theoryEligibility: course.theoryEligibility,
-        labCount: course.labCount,
         labMaxMarks: course.labMaxMarks,
         labEligibility: course.labEligibility,
         aatMaxMarks: course.aatMaxMarks,
@@ -165,6 +174,9 @@ export class AssessmentService {
             where: { id: existingAssessment.id },
             data: {
               semesterId: data.semesterId,
+              title: data.title,
+              componentType: data.componentType,
+              sequence: data.sequence,
               totalMarks: data.totalMarks,
               questions: {
                 create: formattedQuestions,
@@ -178,6 +190,8 @@ export class AssessmentService {
             courseId: data.courseId,
             semesterId: data.semesterId,
             title: data.title,
+            componentType: data.componentType,
+            sequence: data.sequence,
             totalMarks: data.totalMarks,
             questions: {
               create: formattedQuestions,

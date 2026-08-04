@@ -1,29 +1,35 @@
 import { logger } from "@webcampus/common/logger";
 import { db, EligibilityStatus } from "@webcampus/db";
+import { buildAggregationResultsForStudents } from "./assessment-aggregation.loader";
 
 export async function recomputeStudentMark(
   studentId: string,
   courseId: string
 ): Promise<void> {
-  const [assessments, course] = await Promise.all([
-    db.studentAssessment.findMany({
-      where: { studentId, courseId },
-      select: { totalMarks: true },
-    }),
-    db.course.findUnique({
-      where: { id: courseId },
-      select: { seeEligibility: true, code: true },
-    }),
-  ]);
+  const course = await db.course.findUnique({
+    where: { id: courseId },
+    select: { seeEligibility: true, code: true },
+  });
 
   if (!course) {
     logger.warn(`[MarkSync] Course ${courseId} not found — skipping`);
     return;
   }
 
-  const cieTotal = assessments.reduce((sum, a) => sum + a.totalMarks, 0);
-  const status: EligibilityStatus =
-    cieTotal >= (course.seeEligibility || 0) ? "ELIGIBLE" : "NOT_ELIGIBLE";
+  const results = await buildAggregationResultsForStudents(courseId, [
+    studentId,
+  ]);
+  const result = results.get(studentId);
+
+  if (!result) {
+    logger.warn(
+      `[MarkSync] No aggregation result for student=${studentId} course=${course.code} — skipping`
+    );
+    return;
+  }
+
+  const cieTotal = result.cieTotal;
+  const status: EligibilityStatus = result.status;
 
   await db.mark.upsert({
     where: { studentId_courseId: { studentId, courseId } },

@@ -55,7 +55,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
   const [isCopying, setIsCopying] = useState(false);
   const [computedTotal, setComputedTotal] = useState(0);
 
-  const { course, assessmentTitle, maxMarks } = setupContext;
+  const { course, assessmentTitle, maxMarks, componentType, sequence } =
+    setupContext;
 
   const baseType = assessmentTitle.split(" ")[0] || "";
 
@@ -73,6 +74,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
       courseId: course.id,
       semesterId: course.semesterId,
       title: assessmentTitle,
+      componentType,
+      sequence,
       totalMarks: maxMarks,
       questions: [],
     },

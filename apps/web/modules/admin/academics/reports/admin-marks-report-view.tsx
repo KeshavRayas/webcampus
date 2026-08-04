@@ -290,7 +290,7 @@ export const AdminMarksReportView = ({
       `Semester: ${reportData.semester.semesterNumber}`,
       `Section: ${section}`,
       `Academic Term: ${reportData.semester.academicTerm.type} ${reportData.semester.academicTerm.year}`,
-      `Min Required CIE: ${reportData.course.cumulativeMinMarks}`,
+      `Min Required CIE: ${reportData.course.cumulativeMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
     ];
   }, [reportData, appliedFilters, sections]);
 
@@ -330,7 +330,7 @@ export const AdminMarksReportView = ({
           : "-";
       }),
       student.cieTotal != null ? student.cieTotal.toString() : "-",
-      reportData.course.cumulativeMinMarks.toString(),
+      `${reportData.course.cumulativeMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
       student.status === "ELIGIBLE" ? "Eligible" : "Not Eligible",
     ]);
 
@@ -384,7 +384,7 @@ export const AdminMarksReportView = ({
         return score?.totalMarks != null ? score.totalMarks.toString() : "-";
       }),
       student.cieTotal != null ? student.cieTotal.toString() : "-",
-      reportData.course.cumulativeMinMarks.toString(),
+      `${reportData.course.cumulativeMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
       student.status === "ELIGIBLE" ? "Eligible" : "Not Eligible",
     ]);
 

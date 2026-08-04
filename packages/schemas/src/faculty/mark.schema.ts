@@ -122,6 +122,7 @@ export interface MarksReportDTO {
     code: string;
     name: string;
     cumulativeMinMarks: number;
+    cieEligibilityPercent: number;
   };
   assessments: Array<{
     id: string;

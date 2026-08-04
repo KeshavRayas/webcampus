@@ -55,7 +55,6 @@ const MODE_RULES: Partial<Record<CreateCourseDTO["courseMode"], ModeRule>> = {
       tutorialCredits: 0,
       practicalCredits: 0,
       skillCredits: 0,
-      labCount: 0,
       labMaxMarks: 0,
     },
     helperText: "Non-Integrated Course Configuration.",
@@ -65,10 +64,9 @@ const MODE_RULES: Partial<Record<CreateCourseDTO["courseMode"], ModeRule>> = {
       tutorialCredits: 0,
       practicalCredits: 0,
       skillCredits: 0,
-      labCount: 0,
       labMaxMarks: 0,
       aatMaxMarks: 0,
-      theoryMaxMarks: 0,
+      theoryExamMaxMarks: 0,
     },
     helperText: "Final Summary Mode.",
   },
@@ -79,7 +77,7 @@ const MODE_RULES: Partial<Record<CreateCourseDTO["courseMode"], ModeRule>> = {
       skillCredits: 0,
       seeMaxMarks: 0,
       cieMaxMarks: 0,
-      theoryMaxMarks: 0,
+      theoryExamMaxMarks: 0,
       labMaxMarks: 0,
       aatMaxMarks: 0,
     },
@@ -307,8 +305,16 @@ export const CourseFormFields = ({
               CIE
             </p>
             <div className="grid grid-cols-3 gap-3">
-              <NumberField form={form} name="cieCount" label="No. of CIEs" />
-              <NumberField form={form} name="cieMaxMarks" label="Max Marks" />
+              <NumberField
+                form={form}
+                name="theoryMaxExams"
+                label="No. of Exams"
+              />
+              <NumberField
+                form={form}
+                name="cieMaxMarks"
+                label="CIE Max Marks"
+              />
               <NumberField
                 form={form}
                 name="cieEligibility"
@@ -322,7 +328,7 @@ export const CourseFormFields = ({
                 <div className="grid grid-cols-3 gap-3">
                   <NumberField
                     form={form}
-                    name="theoryMaxMarks"
+                    name="theoryExamMaxMarks"
                     label="Max Marks"
                   />
                   <NumberField
@@ -340,12 +346,7 @@ export const CourseFormFields = ({
               </FormSection>
 
               <FormSection title="Lab">
-                <div className="grid grid-cols-3 gap-3">
-                  <NumberField
-                    form={form}
-                    name="labCount"
-                    label="No. of Labs"
-                  />
+                <div className="grid grid-cols-2 gap-3">
                   <NumberField
                     form={form}
                     name="labMaxMarks"

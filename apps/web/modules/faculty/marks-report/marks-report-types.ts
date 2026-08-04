@@ -27,6 +27,7 @@ export interface MarksReportData {
     code: string;
     name: string;
     cumulativeMinMarks: number;
+    cieEligibilityPercent: number;
   };
   assessments: Array<{
     id: string;

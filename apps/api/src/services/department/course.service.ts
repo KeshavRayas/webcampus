@@ -35,13 +35,12 @@ const TRACKABLE_COURSE_FIELDS = [
   "hasLaboratoryComponent",
   "seeMaxMarks",
   "seeEligibility",
-  "cieCount",
   "cieMaxMarks",
   "cieEligibility",
-  "theoryMaxMarks",
+  "theoryMaxExams",
+  "theoryExamMaxMarks",
   "theoryMinExams",
   "theoryEligibility",
-  "labCount",
   "labMaxMarks",
   "labEligibility",
   "aatMaxMarks",
@@ -108,9 +107,7 @@ export class CourseService {
       (data.skillCredits || 0);
 
     const hasLaboratoryComponent =
-      (data.practicalCredits || 0) > 0 ||
-      (data.labCount || 0) > 0 ||
-      (data.labMaxMarks || 0) > 0;
+      (data.practicalCredits || 0) > 0 || (data.labMaxMarks || 0) > 0;
 
     const course = await prisma.course.create({
       data: {
@@ -134,15 +131,14 @@ export class CourseService {
         seeMaxMarks: data.seeMaxMarks,
         seeEligibility: data.seeEligibility,
 
-        cieCount: data.cieCount,
         cieMaxMarks: data.cieMaxMarks,
         cieEligibility: data.cieEligibility,
 
-        theoryMaxMarks: data.theoryMaxMarks,
+        theoryMaxExams: data.theoryMaxExams,
+        theoryExamMaxMarks: data.theoryExamMaxMarks,
         theoryMinExams: data.theoryMinExams,
         theoryEligibility: data.theoryEligibility,
 
-        labCount: data.labCount,
         labMaxMarks: data.labMaxMarks,
         labEligibility: data.labEligibility,
 
@@ -215,10 +211,8 @@ export class CourseService {
     const totalCredits =
       lectureCredits + tutorialCredits + practicalCredits + skillCredits;
 
-    const labCount = data.labCount ?? existingCourse.labCount;
     const labMaxMarks = data.labMaxMarks ?? existingCourse.labMaxMarks;
-    const hasLaboratoryComponent =
-      practicalCredits > 0 || labCount > 0 || labMaxMarks > 0;
+    const hasLaboratoryComponent = practicalCredits > 0 || labMaxMarks > 0;
 
     const course = await prisma.course.update({
       where: { id },
@@ -243,15 +237,14 @@ export class CourseService {
         seeMaxMarks: data.seeMaxMarks,
         seeEligibility: data.seeEligibility,
 
-        cieCount: data.cieCount,
         cieMaxMarks: data.cieMaxMarks,
         cieEligibility: data.cieEligibility,
 
-        theoryMaxMarks: data.theoryMaxMarks,
+        theoryMaxExams: data.theoryMaxExams,
+        theoryExamMaxMarks: data.theoryExamMaxMarks,
         theoryMinExams: data.theoryMinExams,
         theoryEligibility: data.theoryEligibility,
 
-        labCount,
         labMaxMarks,
         labEligibility: data.labEligibility,
 

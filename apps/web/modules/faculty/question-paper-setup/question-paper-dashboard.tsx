@@ -6,6 +6,11 @@ import {
   RegistrationWindowCycleSchema,
   type AcademicTermResponseType,
 } from "@webcampus/schemas/admin";
+import {
+  buildAssessmentSlots,
+  findAssessmentForSlot,
+  type AssessmentSlot,
+} from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
@@ -49,25 +54,32 @@ export interface CoordinatedCourse {
   // New Configuration Fields
   seeMaxMarks: number;
   seeEligibility: number;
-  cieCount: number;
   cieMaxMarks: number;
   cieEligibility: number;
-  theoryMaxMarks: number;
+  theoryMaxExams: number;
+  theoryExamMaxMarks: number;
   theoryMinExams: number;
   theoryEligibility: number;
-  labCount: number;
   labMaxMarks: number;
   labEligibility: number;
   aatMaxMarks: number;
   aatEligibility: number;
 
-  assessments?: { id: string; title: string; totalMarks: number }[];
+  assessments?: {
+    id: string;
+    title: string;
+    totalMarks: number;
+    componentType?: "THEORY" | "LAB" | "AAT" | null;
+    sequence?: number | null;
+  }[];
 }
 
 export type SetupContext = {
   course: CoordinatedCourse;
   assessmentTitle: string;
   maxMarks: number;
+  componentType: "THEORY" | "LAB" | "AAT";
+  sequence: number;
 };
 
 type DashboardFilters = {
@@ -244,35 +256,40 @@ export const QuestionPaperDashboard = () => {
 
   const renderAssessmentButton = (
     course: CoordinatedCourse,
-    title: string,
-    maxMarks: number
+    slot: AssessmentSlot
   ) => {
-    const existing = course.assessments?.find((a) => a.title === title);
+    const existing = findAssessmentForSlot(course.assessments, slot);
 
     if (existing) {
       return (
         <Button
-          key={title}
+          key={slot.title}
           variant="outline"
           size="sm"
           onClick={() =>
             setViewAssessmentId({ id: existing.id, courseName: course.name })
           }
         >
-          <ClipboardList className="mr-2 h-4 w-4" /> View {title}
+          <ClipboardList className="mr-2 h-4 w-4" /> View {slot.title}
         </Button>
       );
     }
 
     return (
       <Button
-        key={title}
+        key={slot.title}
         size="sm"
         onClick={() =>
-          setSetupContext({ course, assessmentTitle: title, maxMarks })
+          setSetupContext({
+            course,
+            assessmentTitle: slot.title,
+            maxMarks: slot.maxMarks,
+            componentType: slot.componentType,
+            sequence: slot.sequence,
+          })
         }
       >
-        <PlusCircle className="mr-2 h-4 w-4" /> Setup {title}
+        <PlusCircle className="mr-2 h-4 w-4" /> Setup {slot.title}
       </Button>
     );
   };
@@ -363,37 +380,9 @@ export const QuestionPaperDashboard = () => {
                         Assessments Configuration
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {Array.from({ length: course.cieCount || 0 }).map(
-                          (_, i) =>
-                            renderAssessmentButton(
-                              course,
-                              `CIE ${i + 1}`,
-                              course.cieMaxMarks
-                            )
+                        {buildAssessmentSlots(course).map((slot) =>
+                          renderAssessmentButton(course, slot)
                         )}
-                        {Array.from({ length: course.labCount || 0 }).map(
-                          (_, i) =>
-                            renderAssessmentButton(
-                              course,
-                              `Lab ${i + 1}`,
-                              course.labMaxMarks
-                            )
-                        )}
-                        {Array.from({
-                          length: course.theoryMinExams || 0,
-                        }).map((_, i) =>
-                          renderAssessmentButton(
-                            course,
-                            `Theory Exam ${i + 1}`,
-                            course.theoryMaxMarks
-                          )
-                        )}
-                        {(course.aatMaxMarks || 0) > 0 &&
-                          renderAssessmentButton(
-                            course,
-                            `AAT`,
-                            course.aatMaxMarks
-                          )}
                       </div>
                     </div>
                   </CardContent>
