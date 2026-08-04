@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { UpdateAdmissionUserSchema } from "@webcampus/schemas/admin";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -35,7 +34,13 @@ import { UserPhotoUpload } from "../shared/user-photo-upload";
 import { useFinanceUserDelete, useFinanceUserEdit } from "./use-finance-users";
 import { FinanceUser } from "./finance-types";
 
-type UpdateFinanceUserFormValues = z.infer<typeof UpdateAdmissionUserSchema>;
+const editFinanceUserSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Invalid email address"),
+});
+
+type UpdateFinanceUserFormValues = z.infer<typeof editFinanceUserSchema>;
 
 export const FinanceActions = ({
   user,
@@ -51,12 +56,11 @@ export const FinanceActions = ({
   const { onEdit, isEditing } = useFinanceUserEdit();
 
   const editForm = useForm<UpdateFinanceUserFormValues>({
-    resolver: zodResolver(UpdateAdmissionUserSchema),
+    resolver: zodResolver(editFinanceUserSchema),
     defaultValues: {
       name: user.name,
       username: user.username || "",
       email: user.email,
-      role: "finance",
     },
   });
 
@@ -81,7 +85,6 @@ export const FinanceActions = ({
       name: user.name,
       username: user.username || "",
       email: user.email,
-      role: "finance",
     });
     setEditPhotoFile(null);
     replacePhotoPreview(null);
@@ -98,8 +101,10 @@ export const FinanceActions = ({
   const handleEditSubmit = async (data: UpdateFinanceUserFormValues) => {
     try {
       const formData = new FormData();
-      Object.entries(data).forEach(([key, value]) => {
-        formData.append(key, String(value));
+      Object.entries({ ...data, role: "finance" }).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, String(value));
+        }
       });
       if (editPhotoFile instanceof File) {
         formData.append("photo", editPhotoFile);

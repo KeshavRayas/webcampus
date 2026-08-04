@@ -8,20 +8,28 @@ import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
 
-export const CreateFinanceUserSchema = z.object({
+type CreateFinanceUserFormValues = {
+  name: string;
+  email: string;
+  username: string;
+  password: string;
+  photo?: File;
+};
+
+const createFinanceUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
   username: z.string().min(1, "Username is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  photo: z.any().optional(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  photo: z.instanceof(File).optional(),
 });
 
 export const useFinanceUsers = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
-  const form = useForm<z.infer<typeof CreateFinanceUserSchema>>({
-    resolver: zodResolver(CreateFinanceUserSchema),
+  const form = useForm<CreateFinanceUserFormValues>({
+    resolver: zodResolver(createFinanceUserSchema),
     defaultValues: {
       name: "",
       email: "",
@@ -53,7 +61,7 @@ export const useFinanceUsers = () => {
     },
   });
 
-  const onSubmit = async (data: z.infer<typeof CreateFinanceUserSchema>) => {
+  const onSubmit = async (data: CreateFinanceUserFormValues) => {
     try {
       const formData = new FormData();
 

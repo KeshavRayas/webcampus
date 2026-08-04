@@ -1,4 +1,5 @@
 export * from "./admission-user.schema";
+export * from "./finance-user.schema";
 export * from "./course-assignment.schema";
 export * from "./course.schema";
 export * from "./freeze.schema";

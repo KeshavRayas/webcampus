@@ -1,6 +1,9 @@
 import { AdminFinanceController } from "@webcampus/api/src/controllers/admin/finance.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
-import { createUserSchema, UpdateAdminUserSchema } from "@webcampus/schemas/admin";
+import {
+  CreateFinanceUserSchema,
+  UpdateFinanceUserSchema,
+} from "@webcampus/schemas/admin";
 import { Router } from "express";
 import multer from "multer";
 
@@ -17,21 +20,21 @@ router.use(
 router.post(
   "/",
   upload.single("photo"),
-  validateRequest(createUserSchema.omit({ role: true })),
+  validateRequest(CreateFinanceUserSchema.omit({ role: true })),
   AdminFinanceController.create
 );
 
 router.put(
   "/:id",
   upload.single("photo"),
-  validateRequest(UpdateAdminUserSchema),
+  validateRequest(UpdateFinanceUserSchema),
   AdminFinanceController.update
 );
 
 router.patch(
   "/:id",
   upload.single("photo"),
-  validateRequest(UpdateAdminUserSchema),
+  validateRequest(UpdateFinanceUserSchema),
   AdminFinanceController.update
 );
 

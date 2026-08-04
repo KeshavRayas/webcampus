@@ -20,8 +20,9 @@ import {
 import { Input } from "@webcampus/ui/components/input";
 import React, { useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { CreateFinanceUserSchema } from "@webcampus/schemas/admin";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
-import { CreateFinanceUserSchema, useFinanceUsers } from "./use-finance-users";
+import { useFinanceUsers } from "./use-finance-users";
 
 type CreateFinanceUserFormValues = z.infer<typeof CreateFinanceUserSchema>;
 
