@@ -1,6 +1,5 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -19,12 +18,16 @@ import {
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
 import React, { useEffect, useRef, useState } from "react";
-import { z } from "zod";
-import { CreateFinanceUserSchema } from "@webcampus/schemas/admin";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
 import { useFinanceUsers } from "./use-finance-users";
 
-type CreateFinanceUserFormValues = z.infer<typeof CreateFinanceUserSchema>;
+type CreateFinanceUserFormValues = {
+  name: string;
+  email: string;
+  username: string;
+  password: string;
+  photo?: File;
+};
 
 export const FinanceForm = () => {
   const { form, onSubmit, isCreating } = useFinanceUsers();

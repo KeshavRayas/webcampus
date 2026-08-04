@@ -13,19 +13,22 @@ export class AdminFinanceController {
           username: req.body.username,
           password: req.body.password,
           name: req.body.name,
+          role: "finance",
         },
         req.headers,
         req.file,
         req.body.photo
       );
 
-      sendResponse({
-        res,
-        status: "success",
-        statusCode: 201,
-        message: response.message,
-        data: response.data,
-      });
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 201,
+          message: response.message,
+          data: response.data,
+        });
+      }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error("Error creating Finance user:", err);
@@ -42,19 +45,17 @@ export class AdminFinanceController {
   static async update(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id);
-      const response = await AdminFinanceService.update(
-        id,
-        req.body,
-        req.file
-      );
+      const response = await AdminFinanceService.update(id, req.body, req.file);
 
-      sendResponse({
-        res,
-        status: "success",
-        statusCode: 200,
-        message: response.message,
-        data: response.data,
-      });
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error("Error updating Finance user:", err);
@@ -71,13 +72,16 @@ export class AdminFinanceController {
   static async getAll(req: Request, res: Response): Promise<void> {
     try {
       const response = await AdminFinanceService.getAll();
-      sendResponse({
-        res,
-        status: "success",
-        statusCode: 200,
-        message: response.message,
-        data: response.data,
-      });
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error("Error fetching Finance users:", err);
@@ -95,13 +99,16 @@ export class AdminFinanceController {
     try {
       const id = String(req.params.id);
       const response = await AdminFinanceService.delete(id);
-      sendResponse({
-        res,
-        status: "success",
-        statusCode: 200,
-        message: response.message,
-        data: response.data,
-      });
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error("Error deleting Finance user:", err);
