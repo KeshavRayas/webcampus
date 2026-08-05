@@ -1,8 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { DataField } from "./data-field";
-import { FacultyProfilePayload } from "./use-faculty-profile";
 import { Button } from "@webcampus/ui/components/button";
 import { Checkbox } from "@webcampus/ui/components/checkbox";
 import {
@@ -15,6 +12,9 @@ import {
 } from "@webcampus/ui/components/dialog";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
+import { useState } from "react";
+import { DataField } from "./data-field";
+import { FacultyProfilePayload } from "./use-faculty-profile";
 
 export const PersonalInfoCard = ({
   profile,
@@ -30,7 +30,9 @@ export const PersonalInfoCard = ({
   const [alternateContactNumber, setAlternateContactNumber] = useState(
     profile.alternateContactNumber || ""
   );
-  const [personalEmail, setPersonalEmail] = useState(profile.personalEmail || "");
+  const [personalEmail, setPersonalEmail] = useState(
+    profile.personalEmail || ""
+  );
   const [contactInformation, setContactInformation] = useState(
     profile.contactInformation || ""
   );
@@ -40,13 +42,21 @@ export const PersonalInfoCard = ({
   );
   const [presentCity, setPresentCity] = useState(profile.presentCity || "");
   const [presentState, setPresentState] = useState(profile.presentState || "");
-  const [presentPincode, setPresentPincode] = useState(profile.presentPincode || "");
+  const [presentPincode, setPresentPincode] = useState(
+    profile.presentPincode || ""
+  );
   const [permanentAddressLine, setPermanentAddressLine] = useState(
     profile.permanentAddressLine || ""
   );
-  const [permanentCity, setPermanentCity] = useState(profile.permanentCity || "");
-  const [permanentState, setPermanentState] = useState(profile.permanentState || "");
-  const [permanentPincode, setPermanentPincode] = useState(profile.permanentPincode || "");
+  const [permanentCity, setPermanentCity] = useState(
+    profile.permanentCity || ""
+  );
+  const [permanentState, setPermanentState] = useState(
+    profile.permanentState || ""
+  );
+  const [permanentPincode, setPermanentPincode] = useState(
+    profile.permanentPincode || ""
+  );
   const [sameAsPresentAddress, setSameAsPresentAddress] = useState(
     Boolean(profile.sameAsPresentAddress)
   );
@@ -74,7 +84,7 @@ export const PersonalInfoCard = ({
               Update
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[85vh] w-[95vw] sm:max-w-xl md:max-w-2xl lg:max-w-4xl xl:max-w-6xl overflow-y-auto">
+          <DialogContent className="max-h-[85vh] w-[95vw] overflow-y-auto sm:max-w-xl md:max-w-2xl lg:max-w-4xl xl:max-w-6xl">
             <DialogHeader>
               <DialogTitle>Update Contact Details</DialogTitle>
             </DialogHeader>
@@ -91,7 +101,9 @@ export const PersonalInfoCard = ({
                   <Label>Alternate Contact Number</Label>
                   <Input
                     value={alternateContactNumber}
-                    onChange={(event) => setAlternateContactNumber(event.target.value)}
+                    onChange={(event) =>
+                      setAlternateContactNumber(event.target.value)
+                    }
                   />
                 </div>
               </div>
@@ -108,7 +120,9 @@ export const PersonalInfoCard = ({
                 <Label>Contact Information</Label>
                 <Input
                   value={contactInformation}
-                  onChange={(event) => setContactInformation(event.target.value)}
+                  onChange={(event) =>
+                    setContactInformation(event.target.value)
+                  }
                 />
               </div>
 
@@ -116,18 +130,26 @@ export const PersonalInfoCard = ({
                 <Label>Present Address</Label>
                 <Input
                   value={presentAddressLine}
-                  onChange={(event) => setPresentAddressLine(event.target.value)}
+                  onChange={(event) =>
+                    setPresentAddressLine(event.target.value)
+                  }
                 />
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label>City</Label>
-                  <Input value={presentCity} onChange={(event) => setPresentCity(event.target.value)} />
+                  <Input
+                    value={presentCity}
+                    onChange={(event) => setPresentCity(event.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>State</Label>
-                  <Input value={presentState} onChange={(event) => setPresentState(event.target.value)} />
+                  <Input
+                    value={presentState}
+                    onChange={(event) => setPresentState(event.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Pincode</Label>
@@ -153,14 +175,18 @@ export const PersonalInfoCard = ({
                     }
                   }}
                 />
-                <Label htmlFor="sameAsPresentAddress">Same As Present Address</Label>
+                <Label htmlFor="sameAsPresentAddress">
+                  Same As Present Address
+                </Label>
               </div>
 
               <div className="space-y-2">
                 <Label>Permanent Address</Label>
                 <Input
                   value={permanentAddressLine}
-                  onChange={(event) => setPermanentAddressLine(event.target.value)}
+                  onChange={(event) =>
+                    setPermanentAddressLine(event.target.value)
+                  }
                 />
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -182,7 +208,9 @@ export const PersonalInfoCard = ({
                   <Label>Pincode</Label>
                   <Input
                     value={permanentPincode}
-                    onChange={(event) => setPermanentPincode(event.target.value)}
+                    onChange={(event) =>
+                      setPermanentPincode(event.target.value)
+                    }
                   />
                 </div>
               </div>
@@ -218,8 +246,12 @@ export const PersonalInfoCard = ({
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <DataField label="Mobile" value={profile.mobileNumber || profile.phoneNumber} />
-        <DataField label="Alt. Contact" value={profile.alternateContactNumber} />
+        <DataField label="Mobile" value={profile.mobileNumber} />
+        <DataField label="Phone Number" value={profile.phoneNumber} />
+        <DataField
+          label="Alt. Contact"
+          value={profile.alternateContactNumber}
+        />
         <DataField label="Official Email" value={profile.user.email} />
         <DataField label="Personal Email" value={profile.personalEmail} />
       </div>
@@ -227,25 +259,21 @@ export const PersonalInfoCard = ({
       <div className="grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-2">
         <DataField
           label="Present Address"
-          value={
-            formatAddressBlock(
-              profile.presentAddressLine,
-              profile.presentCity,
-              profile.presentState,
-              profile.presentPincode
-            )
-          }
+          value={formatAddressBlock(
+            profile.presentAddressLine,
+            profile.presentCity,
+            profile.presentState,
+            profile.presentPincode
+          )}
         />
         <DataField
           label="Permanent Address"
-          value={
-            formatAddressBlock(
-              profile.permanentAddressLine,
-              profile.permanentCity,
-              profile.permanentState,
-              profile.permanentPincode
-            )
-          }
+          value={formatAddressBlock(
+            profile.permanentAddressLine,
+            profile.permanentCity,
+            profile.permanentState,
+            profile.permanentPincode
+          )}
         />
       </div>
     </section>

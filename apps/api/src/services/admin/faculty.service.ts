@@ -93,6 +93,7 @@ export class AdminFacultyService {
           staffType: request.staffType,
           dob: request.dob,
           dateOfJoining: request.dateOfJoining,
+          phoneNumber: request.phoneNumber,
         },
         include: {
           user: true,
@@ -248,11 +249,15 @@ export class AdminFacultyService {
 
       const nextUserData: {
         name?: string;
+        email?: string;
         username?: string;
         displayUsername?: string;
       } = {};
       if (data.name !== undefined) {
         nextUserData.name = data.name;
+      }
+      if (data.email !== undefined) {
+        nextUserData.email = data.email;
       }
       if (data.username !== undefined) {
         nextUserData.username = data.username;
@@ -270,6 +275,7 @@ export class AdminFacultyService {
 
       const facultyData = { ...data } as Record<string, unknown>;
       delete facultyData.name;
+      delete facultyData.email;
       delete facultyData.username;
       delete facultyData.displayUsername;
 

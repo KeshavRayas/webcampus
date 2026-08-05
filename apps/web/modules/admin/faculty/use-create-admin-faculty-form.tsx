@@ -45,6 +45,7 @@ export const useCreateAdminFacultyForm = (departmentId: string) => {
       staffType: "REGULAR",
       dob: new Date(),
       dateOfJoining: new Date(),
+      phoneNumber: "",
     },
   });
 
