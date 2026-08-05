@@ -9,6 +9,7 @@ export interface RegistrationTrackingRow {
   studentId: string;
   studentName: string;
   usn: string;
+  studentEmail: string;
   isRegistered: boolean;
   registrationDate: string | null;
   registeredCourseCount: number;

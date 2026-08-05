@@ -89,8 +89,20 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
   const questionsWatch = form.watch("questions");
   const isValidTotal = computedTotal === maxMarks;
 
-  const createOrGroupId = () =>
-    `group_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const nextFreeOrGroupNumber = (part: string): number => {
+    const used = new Set<number>();
+    getOrGroupOptions(part).forEach((name) => {
+      const match = /^OR Group (\d+)$/.exec(name);
+      const groupNumber = match?.[1];
+      if (groupNumber) used.add(parseInt(groupNumber, 10));
+    });
+    let n = 1;
+    while (used.has(n)) n += 1;
+    return n;
+  };
+
+  const createOrGroupId = (part: string) =>
+    `OR Group ${nextFreeOrGroupNumber(part)}`;
 
   const buildPartQuestions = (
     part: string,
@@ -346,7 +358,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
 
   const handleOrGroupChange = (index: number, value: string) => {
     if (value === "__new__") {
-      const newGroupId = createOrGroupId();
+      const part = form.getValues(`questions.${index}.part`);
+      const newGroupId = createOrGroupId(part);
       form.setValue(`questions.${index}.orGroupId`, newGroupId, {
         shouldDirty: true,
       });
@@ -590,7 +603,6 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
                                           />
                                           {questionsWatch[index]?.orGroupId && (
                                             <Badge variant="secondary">
-                                              OR Group:{" "}
                                               {questionsWatch[index]?.orGroupId}
                                             </Badge>
                                           )}

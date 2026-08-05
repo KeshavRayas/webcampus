@@ -10,6 +10,10 @@ import {
   UpdateCourseDTO,
 } from "@webcampus/schemas/department";
 import type { DepartmentRequestContext } from "@webcampus/types/request-context";
+import {
+  ADMIN_VISIBLE_COURSE_STATUSES,
+  CourseApprovalError,
+} from "../shared/course-approval";
 
 interface AdminCourseEditContext {
   isAdmin?: boolean;
@@ -403,7 +407,11 @@ export class CourseService {
 
   static async getCourse(
     id: string,
-    departmentContext?: { departmentId?: string; departmentName?: string }
+    departmentContext?: {
+      departmentId?: string;
+      departmentName?: string;
+      adminView?: boolean;
+    }
   ) {
     const where: Record<string, unknown> = { id };
     if (departmentContext) {
@@ -435,6 +443,17 @@ export class CourseService {
       throw new Error("Course not found");
     }
 
+    if (
+      departmentContext?.adminView &&
+      !ADMIN_VISIBLE_COURSE_STATUSES.some(
+        (status) => status === course.approvalStatus
+      )
+    ) {
+      throw new CourseApprovalError(
+        "Course has not been submitted for approval."
+      );
+    }
+
     const sectionCounts = await CourseService.getSectionCounts(
       course.semesterId,
       course.departmentId,
@@ -464,7 +483,8 @@ export class CourseService {
     semesterId: string,
     departmentId?: string,
     departmentName?: string,
-    cycle?: string
+    cycle?: string,
+    options?: { adminView?: boolean }
   ) {
     const resolvedDepartmentId = await CourseService.resolveDepartmentId(
       departmentId,
@@ -478,6 +498,10 @@ export class CourseService {
 
     if (cycle && cycle !== "NONE") {
       whereClause.cycle = cycle;
+    }
+
+    if (options?.adminView) {
+      whereClause.approvalStatus = { in: ADMIN_VISIBLE_COURSE_STATUSES };
     }
 
     const sectionCounts = await CourseService.getSectionCounts(
@@ -701,13 +725,24 @@ export class CourseService {
 
   static async getById(id: string, ...args: unknown[]) {
     const [a, b] = args;
-    let ctx: { departmentId?: string; departmentName?: string } | undefined;
+    let ctx:
+      | {
+          departmentId?: string;
+          departmentName?: string;
+          adminView?: boolean;
+        }
+      | undefined;
 
     if (a && typeof a === "object") {
-      const obj = a as { departmentId?: string; departmentName?: string };
+      const obj = a as {
+        departmentId?: string;
+        departmentName?: string;
+        adminView?: boolean;
+      };
       ctx = {
         departmentId: obj.departmentId,
         departmentName: obj.departmentName,
+        adminView: obj.adminView,
       };
     } else if (typeof a === "string") {
       ctx = { departmentId: a, departmentName: (b as string) || undefined };
@@ -725,12 +760,13 @@ export class CourseService {
     cycle?: string,
     ...args: unknown[]
   ) {
-    void args;
+    const options = args[0] as { adminView?: boolean } | undefined;
     return this.getCoursesBySemester(
       semesterId,
       departmentId,
       departmentName,
-      cycle
+      cycle,
+      options
     );
   }
 
@@ -827,14 +863,7 @@ export class CourseService {
   static async getGroupedCourseSubmissions(role: "admin" | "coe") {
     const pendingCourses = await prisma.course.findMany({
       where: {
-        approvalStatus: {
-          in: [
-            CourseApprovalStatus.DRAFT,
-            CourseApprovalStatus.PENDING,
-            CourseApprovalStatus.APPROVED,
-            CourseApprovalStatus.NEEDS_REVISION,
-          ],
-        },
+        approvalStatus: CourseApprovalStatus.PENDING,
       },
       include: {
         department: { select: { id: true, code: true, name: true } },

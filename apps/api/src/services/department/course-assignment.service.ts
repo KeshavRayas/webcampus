@@ -313,6 +313,15 @@ export class CourseAssignmentService {
           batch: {
             select: { name: true },
           },
+          faculty: {
+            select: {
+              shortName: true,
+              user: { select: { name: true } },
+            },
+          },
+          section: {
+            select: { name: true },
+          },
         },
       });
 
@@ -323,6 +332,8 @@ export class CourseAssignmentService {
         assignmentType: a.assignmentType,
         batchId: a.batchId,
         batchName: a.batch?.name ?? null,
+        facultyName: a.faculty?.user?.name ?? a.faculty?.shortName ?? null,
+        sectionName: a.section?.name ?? null,
       }));
 
       return {

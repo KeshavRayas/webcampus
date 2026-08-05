@@ -10,7 +10,26 @@ import {
   UpdateMarkType,
 } from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
+import ExcelJS from "exceljs";
+import {
+  assertFacultyCourseApproved,
+  FACULTY_COURSE_STATUS,
+} from "../shared/course-approval";
 import { recomputeStudentMark } from "../shared/mark-sync.service";
+
+export interface ExcelImportError {
+  row: number;
+  usn: string;
+  question: string;
+  message: string;
+}
+
+export class MarksExcelValidationError extends Error {
+  constructor(public readonly errors: ExcelImportError[]) {
+    super("Marks upload rejected");
+    this.name = "MarksExcelValidationError";
+  }
+}
 
 export class Mark {
   /**
@@ -167,6 +186,8 @@ export class Mark {
         };
       }
 
+      assertFacultyCourseApproved(existingMark.course.approvalStatus, true);
+
       const courseAssignment = existingMark.course.assignments[0];
       const freeze = courseAssignment?.freezes;
 
@@ -192,6 +213,7 @@ export class Mark {
       };
     } catch (error) {
       logger.error("Error updating mark:", { error });
+      if (error instanceof Error) throw error;
       throw new Error("Failed to update mark");
     }
   }
@@ -221,6 +243,8 @@ export class Mark {
         };
       }
 
+      assertFacultyCourseApproved(existingMark.course.approvalStatus, true);
+
       const courseAssignment = existingMark.course.assignments[0];
       const freeze = courseAssignment?.freezes;
 
@@ -245,6 +269,7 @@ export class Mark {
       };
     } catch (error) {
       logger.error("Error deleting mark:", { error });
+      if (error instanceof Error) throw error;
       throw new Error("Failed to delete mark");
     }
   }
@@ -268,6 +293,7 @@ export class Mark {
       const assignments = await db.courseAssignment.findMany({
         where: {
           facultyId: faculty.id,
+          course: { approvalStatus: FACULTY_COURSE_STATUS },
         },
         select: {
           section: {
@@ -349,6 +375,7 @@ export class Mark {
               id: true,
               name: true,
               code: true,
+              approvalStatus: true,
             },
           },
         },
@@ -357,6 +384,8 @@ export class Mark {
       if (!assessment) {
         throw new Error("Assessment not found");
       }
+
+      assertFacultyCourseApproved(assessment.course.approvalStatus);
 
       // Verify faculty is assigned to this course
       const isAssigned = await db.courseAssignment.findFirst({
@@ -487,12 +516,15 @@ export class Mark {
         where: { id: data.assessmentId },
         include: {
           questions: true,
+          course: { select: { approvalStatus: true } },
         },
       });
 
       if (!assessment) {
         throw new Error("Assessment not found");
       }
+
+      assertFacultyCourseApproved(assessment.course.approvalStatus, true);
 
       // Verify faculty is assigned to this course
       const isAssigned = await db.courseAssignment.findFirst({
@@ -629,6 +661,337 @@ export class Mark {
     }
   }
 
+  static async generateMarksTemplate(
+    userId: string,
+    assessmentId: string,
+    sectionId?: string
+  ): Promise<Buffer> {
+    const faculty = await db.faculty.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!faculty) throw new Error("Faculty profile not found");
+
+    const assessment = await db.assessmentTemplate.findUnique({
+      where: { id: assessmentId },
+      include: {
+        questions: { orderBy: [{ part: "asc" }, { qNumber: "asc" }] },
+        course: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            approvalStatus: true,
+            semester: {
+              select: {
+                id: true,
+                semesterNumber: true,
+                academicTerm: { select: { type: true, year: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!assessment) throw new Error("Assessment not found");
+
+    assertFacultyCourseApproved(assessment.course.approvalStatus);
+
+    const isAssigned = await db.courseAssignment.findFirst({
+      where: { courseId: assessment.courseId, facultyId: faculty.id },
+    });
+    if (!isAssigned) throw new Error("Unauthorized to view this assessment");
+
+    const registrations = await db.courseRegistration.findMany({
+      where: {
+        courseId: assessment.courseId,
+        semesterId: assessment.semesterId,
+        ...(sectionId
+          ? { student: { studentSections: { some: { sectionId } } } }
+          : {}),
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            usn: true,
+            user: { select: { name: true, email: true } },
+          },
+        },
+      },
+      orderBy: { student: { usn: "asc" } },
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Marks Entry");
+
+    worksheet.addRow([
+      "Academic Term",
+      `${assessment.course.semester.academicTerm.type} ${assessment.course.semester.academicTerm.year}`,
+    ]);
+    worksheet.addRow(["Semester", assessment.course.semester.semesterNumber]);
+    worksheet.addRow(["Course", assessment.course.name]);
+    worksheet.addRow(["Course Code", assessment.course.code]);
+    worksheet.addRow(["Assessment", assessment.title]);
+    worksheet.addRow(["Max Marks", assessment.totalMarks]);
+    worksheet.addRow([]);
+
+    const headerRow = worksheet.addRow([
+      "USN",
+      "Student Name",
+      "Student Email",
+      ...assessment.questions.map((q) => q.qNumber),
+      "Total",
+    ]);
+    headerRow.font = { bold: true };
+
+    registrations.forEach((reg) => {
+      worksheet.addRow([
+        reg.student.usn,
+        reg.student.user.name,
+        reg.student.user.email,
+        ...assessment.questions.map(() => ""),
+        "",
+      ]);
+    });
+
+    worksheet.getColumn(1).width = 18;
+    worksheet.getColumn(2).width = 30;
+    worksheet.getColumn(3).width = 30;
+    assessment.questions.forEach((_, index) => {
+      worksheet.getColumn(index + 4).width = 10;
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return buffer as unknown as Buffer;
+  }
+
+  private static computeTotalWithOrLogic(
+    questions: Array<{
+      id: string;
+      part: string;
+      marks: number;
+      orGroupId: string | null;
+    }>,
+    marks: Record<string, number>
+  ): number {
+    const byPart = new Map<string, typeof questions>();
+    questions.forEach((q) => {
+      const list = byPart.get(q.part) ?? [];
+      list.push(q);
+      byPart.set(q.part, list);
+    });
+
+    let total = 0;
+    byPart.forEach((partQuestions) => {
+      const orMaxes = new Map<string, number>();
+      let standalone = 0;
+      partQuestions.forEach((q) => {
+        const obtained = marks[q.id] ?? 0;
+        if (q.orGroupId) {
+          orMaxes.set(
+            q.orGroupId,
+            Math.max(orMaxes.get(q.orGroupId) ?? 0, obtained)
+          );
+        } else {
+          standalone += obtained;
+        }
+      });
+
+      let orSum = 0;
+      orMaxes.forEach((max) => {
+        orSum += max;
+      });
+      total += standalone + orSum;
+    });
+
+    return total;
+  }
+
+  static async uploadMarksFromExcel(
+    userId: string,
+    assessmentId: string,
+    sectionId: string | undefined,
+    fileBuffer: Buffer
+  ): Promise<BaseResponse<null>> {
+    const faculty = await db.faculty.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!faculty) throw new Error("Faculty profile not found");
+
+    const assessment = await db.assessmentTemplate.findUnique({
+      where: { id: assessmentId },
+      include: {
+        questions: { orderBy: [{ part: "asc" }, { qNumber: "asc" }] },
+        course: { select: { id: true } },
+      },
+    });
+    if (!assessment) throw new Error("Assessment not found");
+
+    const isAssigned = await db.courseAssignment.findFirst({
+      where: { courseId: assessment.courseId, facultyId: faculty.id },
+    });
+    if (!isAssigned) {
+      throw new Error("Unauthorized to upload marks for this assessment");
+    }
+
+    const registrations = await db.courseRegistration.findMany({
+      where: {
+        courseId: assessment.courseId,
+        semesterId: assessment.semesterId,
+        ...(sectionId
+          ? { student: { studentSections: { some: { sectionId } } } }
+          : {}),
+      },
+      include: { student: { select: { id: true, usn: true } } },
+    });
+    const studentIdByUsn = new Map(
+      registrations.map((r) => [r.student.usn, r.student.id])
+    );
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(fileBuffer as unknown as ArrayBuffer);
+    const worksheet = workbook.getWorksheet(1);
+    if (!worksheet) throw new Error("Invalid Excel file format");
+
+    let headerRowNumber = -1;
+    worksheet.eachRow((row, rowNumber) => {
+      if (
+        headerRowNumber === -1 &&
+        row.getCell(1).text.trim().toUpperCase() === "USN"
+      ) {
+        headerRowNumber = rowNumber;
+      }
+    });
+    if (headerRowNumber === -1) {
+      throw new Error(
+        "Template header row (USN) not found in the uploaded file"
+      );
+    }
+
+    const headerRow = worksheet.getRow(headerRowNumber);
+    const columnByHeader = new Map<string, number>();
+    headerRow.eachCell((cell, colNumber) => {
+      const header = cell.text.trim();
+      if (header) columnByHeader.set(header, colNumber);
+    });
+
+    const missingColumns = assessment.questions.filter(
+      (q) => !columnByHeader.has(q.qNumber)
+    );
+    if (missingColumns.length > 0) {
+      throw new MarksExcelValidationError(
+        missingColumns.map((q) => ({
+          row: headerRowNumber,
+          usn: "-",
+          question: q.qNumber,
+          message: "Missing question column in template",
+        }))
+      );
+    }
+
+    const errors: ExcelImportError[] = [];
+    const seenUsns = new Set<string>();
+    const parsed: Array<{
+      studentId: string;
+      marks: Array<{ questionId: string; marksObtained: number }>;
+    }> = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber <= headerRowNumber) return;
+      const usn = row.getCell(1).text.trim();
+      if (!usn) return;
+
+      const studentId = studentIdByUsn.get(usn);
+      if (!studentId) {
+        errors.push({
+          row: rowNumber,
+          usn,
+          question: "-",
+          message: "Student not found in the selected section",
+        });
+        return;
+      }
+      if (seenUsns.has(usn)) {
+        errors.push({
+          row: rowNumber,
+          usn,
+          question: "-",
+          message: "Duplicate USN in file",
+        });
+        return;
+      }
+      seenUsns.add(usn);
+
+      const marks: Array<{ questionId: string; marksObtained: number }> = [];
+      assessment.questions.forEach((q) => {
+        const colNumber = columnByHeader.get(q.qNumber);
+        const raw = colNumber ? row.getCell(colNumber).text.trim() : "";
+        if (raw === "") {
+          marks.push({ questionId: q.id, marksObtained: 0 });
+          return;
+        }
+
+        const num = Number(raw);
+        if (Number.isNaN(num) || !Number.isFinite(num)) {
+          errors.push({
+            row: rowNumber,
+            usn,
+            question: q.qNumber,
+            message: "Marks must be numeric",
+          });
+          return;
+        }
+        if (num < 0 || num > q.marks) {
+          errors.push({
+            row: rowNumber,
+            usn,
+            question: q.qNumber,
+            message: `Marks ${num} exceed maximum ${q.marks}`,
+          });
+          return;
+        }
+        marks.push({ questionId: q.id, marksObtained: num });
+      });
+      parsed.push({ studentId, marks });
+    });
+
+    if (errors.length > 0) {
+      throw new MarksExcelValidationError(errors);
+    }
+
+    const studentTotals = parsed.map((entry) => {
+      const marksRecord: Record<string, number> = {};
+      entry.marks.forEach((mark) => {
+        marksRecord[mark.questionId] = mark.marksObtained;
+      });
+      return {
+        studentId: entry.studentId,
+        totalMarks: Mark.computeTotalWithOrLogic(
+          assessment.questions,
+          marksRecord
+        ),
+        status: "PRESENT" as const,
+      };
+    });
+
+    const marks = parsed.flatMap((entry) =>
+      entry.marks.map((mark) => ({
+        studentId: entry.studentId,
+        questionId: mark.questionId,
+        marksObtained: mark.marksObtained,
+      }))
+    );
+
+    return Mark.saveAssessmentMarks(userId, {
+      assessmentId,
+      courseId: assessment.courseId,
+      marks,
+      studentTotals,
+    });
+  }
+
   static async getMarksReport(
     userId: string,
     courseId: string,
@@ -648,10 +1011,18 @@ export class Mark {
         where: {
           courseId,
           facultyId: faculty.id,
+          course: { approvalStatus: FACULTY_COURSE_STATUS },
         },
         include: {
           course: {
-            include: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              semesterId: true,
+              cieEligibility: true,
+              cieMaxMarks: true,
+              approvalStatus: true,
               semester: {
                 include: {
                   academicTerm: true,
@@ -667,6 +1038,8 @@ export class Mark {
       }
 
       const course = assignment.course;
+
+      assertFacultyCourseApproved(course.approvalStatus);
 
       const assessments = await db.assessmentTemplate.findMany({
         where: { courseId },
@@ -814,7 +1187,10 @@ export class Mark {
       }
 
       const assignments = await db.courseAssignment.findMany({
-        where: { facultyId: faculty.id },
+        where: {
+          facultyId: faculty.id,
+          course: { approvalStatus: FACULTY_COURSE_STATUS },
+        },
         select: {
           course: {
             select: {

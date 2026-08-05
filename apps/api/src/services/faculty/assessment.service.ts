@@ -2,6 +2,10 @@ import { logger } from "@webcampus/common/logger";
 import { Cycle, db, Prisma } from "@webcampus/db";
 import type { CreateAssessmentType } from "@webcampus/schemas/faculty";
 import type { BaseResponse } from "@webcampus/types/api";
+import {
+  assertFacultyCourseApproved,
+  FACULTY_COURSE_STATUS,
+} from "../shared/course-approval";
 
 export interface CoordinatedCourseDTO {
   id: string;
@@ -64,6 +68,7 @@ export class AssessmentService {
           coordinators: {
             some: { facultyId: faculty.id },
           },
+          approvalStatus: FACULTY_COURSE_STATUS,
           ...(semesterId && { semesterId }),
           ...(cycle && cycle !== "NONE" && { cycle: cycle as Cycle }),
         },
@@ -147,6 +152,15 @@ export class AssessmentService {
       if (!faculty) {
         throw new Error("Faculty profile not found");
       }
+
+      const course = await db.course.findUnique({
+        where: { id: data.courseId },
+        select: { approvalStatus: true },
+      });
+      if (!course) {
+        throw new Error("Course not found");
+      }
+      assertFacultyCourseApproved(course.approvalStatus, true);
 
       const existingAssessment = await db.assessmentTemplate.findFirst({
         where: {
@@ -232,12 +246,17 @@ export class AssessmentService {
 
       const assessment = await db.assessmentTemplate.findUnique({
         where: { id: assessmentId },
-        select: { courseId: true },
+        select: {
+          courseId: true,
+          course: { select: { approvalStatus: true } },
+        },
       });
 
       if (!assessment) {
         throw new Error("Assessment not found");
       }
+
+      assertFacultyCourseApproved(assessment.course.approvalStatus, true);
 
       const isCoordinator = await db.courseCoordinator.findFirst({
         where: {
@@ -305,6 +324,7 @@ export class AssessmentService {
             select: {
               name: true,
               code: true,
+              approvalStatus: true,
             },
           },
         },
@@ -313,6 +333,8 @@ export class AssessmentService {
       if (!assessment) {
         throw new Error("Assessment not found");
       }
+
+      assertFacultyCourseApproved(assessment.course.approvalStatus);
 
       // Ensure faculty is actually assigned to this course
       const faculty = await db.faculty.findUnique({

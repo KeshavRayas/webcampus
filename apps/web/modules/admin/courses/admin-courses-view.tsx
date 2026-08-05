@@ -74,11 +74,9 @@ export const AdminCoursesView = () => {
   );
   const allSemestersForSelectedDraftTerm = selectedDraftTerm?.Semester ?? [];
 
-  const selectedDraftDepartment = departments.find(
-    (d) => d.name === draftFilters.departmentName
+  const firstYearDepartment = departments.find(
+    (d) => d.type === "BASIC_SCIENCES"
   );
-  const isFirstYearDepartment =
-    selectedDraftDepartment?.type === "BASIC_SCIENCES";
 
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
@@ -86,46 +84,22 @@ export const AdminCoursesView = () => {
   });
 
   const semesterOptions = useMemo(() => {
-    if (isFirstYearDepartment) {
-      return allSemestersForSelectedDraftTerm.filter((s) =>
-        FIRST_YEAR_UG_SEMESTERS.has(s.semesterNumber)
-      );
-    }
-
-    const termType = selectedDraftTerm?.type;
-    if (termType === "odd") {
-      return allSemestersForSelectedDraftTerm.filter(
-        (s) => s.semesterNumber >= 3 && s.semesterNumber % 2 === 1
-      );
-    }
-    if (termType === "even") {
-      return allSemestersForSelectedDraftTerm.filter(
-        (s) => s.semesterNumber >= 4 && s.semesterNumber % 2 === 0
-      );
-    }
-
-    return allSemestersForSelectedDraftTerm.filter(
-      (s) => !FIRST_YEAR_UG_SEMESTERS.has(s.semesterNumber)
-    );
-  }, [
-    allSemestersForSelectedDraftTerm,
-    isFirstYearDepartment,
-    selectedDraftTerm?.type,
-  ]);
+    return allSemestersForSelectedDraftTerm;
+  }, [allSemestersForSelectedDraftTerm]);
 
   const selectedDraftSemester = semesterOptions.find(
     (s) => s.id === draftFilters.semesterId
   );
 
-  const isSemesterOneOrTwo =
+  const isFirstYearUg =
     !!selectedDraftSemester &&
-    FIRST_YEAR_UG_SEMESTERS.has(selectedDraftSemester.semesterNumber);
+    FIRST_YEAR_UG_SEMESTERS.has(selectedDraftSemester.semesterNumber) &&
+    selectedDraftSemester.programType === "UG";
 
   const isApplyReady =
     !!draftFilters.termId &&
     !!draftFilters.semesterId &&
-    !!draftFilters.departmentId &&
-    (!isSemesterOneOrTwo || !!draftFilters.cycle);
+    (isFirstYearUg ? !!draftFilters.cycle : !!draftFilters.departmentId);
 
   const selectedAppliedTerm = terms.find(
     (term) => term.id === appliedFilters.termId
@@ -136,14 +110,21 @@ export const AdminCoursesView = () => {
 
   const appliedIsSemesterOneOrTwo =
     !!selectedAppliedSemester &&
-    FIRST_YEAR_UG_SEMESTERS.has(selectedAppliedSemester.semesterNumber);
+    FIRST_YEAR_UG_SEMESTERS.has(selectedAppliedSemester.semesterNumber) &&
+    selectedAppliedSemester.programType === "UG";
 
   const applyFilters = () => {
     if (!isApplyReady) return;
 
-    const nextFilters = {
+    const nextFilters: AdminCoursesFilters = {
       ...draftFilters,
-      cycle: isSemesterOneOrTwo
+      ...(isFirstYearUg && firstYearDepartment
+        ? {
+            departmentId: firstYearDepartment.id,
+            departmentName: firstYearDepartment.name,
+          }
+        : {}),
+      cycle: isFirstYearUg
         ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
         : "",
     };
@@ -172,19 +153,6 @@ export const AdminCoursesView = () => {
       hideAllOption: true,
     },
     {
-      key: "departmentName",
-      label: "Department",
-      type: "select",
-      options: departments.map((department) => ({
-        label: department.name,
-        value: department.name,
-      })),
-      placeholder: draftFilters.termId
-        ? "Select department..."
-        : "Select term first",
-      hideAllOption: true,
-    } as FilterFieldConfig<AdminCoursesFilters>,
-    {
       key: "semesterId",
       label: "Semester",
       type: "select",
@@ -192,13 +160,12 @@ export const AdminCoursesView = () => {
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
-      placeholder:
-        draftFilters.termId && draftFilters.departmentName
-          ? "Select semester..."
-          : "Select term and department first",
+      placeholder: draftFilters.termId
+        ? "Select semester..."
+        : "Select term first",
       hideAllOption: true,
     },
-    ...(isSemesterOneOrTwo
+    ...(isFirstYearUg
       ? [
           {
             key: "cycle",
@@ -211,7 +178,25 @@ export const AdminCoursesView = () => {
             hideAllOption: true,
           } as FilterFieldConfig<AdminCoursesFilters>,
         ]
-      : []),
+      : draftFilters.semesterId
+        ? [
+            {
+              key: "departmentName",
+              label: "Department",
+              type: "select",
+              options: departments
+                .filter((d) => d.type !== "BASIC_SCIENCES")
+                .map((department) => ({
+                  label: department.name,
+                  value: department.name,
+                })),
+              placeholder: draftFilters.semesterId
+                ? "Select department..."
+                : "Select semester first",
+              hideAllOption: true,
+            } as FilterFieldConfig<AdminCoursesFilters>,
+          ]
+        : []),
   ];
 
   const { data: courses, isLoading: coursesLoading } = useQuery({
@@ -308,6 +293,21 @@ export const AdminCoursesView = () => {
                 next.semesterId = "";
                 next.cycle = "";
               } else if (key === "semesterId") {
+                const semester = allSemestersForSelectedDraftTerm.find(
+                  (s) => s.id === value
+                );
+                const isFirstYearUgSemester =
+                  !!semester &&
+                  FIRST_YEAR_UG_SEMESTERS.has(semester.semesterNumber) &&
+                  semester.programType === "UG";
+
+                if (isFirstYearUgSemester && firstYearDepartment) {
+                  next.departmentId = firstYearDepartment.id;
+                  next.departmentName = firstYearDepartment.name;
+                } else {
+                  next.departmentId = "";
+                  next.departmentName = "";
+                }
                 next.cycle = "";
               }
 

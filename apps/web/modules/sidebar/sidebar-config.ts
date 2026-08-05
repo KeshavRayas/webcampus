@@ -198,23 +198,30 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [{ name: "Course Registration", url: "/student/courses" }],
         },
         {
-          name: "Attendance",
+          name: "Academics",
           url: "/student/attendance",
-          icon: Fingerprint,
+          icon: GraduationCap,
           children: [
-            { name: "View Attendance", url: "/student/attendance" },
-            { name: "Attendance Report", url: "/student/attendance/report" },
+            {
+              name: "Attendance",
+              url: "/student/attendance",
+              children: [
+                { name: "View Attendance", url: "/student/attendance" },
+              ],
+            },
+            {
+              name: "Marks",
+              url: "/student/marks",
+              children: [{ name: "View Marks", url: "/student/marks" }],
+            },
+            {
+              name: "Hall Ticket",
+              url: "/student/hall-ticket",
+              children: [
+                { name: "View Hall Ticket", url: "/student/hall-ticket" },
+              ],
+            },
           ],
-        },
-        {
-          name: "CIE",
-          url: "/student/cie",
-          icon: BookOpenText,
-        },
-        {
-          name: "Hall Ticket",
-          url: "/student/hall-ticket",
-          icon: FileText,
         },
         {
           name: "Profile",

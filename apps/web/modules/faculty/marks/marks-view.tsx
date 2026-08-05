@@ -4,6 +4,7 @@ import {
   createFilterQueryString,
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Card,
@@ -17,11 +18,16 @@ import {
   FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import { Loader2 } from "lucide-react";
+import { Download, Loader2, Upload } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { EnterMarksDialog } from "../marks-entry/enter-marks-dialog";
-import { MarksCourseInfo } from "./marks-api";
+import {
+  downloadMarksTemplate,
+  MarksCourseInfo,
+  uploadMarksExcel,
+} from "./marks-api";
 import { useMarksDashboardAssignments } from "./use-marks-entry";
 
 interface MarksFilters extends Record<string, string> {
@@ -42,6 +48,7 @@ export const MarksView = () => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
 
   const [draftFilters, setDraftFilters] = useState<MarksFilters>(
     () =>
@@ -56,6 +63,7 @@ export const MarksView = () => {
     assessmentId: string;
     assessmentTitle: string;
   } | null>(null);
+  const [isProcessingExcel, setIsProcessingExcel] = useState(false);
 
   const { data: assignments, isLoading } = useMarksDashboardAssignments();
 
@@ -248,6 +256,65 @@ export const MarksView = () => {
     });
   };
 
+  const handleDownloadTemplate = async (
+    assessmentId: string,
+    assessmentTitle: string
+  ) => {
+    if (!selectedCourse) return;
+    try {
+      setIsProcessingExcel(true);
+      await downloadMarksTemplate(
+        assessmentId,
+        appliedFilters.sectionId || undefined,
+        selectedCourse.code,
+        assessmentTitle
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to download template"
+      );
+    } finally {
+      setIsProcessingExcel(false);
+    }
+  };
+
+  const handleUploadExcel = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    assessmentId: string
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsProcessingExcel(true);
+      await uploadMarksExcel(
+        assessmentId,
+        appliedFilters.sectionId || undefined,
+        file
+      );
+      toast.success("Marks uploaded successfully");
+      queryClient.invalidateQueries({
+        queryKey: ["marks-dashboard-assignments"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["assessmentWithMarks", assessmentId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["student-marks-summary"],
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload marks"
+      );
+    } finally {
+      setIsProcessingExcel(false);
+      const input = document.getElementById(
+        `marks-excel-input-${assessmentId}`
+      ) as HTMLInputElement | null;
+      if (input) input.value = "";
+    }
+  };
+
   const handleReset = () => {
     setDraftFilters(EMPTY_FILTERS);
     setAppliedFilters(EMPTY_FILTERS);
@@ -309,18 +376,54 @@ export const MarksView = () => {
                         Total Marks: {assessment.totalMarks}
                       </p>
                     </div>
-                    <Button
-                      onClick={() =>
-                        setSelectedAssessment({
-                          courseId: selectedCourse.id,
-                          assessmentId: assessment.id,
-                          assessmentTitle: assessment.title,
-                        })
-                      }
-                      variant="outline"
-                    >
-                      Enter Marks
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id={`marks-excel-input-${assessment.id}`}
+                        type="file"
+                        className="hidden"
+                        accept=".xlsx"
+                        onChange={(event) =>
+                          handleUploadExcel(event, assessment.id)
+                        }
+                      />
+                      <Button
+                        variant="outline"
+                        disabled={isProcessingExcel}
+                        onClick={() =>
+                          handleDownloadTemplate(
+                            assessment.id,
+                            assessment.title
+                          )
+                        }
+                      >
+                        <Download className="mr-2 h-4 w-4" /> Download Template
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={isProcessingExcel}
+                        onClick={() =>
+                          document
+                            .getElementById(
+                              `marks-excel-input-${assessment.id}`
+                            )
+                            ?.click()
+                        }
+                      >
+                        <Upload className="mr-2 h-4 w-4" /> Upload Excel
+                      </Button>
+                      <Button
+                        onClick={() =>
+                          setSelectedAssessment({
+                            courseId: selectedCourse.id,
+                            assessmentId: assessment.id,
+                            assessmentTitle: assessment.title,
+                          })
+                        }
+                        variant="outline"
+                      >
+                        Enter Marks
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
