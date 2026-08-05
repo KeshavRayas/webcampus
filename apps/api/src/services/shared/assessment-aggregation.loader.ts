@@ -10,15 +10,17 @@ import type { AggregationResult } from "./assessment-aggregation.types";
 
 export async function buildAggregationResultsForStudents(
   courseId: string,
-  studentIds: string[]
+  studentIds: string[],
+  tx?: Prisma.TransactionClient
 ): Promise<Map<string, AggregationResult>> {
+  const prisma = tx ?? db;
   const results = new Map<string, AggregationResult>();
 
   if (studentIds.length === 0) {
     return results;
   }
 
-  const course = await db.course.findUnique({
+  const course = await prisma.course.findUnique({
     where: { id: courseId },
     select: {
       id: true,
