@@ -1,4 +1,4 @@
-import { resolveHODDepartment } from "@webcampus/api/src/services/hod/resolve-hod-department";
+import { resolveFeedbackScope } from "@webcampus/api/src/services/shared/feedback-scope.service";
 import { FeedbackService } from "@webcampus/api/src/services/shared/feedback.service";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import type { FeedbackReportQuery } from "@webcampus/schemas/feedback";
@@ -52,12 +52,55 @@ export class FeedbackController {
     }
   }
 
-  static async configuration(req: Request, res: Response) {
+  static async getTermConfiguration(req: Request, res: Response) {
     try {
       reply(
         res,
-        await FeedbackService.getConfiguration(req.params.semesterId as string),
-        "Feedback configuration fetched successfully"
+        await FeedbackService.getTermConfiguration(
+          req.params.academicTermId as string
+        ),
+        "Term feedback configuration fetched successfully"
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  }
+
+  static async configureTerm(req: Request, res: Response) {
+    try {
+      reply(
+        res,
+        await FeedbackService.configureTerm(userId(req), req.body),
+        "Term feedback configuration saved successfully"
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  }
+
+  static async presets(req: Request, res: Response) {
+    try {
+      reply(
+        res,
+        await FeedbackService.listPresets(
+          typeof req.query.academicTermId === "string"
+            ? req.query.academicTermId
+            : undefined
+        ),
+        "Feedback presets fetched successfully"
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  }
+
+  static async createPreset(req: Request, res: Response) {
+    try {
+      reply(
+        res,
+        await FeedbackService.createPreset(userId(req), req.body),
+        "Feedback preset created successfully",
+        201
       );
     } catch (error) {
       fail(res, error);
@@ -66,22 +109,19 @@ export class FeedbackController {
 
   static async filterOptions(req: Request, res: Response) {
     try {
+      const role = req.requestContext?.role;
+      if (
+        !role ||
+        !["faculty", "hod", "department", "coe", "admin"].includes(role)
+      ) {
+        throw new Error("Feedback reports are unavailable for this role");
+      }
       reply(
         res,
-        await FeedbackService.getFilterOptions(),
+        await FeedbackService.getFilterOptions(
+          await resolveFeedbackScope(userId(req), role as never)
+        ),
         "Feedback filters fetched successfully"
-      );
-    } catch (error) {
-      fail(res, error);
-    }
-  }
-
-  static async saveQuestions(req: Request, res: Response) {
-    try {
-      reply(
-        res,
-        await FeedbackService.saveQuestionSet(userId(req), req.body),
-        "Feedback questions saved successfully"
       );
     } catch (error) {
       fail(res, error);
@@ -141,32 +181,13 @@ export class FeedbackController {
     try {
       const query = req.query as FeedbackReportQuery;
       const role = req.requestContext?.role;
-      let scope: { facultyId?: string; departmentId?: string } | undefined;
-      if (role === "faculty") {
-        const faculty = await (
-          await import("@webcampus/db")
-        ).db.faculty.findUnique({
-          where: { userId: userId(req) },
-          select: { id: true },
-        });
-        if (!faculty) throw new Error("Faculty profile not found");
-        scope = { facultyId: faculty.id };
+      if (
+        !role ||
+        !["faculty", "hod", "department", "coe", "admin"].includes(role)
+      ) {
+        throw new Error("Feedback reports are unavailable for this role");
       }
-      if (role === "hod") {
-        const department = await resolveHODDepartment(userId(req));
-        if (!department) throw new Error("HOD department not found");
-        scope = { departmentId: department.departmentId };
-      }
-      if (role === "department") {
-        const membership = await (
-          await import("@webcampus/db")
-        ).db.departmentUser.findFirst({
-          where: { userId: userId(req), role: { in: ["ADMIN", "VIEWER"] } },
-          select: { departmentId: true },
-        });
-        if (!membership) throw new Error("Department membership not found");
-        scope = { departmentId: membership.departmentId };
-      }
+      const scope = await resolveFeedbackScope(userId(req), role as never);
       reply(
         res,
         await FeedbackService.getReport(query, scope),

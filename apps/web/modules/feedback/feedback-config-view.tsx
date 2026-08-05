@@ -11,68 +11,195 @@ import {
 } from "@webcampus/ui/components/card";
 import { Input } from "@webcampus/ui/components/input";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
-const defaults = Array.from({ length: 10 }, (_, index) => ({
-  questionNumber: index + 1,
-  questionText: "",
-}));
+type Preset = {
+  id: string;
+  name: string;
+  description?: string;
+  questions: Array<{ questionNumber: number; questionText: string }>;
+};
+
+type Question = { questionNumber: number; questionText: string };
+
+type RoundState = {
+  id: string;
+  roundNumber: number;
+  startsAt: string;
+  endsAt: string;
+  isEnabled: boolean;
+};
+
+const emptyRounds = (): RoundState[] =>
+  [1, 2, 3].map((roundNumber) => ({
+    id: "",
+    roundNumber,
+    startsAt: "",
+    endsAt: "",
+    isEnabled: false,
+  }));
+
+const errorMessage = (error: unknown, fallback: string) =>
+  axios.isAxiosError(error)
+    ? (error.response?.data?.message ?? fallback)
+    : error instanceof Error
+      ? error.message
+      : fallback;
 
 export function FeedbackConfigView() {
-  const { data: loadedTerms } = useAcademicTerms({ isCurrent: true });
+  const { data: loadedTerms } = useAcademicTerms();
   const terms = loadedTerms ?? [];
-  const [semesterId, setSemesterId] = useState("");
-  const [questions, setQuestions] = useState(defaults);
-  const [rounds, setRounds] = useState([
-    { id: "", roundNumber: 1, startsAt: "", endsAt: "", isEnabled: false },
-    { id: "", roundNumber: 2, startsAt: "", endsAt: "", isEnabled: false },
-    { id: "", roundNumber: 3, startsAt: "", endsAt: "", isEnabled: false },
-  ]);
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const semester = terms
-    .flatMap((term) => term.Semester ?? [])
-    .find((item) => item.id === semesterId);
-  useEffect(() => {
-    if (!semesterId) return;
-    void axios
-      .get(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/configuration/${semesterId}`,
-        { withCredentials: true }
-      )
-      .then((response) => {
-        const config = response.data.data;
-        if (config?.questions?.length)
+  const [academicTermId, setAcademicTermId] = useState("");
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [presetId, setPresetId] = useState("");
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [rounds, setRounds] = useState<RoundState[]>(emptyRounds());
+  const [locked, setLocked] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(false);
+
+  const loadTermConfig = useCallback(
+    (termId: string) => {
+      setLoadingConfig(true);
+      void axios
+        .get(
+          `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/configuration/term/${termId}`,
+          { withCredentials: true }
+        )
+        .then((response) => {
+          const config = response.data.data;
+          setPresetId(config?.presetId ?? "");
           setQuestions(
-            config.questions.map(
-              (question: { questionNumber: number; questionText: string }) => ({
-                questionNumber: question.questionNumber,
-                questionText: question.questionText,
+            config?.questions?.length
+              ? config.questions.map(
+                  (question: {
+                    questionNumber: number;
+                    questionText: string;
+                  }) => ({
+                    questionNumber: question.questionNumber,
+                    questionText: question.questionText,
+                  })
+                )
+              : []
+          );
+          const hasRounds = config?.rounds?.length > 0;
+          setLocked(Boolean(config?.isLocked) || hasRounds);
+          if (hasRounds) {
+            setRounds(
+              emptyRounds().map((round) => {
+                const saved = config.rounds.find(
+                  (item: { roundNumber: number }) =>
+                    item.roundNumber === round.roundNumber
+                );
+                return saved
+                  ? {
+                      id: saved.id,
+                      roundNumber: saved.roundNumber,
+                      startsAt: saved.startsAt.slice(0, 16),
+                      endsAt: saved.endsAt.slice(0, 16),
+                      isEnabled: saved.isEnabled,
+                    }
+                  : round;
               })
+            );
+          } else {
+            setRounds(emptyRounds());
+          }
+        })
+        .catch(() => {
+          setPresetId("");
+          setQuestions([]);
+          setRounds(emptyRounds());
+          setLocked(false);
+        })
+        .finally(() => setLoadingConfig(false));
+    },
+    [NEXT_PUBLIC_API_BASE_URL]
+  );
+
+  useEffect(() => {
+    void axios
+      .get(`${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/presets`, {
+        withCredentials: true,
+      })
+      .then((response) => setPresets(response.data.data ?? []))
+      .catch(() => setPresets([]));
+  }, [NEXT_PUBLIC_API_BASE_URL]);
+
+  useEffect(() => {
+    if (!academicTermId) {
+      setPresetId("");
+      setQuestions([]);
+      setRounds(emptyRounds());
+      setLocked(false);
+      return;
+    }
+    loadTermConfig(academicTermId);
+  }, [academicTermId, loadTermConfig]);
+
+  const selectedPreset = presets.find((preset) => preset.id === presetId);
+  const displayQuestions =
+    questions.length > 0 ? questions : (selectedPreset?.questions ?? []);
+
+  const saveQuestionSet = async () => {
+    if (!academicTermId || !presetId) return;
+    try {
+      await axios.post(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/configuration/term`,
+        { academicTermId, presetId },
+        { withCredentials: true }
+      );
+      toast.success("Feedback question set saved");
+      loadTermConfig(academicTermId);
+    } catch (error) {
+      toast.error(errorMessage(error, "Could not save question set"));
+    }
+  };
+
+  const saveRounds = async () => {
+    if (!academicTermId) return;
+    try {
+      for (const round of rounds) {
+        if (!round.startsAt || !round.endsAt)
+          throw new Error(`Set dates for round ${round.roundNumber}`);
+        const payload = {
+          academicTermId,
+          roundNumber: round.roundNumber,
+          startsAt: new Date(round.startsAt).toISOString(),
+          endsAt: new Date(round.endsAt).toISOString(),
+          isEnabled: round.isEnabled,
+        };
+        if (round.id) {
+          await axios.patch(
+            `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/rounds/${round.id}`,
+            payload,
+            { withCredentials: true }
+          );
+        } else {
+          const response = await axios.post(
+            `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/rounds`,
+            payload,
+            { withCredentials: true }
+          );
+          setRounds((current) =>
+            current.map((item) =>
+              item.roundNumber === round.roundNumber
+                ? { ...item, id: response.data.data.id }
+                : item
             )
           );
-        if (config?.rounds?.length)
-          setRounds(
-            config.rounds.map(
-              (round: {
-                id: string;
-                roundNumber: number;
-                startsAt: string;
-                endsAt: string;
-                isEnabled: boolean;
-              }) => ({
-                id: round.id,
-                roundNumber: round.roundNumber,
-                startsAt: round.startsAt.slice(0, 16),
-                endsAt: round.endsAt.slice(0, 16),
-                isEnabled: round.isEnabled,
-              })
-            )
-          );
-      });
-  }, [NEXT_PUBLIC_API_BASE_URL, semesterId]);
+        }
+      }
+      toast.success("Feedback rounds saved");
+      loadTermConfig(academicTermId);
+    } catch (error) {
+      toast.error(errorMessage(error, "Could not save rounds"));
+    }
+  };
+
   const updateRound = async (
-    round: (typeof rounds)[number],
+    round: RoundState,
     action: "enable" | "disable"
   ) => {
     if (!round.id) return;
@@ -91,122 +218,97 @@ export function FeedbackConfigView() {
       );
       toast.success(`Round ${round.roundNumber} ${action}d`);
     } catch (error) {
-      toast.error(
-        axios.isAxiosError(error)
-          ? (error.response?.data?.message ?? `Could not ${action} round`)
-          : `Could not ${action} round`
-      );
+      toast.error(errorMessage(error, `Could not ${action} round`));
     }
   };
-  const isRoundActive = (round: (typeof rounds)[number]) =>
+
+  const isRoundActive = (round: RoundState) =>
     round.isEnabled &&
     round.startsAt.length > 0 &&
     round.endsAt.length > 0 &&
     new Date() >= new Date(round.startsAt) &&
     new Date() <= new Date(round.endsAt);
-  const save = async () => {
-    if (!semester || !semesterId) return;
-    try {
-      await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/questions`,
-        { academicTermId: semester.academicTermId, semesterId, questions },
-        { withCredentials: true }
-      );
-      for (const round of rounds) {
-        if (!round.startsAt || !round.endsAt)
-          throw new Error(`Set dates for round ${round.roundNumber}`);
-        const payload = {
-          academicTermId: semester.academicTermId,
-          semesterId,
-          roundNumber: round.roundNumber,
-          startsAt: new Date(round.startsAt).toISOString(),
-          endsAt: new Date(round.endsAt).toISOString(),
-          isEnabled: round.isEnabled,
-        };
-        if (round.id)
-          await axios.patch(
-            `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/rounds/${round.id}`,
-            payload,
-            { withCredentials: true }
-          );
-        else {
-          const response = await axios.post(
-            `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/rounds`,
-            payload,
-            { withCredentials: true }
-          );
-          setRounds((current) =>
-            current.map((item) =>
-              item.roundNumber === round.roundNumber
-                ? { ...item, id: response.data.data.id }
-                : item
-            )
-          );
-        }
-      }
-      toast.success("Feedback configuration saved");
-    } catch (error) {
-      toast.error(
-        axios.isAxiosError(error)
-          ? (error.response?.data?.message ?? "Failed to save configuration")
-          : error instanceof Error
-            ? error.message
-            : "Failed to save configuration"
-      );
-    }
-  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Feedback Configuration</h1>
         <p className="text-muted-foreground text-sm">
-          Select a semester, enter ten questions, set three date ranges, save,
-          then enable each round when ready.
+          Select an academic term, choose a question preset, set three round
+          date ranges, save, then enable each round when ready.
         </p>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Semester</CardTitle>
+          <CardTitle>Academic Term</CardTitle>
         </CardHeader>
         <CardContent>
           <select
             className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            value={semesterId}
-            onChange={(event) => setSemesterId(event.target.value)}
+            value={academicTermId}
+            onChange={(event) => setAcademicTermId(event.target.value)}
           >
-            <option value="">Select semester</option>
-            {terms.flatMap((term) =>
-              (term.Semester ?? []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {term.type.toUpperCase()} {term.year} - {item.programType}{" "}
-                  Semester {item.semesterNumber}
-                </option>
-              ))
-            )}
+            <option value="">Select academic term</option>
+            {terms.map((term) => (
+              <option key={term.id} value={term.id}>
+                {term.type.toUpperCase()} {term.year}
+                {term.isCurrent ? " (Current)" : ""}
+              </option>
+            ))}
           </select>
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Questions</CardTitle>
+          <CardTitle>Question Set</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {questions.map((question, index) => (
-            <Input
-              key={question.questionNumber}
-              placeholder={`Question ${question.questionNumber}`}
-              value={question.questionText}
-              onChange={(event) =>
-                setQuestions((current) =>
-                  current.map((item, itemIndex) =>
-                    itemIndex === index
-                      ? { ...item, questionText: event.target.value }
-                      : item
-                  )
-                )
-              }
-            />
-          ))}
+          <select
+            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            value={presetId}
+            onChange={(event) => {
+              setPresetId(event.target.value);
+              setQuestions([]);
+            }}
+            disabled={!academicTermId || locked}
+          >
+            <option value="">Select question preset</option>
+            {presets.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.name}
+              </option>
+            ))}
+          </select>
+          {locked && (
+            <p className="text-muted-foreground text-sm">
+              Question set is locked because feedback rounds have been
+              configured for this term.
+            </p>
+          )}
+          {loadingConfig ? (
+            <p className="text-muted-foreground text-sm">Loading...</p>
+          ) : displayQuestions.length > 0 ? (
+            <ol className="space-y-2">
+              {displayQuestions.map((question) => (
+                <li
+                  key={question.questionNumber}
+                  className="border-input text-sm"
+                >
+                  {question.questionNumber}. {question.questionText}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Select a preset to preview its ten questions.
+            </p>
+          )}
+          <Button
+            onClick={saveQuestionSet}
+            disabled={!academicTermId || !presetId || locked}
+          >
+            Save question set
+          </Button>
         </CardContent>
       </Card>
       <Card>
@@ -270,8 +372,8 @@ export function FeedbackConfigView() {
               </div>
             );
           })}
-          <Button onClick={save} disabled={!semesterId}>
-            Save configuration
+          <Button onClick={saveRounds} disabled={!academicTermId}>
+            Save rounds
           </Button>
         </CardContent>
       </Card>

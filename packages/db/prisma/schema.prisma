@@ -36,6 +36,7 @@ model User {
   adminEditLogs AdminEditLog[]
   feedbackQuestionSetsCreated FeedbackQuestionSet[]
   feedbackRoundsCreated      FeedbackRound[]
+  feedbackPresetsCreated     FeedbackQuestionPreset[]
 
   courseMappingAuditLogs CourseMappingAuditLog[]
   supportTicketsCreated SupportTicket[]        @relation("SupportTicketCreator")
@@ -55,6 +56,7 @@ model AcademicTerm {
   hallTickets         HallTicket[]
   feedbackQuestionSets FeedbackQuestionSet[]
   feedbackRounds      FeedbackRound[]
+  feedbackQuestionPresets FeedbackQuestionPreset[]
 
   @@unique([type, year])
 }
@@ -514,20 +516,48 @@ model CourseRegistration {
 model FeedbackQuestionSet {
   id             String   @id @default(uuid())
   academicTermId String
-  semesterId     String   @unique
+  semesterId     String?  @unique
   isLocked       Boolean  @default(false)
   createdById    String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   academicTerm AcademicTerm      @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
-  semester     Semester          @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  semester     Semester?         @relation(fields: [semesterId], references: [id], onDelete: Cascade)
   createdBy    User              @relation(fields: [createdById], references: [id])
   questions    FeedbackQuestion[]
   rounds       FeedbackRound[]
+  presetId     String?
+  preset       FeedbackQuestionPreset? @relation(fields: [presetId], references: [id])
 
   @@unique([academicTermId, semesterId])
   @@index([academicTermId])
+}
+
+model FeedbackQuestionPreset {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  academicTermId String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  academicTerm AcademicTerm? @relation(fields: [academicTermId], references: [id], onDelete: SetNull)
+  createdBy User @relation(fields: [createdById], references: [id])
+  questions FeedbackQuestionPresetItem[]
+  questionSets FeedbackQuestionSet[]
+}
+
+model FeedbackQuestionPresetItem {
+  id         String @id @default(uuid())
+  presetId   String
+  questionNumber Int
+  questionText String
+
+  preset FeedbackQuestionPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  @@unique([presetId, questionNumber])
 }
 
 model FeedbackQuestion {
@@ -548,7 +578,7 @@ model FeedbackQuestion {
 model FeedbackRound {
   id             String             @id @default(uuid())
   academicTermId String
-  semesterId     String
+  semesterId     String?
   questionSetId  String
   roundNumber    Int
   startsAt       DateTime
@@ -559,12 +589,12 @@ model FeedbackRound {
   updatedAt      DateTime           @updatedAt
 
   academicTerm AcademicTerm      @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
-  semester     Semester          @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  semester     Semester?         @relation(fields: [semesterId], references: [id], onDelete: Cascade)
   questionSet  FeedbackQuestionSet @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
   createdBy    User              @relation(fields: [createdById], references: [id])
   responses    FeedbackResponse[]
 
-  @@unique([academicTermId, semesterId, roundNumber])
+  @@unique([academicTermId, roundNumber])
   @@index([semesterId, startsAt, endsAt])
 }
 

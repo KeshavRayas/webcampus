@@ -1,22 +1,32 @@
 import { FeedbackController } from "@webcampus/api/src/controllers/feedback.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
-  FeedbackQuestionSetSchema,
+  FeedbackPresetSchema,
   FeedbackReportQuerySchema,
   FeedbackRoundSchema,
   FeedbackRoundUpdateSchema,
+  FeedbackTermConfigurationSchema,
 } from "@webcampus/schemas/feedback";
 import { Router, type Router as ExpressRouter } from "express";
 
 const admin: ExpressRouter = Router();
 admin.use(protect({ role: "admin", permissions: { feedback: ["manage"] } }));
-admin.get("/configuration/:semesterId", FeedbackController.configuration);
-admin.get("/filter-options", FeedbackController.filterOptions);
-admin.post(
-  "/questions",
-  validateRequest(FeedbackQuestionSetSchema),
-  FeedbackController.saveQuestions
+admin.get(
+  "/configuration/term/:academicTermId",
+  FeedbackController.getTermConfiguration
 );
+admin.post(
+  "/configuration/term",
+  validateRequest(FeedbackTermConfigurationSchema),
+  FeedbackController.configureTerm
+);
+admin.get("/presets", FeedbackController.presets);
+admin.post(
+  "/presets",
+  validateRequest(FeedbackPresetSchema),
+  FeedbackController.createPreset
+);
+admin.get("/filter-options", FeedbackController.filterOptions);
 admin.post(
   "/rounds",
   validateRequest(FeedbackRoundSchema),
@@ -36,7 +46,12 @@ admin.get(
 );
 
 const report: ExpressRouter = Router();
-report.use(protect({ permissions: { feedback: ["read"] } }));
+report.use(
+  protect({
+    role: ["faculty", "hod", "department", "coe", "admin"],
+    permissions: { feedback: ["read"] },
+  })
+);
 report.get("/filter-options", FeedbackController.filterOptions);
 report.get(
   "/report",

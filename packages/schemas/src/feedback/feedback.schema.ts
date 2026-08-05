@@ -29,10 +29,28 @@ export const FeedbackQuestionSetSchema = z.object({
   questions: FeedbackQuestionsSchema,
 });
 
+export const FeedbackTermConfigurationSchema = z.object({
+  academicTermId: z.string().uuid(),
+  presetId: z.string().uuid(),
+});
+
+export const FeedbackPresetSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  description: z.string().trim().max(500).optional(),
+  academicTermId: z.string().uuid().optional(),
+  questions: FeedbackQuestionsSchema,
+});
+
+export const FeedbackPresetUpdateSchema = FeedbackPresetSchema.partial().extend(
+  {
+    questions: FeedbackQuestionsSchema.optional(),
+  }
+);
+
 export const FeedbackRoundSchema = z
   .object({
     academicTermId: z.string().uuid(),
-    semesterId: z.string().uuid(),
+    semesterId: z.string().uuid().optional(),
     roundNumber: z.number().int().min(1).max(3),
     startsAt: z.coerce.date(),
     endsAt: z.coerce.date(),
@@ -95,6 +113,10 @@ export const FeedbackRoleSchema = z.enum([
 export type FeedbackQuestionSetInput = z.infer<
   typeof FeedbackQuestionSetSchema
 >;
+export type FeedbackTermConfigurationInput = z.infer<
+  typeof FeedbackTermConfigurationSchema
+>;
+export type FeedbackPresetInput = z.infer<typeof FeedbackPresetSchema>;
 export type FeedbackRoundInput = z.infer<typeof FeedbackRoundSchema>;
 export type FeedbackRoundUpdateInput = z.infer<
   typeof FeedbackRoundUpdateSchema

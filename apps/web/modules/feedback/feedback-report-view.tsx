@@ -84,6 +84,8 @@ export function FeedbackReportView({
   });
   const selectClass =
     "border-input bg-background h-9 rounded-md border px-3 text-sm";
+  const canSelectFaculty =
+    role === "admin" || role === "hod" || role === "department";
   const rows = data.map((row) => ({
     Faculty: row.faculty.user.name,
     Course: `${row.course.code} - ${row.course.name}`,
@@ -148,18 +150,20 @@ export function FeedbackReportView({
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
-          <select
-            className={selectClass}
-            value={draftFilters.courseId}
-            onChange={(event) => updateFilter("courseId", event.target.value)}
-          >
-            <option value="">All courses</option>
-            {options?.courses.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.code} - {item.name}
-              </option>
-            ))}
-          </select>
+          {canSelectFaculty && (
+            <select
+              className={selectClass}
+              value={draftFilters.courseId}
+              onChange={(event) => updateFilter("courseId", event.target.value)}
+            >
+              <option value="">All courses</option>
+              {options?.courses.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.code} - {item.name}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             className={selectClass}
             value={draftFilters.facultyId}

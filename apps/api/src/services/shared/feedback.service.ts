@@ -1,11 +1,13 @@
 import { db } from "@webcampus/db";
 import type {
-  FeedbackQuestionSetInput,
+  FeedbackPresetInput,
   FeedbackReportQuery,
   FeedbackRoundInput,
   FeedbackRoundUpdateInput,
   FeedbackSubmissionInput,
+  FeedbackTermConfigurationInput,
 } from "@webcampus/schemas/feedback";
+import type { FeedbackScope } from "./feedback-scope.service";
 
 const FEEDBACK_SCORE_LABELS = {
   5: "Excellent",
@@ -186,67 +188,107 @@ export class FeedbackService {
     });
   }
 
-  static async saveQuestionSet(
-    adminUserId: string,
-    input: FeedbackQuestionSetInput
-  ) {
-    const semester = await db.semester.findUnique({
-      where: { id: input.semesterId },
-      select: { academicTermId: true },
-    });
-    if (!semester || semester.academicTermId !== input.academicTermId)
-      throw new Error("Semester does not belong to the selected term");
-
-    const existing = await db.feedbackQuestionSet.findUnique({
-      where: { semesterId: input.semesterId },
-    });
-    if (
-      existing?.isLocked ||
-      (existing &&
-        (await db.feedbackRound.count({
-          where: { questionSetId: existing.id },
-        })) > 0)
-    ) {
-      throw new Error(
-        "Feedback questions are locked after round configuration begins"
-      );
-    }
-
-    return db.$transaction(async (tx) => {
-      const questionSet = existing
-        ? await tx.feedbackQuestionSet.update({
-            where: { id: existing.id },
-            data: {
-              questions: { deleteMany: {}, create: input.questions },
-              createdById: adminUserId,
-            },
-          })
-        : await tx.feedbackQuestionSet.create({
-            data: {
-              academicTermId: input.academicTermId,
-              semesterId: input.semesterId,
-              createdById: adminUserId,
-              questions: { create: input.questions },
-            },
-          });
-      return questionSet;
-    });
-  }
-
-  static async getConfiguration(semesterId: string) {
-    return db.feedbackQuestionSet.findUnique({
-      where: { semesterId },
+  static async getTermConfiguration(academicTermId: string) {
+    return db.feedbackQuestionSet.findFirst({
+      where: { academicTermId },
       include: {
+        preset: true,
         questions: { orderBy: { questionNumber: "asc" } },
         rounds: { orderBy: { roundNumber: "asc" } },
       },
     });
   }
 
-  static async getFilterOptions(scope?: { departmentId?: string }) {
+  static async listPresets(academicTermId?: string) {
+    return db.feedbackQuestionPreset.findMany({
+      where: academicTermId
+        ? { OR: [{ academicTermId }, { academicTermId: null }] }
+        : undefined,
+      include: { questions: { orderBy: { questionNumber: "asc" } } },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  static async createPreset(userId: string, input: FeedbackPresetInput) {
+    return db.feedbackQuestionPreset.create({
+      data: {
+        name: input.name,
+        description: input.description,
+        academicTermId: input.academicTermId,
+        createdById: userId,
+        questions: { create: input.questions },
+      },
+      include: { questions: true },
+    });
+  }
+
+  static async configureTerm(
+    userId: string,
+    input: FeedbackTermConfigurationInput
+  ) {
+    const term = await db.academicTerm.findUnique({
+      where: { id: input.academicTermId },
+      select: { id: true },
+    });
+    if (!term) throw new Error("Academic term not found");
+    const preset = await db.feedbackQuestionPreset.findUnique({
+      where: { id: input.presetId },
+      include: { questions: { orderBy: { questionNumber: "asc" } } },
+    });
+    if (!preset || preset.questions.length !== 10)
+      throw new Error("Preset must contain exactly ten questions");
+    const existing = await db.feedbackQuestionSet.findFirst({
+      where: { academicTermId: input.academicTermId },
+    });
+    if (
+      existing &&
+      (existing.isLocked ||
+        (await db.feedbackRound.count({
+          where: { questionSetId: existing.id },
+        })) > 0)
+    )
+      throw new Error(
+        "Term feedback questions are locked after round configuration begins"
+      );
+    return db.$transaction(async (tx) => {
+      if (existing) {
+        return tx.feedbackQuestionSet.update({
+          where: { id: existing.id },
+          data: {
+            presetId: preset.id,
+            questions: {
+              deleteMany: {},
+              create: preset.questions.map((question) => ({
+                questionNumber: question.questionNumber,
+                questionText: question.questionText,
+              })),
+            },
+          },
+          include: { questions: true },
+        });
+      }
+      return tx.feedbackQuestionSet.create({
+        data: {
+          academicTermId: input.academicTermId,
+          presetId: preset.id,
+          createdById: userId,
+          questions: {
+            create: preset.questions.map((question) => ({
+              questionNumber: question.questionNumber,
+              questionText: question.questionText,
+            })),
+          },
+        },
+        include: { questions: true },
+      });
+    });
+  }
+
+  static async getFilterOptions(scope: FeedbackScope) {
     const assignments = await db.courseAssignment.findMany({
       where: {
-        ...(scope?.departmentId ? { departmentId: scope.departmentId } : {}),
+        ...(scope.departmentId ? { departmentId: scope.departmentId } : {}),
+        ...(scope.facultyId ? { facultyId: scope.facultyId } : {}),
         course: { allowFeedback: true },
       },
       select: {
@@ -295,17 +337,15 @@ export class FeedbackService {
   }
 
   static async createRound(adminUserId: string, input: FeedbackRoundInput) {
-    const questionSet = await db.feedbackQuestionSet.findUnique({
-      where: { semesterId: input.semesterId },
+    const questionSet = await db.feedbackQuestionSet.findFirst({
+      where: { academicTermId: input.academicTermId },
     });
-    if (!questionSet || questionSet.academicTermId !== input.academicTermId)
-      throw new Error("Configure feedback questions first");
+    if (!questionSet) throw new Error("Configure feedback questions first");
     if (input.roundNumber > 1) {
       const previous = await db.feedbackRound.findUnique({
         where: {
-          academicTermId_semesterId_roundNumber: {
+          academicTermId_roundNumber: {
             academicTermId: input.academicTermId,
-            semesterId: input.semesterId,
             roundNumber: input.roundNumber - 1,
           },
         },
@@ -317,9 +357,8 @@ export class FeedbackService {
     }
     const existing = await db.feedbackRound.findUnique({
       where: {
-        academicTermId_semesterId_roundNumber: {
+        academicTermId_roundNumber: {
           academicTermId: input.academicTermId,
-          semesterId: input.semesterId,
           roundNumber: input.roundNumber,
         },
       },
@@ -329,6 +368,7 @@ export class FeedbackService {
     return db.feedbackRound.create({
       data: {
         ...input,
+        semesterId: null,
         questionSetId: questionSet.id,
         createdById: adminUserId,
       },
@@ -343,10 +383,7 @@ export class FeedbackService {
     return db.feedbackRound.update({ where: { id }, data: { isEnabled } });
   }
 
-  static async getReport(
-    query: FeedbackReportQuery,
-    scope?: { facultyId?: string; departmentId?: string }
-  ) {
+  static async getReport(query: FeedbackReportQuery, scope: FeedbackScope) {
     const rounds = await db.feedbackRound.findMany({
       where: {
         ...(query.feedbackRoundId ? { id: query.feedbackRoundId } : {}),
@@ -369,15 +406,15 @@ export class FeedbackService {
         ...(query.facultyId ? { facultyId: query.facultyId } : {}),
         ...(query.sectionId ? { sectionId: query.sectionId } : {}),
         ...(query.batchId ? { batchId: query.batchId } : {}),
-        ...(scope?.facultyId
+        ...(scope.facultyId
           ? {
-              faculty: { userId: scope.facultyId },
+              facultyId: scope.facultyId,
             }
           : {}),
-        ...(scope?.departmentId || query.assignmentType
+        ...(scope.departmentId || query.assignmentType
           ? {
               courseAssignment: {
-                ...(scope?.departmentId
+                ...(scope.departmentId
                   ? { departmentId: scope.departmentId }
                   : {}),
                 ...(query.assignmentType
