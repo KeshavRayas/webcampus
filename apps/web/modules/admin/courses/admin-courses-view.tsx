@@ -290,7 +290,6 @@ export const AdminCoursesView = () => {
               } else if (key === "departmentName") {
                 const selected = departments.find((d) => d.name === value);
                 next.departmentId = selected?.id ?? "";
-                next.semesterId = "";
                 next.cycle = "";
               } else if (key === "semesterId") {
                 const semester = allSemestersForSelectedDraftTerm.find(
