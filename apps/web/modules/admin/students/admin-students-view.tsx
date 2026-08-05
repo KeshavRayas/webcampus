@@ -323,9 +323,15 @@ export const AdminStudentsView = () => {
             }
 
             updateDraftFilter(key, value);
+
+            if (key === "usn" || key === "name" || key === "email") {
+              setAppliedFilters((current) => ({
+                ...current,
+                [key]: value,
+              }));
+            }
           }}
           allValue={DEFAULT_FILTER_ALL_VALUE}
-          className="md:grid-cols-2 xl:grid-cols-7"
         />
         <FilterActions onApply={applyFilters} onReset={resetFilters} />
       </FilterPanel>

@@ -83,7 +83,7 @@ export const MarksView = () => {
       if (!options.has(term.id)) {
         options.set(term.id, {
           value: term.id,
-          label: `${term.type} ${term.year}`,
+          label: `${term.type.toUpperCase()} ${term.year}`,
         });
       }
     });
@@ -342,7 +342,6 @@ export const MarksView = () => {
               fields={filterFields}
               draftFilters={draftFilters}
               onDraftChange={handleDraftChange}
-              className="md:grid-cols-2"
             />
             <div className="mt-4 flex justify-end">
               <FilterActions onApply={handleApply} onReset={handleReset} />

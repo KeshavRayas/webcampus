@@ -137,8 +137,8 @@ export const AdminSemesterView = () => {
       key: "status",
       label: "Semester Status",
       type: "select",
-      placeholder: "All",
-      allOptionLabel: "All",
+      placeholder: "All statuses",
+      allOptionLabel: "All statuses",
       options: SemesterLifecycleStatusSchema.options.map((status) => ({
         label: status,
         value: status,
@@ -148,8 +148,8 @@ export const AdminSemesterView = () => {
       key: "type",
       label: "Term Type",
       type: "select",
-      placeholder: "All",
-      allOptionLabel: "All",
+      placeholder: "All term types",
+      allOptionLabel: "All term types",
       options: SemesterTypeSchema.options.map((type) => ({
         label: type.charAt(0).toUpperCase() + type.slice(1),
         value: type,
@@ -159,8 +159,8 @@ export const AdminSemesterView = () => {
       key: "year",
       label: "Year",
       type: "select",
-      placeholder: "All",
-      allOptionLabel: "All",
+      placeholder: "All years",
+      allOptionLabel: "All years",
       options: years.map((year) => ({
         label: year,
         value: year,
@@ -262,7 +262,6 @@ export const AdminSemesterView = () => {
               draftFilters={draftFilters}
               onDraftChange={handleFilterChange}
               allValue={DEFAULT_FILTER_ALL_VALUE}
-              className="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
             />
             <div className="flex w-full justify-end pt-2">
               <Button variant="ghost" size="sm" onClick={resetFilters}>

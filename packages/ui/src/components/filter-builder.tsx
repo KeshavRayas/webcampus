@@ -59,7 +59,15 @@ export function FilterGrid({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  return <div className={cn("grid gap-4", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 export function FilterActions({
@@ -80,7 +88,7 @@ export function FilterActions({
   className?: string;
 }) {
   return (
-    <div className={cn("flex gap-2", className)}>
+    <div className={cn("flex flex-wrap justify-end gap-2", className)}>
       <Button type="button" onClick={onApply} disabled={isApplyDisabled}>
         {applyLabel}
       </Button>

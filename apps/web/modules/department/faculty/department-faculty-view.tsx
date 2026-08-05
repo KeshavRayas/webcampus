@@ -251,9 +251,17 @@ export const DepartmentFacultyView = () => {
         <FilterBuilder
           fields={facultyFilterFields}
           draftFilters={draftFilters}
-          onDraftChange={updateDraftFilter}
+          onDraftChange={(key, value) => {
+            updateDraftFilter(key, value);
+
+            if (key === "name" || key === "email") {
+              setAppliedFilters((current) => ({
+                ...current,
+                [key]: value,
+              }));
+            }
+          }}
           allValue={DEFAULT_FILTER_ALL_VALUE}
-          className="md:grid-cols-2 xl:grid-cols-5"
         />
 
         <FilterActions onApply={applyFilters} onReset={resetFilters} />

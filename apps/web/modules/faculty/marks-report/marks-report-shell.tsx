@@ -4,6 +4,7 @@ import { MarksReportTable } from "@/components/academics/reports/marks-tables";
 import {
   FilterActions,
   FilterBuilder,
+  FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import { useMemo } from "react";
@@ -165,24 +166,21 @@ export const MarksReportShell = ({
   };
   return (
     <div className="flex w-full flex-col gap-6">
-      <div className="bg-card text-card-foreground rounded-xl border shadow-sm">
-        <div className="border-b p-4">
-          <FilterBuilder
-            fields={filterFields}
-            draftFilters={draftFilters}
-            onDraftChange={onDraftChange}
-            className="md:grid-cols-2 xl:grid-cols-5"
+      <FilterPanel>
+        <FilterBuilder
+          fields={filterFields}
+          draftFilters={draftFilters}
+          onDraftChange={onDraftChange}
+        />
+        <div className="mt-4 flex justify-end">
+          <FilterActions
+            onApply={onGetReport}
+            onReset={onResetFilters}
+            isApplyDisabled={!hasRequiredFilters}
+            applyLabel="Get Report"
           />
-          <div className="mt-4 flex justify-end">
-            <FilterActions
-              onApply={onGetReport}
-              onReset={onResetFilters}
-              isApplyDisabled={!hasRequiredFilters}
-              applyLabel="Get Report"
-            />
-          </div>
         </div>
-      </div>
+      </FilterPanel>
       <main>
         <MarksReportTable
           reportData={reportData}
