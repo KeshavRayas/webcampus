@@ -7,6 +7,7 @@ export const CreateAdmissionShellSchema = z.object({
   primaryEmail: z.email().min(1, "Email is required"),
   password: z.string().min(8),
   semesterId: z.string().uuid("Invalid semester ID"),
+  departmentId: z.string().uuid("Invalid department ID"),
 });
 
 export const AdmissionStatusSchema = z.enum([

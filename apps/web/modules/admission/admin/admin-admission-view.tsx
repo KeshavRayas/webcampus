@@ -157,7 +157,10 @@ export const AdminAdmissionView = ({
   console.log("selectedSemesterId =", showFilters ? draftFilters.semester : "");
   console.log("pathname:", pathname);
   console.log("showFilters:", showFilters);
-  const { form, onSubmit } = useCreateAdmissionShellForm(selectedSemesterId);
+  const { form, onSubmit } = useCreateAdmissionShellForm(
+    selectedSemesterId,
+    departments
+  );
   const { onPortStudents, isPorting } = usePortStudents();
 
   const selectedSemester = nestedSemesters.find(

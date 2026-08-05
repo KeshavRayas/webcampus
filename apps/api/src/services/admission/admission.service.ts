@@ -255,6 +255,34 @@ export class AdmissionService {
         throw new Error("An account with this email already exists");
       }
 
+      const departmentCode = applicantEmail
+        .split("@")[0]
+        ?.match(/\.([a-z]+)\d{2,4}$/i)?.[1];
+
+      if (!departmentCode) {
+        throw new Error(
+          "Applicant email must follow the name.departmentCodeYear format"
+        );
+      }
+
+      const department = await db.department.findFirst({
+        where: {
+          code: {
+            equals: departmentCode,
+            mode: "insensitive",
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!department) {
+        throw new Error(`Department code ${departmentCode} was not found`);
+      }
+
+      if (department.id !== data.departmentId) {
+        throw new Error("The selected department does not match the email");
+      }
+
       const userService = new UserService({
         request: {
           email: applicantEmail,
@@ -274,21 +302,13 @@ export class AdmissionService {
         );
       }
 
-      const placeholderDepartment = await db.department.findFirst({
-        select: { id: true },
-      });
-
-      if (!placeholderDepartment) {
-        throw new Error("No departments found to use as placeholder");
-      }
-
       await db.admission.create({
         data: {
           // applicationId: crypto.randomUUID(), // or primaryEmail for now
           primaryEmail: data.primaryEmail,
 
           semesterId: data.semesterId,
-          departmentId: placeholderDepartment.id,
+          departmentId: department.id,
 
           status: "PENDING",
         },

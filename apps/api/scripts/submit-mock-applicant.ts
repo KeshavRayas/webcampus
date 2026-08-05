@@ -260,7 +260,7 @@ async function main() {
   });
 
   while (approvedCreated < args.count) {
-    const email = `mock${approvedCreated + 1}@bmsce.ac.in`;
+    const email = `mock${approvedCreated + 1}.${args.departmentCode.toLowerCase()}26@bmsce.ac.in`;
     const password = "password";
     // nextApplicationNumber += 1;
 
@@ -287,6 +287,7 @@ async function main() {
           primaryEmail: email,
           password,
           semesterId: context.semesterId,
+          departmentId: context.departmentId,
         },
         context.headers
       );
