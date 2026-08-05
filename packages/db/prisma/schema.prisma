@@ -971,6 +971,7 @@ enum AuditEntityType {
   COORDINATOR
   BATCH
   ASSESSMENT
+  STUDENT_PROFILE
 }
 
 enum AuditAction {
@@ -978,6 +979,7 @@ enum AuditAction {
   UPSERT_MAPPING
   DELETE_MAPPING
   UPDATE_COORDINATOR
+  UPDATE_STUDENT_PROFILE
 }
 
 model AdminEditLog {

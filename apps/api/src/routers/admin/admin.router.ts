@@ -10,6 +10,7 @@ import FinanceRouter from "@webcampus/api/src/routers/admin/finance.router";
 import RegistrationTrackingRouter from "@webcampus/api/src/routers/admin/registration-tracking.router";
 import RegistrationWindowRouter from "@webcampus/api/src/routers/admin/registration-window.router";
 import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
+import StudentProfileRouter from "@webcampus/api/src/routers/admin/student-profile.router";
 import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
 import UserRouter from "@webcampus/api/src/routers/admin/user.router";
 import { Router } from "express";
@@ -32,6 +33,7 @@ router.use("/semester", SemesterRouter);
 router.use("/faculty", facultyRouter);
 
 router.use("/student", StudentRouter);
+router.use("/students", StudentProfileRouter);
 
 router.use("/course", AdminCourseRouter);
 

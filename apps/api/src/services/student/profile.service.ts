@@ -1,3 +1,4 @@
+import { logChanges } from "@webcampus/api/src/services/shared/audit.service";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import {
@@ -41,6 +42,21 @@ const mergeAddress = (
 };
 
 export class StudentProfileService {
+  static async getProfileByStudentId(
+    studentId: string
+  ): Promise<BaseResponse<unknown>> {
+    const student = await db.student.findUnique({
+      where: { id: studentId },
+      select: { userId: true },
+    });
+
+    if (!student) {
+      throw new Error("Student not found");
+    }
+
+    return this.getProfileByUserId(student.userId);
+  }
+
   static async getProfileByUserId(
     userId: string
   ): Promise<BaseResponse<unknown>> {
@@ -262,13 +278,30 @@ export class StudentProfileService {
     }
   }
 
-  static async updateProfileByUserId(
+  static async updateOwnProfile(
     userId: string,
     payload: UpdateStudentProfileType
   ): Promise<BaseResponse<unknown>> {
+    const student = await db.student.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new Error("Student profile not found");
+    }
+
+    return this.updateStudentProfile(student.id, payload);
+  }
+
+  static async updateStudentProfile(
+    studentId: string,
+    payload: UpdateStudentProfileType,
+    adminUserId?: string
+  ): Promise<BaseResponse<unknown>> {
     try {
       const student = await db.student.findUnique({
-        where: { userId },
+        where: { id: studentId },
         include: { admission: true },
       });
 
@@ -283,7 +316,7 @@ export class StudentProfileService {
       const updated = await db.$transaction(async (tx) => {
         if (payload.fullName) {
           await tx.user.update({
-            where: { id: userId },
+            where: { id: student.userId },
             data: { name: payload.fullName },
           });
         }
@@ -355,6 +388,25 @@ export class StudentProfileService {
           where: { id: student.admission!.id },
           data: admissionUpdateData,
         });
+
+        if (adminUserId) {
+          await logChanges(
+            {
+              entityType: "STUDENT_PROFILE",
+              entityId: student.id,
+              action: "UPDATE_STUDENT_PROFILE",
+              adminUserId,
+              changes: Object.entries(payload)
+                .filter(([, value]) => value !== undefined)
+                .map(([fieldName, newValue]) => ({
+                  fieldName,
+                  oldValue: null,
+                  newValue,
+                })),
+            },
+            tx
+          );
+        }
 
         const reloaded = await tx.student.findUnique({
           where: { id: student.id },

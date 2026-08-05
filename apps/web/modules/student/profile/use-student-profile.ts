@@ -2,15 +2,11 @@
 
 import { apiClient, getApiErrorMessage } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  StudentProfileRequestApprovalSchema,
-  UpdateStudentProfileSchema,
-} from "@webcampus/schemas/student";
+import { StudentProfileRequestApprovalSchema } from "@webcampus/schemas/student";
 import { BaseResponse } from "@webcampus/types/api";
 import { toast } from "react-toastify";
-import { z } from "zod";
 
-const studentProfileQueryKey = ["student-profile"] as const;
+export const studentProfileQueryKey = ["student-profile"] as const;
 
 export type StudentProfilePayload = {
   id: string;
@@ -119,28 +115,6 @@ export const useStudentProfile = () => {
           "/student/profile"
         );
       return unwrapSuccess(response.data);
-    },
-  });
-};
-
-export const useUpdateStudentProfile = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (payload: z.input<typeof UpdateStudentProfileSchema>) => {
-      const validated = UpdateStudentProfileSchema.parse(payload);
-      const response = await apiClient.put<BaseResponse<StudentProfilePayload>>(
-        "/student/profile",
-        validated
-      );
-      return unwrapSuccess(response.data);
-    },
-    onSuccess: () => {
-      toast.success("Profile updated");
-      invalidateStudentProfile(queryClient);
-    },
-    onError: (error) => {
-      toast.error(getApiErrorMessage(error, "Failed to update profile"));
     },
   });
 };
