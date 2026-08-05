@@ -406,6 +406,7 @@ model Course {
   theoryExamMaxMarks Int @default(0)
   theoryMaxExams     Int @default(0)
   theoryMinExams     Int @default(0)
+  theoryCieContribution Int @default(0)
   theoryEligibility  Int @default(40)
 
   // Lab

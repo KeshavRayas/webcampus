@@ -44,6 +44,7 @@ const TRACKABLE_COURSE_FIELDS = [
   "theoryMaxExams",
   "theoryExamMaxMarks",
   "theoryMinExams",
+  "theoryCieContribution",
   "theoryEligibility",
   "labMaxMarks",
   "labEligibility",
@@ -141,6 +142,7 @@ export class CourseService {
         theoryMaxExams: data.theoryMaxExams,
         theoryExamMaxMarks: data.theoryExamMaxMarks,
         theoryMinExams: data.theoryMinExams,
+        theoryCieContribution: data.theoryCieContribution,
         theoryEligibility: data.theoryEligibility,
 
         labMaxMarks: data.labMaxMarks,
@@ -247,6 +249,7 @@ export class CourseService {
         theoryMaxExams: data.theoryMaxExams,
         theoryExamMaxMarks: data.theoryExamMaxMarks,
         theoryMinExams: data.theoryMinExams,
+        theoryCieContribution: data.theoryCieContribution,
         theoryEligibility: data.theoryEligibility,
 
         labMaxMarks,

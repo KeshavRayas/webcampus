@@ -28,6 +28,7 @@ export async function buildAggregationResultsForStudents(
       theoryMaxExams: true,
       theoryMinExams: true,
       theoryExamMaxMarks: true,
+      theoryCieContribution: true,
       theoryEligibility: true,
       labMaxMarks: true,
       labEligibility: true,

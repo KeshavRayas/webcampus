@@ -1,14 +1,16 @@
 import { logger } from "@webcampus/common/logger";
-import { db, EligibilityStatus } from "@webcampus/db";
+import { db, EligibilityStatus, Prisma } from "@webcampus/db";
 import { buildAggregationResultsForStudents } from "./assessment-aggregation.loader";
 
 export async function recomputeStudentMark(
   studentId: string,
-  courseId: string
+  courseId: string,
+  tx?: Prisma.TransactionClient
 ): Promise<void> {
-  const course = await db.course.findUnique({
+  const prisma = tx ?? db;
+  const course = await prisma.course.findUnique({
     where: { id: courseId },
-    select: { seeEligibility: true, code: true },
+    select: { cieEligibility: true, code: true },
   });
 
   if (!course) {

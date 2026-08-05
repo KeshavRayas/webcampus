@@ -44,6 +44,7 @@ export type CourseAggregationConfig = {
   cieEligibilityPolicy: CieEligibilityPolicy;
   theoryMaxExams: number;
   theoryMinExams: number;
+  theoryCieContribution: number;
   theoryTemplateCount: number;
   labMaxMarks: number;
   aatMaxMarks: number;
