@@ -35,6 +35,7 @@ export type UploadDocsResponse = {
 
   studyCertificate?: string | null;
   transferCertificate?: string | null;
+  embassyPermissionLetter?: string | null;
 };
 
 const countDocuments = (row: UploadDocsResponse) => {

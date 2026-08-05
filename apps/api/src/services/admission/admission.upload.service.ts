@@ -12,6 +12,7 @@ const DOCUMENT_PREFIXES = {
   disabilityCertificate: "admission_disability_certificate_",
   studyCertificate: "admission_study_certificate_",
   transferCertificate: "admission_transfer_certificate_",
+  embassyPermissionLetter: "admission_embassy_permission_letter_",
 } as const;
 
 type DocumentField = keyof typeof DOCUMENT_PREFIXES;
@@ -43,6 +44,7 @@ export class AdmissionUploadService {
         disabilityCertificate: true,
         studyCertificate: true,
         transferCertificate: true,
+        embassyPermissionLetter: true,
       },
     });
 

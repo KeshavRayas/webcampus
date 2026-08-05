@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { categoriesAllotted, categoriesClaimed, quotas } from "../constants";
+import {
+  admissionTypes,
+  categoriesAllotted,
+  categoriesClaimed,
+  quotas,
+} from "../constants";
 
 export const QuotaSchema = z.enum(quotas);
 
@@ -23,6 +28,10 @@ export const AdmissionStatusSchema = z.enum([
   "REJECTED",
   "EXITED",
 ]);
+
+export const AdmissionTypeSchema = z.enum(
+  admissionTypes.map((type) => type.value) as [string, ...string[]]
+);
 
 export const AdmissionActionParamSchema = z.object({
   id: z.string().uuid("Invalid admission ID"),
@@ -103,6 +112,7 @@ export const GetAdmissionsQuerySchema = z
     applicationId: optionalQueryString(z.string()),
     status: optionalQueryString(AdmissionStatusSchema),
     mode: optionalQueryString(z.string()),
+    admissionType: optionalQueryString(AdmissionTypeSchema),
     semester: optionalQueryString(z.string().uuid("Invalid semester")),
     createdFrom: optionalQueryString(
       z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
@@ -140,6 +150,20 @@ export const SubmitApplicationSchema = z
 
     semesterId: z.string().uuid("Invalid Semester ID"),
     departmentId: z.string().uuid("Invalid Department ID"),
+    admissionType: AdmissionTypeSchema,
+    scholarship: z.enum(["true", "false"]),
+    sspId: z.string().trim().optional(),
+    abcAparId: z.string().trim().optional(),
+    counsellingRound: z.string().trim().optional(),
+    feeReceiptNumber: z.string().trim().optional(),
+    studiedKannadaIn10th: z.enum(["true", "false"]),
+    passportNumber: z.string().trim().optional(),
+    passportExpiryDate: z.string().optional(),
+    visaNumber: z.string().trim().optional(),
+    visaExpiryDate: z.string().optional(),
+    parentPassportNumber: z.string().trim().optional(),
+    parentVisaNumber: z.string().trim().optional(),
+    parentVisaExpiryDate: z.string().optional(),
 
     categoryClaimed: z.string().min(1, "Category Claimed is required"),
     categoryAllotted: z.string().min(1, "Category Allotted is required"),
@@ -150,6 +174,14 @@ export const SubmitApplicationSchema = z
     diplomaCountry: optionalText,
   })
   .superRefine((data, ctx) => {
+    if (data.scholarship === "true" && !data.sspId?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sspId"],
+        message: "SSP ID is required when scholarship is enabled",
+      });
+    }
+
     const claimed =
       categoriesClaimed[data.modeOfAdmission as keyof typeof categoriesClaimed];
 

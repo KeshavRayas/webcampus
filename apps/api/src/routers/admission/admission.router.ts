@@ -164,6 +164,7 @@ router.put(
     { name: "aadharCard", maxCount: 1 },
     { name: "transferCertificate", maxCount: 1 },
     { name: "studyCertificate", maxCount: 1 },
+    { name: "embassyPermissionLetter", maxCount: 1 },
   ]),
   AdmissionController.submit
 );

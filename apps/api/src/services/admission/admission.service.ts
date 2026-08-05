@@ -357,6 +357,12 @@ export class AdmissionService {
                 mode: "insensitive",
               }
             : undefined,
+          admissionType: filters.admissionType
+            ? {
+                equals: filters.admissionType,
+                mode: "insensitive",
+              }
+            : undefined,
           semesterId: filters.semester,
           createdAt:
             filters.createdFrom || createdTo
@@ -449,6 +455,7 @@ export class AdmissionService {
         admission.aadharCard,
         admission.transferCertificate,
         admission.studyCertificate,
+        admission.embassyPermissionLetter,
       ].filter(
         (url): url is string => typeof url === "string" && url.length > 0
       );
@@ -558,6 +565,9 @@ export class AdmissionService {
         where: {
           primaryEmail,
         },
+        include: {
+          semester: true,
+        },
       });
 
       if (!admission) {
@@ -566,6 +576,35 @@ export class AdmissionService {
 
       if (admission.status === "SUBMITTED") {
         throw new Error("Application has already been submitted.");
+      }
+
+      if (!data.admissionType) {
+        throw new Error("Admission type is required.");
+      }
+
+      const validAdmissionTypes =
+        admission.semester.semesterNumber === 1
+          ? ["REGULAR"]
+          : admission.semester.semesterNumber === 3
+            ? ["LATERAL_ENTRY", "COLLEGE_CHANGE"]
+            : [];
+
+      if (!validAdmissionTypes.includes(data.admissionType)) {
+        throw new Error(
+          `Admission type ${data.admissionType} is not valid for semester ${admission.semester.semesterNumber}.`
+        );
+      }
+
+      if (data.semesterId && data.semesterId !== admission.semesterId) {
+        throw new Error("The submitted semester does not match the admission.");
+      }
+
+      if (data.scholarship !== "true" && data.scholarship !== "false") {
+        throw new Error("Scholarship selection is required.");
+      }
+
+      if (data.scholarship === "true" && !data.sspId?.trim()) {
+        throw new Error("SSP ID is required when scholarship is enabled.");
       }
 
       if (data.aadharNumber && data.aadharNumber !== admission.aadharNumber) {
@@ -594,11 +633,12 @@ export class AdmissionService {
 
           // Admission Details
           applicationId: data.applicationId,
+          admissionType: data.admissionType,
           firstName: data.firstName,
           middleName: data.middleName,
           lastName: data.lastName,
           modeOfAdmission: data.modeOfAdmission,
-          semesterId: data.semesterId,
+          semesterId: admission.semesterId,
           departmentId: data.departmentId,
           categoryClaimed: data.categoryClaimed,
           categoryAllotted: data.categoryAllotted,
@@ -610,6 +650,12 @@ export class AdmissionService {
             ? new Date(data.originalAdmissionOrderDate)
             : null,
           feePaid: data.feePaid ? parseFloat(data.feePaid) : null,
+          feeReceiptNumber: data.feeReceiptNumber ?? null,
+          scholarship: data.scholarship === "true",
+          sspId: data.scholarship === "true" ? data.sspId?.trim() : null,
+          abcAparId: data.abcAparId ?? null,
+          counsellingRound: data.counsellingRound ?? null,
+          dateOfAdmission: admission.dateOfAdmission ?? new Date(),
           hostel: data.hostel === "true",
           hostelRoomNumber: data.hostelRoomNumber ?? null,
 
@@ -652,6 +698,20 @@ export class AdmissionService {
           disabilityType: data.disabilityType ?? null,
           economicallyBackward: data.economicallyBackward === "true",
           aadharNumber: data.aadharNumber,
+          studiedKannadaIn10th: data.studiedKannadaIn10th === "true",
+          passportNumber: data.passportNumber ?? null,
+          passportExpiryDate: data.passportExpiryDate
+            ? new Date(data.passportExpiryDate)
+            : null,
+          visaNumber: data.visaNumber ?? null,
+          visaExpiryDate: data.visaExpiryDate
+            ? new Date(data.visaExpiryDate)
+            : null,
+          parentPassportNumber: data.parentPassportNumber ?? null,
+          parentVisaNumber: data.parentVisaNumber ?? null,
+          parentVisaExpiryDate: data.parentVisaExpiryDate
+            ? new Date(data.parentVisaExpiryDate)
+            : null,
 
           class10thSchoolName: data.class10thSchoolName,
           class10thSchoolType: data.class10thSchoolType,

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import {
   admissionModes,
+  admissionTypes,
   categoriesAllotted,
   categoriesClaimed,
   quotas,
@@ -43,6 +44,32 @@ type ApplicantAdmissionData = {
   categoryAllotted?: string;
   quota?: string;
   primaryEmail: string;
+  admissionType?: string | null;
+  scholarship?: boolean | null;
+  sspId?: string | null;
+  abcAparId?: string | null;
+  counsellingRound?: string | null;
+  feeReceiptNumber?: string | null;
+  dateOfAdmission?: string | null;
+  studiedKannadaIn10th?: boolean | null;
+  passportNumber?: string | null;
+  passportExpiryDate?: string | null;
+  visaNumber?: string | null;
+  visaExpiryDate?: string | null;
+  parentPassportNumber?: string | null;
+  parentVisaNumber?: string | null;
+  parentVisaExpiryDate?: string | null;
+  placeOfBirth?: string | null;
+  stateOfBirth?: string | null;
+  semester?: {
+    id: string;
+    semesterNumber: number;
+    programType: string;
+    academicTerm: {
+      type: string;
+      year: string;
+    };
+  };
 };
 
 type StepKey = "admission" | "personal" | "education" | "parent" | "review";
@@ -111,6 +138,9 @@ export const ApplicantAdmissionView = () => {
   const [fatherPhone, setFatherPhone] = useState("");
   const [motherPhone, setMotherPhone] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
+  const [selectedAdmissionType, setSelectedAdmissionType] = useState("");
+  const [scholarshipEnabled, setScholarshipEnabled] = useState(false);
+  const [studiedKannadaEnabled, setStudiedKannadaEnabled] = useState(false);
   const [economicallyBackwardEnabled, setEconomicallyBackwardEnabled] =
     useState(false);
   const [class12Enabled, setClass12Enabled] = useState(true);
@@ -126,7 +156,7 @@ export const ApplicantAdmissionView = () => {
     review: null,
   });
   const [birthState, setBirthState] = useState("");
-  const [birthPlace, setBirthPlace] = useState("");
+  const [domicileState, setDomicileState] = useState("");
   // Class 10
   const [class10State, setClass10State] = useState("");
   const [class10City, setClass10City] = useState("");
@@ -367,6 +397,13 @@ export const ApplicantAdmissionView = () => {
         fields: [
           "applicationId",
           "modeOfAdmission",
+          "admissionType",
+          "semesterId",
+          "counsellingRound",
+          "abcAparId",
+          "feeReceiptNumber",
+          "scholarship",
+          "sspId",
           "firstName",
           "middleName",
           "lastName",
@@ -418,6 +455,10 @@ export const ApplicantAdmissionView = () => {
           "disabilityType",
           "economicallyBackward",
           "aadharNumber",
+          "passportNumber",
+          "passportExpiryDate",
+          "visaNumber",
+          "visaExpiryDate",
         ],
       },
       {
@@ -432,6 +473,7 @@ export const ApplicantAdmissionView = () => {
           "class10thAggregateScore",
           "class10thAggregateTotal",
           "class10thMediumOfTeaching",
+          "studiedKannadaIn10th",
 
           "hasClass12",
           "class12thInstituteName",
@@ -466,6 +508,9 @@ export const ApplicantAdmissionView = () => {
           "fatherNumber",
           "fatherOccupation",
           "fatherPermanentAddress",
+          "parentPassportNumber",
+          "parentVisaNumber",
+          "parentVisaExpiryDate",
 
           "motherName",
           "motherEmail",
@@ -602,6 +647,24 @@ export const ApplicantAdmissionView = () => {
     if (admission?.department?.id) {
       setSelectedDepartment(admission.department.id);
     }
+
+    if (admission?.modeOfAdmission) {
+      setSelectedMode(
+        admission.modeOfAdmission as keyof typeof categoriesClaimed
+      );
+    }
+
+    if (admission?.admissionType) {
+      setSelectedAdmissionType(admission.admissionType);
+    }
+
+    if (admission?.scholarship != null) {
+      setScholarshipEnabled(admission.scholarship);
+    }
+
+    if (admission?.studiedKannadaIn10th != null) {
+      setStudiedKannadaEnabled(admission.studiedKannadaIn10th);
+    }
   }, [admission]);
 
   useEffect(() => {
@@ -643,8 +706,26 @@ export const ApplicantAdmissionView = () => {
   );
   const birthStates = State.getStatesOfCountry("IN");
 
-  const birthPlaces = City.getCitiesOfState("IN", birthState);
   const educationStates = State.getStatesOfCountry("IN");
+
+  useEffect(() => {
+    const placeOfBirthState = birthStates.find(
+      (state) => state.name === admission?.placeOfBirth
+    );
+    const domicileStateOption = birthStates.find(
+      (state) => state.name === admission?.stateOfBirth
+    );
+
+    if (placeOfBirthState) setBirthState(placeOfBirthState.isoCode);
+    if (domicileStateOption) setDomicileState(domicileStateOption.isoCode);
+  }, [admission, birthStates]);
+
+  const validAdmissionTypes =
+    admission?.semester?.semesterNumber === 1
+      ? admissionTypes.filter((type) => type.value === "REGULAR")
+      : admission?.semester?.semesterNumber === 3
+        ? admissionTypes.filter((type) => type.value !== "REGULAR")
+        : [];
 
   const class10Cities = City.getCitiesOfState("IN", class10State);
   const class12Cities = City.getCitiesOfState("IN", class12State);
@@ -685,6 +766,12 @@ export const ApplicantAdmissionView = () => {
           Your application (ID: {admission.applicationId}) is currently under
           review by the administration.
         </p>
+        {admission.dateOfAdmission && (
+          <p className="text-muted-foreground mt-2 text-sm">
+            Date of admission:{" "}
+            {new Date(admission.dateOfAdmission).toLocaleDateString()}
+          </p>
+        )}
       </div>
     );
   }
@@ -820,6 +907,55 @@ export const ApplicantAdmissionView = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="admissionType">Admission Type *</Label>
+              <Select
+                name="admissionType"
+                value={selectedAdmissionType}
+                onValueChange={setSelectedAdmissionType}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select admission type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {validAdmissionTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="semesterDisplay">Semester</Label>
+              <Input
+                id="semesterDisplay"
+                value={
+                  admission.semester
+                    ? `${admission.semester.programType} Semester ${admission.semester.semesterNumber}`
+                    : ""
+                }
+                readOnly
+              />
+              <input
+                type="hidden"
+                name="semesterId"
+                value={admission.semester?.id ?? ""}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="termDisplay">Admission Term</Label>
+              <Input
+                id="termDisplay"
+                value={
+                  admission.semester?.academicTerm
+                    ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`
+                    : ""
+                }
+                readOnly
+              />
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
             <div className="space-y-2 md:col-span-4">
@@ -907,6 +1043,61 @@ export const ApplicantAdmissionView = () => {
                 required
               />
             </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="counsellingRound">Counselling Round</Label>
+              <Input
+                id="counsellingRound"
+                name="counsellingRound"
+                defaultValue={admission.counsellingRound ?? ""}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="abcAparId">ABC/APAAR ID</Label>
+              <Input
+                id="abcAparId"
+                name="abcAparId"
+                defaultValue={admission.abcAparId ?? ""}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="feeReceiptNumber">Fee Receipt No.</Label>
+              <Input
+                id="feeReceiptNumber"
+                name="feeReceiptNumber"
+                defaultValue={admission.feeReceiptNumber ?? ""}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="scholarship">Scholarship *</Label>
+              <input
+                type="hidden"
+                name="scholarship"
+                value={scholarshipEnabled ? "true" : "false"}
+              />
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                <Checkbox
+                  id="scholarship"
+                  checked={scholarshipEnabled}
+                  onCheckedChange={(checked) =>
+                    setScholarshipEnabled(Boolean(checked))
+                  }
+                />
+                <Label htmlFor="scholarship" className="cursor-pointer">
+                  Receiving scholarship
+                </Label>
+              </div>
+            </div>
+            {scholarshipEnabled && (
+              <div className="space-y-2 md:col-span-4">
+                <Label htmlFor="sspId">SSP ID *</Label>
+                <Input
+                  id="sspId"
+                  name="sspId"
+                  defaultValue={admission.sspId ?? ""}
+                  required
+                />
+              </div>
+            )}
             <div className="space-y-2 md:col-span-4">
               <Label htmlFor="feePaid">Fee Paid (₹) *</Label>
               <Input id="feePaid" name="feePaid" type="number" required />
@@ -1427,16 +1618,39 @@ export const ApplicantAdmissionView = () => {
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="stateOfBirth">State of Birth *</Label>
+                  <Label htmlFor="placeOfBirth">Place of Birth *</Label>
+                  <Select value={birthState} onValueChange={setBirthState}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select birth state" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      {birthStates.map((state) => (
+                        <SelectItem key={state.isoCode} value={state.isoCode}>
+                          {state.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <input
+                    type="hidden"
+                    name="placeOfBirth"
+                    value={
+                      birthStates.find((s) => s.isoCode === birthState)?.name ??
+                      ""
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stateOfBirth">Domicile State *</Label>
                   <Select
-                    value={birthState}
-                    onValueChange={(value) => {
-                      setBirthState(value);
-                      setBirthPlace("");
-                    }}
+                    value={domicileState}
+                    onValueChange={setDomicileState}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select State" />
+                      <SelectValue placeholder="Select domicile state" />
                     </SelectTrigger>
 
                     <SelectContent>
@@ -1452,32 +1666,9 @@ export const ApplicantAdmissionView = () => {
                     type="hidden"
                     name="stateOfBirth"
                     value={
-                      birthStates.find((s) => s.isoCode === birthState)?.name ??
-                      ""
+                      birthStates.find((s) => s.isoCode === domicileState)
+                        ?.name ?? ""
                     }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="placeOfBirth">Place of Birth *</Label>
-                  <Select value={birthPlace} onValueChange={setBirthPlace}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select Place of Birth" />
-                    </SelectTrigger>
-
-                    <SelectContent>
-                      {birthPlaces.map((city) => (
-                        <SelectItem key={city.name} value={city.name}>
-                          {city.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <input
-                    type="hidden"
-                    name="placeOfBirth"
-                    value={birthPlace}
                     required
                   />
                 </div>
@@ -1593,6 +1784,48 @@ export const ApplicantAdmissionView = () => {
                     pattern="[0-9]{12}"
                     maxLength={12}
                     required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="passportNumber">
+                    Student Passport Number
+                  </Label>
+                  <Input
+                    id="passportNumber"
+                    name="passportNumber"
+                    defaultValue={admission.passportNumber ?? ""}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="passportExpiryDate">
+                    Passport Expiry Date
+                  </Label>
+                  <Input
+                    id="passportExpiryDate"
+                    name="passportExpiryDate"
+                    type="date"
+                    defaultValue={
+                      admission.passportExpiryDate?.slice(0, 10) ?? ""
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="visaNumber">Student Visa Number</Label>
+                  <Input
+                    id="visaNumber"
+                    name="visaNumber"
+                    defaultValue={admission.visaNumber ?? ""}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="visaExpiryDate">
+                    Student Visa Expiry Date
+                  </Label>
+                  <Input
+                    id="visaExpiryDate"
+                    name="visaExpiryDate"
+                    type="date"
+                    defaultValue={admission.visaExpiryDate?.slice(0, 10) ?? ""}
                   />
                 </div>
               </div>
@@ -1790,6 +2023,31 @@ export const ApplicantAdmissionView = () => {
                 name="class10thMediumOfTeaching"
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="studiedKannadaIn10th">
+                Studied Kannada in 10th? *
+              </Label>
+              <input
+                type="hidden"
+                name="studiedKannadaIn10th"
+                value={studiedKannadaEnabled ? "true" : "false"}
+              />
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                <Checkbox
+                  id="studiedKannadaIn10th"
+                  checked={studiedKannadaEnabled}
+                  onCheckedChange={(checked) =>
+                    setStudiedKannadaEnabled(Boolean(checked))
+                  }
+                />
+                <Label
+                  htmlFor="studiedKannadaIn10th"
+                  className="cursor-pointer"
+                >
+                  Yes
+                </Label>
+              </div>
             </div>
 
             <div className="space-y-3 border-t pt-6 md:col-span-2 lg:col-span-3">
@@ -2253,6 +2511,37 @@ export const ApplicantAdmissionView = () => {
               <div className="space-y-2">
                 <Label htmlFor="fatherOccupation">Occupation </Label>
                 <Input id="fatherOccupation" name="fatherOccupation" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="parentPassportNumber">
+                  Parent Passport Number
+                </Label>
+                <Input
+                  id="parentPassportNumber"
+                  name="parentPassportNumber"
+                  defaultValue={admission.parentPassportNumber ?? ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="parentVisaNumber">Parent Visa Number</Label>
+                <Input
+                  id="parentVisaNumber"
+                  name="parentVisaNumber"
+                  defaultValue={admission.parentVisaNumber ?? ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="parentVisaExpiryDate">
+                  Parent Visa Expiry Date
+                </Label>
+                <Input
+                  id="parentVisaExpiryDate"
+                  name="parentVisaExpiryDate"
+                  type="date"
+                  defaultValue={
+                    admission.parentVisaExpiryDate?.slice(0, 10) ?? ""
+                  }
+                />
               </div>
               <div className="space-y-3">
                 <Label>Address *</Label>

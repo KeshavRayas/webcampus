@@ -9,7 +9,7 @@ import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { admissionModes } from "@webcampus/schemas/constants";
+import { admissionModes, admissionTypes } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import {
@@ -36,6 +36,7 @@ type UploadDocumentFilters = {
   applicationId: string;
   status: string;
   mode: string;
+  admissionType: string;
   academicTerm: string;
   semester: string;
   createdFrom: string;
@@ -46,6 +47,7 @@ const EMPTY_FILTERS: UploadDocumentFilters = {
   applicationId: "",
   status: "",
   mode: "",
+  admissionType: "",
   academicTerm: "",
   semester: "",
   createdFrom: "",
@@ -98,7 +100,6 @@ export function UploadDocsView() {
       const query = createFilterQueryString(appliedFilters);
 
       const res = await apiClient.get<BaseResponse<UploadDocsResponse[]>>(
-        // TODO: Switch back to /admission/upload-documents when the backend endpoint is implemented
         `/admission${query ? `?${query}` : ""}`,
         {
           withCredentials: true,
@@ -185,6 +186,17 @@ export function UploadDocsView() {
       options: admissionModes.map((mode) => ({
         label: mode,
         value: mode,
+      })),
+    },
+    {
+      key: "admissionType",
+      label: "Admission Type",
+      type: "select",
+      placeholder: "All admission types",
+      allOptionLabel: "All admission types",
+      options: admissionTypes.map((type) => ({
+        label: type.label,
+        value: type.value,
       })),
     },
     {

@@ -130,6 +130,11 @@ export class AdmissionController {
               name: true,
             },
           },
+          semester: {
+            include: {
+              academicTerm: true,
+            },
+          },
         },
       });
 

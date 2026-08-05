@@ -8,7 +8,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024,
-    files: 9,
+    files: 10,
   },
   fileFilter: (_req, file, callback) => {
     const allowedMimeTypes = new Set([
@@ -47,6 +47,7 @@ router.patch(
     { name: "disabilityCertificate", maxCount: 1 },
     { name: "studyCertificate", maxCount: 1 },
     { name: "transferCertificate", maxCount: 1 },
+    { name: "embassyPermissionLetter", maxCount: 1 },
   ]),
   AdmissionUploadController.uploadDocuments
 );

@@ -334,6 +334,14 @@ export function UploadDocsActions({ admission }: Props) {
                   onFileChange={setFile}
                 />
 
+                <DocumentCard
+                  title="Embassy Permission Letter"
+                  field="embassyPermissionLetter"
+                  currentFile={admission.embassyPermissionLetter}
+                  selectedFile={files.embassyPermissionLetter}
+                  onFileChange={setFile}
+                />
+
                 {admission.disability && (
                   <DocumentCard
                     title="Disability Certificate"
