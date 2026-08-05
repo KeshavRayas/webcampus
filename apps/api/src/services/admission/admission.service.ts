@@ -16,6 +16,20 @@ import {
   normalizeStudentEmailToken,
 } from "./student-email";
 
+const parseOptionalNumber = (value: string | undefined): number | null => {
+  if (value === undefined || value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const calculatePercentage = (
+  marks: number | null,
+  maxMarks: number | null
+): number | null => {
+  if (marks === null || maxMarks === null || maxMarks <= 0) return null;
+  return Number(((marks / maxMarks) * 100).toFixed(2));
+};
+
 export class AdmissionService {
   private static getStudentFullName(admission: {
     firstName?: string | null;
@@ -607,6 +621,59 @@ export class AdmissionService {
         throw new Error("SSP ID is required when scholarship is enabled.");
       }
 
+      const physicsMarks = parseOptionalNumber(data.physicsMarks);
+      const physicsMaxMarks = parseOptionalNumber(data.physicsMaxMarks);
+      const chemistryMarks = parseOptionalNumber(data.chemistryMarks);
+      const chemistryMaxMarks = parseOptionalNumber(data.chemistryMaxMarks);
+      const mathematicsMarks = parseOptionalNumber(data.mathematicsMarks);
+      const mathematicsMaxMarks = parseOptionalNumber(data.mathematicsMaxMarks);
+      const physicsMinMarks = parseOptionalNumber(data.physicsMinMarks);
+      const chemistryMinMarks = parseOptionalNumber(data.chemistryMinMarks);
+      const mathematicsMinMarks = parseOptionalNumber(data.mathematicsMinMarks);
+      const pcmMaxMarks = [
+        physicsMaxMarks,
+        chemistryMaxMarks,
+        mathematicsMaxMarks,
+      ];
+      const pcmMarks = [physicsMarks, chemistryMarks, mathematicsMarks];
+      const pcmMinMarks = [
+        physicsMinMarks,
+        chemistryMinMarks,
+        mathematicsMinMarks,
+      ];
+      if (
+        [...pcmMarks, ...pcmMaxMarks, ...pcmMinMarks].some(
+          (value) => value !== null
+        ) &&
+        [...pcmMarks, ...pcmMaxMarks, ...pcmMinMarks].some(
+          (value) => value === null
+        )
+      ) {
+        throw new Error(
+          "Physics, Chemistry, and Mathematics marks, maximum marks, and minimum marks are all required."
+        );
+      }
+      for (let index = 0; index < pcmMarks.length; index++) {
+        if (pcmMarks[index]! > pcmMaxMarks[index]!) {
+          throw new Error("Obtained marks cannot exceed maximum marks.");
+        }
+        if (pcmMinMarks[index]! > pcmMaxMarks[index]!) {
+          throw new Error("Minimum marks cannot exceed maximum marks.");
+        }
+      }
+      const pcmPercentage =
+        pcmMarks.every((value) => value !== null) &&
+        pcmMaxMarks.every((value) => value !== null) &&
+        pcmMaxMarks.every((value) => value! > 0)
+          ? Number(
+              (
+                (pcmMarks.reduce((sum, value) => sum + value!, 0) /
+                  pcmMaxMarks.reduce((sum, value) => sum + value!, 0)) *
+                100
+              ).toFixed(2)
+            )
+          : null;
+
       if (data.aadharNumber && data.aadharNumber !== admission.aadharNumber) {
         const existingAadhar = await db.admission.findFirst({
           where: {
@@ -714,6 +781,8 @@ export class AdmissionService {
             : null,
 
           class10thSchoolName: data.class10thSchoolName,
+          class10thRollRegNumber: data.class10thRollRegNumber ?? null,
+          admissionBasedOn: data.admissionBasedOn ?? null,
           class10thSchoolType: data.class10thSchoolType,
           schoolCountry: data.schoolCountry ?? null,
           class10thSchoolCity: data.class10thSchoolCity,
@@ -730,6 +799,7 @@ export class AdmissionService {
           hasClass12: data.hasClass12 === "true",
           hasDiploma: data.hasDiploma === "true",
           class12thInstituteName: data.class12thInstituteName,
+          class12thRollRegNumber: data.class12thRollRegNumber ?? null,
           class12thInstituteType: data.class12thInstituteType,
           instituteCountry: data.instituteCountry ?? null,
           class12thInstituteCity: data.class12thInstituteCity,
@@ -743,6 +813,25 @@ export class AdmissionService {
             ? parseFloat(data.class12thAggregateTotal)
             : null,
           class12thMediumOfTeaching: data.class12thMediumOfTeaching,
+          physicsMarks,
+          physicsMaxMarks,
+          physicsMinMarks,
+          physicsPercentage: calculatePercentage(physicsMarks, physicsMaxMarks),
+          chemistryMarks,
+          chemistryMaxMarks,
+          chemistryMinMarks,
+          chemistryPercentage: calculatePercentage(
+            chemistryMarks,
+            chemistryMaxMarks
+          ),
+          mathematicsMarks,
+          mathematicsMaxMarks,
+          mathematicsMinMarks,
+          mathematicsPercentage: calculatePercentage(
+            mathematicsMarks,
+            mathematicsMaxMarks
+          ),
+          pcmPercentage,
 
           diplomaInstituteName: data.diplomaInstituteName ?? null,
           diplomaInstituteType: data.diplomaInstituteType ?? null,

@@ -139,6 +139,7 @@ export const ApplicantAdmissionView = () => {
   const [motherPhone, setMotherPhone] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
   const [selectedAdmissionType, setSelectedAdmissionType] = useState("");
+  const [admissionBasedOn, setAdmissionBasedOn] = useState("");
   const [scholarshipEnabled, setScholarshipEnabled] = useState(false);
   const [studiedKannadaEnabled, setStudiedKannadaEnabled] = useState(false);
   const [economicallyBackwardEnabled, setEconomicallyBackwardEnabled] =
@@ -167,6 +168,18 @@ export const ApplicantAdmissionView = () => {
   const [class12City, setClass12City] = useState("");
   const [class12Country, setClass12Country] = useState("IN");
 
+  const [pcmMarks, setPcmMarks] = useState({
+    physicsMarks: "",
+    physicsMaxMarks: "",
+    physicsMinMarks: "",
+    chemistryMarks: "",
+    chemistryMaxMarks: "",
+    chemistryMinMarks: "",
+    mathematicsMarks: "",
+    mathematicsMaxMarks: "",
+    mathematicsMinMarks: "",
+  });
+
   // Diploma
   const [diplomaState, setDiplomaState] = useState("");
   const [diplomaCity, setDiplomaCity] = useState("");
@@ -177,6 +190,41 @@ export const ApplicantAdmissionView = () => {
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedQuota, setSelectedQuota] = useState("");
   const { data: departments } = useAdmissionDepartments();
+
+  const updatePcmMark = (field: keyof typeof pcmMarks, value: string) => {
+    setPcmMarks((current) => ({ ...current, [field]: value }));
+  };
+
+  const percentage = (marks: string, maxMarks: string) => {
+    const marksValue = Number(marks);
+    const maxMarksValue = Number(maxMarks);
+    if (!marks || !maxMarks || maxMarksValue <= 0) return "";
+    return ((marksValue / maxMarksValue) * 100).toFixed(2);
+  };
+
+  const pcmPercentage = (() => {
+    const marks = [
+      pcmMarks.physicsMarks,
+      pcmMarks.chemistryMarks,
+      pcmMarks.mathematicsMarks,
+    ];
+    const maxMarks = [
+      pcmMarks.physicsMaxMarks,
+      pcmMarks.chemistryMaxMarks,
+      pcmMarks.mathematicsMaxMarks,
+    ];
+    if (marks.some((value) => !value) || maxMarks.some((value) => !value)) {
+      return "";
+    }
+    const totalMarks = marks.reduce((sum, value) => sum + Number(value), 0);
+    const totalMaxMarks = maxMarks.reduce(
+      (sum, value) => sum + Number(value),
+      0
+    );
+    return totalMaxMarks > 0
+      ? ((totalMarks / totalMaxMarks) * 100).toFixed(2)
+      : "";
+  })();
 
   // Fetch the applicant's existing shell
   const {
@@ -398,6 +446,7 @@ export const ApplicantAdmissionView = () => {
           "applicationId",
           "modeOfAdmission",
           "admissionType",
+          "admissionBasedOn",
           "semesterId",
           "counsellingRound",
           "abcAparId",
@@ -465,6 +514,7 @@ export const ApplicantAdmissionView = () => {
         title: "Education Details",
         fields: [
           "class10thSchoolName",
+          "class10thRollRegNumber",
           "class10thSchoolType",
           "schoolCountry",
           "class10thSchoolCity",
@@ -477,6 +527,7 @@ export const ApplicantAdmissionView = () => {
 
           "hasClass12",
           "class12thInstituteName",
+          "class12thRollRegNumber",
           "class12thInstituteType",
           "instituteCountry",
           "class12thInstituteCity",
@@ -486,6 +537,19 @@ export const ApplicantAdmissionView = () => {
           "class12thMediumOfTeaching",
           "class12thAggregateScore",
           "class12thAggregateTotal",
+          "physicsMarks",
+          "physicsMaxMarks",
+          "physicsMinMarks",
+          "physicsPercentage",
+          "chemistryMarks",
+          "chemistryMaxMarks",
+          "chemistryMinMarks",
+          "chemistryPercentage",
+          "mathematicsMarks",
+          "mathematicsMaxMarks",
+          "mathematicsMinMarks",
+          "mathematicsPercentage",
+          "pcmPercentage",
 
           "hasDiploma",
           "diplomaInstituteName",
@@ -924,6 +988,23 @@ export const ApplicantAdmissionView = () => {
                       {type.label}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="admissionBasedOn">Admission Based On *</Label>
+              <Select
+                name="admissionBasedOn"
+                value={admissionBasedOn}
+                onValueChange={setAdmissionBasedOn}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select qualification" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CLASS_12_PUC">Class 12th / PUC</SelectItem>
+                  <SelectItem value="DIPLOMA">Diploma</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1875,6 +1956,15 @@ export const ApplicantAdmissionView = () => {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="class10thRollRegNumber">
+                Roll / Registration Number
+              </Label>
+              <Input
+                id="class10thRollRegNumber"
+                name="class10thRollRegNumber"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="class10thSchoolType">School Type *</Label>
               <Select name="class10thSchoolType" required>
                 <SelectTrigger>
@@ -2248,6 +2338,15 @@ export const ApplicantAdmissionView = () => {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="class12thRollRegNumber">
+                  Roll / Registration Number
+                </Label>
+                <Input
+                  id="class12thRollRegNumber"
+                  name="class12thRollRegNumber"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="class12thMediumOfTeaching">
                   Medium of Instruction *
                 </Label>
@@ -2278,6 +2377,102 @@ export const ApplicantAdmissionView = () => {
                   type="number"
                   step="1"
                   required
+                />
+              </div>
+
+              {(
+                [
+                  ["Physics", "physics"],
+                  ["Chemistry", "chemistry"],
+                  ["Mathematics", "mathematics"],
+                ] as const
+              ).map(([label, key]) => (
+                <React.Fragment key={key}>
+                  <div className="space-y-2">
+                    <Label htmlFor={`${key}Marks`}>{label} Marks *</Label>
+                    <Input
+                      id={`${key}Marks`}
+                      name={`${key}Marks`}
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={pcmMarks[`${key}Marks` as keyof typeof pcmMarks]}
+                      onChange={(event) =>
+                        updatePcmMark(
+                          `${key}Marks` as keyof typeof pcmMarks,
+                          event.target.value
+                        )
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`${key}MaxMarks`}>
+                      {label} Max Marks *
+                    </Label>
+                    <Input
+                      id={`${key}MaxMarks`}
+                      name={`${key}MaxMarks`}
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={
+                        pcmMarks[`${key}MaxMarks` as keyof typeof pcmMarks]
+                      }
+                      onChange={(event) =>
+                        updatePcmMark(
+                          `${key}MaxMarks` as keyof typeof pcmMarks,
+                          event.target.value
+                        )
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`${key}MinMarks`}>
+                      {label} Min / Pass Marks *
+                    </Label>
+                    <Input
+                      id={`${key}MinMarks`}
+                      name={`${key}MinMarks`}
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={
+                        pcmMarks[`${key}MinMarks` as keyof typeof pcmMarks]
+                      }
+                      onChange={(event) =>
+                        updatePcmMark(
+                          `${key}MinMarks` as keyof typeof pcmMarks,
+                          event.target.value
+                        )
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`${key}Percentage`}>
+                      {label} Percentage
+                    </Label>
+                    <Input
+                      id={`${key}Percentage`}
+                      name={`${key}Percentage`}
+                      value={percentage(
+                        pcmMarks[`${key}Marks` as keyof typeof pcmMarks],
+                        pcmMarks[`${key}MaxMarks` as keyof typeof pcmMarks]
+                      )}
+                      readOnly
+                    />
+                  </div>
+                </React.Fragment>
+              ))}
+              <div className="space-y-2">
+                <Label htmlFor="pcmPercentage">PCM Grade (%)</Label>
+                <Input
+                  id="pcmPercentage"
+                  name="pcmPercentage"
+                  value={pcmPercentage}
+                  readOnly
                 />
               </div>
             </fieldset>

@@ -82,6 +82,7 @@ export type AdmissionResponse = {
   aadharCard?: string | null;
 
   class10thSchoolName?: string | null;
+  class10thRollRegNumber?: string | null;
   class10thSchoolType?: string | null;
   class10thSchoolCity?: string | null;
   class10thSchoolState?: string | null;
@@ -92,6 +93,7 @@ export type AdmissionResponse = {
   class10thMarksPdf?: string | null;
 
   class12thInstituteName?: string | null;
+  class12thRollRegNumber?: string | null;
   class12thInstituteType?: string | null;
   class12thInstituteCity?: string | null;
   class12thInstituteState?: string | null;
@@ -101,6 +103,20 @@ export type AdmissionResponse = {
   class12thAggregateTotal?: number | null;
   class12thMediumOfTeaching: string | null;
   class12thMarksPdf?: string | null;
+  admissionBasedOn?: string | null;
+  physicsMarks?: number | null;
+  physicsMaxMarks?: number | null;
+  physicsMinMarks?: number | null;
+  physicsPercentage?: number | null;
+  chemistryMarks?: number | null;
+  chemistryMaxMarks?: number | null;
+  chemistryMinMarks?: number | null;
+  chemistryPercentage?: number | null;
+  mathematicsMarks?: number | null;
+  mathematicsMaxMarks?: number | null;
+  mathematicsMinMarks?: number | null;
+  mathematicsPercentage?: number | null;
+  pcmPercentage?: number | null;
 
   studyCertificate?: string | null;
   transferCertificate?: string | null;

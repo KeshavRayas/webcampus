@@ -452,6 +452,10 @@ export const AdminAdmissionActions = ({
                           value={admission.class10thSchoolName}
                         />
                         <DataField
+                          label="Roll / Registration Number"
+                          value={admission.class10thRollRegNumber}
+                        />
+                        <DataField
                           label="School Type"
                           value={admission.class10thSchoolType}
                         />
@@ -499,6 +503,20 @@ export const AdminAdmissionActions = ({
                           value={admission.class12thInstituteName}
                         />
                         <DataField
+                          label="Roll / Registration Number"
+                          value={admission.class12thRollRegNumber}
+                        />
+                        <DataField
+                          label="Admission Based On"
+                          value={
+                            admission.admissionBasedOn === "CLASS_12_PUC"
+                              ? "Class 12th / PUC"
+                              : admission.admissionBasedOn === "DIPLOMA"
+                                ? "Diploma"
+                                : admission.admissionBasedOn
+                          }
+                        />
+                        <DataField
                           label="Institute Type"
                           value={admission.class12thInstituteType}
                         />
@@ -536,6 +554,50 @@ export const AdminAdmissionActions = ({
                             admission.class12thAggregateScore &&
                             admission.class12thAggregateTotal
                               ? `${((admission.class12thAggregateScore / admission.class12thAggregateTotal) * 100).toFixed(2)}%`
+                              : "-"
+                          }
+                        />
+                        <DataField
+                          label="Physics Marks / Max / Min"
+                          value={`${admission.physicsMarks ?? "-"} / ${admission.physicsMaxMarks ?? "-"} / ${admission.physicsMinMarks ?? "-"}`}
+                        />
+                        <DataField
+                          label="Physics Percentage"
+                          value={
+                            admission.physicsPercentage != null
+                              ? `${admission.physicsPercentage.toFixed(2)}%`
+                              : "-"
+                          }
+                        />
+                        <DataField
+                          label="Chemistry Marks / Max / Min"
+                          value={`${admission.chemistryMarks ?? "-"} / ${admission.chemistryMaxMarks ?? "-"} / ${admission.chemistryMinMarks ?? "-"}`}
+                        />
+                        <DataField
+                          label="Chemistry Percentage"
+                          value={
+                            admission.chemistryPercentage != null
+                              ? `${admission.chemistryPercentage.toFixed(2)}%`
+                              : "-"
+                          }
+                        />
+                        <DataField
+                          label="Mathematics Marks / Max / Min"
+                          value={`${admission.mathematicsMarks ?? "-"} / ${admission.mathematicsMaxMarks ?? "-"} / ${admission.mathematicsMinMarks ?? "-"}`}
+                        />
+                        <DataField
+                          label="Mathematics Percentage"
+                          value={
+                            admission.mathematicsPercentage != null
+                              ? `${admission.mathematicsPercentage.toFixed(2)}%`
+                              : "-"
+                          }
+                        />
+                        <DataField
+                          label="PCM Grade (%)"
+                          value={
+                            admission.pcmPercentage != null
+                              ? `${admission.pcmPercentage.toFixed(2)}%`
                               : "-"
                           }
                         />
