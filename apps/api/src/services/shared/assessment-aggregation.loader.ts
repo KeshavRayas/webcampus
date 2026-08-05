@@ -1,4 +1,4 @@
-import { db } from "@webcampus/db";
+import { db, Prisma } from "@webcampus/db";
 import {
   buildComponentInputs,
   toCourseAggregationConfig,
@@ -43,7 +43,7 @@ export async function buildAggregationResultsForStudents(
     throw new Error(`Course ${courseId} not found`);
   }
 
-  const templates = await db.assessmentTemplate.findMany({
+  const templates = await prisma.assessmentTemplate.findMany({
     where: { courseId },
     select: {
       id: true,
@@ -68,7 +68,7 @@ export async function buildAggregationResultsForStudents(
   const courseConfig = toCourseAggregationConfig(course, theoryTemplateCount);
   const layoutWarnings = validateCourseTemplateLayout(course, templates);
 
-  const studentAssessments = await db.studentAssessment.findMany({
+  const studentAssessments = await prisma.studentAssessment.findMany({
     where: {
       courseId,
       studentId: { in: studentIds },

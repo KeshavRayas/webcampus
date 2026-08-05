@@ -18,9 +18,11 @@ export async function recomputeStudentMark(
     return;
   }
 
-  const results = await buildAggregationResultsForStudents(courseId, [
-    studentId,
-  ]);
+  const results = await buildAggregationResultsForStudents(
+    courseId,
+    [studentId],
+    tx
+  );
   const result = results.get(studentId);
 
   if (!result) {
@@ -33,14 +35,14 @@ export async function recomputeStudentMark(
   const cieTotal = result.cieTotal;
   const status: EligibilityStatus = result.status;
 
-  await db.mark.upsert({
+  await prisma.mark.upsert({
     where: { studentId_courseId: { studentId, courseId } },
     create: { studentId, courseId, cieTotal, status },
     update: { cieTotal, status },
   });
 
   logger.info(
-    `[MarkSync] student=${studentId} course=${course.code} cieTotal=${cieTotal} min=${course.seeEligibility} status=${status}`
+    `[MarkSync] student=${studentId} course=${course.code} cieTotal=${cieTotal} min=${course.cieEligibility} status=${status}`
   );
 }
 
