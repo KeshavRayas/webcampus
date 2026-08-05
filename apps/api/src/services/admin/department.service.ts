@@ -219,14 +219,25 @@ export class DepartmentService {
 
   static async delete(departmentId: string): Promise<BaseResponse<null>> {
     try {
-      // Look up the department to get the associated userId
+      // Look up the department to get the associated userId and image
       const department = await db.department.findUnique({
         where: { id: departmentId },
-        select: { userId: true },
+        select: {
+          userId: true,
+          user: {
+            select: { image: true },
+          },
+        },
       });
 
       if (!department) {
         throw new Error("Department not found");
+      }
+
+      // Delete the image from S3/MinIO if one exists
+      if (department.user.image) {
+        const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+        await deleteFromS3(department.user.image);
       }
 
       // Delete the department first
