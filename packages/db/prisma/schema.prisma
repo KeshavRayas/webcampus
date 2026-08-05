@@ -34,6 +34,8 @@ model User {
   accounts      Account[]
   sessions      Session[]
   adminEditLogs AdminEditLog[]
+  feedbackQuestionSetsCreated FeedbackQuestionSet[]
+  feedbackRoundsCreated      FeedbackRound[]
 
   courseMappingAuditLogs CourseMappingAuditLog[]
   supportTicketsCreated SupportTicket[]        @relation("SupportTicketCreator")
@@ -51,6 +53,8 @@ model AcademicTerm {
   registrationWindows RegistrationWindow[]
   courseRegistrations CourseRegistration[]
   hallTickets         HallTicket[]
+  feedbackQuestionSets FeedbackQuestionSet[]
+  feedbackRounds      FeedbackRound[]
 
   @@unique([type, year])
 }
@@ -71,6 +75,8 @@ model Semester {
   courseRegistrations CourseRegistration[]
   Section             Section[]
   hallTickets         HallTicket[]
+  feedbackQuestionSet FeedbackQuestionSet?
+  feedbackRounds      FeedbackRound[]
   academicTerm        AcademicTerm         @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
   createdBy           User                 @relation(fields: [userId], references: [id])
 
@@ -261,6 +267,7 @@ model Student {
   batches           Batch[]              @relation("BatchStudents")
   hallTickets       HallTicket[]
   finances          Finance[]
+  feedbackResponses FeedbackResponse[]
   @@index([departmentName])
   @@index([departmentName, currentSemester])
   @@index([semesterId])
@@ -313,6 +320,7 @@ model Faculty {
   publications           FacultyPublication[]
   qualifications         FacultyQualification[]
   hod                    Hod?
+  feedbackAssignments    FeedbackResponse[]
 
   @@unique([id, departmentId])
   @@index([departmentId])
@@ -447,6 +455,7 @@ model Course {
   marks              Mark[]
   studentAssessments StudentAssessment[]
   mappingAuditLogs   CourseMappingAuditLog[]
+  feedbackResponses  FeedbackResponse[]
 
   // ─── INDEXES ───
   @@unique([id, departmentId])
@@ -472,6 +481,7 @@ model CourseAssignment {
   faculty        Faculty        @relation(fields: [facultyId], references: [id])
   section        Section        @relation(fields: [sectionId, departmentId], references: [id, departmentId])
   freezes        Freeze?
+  feedbackResponses FeedbackResponse[]
 
   @@unique([departmentId, courseId, facultyId, sectionId, batchId, assignmentType, semester, academicYear])
   @@index([sectionId, semester])
@@ -499,6 +509,100 @@ model CourseRegistration {
   @@index([courseId])
   @@index([semesterId])
   @@index([academicTermId])
+}
+
+model FeedbackQuestionSet {
+  id             String   @id @default(uuid())
+  academicTermId String
+  semesterId     String   @unique
+  isLocked       Boolean  @default(false)
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  academicTerm AcademicTerm      @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+  semester     Semester          @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  createdBy    User              @relation(fields: [createdById], references: [id])
+  questions    FeedbackQuestion[]
+  rounds       FeedbackRound[]
+
+  @@unique([academicTermId, semesterId])
+  @@index([academicTermId])
+}
+
+model FeedbackQuestion {
+  id            String             @id @default(uuid())
+  questionSetId String
+  questionNumber Int
+  questionText String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  questionSet FeedbackQuestionSet @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+  answers     FeedbackAnswer[]
+
+  @@unique([questionSetId, questionNumber])
+  @@index([questionSetId])
+}
+
+model FeedbackRound {
+  id             String             @id @default(uuid())
+  academicTermId String
+  semesterId     String
+  questionSetId  String
+  roundNumber    Int
+  startsAt       DateTime
+  endsAt         DateTime
+  isEnabled      Boolean            @default(false)
+  createdById    String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  academicTerm AcademicTerm      @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+  semester     Semester          @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  questionSet  FeedbackQuestionSet @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+  createdBy    User              @relation(fields: [createdById], references: [id])
+  responses    FeedbackResponse[]
+
+  @@unique([academicTermId, semesterId, roundNumber])
+  @@index([semesterId, startsAt, endsAt])
+}
+
+model FeedbackResponse {
+  id                String          @id @default(uuid())
+  feedbackRoundId   String
+  studentId         String
+  courseAssignmentId String
+  courseId          String
+  facultyId          String
+  sectionId         String
+  batchId           String?
+  submittedAt       DateTime        @default(now())
+
+  feedbackRound   FeedbackRound   @relation(fields: [feedbackRoundId], references: [id], onDelete: Cascade)
+  student         Student         @relation(fields: [studentId], references: [id])
+  courseAssignment CourseAssignment @relation(fields: [courseAssignmentId], references: [id])
+  course          Course          @relation(fields: [courseId], references: [id])
+  faculty         Faculty         @relation(fields: [facultyId], references: [id])
+  answers         FeedbackAnswer[]
+
+  @@unique([studentId, feedbackRoundId, courseAssignmentId])
+  @@index([feedbackRoundId, courseAssignmentId])
+  @@index([facultyId, feedbackRoundId])
+  @@index([courseId, sectionId, feedbackRoundId])
+}
+
+model FeedbackAnswer {
+  id           String          @id @default(uuid())
+  responseId   String
+  questionId   String
+  score        Int
+
+  response FeedbackResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question FeedbackQuestion @relation(fields: [questionId], references: [id])
+
+  @@unique([responseId, questionId])
+  @@index([questionId])
 }
 
 model Attendance {

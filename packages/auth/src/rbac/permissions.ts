@@ -22,6 +22,7 @@ const statement = {
   registrationWindow: ["create", "read", "update"],
   finance: ["read", "update"],
   support: ["create", "read", "reply", "updateStatus"],
+  feedback: ["create", "read", "manage", "export"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -43,25 +44,30 @@ export const roles = {
     registrationWindow: ["create", "read", "update"],
     freeze: ["read", "lock"],
     support: ["create", "read", "reply", "updateStatus"],
+    feedback: ["read", "manage", "export"],
   }),
   applicant: ac.newRole({
     admission: ["read", "update"],
     department: ["read"],
     support: ["create", "read", "reply"],
+    feedback: ["create", "read"],
   }),
   student: ac.newRole({
     user: [],
     support: ["create", "read", "reply"],
+    feedback: ["create", "read"],
   }),
   faculty: ac.newRole({
     attendance: ["create"],
     freeze: ["read", "lock"],
     semester: ["read"],
     support: ["create", "read", "reply"],
+    feedback: ["read"],
   }),
   coordinator: ac.newRole({
     attendance: ["create"],
     support: ["create", "read", "reply"],
+    feedback: ["read", "export"],
   }),
   hod: ac.newRole({
     ...adminAc.statements,
@@ -69,16 +75,19 @@ export const roles = {
     courseAssignment: ["create"],
     freeze: ["read", "lock"],
     support: ["create", "read", "reply"],
+    feedback: ["read"],
   }),
   coe: ac.newRole({
     freeze: ["read", "lock"],
     attendance: ["read"],
     marks: ["read"],
     support: ["create", "read", "reply"],
+    feedback: ["read", "export"],
   }),
   finance: ac.newRole({
     finance: ["read", "update"],
     support: ["create", "read", "reply"],
+    feedback: ["read"],
   }),
   department: ac.newRole({
     ...adminAc.statements,
@@ -93,6 +102,7 @@ export const roles = {
     courseCoordinator: ["create", "read", "update"],
     freeze: ["read", "lock"],
     support: ["create", "read", "reply"],
+    feedback: ["read"],
   }),
   admission: ac.newRole({
     semester: ["read"],
