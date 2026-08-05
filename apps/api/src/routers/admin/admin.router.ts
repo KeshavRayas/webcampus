@@ -1,5 +1,6 @@
 import AcademicsReportRouter from "@webcampus/api/src/routers/admin/academics-report.router";
 import AdmissionUserRouter from "@webcampus/api/src/routers/admin/admission-user.router";
+import ArchiveRouter from "@webcampus/api/src/routers/admin/archive.router";
 import AttendanceWindowRouter from "@webcampus/api/src/routers/admin/attendance-window.router";
 import AuditRouter from "@webcampus/api/src/routers/admin/audit.router";
 import CoeRouter from "@webcampus/api/src/routers/admin/coe.router";
@@ -26,6 +27,8 @@ router.use("/department", DepartmentRouter);
 router.use("/academics/reports", AcademicsReportRouter);
 
 router.use("/semester", SemesterRouter);
+
+router.use("/archive", ArchiveRouter);
 
 router.use("/faculty", facultyRouter);
 

@@ -143,15 +143,6 @@ export function EnterMarksDialog({
     }
   }, [assessmentData]);
 
-  // Build a lookup of max marks per question for clamping
-  const maxMarksByQuestion = useMemo(() => {
-    const map = new Map<string, number>();
-    assessmentData?.questions.forEach((q: QuestionInfo) => {
-      map.set(q.id, q.marks);
-    });
-    return map;
-  }, [assessmentData]);
-
   // Group questions by part and OR group
   const questionStructure = useMemo(() => {
     if (!assessmentData) return null;
@@ -249,8 +240,7 @@ export function EnterMarksDialog({
     questionId: string,
     value: string
   ): void => {
-    const maxMarks = maxMarksByQuestion.get(questionId) ?? Infinity;
-    const numValue = Math.min(Math.max(0, Number(value) || 0), maxMarks);
+    const numValue = value === "" ? 0 : Number(value) || 0;
     setStudentMarks((prev) => ({
       ...prev,
       [studentId]: {
@@ -285,12 +275,48 @@ export function EnterMarksDialog({
   };
 
   const handleTotalChange = (studentId: string, value: string): void => {
-    const nextValue = Math.max(0, Number(value) || 0);
+    const nextValue = value === "" ? 0 : Number(value) || 0;
     setStudentTotals((prev) => ({
       ...prev,
       [studentId]: nextValue,
     }));
   };
+
+  const validationErrors = useMemo(() => {
+    const errors: {
+      [studentId: string]: { [questionId: string]: boolean } | boolean;
+    } = {};
+    let hasError = false;
+
+    if (!assessmentData) return { errors, hasError };
+    const hasQuestions = assessmentData.questions.length > 0;
+
+    assessmentData.students.forEach((student: StudentInfo) => {
+      const disabled = isStudentDisabled(student.studentId);
+      if (disabled) return;
+
+      if (hasQuestions) {
+        assessmentData.questions.forEach((question: QuestionInfo) => {
+          const val = studentMarks[student.studentId]?.[question.id] ?? 0;
+          if (val > question.marks || val < 0) {
+            if (!errors[student.studentId]) errors[student.studentId] = {};
+            (errors[student.studentId] as Record<string, boolean>)[
+              question.id
+            ] = true;
+            hasError = true;
+          }
+        });
+      } else {
+        const val = studentTotals[student.studentId] ?? 0;
+        if (val > assessmentData.totalMarks || val < 0) {
+          errors[student.studentId] = true;
+          hasError = true;
+        }
+      }
+    });
+
+    return { errors, hasError };
+  }, [assessmentData, studentMarks, studentTotals, studentStatuses]);
 
   const isStudentDisabled = (studentId: string): boolean => {
     const status = studentStatuses[studentId];
@@ -471,10 +497,15 @@ export function EnterMarksDialog({
                         {Array.from(questionStructure?.values() || [])
                           .flat()
                           .map((question: QuestionInfo) => {
+                            const isError = (
+                              validationErrors.errors[student.studentId] as
+                                | Record<string, boolean>
+                                | undefined
+                            )?.[question.id];
                             return (
                               <TableCell
                                 key={`${student.studentId}-${question.id}`}
-                                className="p-1 text-center"
+                                className="p-1 text-center align-top"
                               >
                                 <Input
                                   type="number"
@@ -493,9 +524,14 @@ export function EnterMarksDialog({
                                     )
                                   }
                                   disabled={disabled}
-                                  className="h-8 w-full text-center text-sm"
+                                  className={`h-8 w-full text-center text-sm ${isError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                                   placeholder="0"
                                 />
+                                {isError && (
+                                  <div className="mt-1 text-center text-[10px] leading-tight text-red-500">
+                                    Max: {question.marks}
+                                  </div>
+                                )}
                               </TableCell>
                             );
                           })}
@@ -563,7 +599,7 @@ export function EnterMarksDialog({
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right align-top">
                         <Input
                           type="number"
                           min="0"
@@ -573,9 +609,15 @@ export function EnterMarksDialog({
                             handleTotalChange(student.studentId, e.target.value)
                           }
                           disabled={disabled}
-                          className="h-8 text-right"
+                          className={`h-8 text-right ${validationErrors.errors[student.studentId] === true ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                           placeholder="0"
                         />
+                        {validationErrors.errors[student.studentId] ===
+                          true && (
+                          <div className="mt-1 text-right text-[10px] leading-tight text-red-500">
+                            Max: {assessmentData.totalMarks}
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -589,7 +631,10 @@ export function EnterMarksDialog({
           <Button variant="outline" onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || validationErrors.hasError}
+          >
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -183,7 +183,8 @@ export function computeEligibility(
     aat: ComponentResult;
   },
   cieTotal: number,
-  courseConfig: CourseAggregationConfig
+  courseConfig: CourseAggregationConfig,
+  theoryAttemptedExams: number = 0
 ): {
   cie: AggregationResult["cie"];
   status: EligibilityStatus;
@@ -203,11 +204,19 @@ export function computeEligibility(
   ].filter((c) => c.active);
   const allComponentsEligible = activeComponents.every((c) => c.eligible);
 
+  const hasMetMinTheoryExams =
+    courseConfig.theoryMinExams > 0
+      ? theoryAttemptedExams >= courseConfig.theoryMinExams
+      : true;
+
   let status: EligibilityStatus;
   if (courseConfig.cieEligibilityPolicy === "OVERALL_ONLY") {
-    status = cieEligible ? "ELIGIBLE" : "NOT_ELIGIBLE";
+    status = cieEligible && hasMetMinTheoryExams ? "ELIGIBLE" : "NOT_ELIGIBLE";
   } else {
-    status = cieEligible && allComponentsEligible ? "ELIGIBLE" : "NOT_ELIGIBLE";
+    status =
+      cieEligible && allComponentsEligible && hasMetMinTheoryExams
+        ? "ELIGIBLE"
+        : "NOT_ELIGIBLE";
   }
 
   return {
@@ -295,10 +304,17 @@ export function computeAggregation(
     aat: aatComputed.result,
   };
 
+  const theoryAttemptedExams = theoryInput
+    ? theoryInput.assessments.filter(
+        (a) => a.score !== null && a.status !== null && a.status !== "ABSENT"
+      ).length
+    : 0;
+
   const { cie, status } = computeEligibility(
     componentResults,
     cieTotal,
-    courseConfig
+    courseConfig,
+    theoryAttemptedExams
   );
 
   return {

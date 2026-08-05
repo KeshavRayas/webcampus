@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -26,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
+import { useMemo, useState } from "react";
 import {
   FacultyProfilePayload,
   qualificationProgramTypeOptions,
@@ -55,16 +55,19 @@ export const QualificationsTable = ({
   onUpdate,
   onDelete,
   isWorking,
+  isReadOnly,
 }: {
   profile: FacultyProfilePayload;
   onCreate: (payload: QualificationPayload) => void;
   onUpdate: (id: string, payload: QualificationPayload) => void;
   onDelete: (id: string) => void;
   isWorking: boolean;
+  isReadOnly?: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<QualificationPayload>(initialQualification);
+  const [formData, setFormData] =
+    useState<QualificationPayload>(initialQualification);
 
   const title = useMemo(
     () => (editingId ? "Update Qualification" : "Add Qualification"),
@@ -79,18 +82,22 @@ export const QualificationsTable = ({
   return (
     <section className="bg-card rounded-xl border p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h4 className="border-b pb-2 text-lg font-semibold">Academic Qualifications</h4>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            resetForm();
-            setOpen(true);
-          }}
-          disabled={isWorking}
-        >
-          Update
-        </Button>
+        <h4 className="border-b pb-2 text-lg font-semibold">
+          Academic Qualifications
+        </h4>
+        {!isReadOnly && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              resetForm();
+              setOpen(true);
+            }}
+            disabled={isWorking}
+          >
+            Add
+          </Button>
+        )}
       </div>
 
       <Dialog
@@ -102,7 +109,7 @@ export const QualificationsTable = ({
           }
         }}
       >
-        <DialogContent className="max-h-[85vh] w-[95vw] sm:max-w-xl md:max-w-3xl lg:max-w-5xl overflow-y-auto">
+        <DialogContent className="max-h-[85vh] w-[95vw] overflow-y-auto sm:max-w-xl md:max-w-3xl lg:max-w-5xl">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
@@ -113,7 +120,10 @@ export const QualificationsTable = ({
                 <Input
                   value={formData.program}
                   onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, program: event.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      program: event.target.value,
+                    }))
                   }
                 />
               </div>
@@ -145,7 +155,8 @@ export const QualificationsTable = ({
                   onChange={(event) =>
                     setFormData((prev) => ({
                       ...prev,
-                      yearPassed: Number(event.target.value) || new Date().getFullYear(),
+                      yearPassed:
+                        Number(event.target.value) || new Date().getFullYear(),
                     }))
                   }
                 />
@@ -155,7 +166,10 @@ export const QualificationsTable = ({
                 <Input
                   value={formData.degree}
                   onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, degree: event.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      degree: event.target.value,
+                    }))
                   }
                 />
               </div>
@@ -167,7 +181,10 @@ export const QualificationsTable = ({
                 <Input
                   value={formData.specialization}
                   onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, specialization: event.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      specialization: event.target.value,
+                    }))
                   }
                 />
               </div>
@@ -176,7 +193,10 @@ export const QualificationsTable = ({
                 <Input
                   value={formData.institution}
                   onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, institution: event.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      institution: event.target.value,
+                    }))
                   }
                 />
               </div>
@@ -197,7 +217,11 @@ export const QualificationsTable = ({
             >
               {isWorking ? "Saving..." : editingId ? "Update" : "Add"}
             </Button>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
               Cancel
             </Button>
           </DialogFooter>
@@ -213,7 +237,9 @@ export const QualificationsTable = ({
               <TableHead>Specialization</TableHead>
               <TableHead>Institution</TableHead>
               <TableHead>Year Passed</TableHead>
-              <TableHead className="w-[130px] text-right">Actions</TableHead>
+              {!isReadOnly && (
+                <TableHead className="w-[130px] text-right">Actions</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -225,43 +251,48 @@ export const QualificationsTable = ({
                   <TableCell>{qualification.specialization}</TableCell>
                   <TableCell>{qualification.institution}</TableCell>
                   <TableCell>{qualification.yearPassed}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingId(qualification.id);
-                          setFormData({
-                            program: qualification.program,
-                            degree: qualification.degree,
-                            specialization: qualification.specialization,
-                            institution: qualification.institution,
-                            programType: qualification.programType,
-                            yearPassed: qualification.yearPassed,
-                          });
-                          setOpen(true);
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => onDelete(qualification.id)}
-                        disabled={isWorking}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {!isReadOnly && (
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingId(qualification.id);
+                            setFormData({
+                              program: qualification.program,
+                              degree: qualification.degree,
+                              specialization: qualification.specialization,
+                              institution: qualification.institution,
+                              programType: qualification.programType,
+                              yearPassed: qualification.yearPassed,
+                            });
+                            setOpen(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => onDelete(qualification.id)}
+                          disabled={isWorking}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground">
+                <TableCell
+                  colSpan={isReadOnly ? 5 : 6}
+                  className="text-muted-foreground h-24 text-center text-sm"
+                >
                   No qualifications added yet.
                 </TableCell>
               </TableRow>

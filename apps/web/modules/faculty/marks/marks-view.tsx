@@ -275,7 +275,7 @@ export const MarksView = () => {
               fields={filterFields}
               draftFilters={draftFilters}
               onDraftChange={handleDraftChange}
-              className="md:grid-cols-2"
+              className="md:grid-cols-4"
             />
             <div className="mt-4 flex justify-end">
               <FilterActions onApply={handleApply} onReset={handleReset} />
@@ -309,18 +309,29 @@ export const MarksView = () => {
                         Total Marks: {assessment.totalMarks}
                       </p>
                     </div>
-                    <Button
-                      onClick={() =>
-                        setSelectedAssessment({
-                          courseId: selectedCourse.id,
-                          assessmentId: assessment.id,
-                          assessmentTitle: assessment.title,
-                        })
-                      }
-                      variant="outline"
-                    >
-                      Enter Marks
-                    </Button>
+                    <div className="flex items-center space-x-4">
+                      {assessment.hasMarks ? (
+                        <span className="rounded-md bg-green-50 px-2.5 py-1 text-sm font-medium text-green-600">
+                          Completed
+                        </span>
+                      ) : (
+                        <span className="rounded-md bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-600">
+                          Pending
+                        </span>
+                      )}
+                      <Button
+                        onClick={() =>
+                          setSelectedAssessment({
+                            courseId: selectedCourse.id,
+                            assessmentId: assessment.id,
+                            assessmentTitle: assessment.title,
+                          })
+                        }
+                        variant="outline"
+                      >
+                        {assessment.hasMarks ? "Edit Marks" : "Enter Marks"}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

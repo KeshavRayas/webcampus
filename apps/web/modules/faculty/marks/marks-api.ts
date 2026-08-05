@@ -5,6 +5,7 @@ export interface MarksAssessmentInfo {
   id: string;
   title: string;
   totalMarks: number;
+  hasMarks: boolean;
 }
 
 export interface MarksCourseInfo {

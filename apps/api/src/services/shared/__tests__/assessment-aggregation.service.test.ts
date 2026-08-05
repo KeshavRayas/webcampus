@@ -123,7 +123,8 @@ describe("computeEligibility", () => {
     const { status } = computeEligibility(
       { theory: activePass, lab: emptyInactive(), aat: activeFail },
       41,
-      baseCourseConfig()
+      baseCourseConfig(),
+      2 // Passing 2 attempted exams
     );
     expect(status).toBe("NOT_ELIGIBLE");
   });
@@ -132,7 +133,8 @@ describe("computeEligibility", () => {
     const { status } = computeEligibility(
       { theory: activePass, lab: emptyInactive(), aat: activeFail },
       41,
-      baseCourseConfig({ cieEligibilityPolicy: "OVERALL_ONLY" })
+      baseCourseConfig({ cieEligibilityPolicy: "OVERALL_ONLY" }),
+      2 // Passing 2 attempted exams
     );
     expect(status).toBe("ELIGIBLE");
   });
@@ -502,6 +504,138 @@ describe("computeAggregation", () => {
 
     expect(result.theoryAggregate).toBe(40);
     expect(result.cieTotal).toBe(35.67);
+  });
+
+  describe("minimum theory exams requirement", () => {
+    const courseMin2 = {
+      id: "course-min-2",
+      cieMaxMarks: 50,
+      cieEligibility: 40, // 20 marks
+      cieEligibilityPolicy: "OVERALL_ONLY" as const,
+      theoryMaxExams: 3,
+      theoryMinExams: 2,
+      theoryExamMaxMarks: 30,
+      theoryEligibility: 40,
+      labMaxMarks: 0,
+      labEligibility: 40,
+      aatMaxMarks: 0,
+      aatEligibility: 40,
+    };
+
+    const templates3 = [
+      {
+        id: "t1",
+        componentType: "THEORY" as const,
+        sequence: 1,
+        totalMarks: 30,
+      },
+      {
+        id: "t2",
+        componentType: "THEORY" as const,
+        sequence: 2,
+        totalMarks: 30,
+      },
+      {
+        id: "t3",
+        componentType: "THEORY" as const,
+        sequence: 3,
+        totalMarks: 30,
+      },
+    ];
+
+    it("Required = 2, Attempted = 3 -> Eligible", () => {
+      const studentAssessments = [
+        { assessmentId: "t1", totalMarks: 20, status: "PRESENT" },
+        { assessmentId: "t2", totalMarks: 20, status: "PRESENT" },
+        { assessmentId: "t3", totalMarks: 20, status: "PRESENT" },
+      ];
+      const components = buildComponentInputs(
+        courseMin2,
+        templates3,
+        studentAssessments
+      );
+      const result = computeAggregation(
+        components,
+        baseCourseConfig({ theoryMinExams: 2 }),
+        "s1"
+      );
+      expect(result.status).toBe("ELIGIBLE");
+    });
+
+    it("Required = 2, Attempted = 2 -> Eligible", () => {
+      const studentAssessments = [
+        { assessmentId: "t1", totalMarks: 20, status: "PRESENT" },
+        { assessmentId: "t2", totalMarks: 20, status: "PRESENT" },
+        { assessmentId: "t3", totalMarks: 0, status: "ABSENT" },
+      ];
+      const components = buildComponentInputs(
+        courseMin2,
+        templates3,
+        studentAssessments
+      );
+      const result = computeAggregation(
+        components,
+        baseCourseConfig({ theoryMinExams: 2 }),
+        "s1"
+      );
+      expect(result.status).toBe("ELIGIBLE");
+    });
+
+    it("Required = 2, Attempted = 1 -> Not Eligible", () => {
+      const studentAssessments = [
+        { assessmentId: "t1", totalMarks: 20, status: "PRESENT" }, // Attempted 1
+        { assessmentId: "t2", totalMarks: 0, status: "ABSENT" }, // Absent 1
+        // Unconducted 1
+      ];
+      const components = buildComponentInputs(
+        courseMin2,
+        templates3,
+        studentAssessments
+      );
+      const result = computeAggregation(
+        components,
+        baseCourseConfig({ theoryMinExams: 2 }),
+        "s1"
+      );
+      expect(result.status).toBe("NOT_ELIGIBLE");
+    });
+
+    it("Required = 2, Attempted = 0 -> Not Eligible", () => {
+      const studentAssessments = [
+        { assessmentId: "t1", totalMarks: 0, status: "ABSENT" },
+        { assessmentId: "t2", totalMarks: 0, status: "ABSENT" },
+      ];
+      const components = buildComponentInputs(
+        courseMin2,
+        templates3,
+        studentAssessments
+      );
+      const result = computeAggregation(
+        components,
+        baseCourseConfig({ theoryMinExams: 2 }),
+        "s1"
+      );
+      expect(result.status).toBe("NOT_ELIGIBLE");
+    });
+
+    it("Required = 2, Attempted = 3 but CIE eligibility fails -> Not Eligible", () => {
+      const studentAssessments = [
+        { assessmentId: "t1", totalMarks: 5, status: "PRESENT" },
+        { assessmentId: "t2", totalMarks: 5, status: "PRESENT" },
+        { assessmentId: "t3", totalMarks: 5, status: "PRESENT" },
+      ];
+      const components = buildComponentInputs(
+        courseMin2,
+        templates3,
+        studentAssessments
+      );
+      const result = computeAggregation(
+        components,
+        baseCourseConfig({ theoryMinExams: 2 }),
+        "s1"
+      );
+      expect(result.status).toBe("NOT_ELIGIBLE");
+    });
   });
 });
 

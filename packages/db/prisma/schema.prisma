@@ -1048,3 +1048,78 @@ model FinancePayment {
   @@index([financeId])
   @@index([paidAt])
 }
+
+// ─── ARCHIVE TABLES ───
+
+model ArchivedSemester {
+  id               String      @id @default(uuid())
+  originalId       String
+  semesterNumber   Int
+  programType      ProgramType
+  academicTermId   String
+  academicTermType String
+  academicTermYear String
+  startDate        DateTime
+  endDate          DateTime
+  snapshot         Json
+  archivedAt       DateTime    @default(now())
+  archivedBy       String
+
+  @@unique([originalId, archivedAt])
+  @@index([originalId])
+  @@index([academicTermId])
+  @@index([archivedAt])
+}
+
+model ArchivedDepartment {
+  id           String         @id @default(uuid())
+  originalId   String
+  name         String
+  code         String
+  abbreviation String
+  type         DepartmentType
+  semesterId   String
+  snapshot     Json
+  archivedAt   DateTime       @default(now())
+  archivedBy   String
+
+  @@unique([originalId, semesterId, archivedAt])
+  @@index([originalId])
+  @@index([semesterId])
+  @@index([archivedAt])
+}
+
+model ArchivedFaculty {
+  id           String      @id @default(uuid())
+  originalId   String
+  userId       String
+  departmentId String
+  designation  Designation
+  shortName    String
+  employeeId   String?
+  semesterId   String
+  snapshot     Json
+  archivedAt   DateTime    @default(now())
+  archivedBy   String
+
+  @@unique([originalId, semesterId, archivedAt])
+  @@index([originalId])
+  @@index([semesterId])
+  @@index([departmentId])
+  @@index([archivedAt])
+}
+
+model ArchivedAdmin {
+  id         String   @id @default(uuid())
+  originalId String
+  userId     String
+  semesterId String
+  snapshot   Json
+  archivedAt DateTime @default(now())
+  archivedBy String
+
+  @@unique([originalId, semesterId, archivedAt])
+  @@index([originalId])
+  @@index([semesterId])
+  @@index([archivedAt])
+}

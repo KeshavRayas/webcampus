@@ -1,6 +1,14 @@
 "use client";
 
+import { MarksReportDetailedTable } from "@/components/academics/reports/marks-detailed-table";
+import { MarksReportTable } from "@/components/academics/reports/marks-tables";
 import { useQuery } from "@tanstack/react-query";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@webcampus/ui/components/tabs";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -19,6 +27,7 @@ const EMPTY_FILTERS: MarksReportFilters = {
   semesterId: "",
   courseId: "",
   sectionId: "",
+  assessmentId: "",
 };
 
 const hasRequiredFilters = (filters: MarksReportFilters) =>
@@ -55,6 +64,8 @@ export const MarksReportView = () => {
   const [runToken, setRunToken] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
+  const [activeTab, setActiveTab] = useState<"summary" | "detailed">("summary");
+
   const { data: handlingOptions } = useFacultyHandlingFilterOptions("courses");
   const { data: filterOptions } = useQuery({
     queryKey: ["marks-report-filter-options"],
@@ -67,12 +78,16 @@ export const MarksReportView = () => {
       "marks-report",
       appliedFilters.courseId,
       appliedFilters.sectionId,
+      appliedFilters.assessmentId,
+      activeTab,
       runToken,
     ],
     queryFn: () =>
       getMarksReport(
         appliedFilters.courseId,
-        appliedFilters.sectionId || undefined
+        appliedFilters.sectionId || undefined,
+        appliedFilters.assessmentId || undefined,
+        activeTab === "detailed"
       ),
     enabled:
       hasRunReport &&
@@ -138,6 +153,13 @@ export const MarksReportView = () => {
     );
   }, [filterOptions, draftFilters.courseId]);
 
+  const assessmentOptions = useMemo(() => {
+    if (!draftFilters.courseId) return [];
+    return (filterOptions?.assessments ?? [])
+      .filter((a) => a.courseId === draftFilters.courseId)
+      .map((a) => ({ value: a.id, label: a.title }));
+  }, [filterOptions, draftFilters.courseId]);
+
   const hasRequiredDraftFilters = useMemo(
     () => hasRequiredFilters(draftFilters),
     [draftFilters]
@@ -157,15 +179,19 @@ export const MarksReportView = () => {
           updated.semesterId = "";
           updated.courseId = "";
           updated.sectionId = "";
+          updated.assessmentId = "";
         } else if (key === "programType") {
           updated.semesterId = "";
           updated.courseId = "";
           updated.sectionId = "";
+          updated.assessmentId = "";
         } else if (key === "semesterId") {
           updated.courseId = "";
           updated.sectionId = "";
+          updated.assessmentId = "";
         } else if (key === "courseId") {
           updated.sectionId = "";
+          updated.assessmentId = "";
         }
         return updated;
       });
@@ -313,6 +339,160 @@ export const MarksReportView = () => {
     downloadCSV("marks-report.csv", csvRows);
   }, [reportData, getHeaderMetadata]);
 
+  const handleDownloadDetailedPDF = useCallback(() => {
+    if (!reportData || !reportData.students.length) return;
+    const doc = new jsPDF({ orientation: "landscape" });
+    const metadata = getHeaderMetadata();
+
+    doc.setFontSize(16);
+    doc.text("Detailed Marks Report", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 22);
+
+    let yPos = 30;
+    metadata.forEach((text) => {
+      doc.text(text, 14, yPos);
+      yPos += 6;
+    });
+
+    const headers1: Record<string, unknown>[] = [
+      { content: "USN", rowSpan: 2 },
+      { content: "Student Name", rowSpan: 2 },
+    ];
+    const headers2: Record<string, unknown>[] = [];
+
+    reportData.assessments.forEach((a) => {
+      const hasQuestions = a.questions && a.questions.length > 0;
+      const colSpan = hasQuestions ? a.questions!.length + 1 : 1;
+      headers1.push({
+        content: `${a.title} (Max: ${a.totalMarks})`,
+        colSpan,
+        styles: { halign: "center" },
+      });
+
+      if (hasQuestions) {
+        a.questions!.forEach((q) => {
+          headers2.push({
+            content: `${q.part ? `${q.part}-${q.qNumber}` : `Q${q.qNumber}`}\n(${q.marks})`,
+            styles: { halign: "center" },
+          });
+        });
+      }
+      headers2.push({
+        content: `Total\n(${a.totalMarks})`,
+        styles: { halign: "center" },
+      });
+    });
+
+    headers1.push({ content: "Total CIE", rowSpan: 2 });
+    headers1.push({ content: "Status", rowSpan: 2 });
+
+    const rows = reportData.students.map((student) => {
+      const row = [student.usn, student.name];
+      reportData.assessments.forEach((a) => {
+        const score = student.assessments.find((s) => s.assessmentId === a.id);
+        if (a.questions && a.questions.length > 0) {
+          a.questions.forEach((q) => {
+            const qMark = score?.questionMarks?.[q.id];
+            row.push(qMark != null ? qMark.toString() : "-");
+          });
+        }
+        row.push(
+          score?.totalMarks != null
+            ? `${score.totalMarks}/${a.totalMarks}`
+            : "-"
+        );
+      });
+      row.push(student.cieTotal != null ? student.cieTotal.toString() : "-");
+      row.push(student.status === "ELIGIBLE" ? "Eligible" : "Not Eligible");
+      return row;
+    });
+
+    autoTable(doc, {
+      head: [headers1, headers2],
+      body: rows,
+      startY: yPos + 4,
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        fontStyle: "bold",
+      },
+    });
+
+    doc.save("marks-detailed-report.pdf");
+  }, [reportData, getHeaderMetadata]);
+
+  const handleDownloadDetailedExcel = useCallback(() => {
+    if (!reportData || !reportData.students.length) return;
+    const metadata = getHeaderMetadata();
+
+    const header1 = ["USN", "Student Name"];
+    const header2 = ["", ""];
+
+    reportData.assessments.forEach((a) => {
+      const hasQuestions = a.questions && a.questions.length > 0;
+      header1.push(`${a.title} (Max: ${a.totalMarks})`);
+      if (hasQuestions) {
+        a.questions!.forEach((q) => {
+          header1.push(""); // empty for colSpan
+          header2.push(
+            `${q.part ? `${q.part}-${q.qNumber}` : `Q${q.qNumber}`} (${q.marks})`
+          );
+        });
+      }
+      header2.push(`Total (${a.totalMarks})`);
+    });
+
+    header1.push("Total CIE");
+    header1.push("Status");
+    header2.push("");
+    header2.push("");
+
+    const rows = reportData.students.map((student) => {
+      const row = [student.usn, student.name];
+      reportData.assessments.forEach((a) => {
+        const score = student.assessments.find((s) => s.assessmentId === a.id);
+        if (a.questions && a.questions.length > 0) {
+          a.questions.forEach((q) => {
+            const qMark = score?.questionMarks?.[q.id];
+            row.push(qMark != null ? qMark.toString() : "-");
+          });
+        }
+        row.push(score?.totalMarks != null ? score.totalMarks.toString() : "-");
+      });
+      row.push(student.cieTotal != null ? student.cieTotal.toString() : "-");
+      row.push(student.status === "ELIGIBLE" ? "Eligible" : "Not Eligible");
+      return row;
+    });
+
+    const csvRows = [
+      ["Detailed Marks Report"],
+      [`Generated: ${new Date().toLocaleDateString()}`],
+      [],
+      ...metadata.map((m) => [m]),
+      [],
+      header1,
+      header2,
+      ...rows,
+    ];
+
+    downloadCSV("marks-detailed-report.csv", csvRows);
+  }, [reportData, getHeaderMetadata]);
+
+  const getEmptyMessage = () => {
+    if (!hasRequiredFilters(draftFilters)) {
+      return "Select all filters to enable Get Report.";
+    }
+    if (filtersChangedAfterRun) {
+      return "Filters changed. Press Get Report to refresh results.";
+    }
+    if (!hasRunReport) {
+      return "Press Get Report to view marks report.";
+    }
+    return "No data found for selected filters.";
+  };
+
   return (
     <MarksReportShell
       draftFilters={draftFilters}
@@ -334,6 +514,37 @@ export const MarksReportView = () => {
       onResetFilters={onResetFilters}
       onDownloadPDF={handleDownloadPDF}
       onDownloadExcel={handleDownloadExcel}
-    />
+      showAssessmentFilter={assessmentOptions.length > 0}
+      assessmentOptions={assessmentOptions}
+    >
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as "summary" | "detailed")}
+        className="w-full"
+      >
+        <TabsList className="mb-4">
+          <TabsTrigger value="summary">Summary</TabsTrigger>
+          <TabsTrigger value="detailed">Detailed Report</TabsTrigger>
+        </TabsList>
+        <TabsContent value="summary" className="mt-0">
+          <MarksReportTable
+            reportData={reportData}
+            isLoading={isLoadingReport}
+            onDownloadPDF={handleDownloadPDF}
+            onDownloadExcel={handleDownloadExcel}
+            emptyMessage={getEmptyMessage()}
+          />
+        </TabsContent>
+        <TabsContent value="detailed" className="mt-0">
+          <MarksReportDetailedTable
+            reportData={reportData}
+            isLoading={isLoadingReport}
+            onDownloadPDF={handleDownloadDetailedPDF}
+            onDownloadExcel={handleDownloadDetailedExcel}
+            emptyMessage={getEmptyMessage()}
+          />
+        </TabsContent>
+      </Tabs>
+    </MarksReportShell>
   );
 };
