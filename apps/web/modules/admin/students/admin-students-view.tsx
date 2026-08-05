@@ -5,8 +5,9 @@ import {
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
+import { useDebounce } from "@/lib/use-debounce";
 import { useDepartments } from "@/lib/use-departments";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import { AdminStudentResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
@@ -62,6 +63,29 @@ export const AdminStudentsView = () => {
   const [appliedFilters, setAppliedFilters] = useState<StudentFilters>(() =>
     getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
   );
+
+  const debouncedSearch = useDebounce(
+    {
+      usn: draftFilters.usn,
+      name: draftFilters.name,
+      email: draftFilters.email,
+    },
+    300
+  );
+
+  useEffect(() => {
+    setAppliedFilters((current) => {
+      const next = { ...current };
+      let changed = false;
+      (["usn", "name", "email"] as const).forEach((key) => {
+        if (next[key] !== debouncedSearch[key]) {
+          next[key] = debouncedSearch[key];
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [debouncedSearch.usn, debouncedSearch.name, debouncedSearch.email]);
 
   const selectedTerm = useMemo(
     () => terms.find((term) => term.id === draftFilters.academicTerm),
@@ -148,6 +172,7 @@ export const AdminStudentsView = () => {
     retry: 1,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 
   useEffect(() => {
@@ -323,13 +348,6 @@ export const AdminStudentsView = () => {
             }
 
             updateDraftFilter(key, value);
-
-            if (key === "usn" || key === "name" || key === "email") {
-              setAppliedFilters((current) => ({
-                ...current,
-                [key]: value,
-              }));
-            }
           }}
           allValue={DEFAULT_FILTER_ALL_VALUE}
         />
