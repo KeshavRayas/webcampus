@@ -598,12 +598,15 @@ model Admission {
   class10thSchoolCode             String?
   class10thSchoolState            String?
   class10thSchoolType             String?
+  schoolCountry                   String?
   class10thYearOfPassing          String?
   class12thAggregateScore         Float?
   class12thAggregateTotal         Float?
   class12thBranch                 String?
+  instituteCountry                String?
   diplomaInstituteName            String?
   diplomaInstituteType            String?
+  diplomaCountry                  String?
   diplomaInstituteCity            String?
   diplomaInstituteState           String?
   diplomaYearOfPassing            String?

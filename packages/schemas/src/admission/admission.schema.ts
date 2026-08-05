@@ -3,6 +3,12 @@ import { categoriesAllotted, categoriesClaimed, quotas } from "../constants";
 
 export const QuotaSchema = z.enum(quotas);
 
+const optionalText = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}, z.string().optional());
+
 export const CreateAdmissionShellSchema = z.object({
   primaryEmail: z.email().min(1, "Email is required"),
   password: z.string().min(8),
@@ -34,7 +40,7 @@ export const ChangeAdmissionModeSchema = z
 
     categoryAllotted: z.string().min(1, "Category Allotted is required"),
 
-    quota: QuotaSchema,
+    quota: QuotaSchema.optional(),
 
     entranceExamRank: z.coerce.number().nullable().optional(),
 
@@ -73,6 +79,14 @@ export const ChangeAdmissionModeSchema = z
         code: z.ZodIssueCode.custom,
         path: ["categoryAllotted"],
         message: "Invalid allotted category",
+      });
+    }
+
+    if (data.modeOfAdmission === "KCET" && !data.quota) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["quota"],
+        message: "Quota is required for KCET admissions",
       });
     }
   });
@@ -131,6 +145,9 @@ export const SubmitApplicationSchema = z
     categoryAllotted: z.string().min(1, "Category Allotted is required"),
 
     quota: QuotaSchema.optional(),
+    schoolCountry: optionalText,
+    instituteCountry: optionalText,
+    diplomaCountry: optionalText,
   })
   .superRefine((data, ctx) => {
     const claimed =
