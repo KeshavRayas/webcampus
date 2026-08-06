@@ -67,8 +67,8 @@ const EMPTY_FILTERS: CancelAdmissionFilters = {
   admissionType: "",
   createdFrom: "",
   createdTo: "",
-  cancellationStatus: "ALL",
-  cancellationReason: "ALL",
+  cancellationStatus: "",
+  cancellationReason: "",
 };
 
 export function CancelAdmissionView() {
@@ -243,7 +243,10 @@ export function CancelAdmissionView() {
       );
     }
 
-    if (appliedFilters.cancellationReason !== "ALL") {
+    if (
+      appliedFilters.cancellationReason &&
+      appliedFilters.cancellationReason !== "ALL"
+    ) {
       admissions = admissions.filter((admission) => {
         const reason = admission.archive?.reason;
         if (!reason) return false;
