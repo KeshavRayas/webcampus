@@ -1,16 +1,57 @@
 "use client";
 
 import { apiClient } from "@/lib/api-client";
+import {
+  createFilterQueryString,
+  getFiltersFromSearchParams,
+} from "@/lib/filter-search-params";
+import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
+import { useAdmissionDepartments } from "@/lib/use-departments";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
+import { admissionModes, admissionTypes } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
+import {
+  FilterActions,
+  FilterBuilder,
+  type FilterFieldConfig,
+} from "@webcampus/ui/components/filter-builder";
 import { Loader2 } from "lucide-react";
-import React, { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import React, { useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { AdmissionResponse } from "../admin/admin-admission-columns";
 import { useAdmissionPayment } from "./use-admission-payment";
+
+const PAYMENT_STATUS_VALUES = ["PAID", "UNPAID"] as const;
+
+type PaymentStatus = (typeof PAYMENT_STATUS_VALUES)[number];
+
+type FeePaymentFilters = {
+  academicTerm: string;
+  semester: string;
+  applicationId: string;
+  mode: string;
+  admissionType: string;
+  createdFrom: string;
+  createdTo: string;
+  paymentStatus: PaymentStatus | "";
+};
+
+const EMPTY_FILTERS: FeePaymentFilters = {
+  academicTerm: "",
+  semester: "",
+  applicationId: "",
+  mode: "",
+  admissionType: "",
+  createdFrom: "",
+  createdTo: "",
+  paymentStatus: "",
+};
 
 const getStatusVariant = (status: AdmissionResponse["status"]) => {
   switch (status) {
@@ -26,14 +67,134 @@ const getStatusVariant = (status: AdmissionResponse["status"]) => {
 };
 
 export const FeePaymentView = () => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialFilters = getFiltersFromSearchParams(
+    searchParams,
+    EMPTY_FILTERS
+  );
+  const [draftFilters, setDraftFilters] =
+    useState<FeePaymentFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] =
+    useState<FeePaymentFilters>(initialFilters);
   const [payingId, setPayingId] = useState<string | null>(null);
   const { initiatePayment, isProcessing } = useAdmissionPayment();
 
-  const { data: admissions, isLoading } = useQuery({
-    queryKey: ["admissions", "fee-payment"],
+  const { data: termsData } = useAcademicTerms();
+  const terms = termsData ?? [];
+  const { data: departments } = useAdmissionDepartments();
+  const selectedTerm = terms.find(
+    (term) => term.id === draftFilters.academicTerm
+  );
+  const nestedSemesters = selectedTerm?.Semester || [];
+
+  useCascadingFilterSync(draftFilters, setDraftFilters, {
+    academicTerms: terms,
+    semesters: nestedSemesters,
+    departments,
+  });
+
+  const updateDraftFilter = <K extends keyof FeePaymentFilters>(
+    key: K,
+    value: FeePaymentFilters[K]
+  ) => {
+    setDraftFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const filterFields: FilterFieldConfig<FeePaymentFilters>[] = [
+    {
+      key: "academicTerm",
+      label: "Academic Term",
+      type: "select",
+      placeholder: "All terms",
+      allOptionLabel: "All terms",
+      options: terms.map((term) => ({
+        label: `${term.type} ${term.year}`,
+        value: term.id,
+      })),
+    },
+    {
+      key: "semester",
+      label: "Semester",
+      type: "select",
+      placeholder: draftFilters.academicTerm
+        ? "All semesters"
+        : "Select term first",
+      allOptionLabel: "All semesters",
+      options: nestedSemesters.map((semester) => ({
+        label: `${semester.programType} - Semester ${semester.semesterNumber}`,
+        value: semester.id,
+      })),
+    },
+    {
+      key: "applicationId",
+      label: "Application ID",
+      type: "text",
+      placeholder: "Search application ID",
+      inputId: "fee-payment-application-id",
+    },
+    {
+      key: "mode",
+      label: "Mode",
+      type: "select",
+      placeholder: "All modes",
+      allOptionLabel: "All modes",
+      options: admissionModes.map((mode) => ({ label: mode, value: mode })),
+    },
+    {
+      key: "admissionType",
+      label: "Admission Type",
+      type: "select",
+      placeholder: "All admission types",
+      allOptionLabel: "All admission types",
+      options: admissionTypes.map((type) => ({
+        label: type.label,
+        value: type.value,
+      })),
+    },
+    {
+      key: "createdFrom",
+      label: "Created From",
+      type: "date",
+      inputId: "fee-payment-created-from",
+      className: "xl:col-start-1",
+    },
+    {
+      key: "createdTo",
+      label: "Created To",
+      type: "date",
+      inputId: "fee-payment-created-to",
+      className: "xl:col-start-2",
+    },
+    {
+      key: "paymentStatus",
+      label: "Payment Status",
+      type: "select",
+      placeholder: "All payment statuses",
+      allOptionLabel: "All payment statuses",
+      options: PAYMENT_STATUS_VALUES.map((status) => ({
+        label: status === "PAID" ? "Paid" : "Unpaid",
+        value: status,
+      })),
+    },
+  ];
+
+  const queryFilters = {
+    academicTerm: appliedFilters.academicTerm,
+    semester: appliedFilters.semester,
+    applicationId: appliedFilters.applicationId,
+    mode: appliedFilters.mode,
+    admissionType: appliedFilters.admissionType,
+    createdFrom: appliedFilters.createdFrom,
+    createdTo: appliedFilters.createdTo,
+  };
+  const query = createFilterQueryString(queryFilters);
+  const { data, isFetching, isLoading } = useQuery({
+    queryKey: ["admissions", "fee-payment", appliedFilters],
     queryFn: async () => {
       const res = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
-        "/admission",
+        `/admission${query ? `?${query}` : ""}`,
         { withCredentials: true }
       );
       if (res.data.status === "success" && Array.isArray(res.data.data)) {
@@ -42,6 +203,22 @@ export const FeePaymentView = () => {
       return [] as AdmissionResponse[];
     },
   });
+
+  const filteredAdmissions = useMemo(() => {
+    let admissions = data ?? [];
+
+    if (appliedFilters.paymentStatus === "PAID") {
+      admissions = admissions.filter(
+        (admission) => admission.status === "APPROVED"
+      );
+    } else if (appliedFilters.paymentStatus === "UNPAID") {
+      admissions = admissions.filter(
+        (admission) => admission.status !== "APPROVED"
+      );
+    }
+
+    return admissions;
+  }, [appliedFilters.paymentStatus, data]);
 
   const handlePay = async (id: string) => {
     setPayingId(id);
@@ -52,6 +229,29 @@ export const FeePaymentView = () => {
     } finally {
       setPayingId(null);
     }
+  };
+
+  const applyFilters = () => {
+    if (
+      draftFilters.createdFrom &&
+      draftFilters.createdTo &&
+      new Date(draftFilters.createdFrom) > new Date(draftFilters.createdTo)
+    ) {
+      toast.error("Created from date must be before created to date.");
+      return;
+    }
+
+    setAppliedFilters(draftFilters);
+    const filterQuery = createFilterQueryString(draftFilters);
+    router.replace(`${pathname}${filterQuery ? `?${filterQuery}` : ""}`, {
+      scroll: false,
+    });
+  };
+
+  const resetFilters = () => {
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+    router.replace(pathname, { scroll: false });
   };
 
   const columns: ColumnDef<AdmissionResponse>[] = [
@@ -138,6 +338,15 @@ export const FeePaymentView = () => {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading admissions...
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card text-card-foreground space-y-4 rounded-lg border p-6 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -148,16 +357,22 @@ export const FeePaymentView = () => {
             are pending payment and can be marked as paid.
           </p>
         </div>
+        {isFetching && (
+          <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+        )}
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center gap-2 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading admissions...
-        </div>
-      ) : (
-        <DataTable columns={columns} data={admissions || []} />
-      )}
+      <FilterBuilder
+        fields={filterFields}
+        draftFilters={draftFilters}
+        onDraftChange={updateDraftFilter}
+        className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-6"
+      />
+      <div className="flex justify-end">
+        <FilterActions onApply={applyFilters} onReset={resetFilters} />
+      </div>
+
+      <DataTable columns={columns} data={filteredAdmissions} />
     </div>
   );
 };

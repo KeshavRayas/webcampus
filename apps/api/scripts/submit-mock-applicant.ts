@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { faker } from "@faker-js/faker";
+import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { AdmissionService } from "@webcampus/api/src/services/admission/admission.service";
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
@@ -15,30 +16,28 @@ const PDF_URL =
 interface ParsedArgs {
   count: number;
   departmentCode: string;
-  asInstructor: boolean;
+  port: boolean;
 }
 
 const parseCliArguments = (): ParsedArgs => {
   const args = process.argv.slice(2);
-  const result: Partial<ParsedArgs> = {
-    asInstructor: false,
-  };
+  const result: Partial<ParsedArgs> = { port: false };
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--count") {
       const countValue = args[i + 1];
       if (typeof countValue !== "string") {
         throw new Error(
-          "Missing value for --count. Usage: npm run submit-mock-applicant --count <number> --dept <code> [--instructor]"
+          "Missing value for --count. Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]"
         );
       }
 
       const parsed = Number.parseInt(countValue, 10);
-      if (Number.isFinite(parsed) && parsed > 0) {
+      if (Number.isFinite(parsed) && parsed >= 0) {
         result.count = parsed;
       } else {
         throw new Error(
-          `Invalid --count value: "${countValue}". Must be a positive integer.`
+          `Invalid --count value: "${countValue}". Must be a non-negative integer.`
         );
       }
       i++;
@@ -46,32 +45,44 @@ const parseCliArguments = (): ParsedArgs => {
       const departmentValue = args[i + 1];
       if (typeof departmentValue !== "string") {
         throw new Error(
-          "Missing value for --dept. Usage: npm run submit-mock-applicant --count <number> --dept <code> [--instructor]"
+          "Missing value for --dept. Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]"
         );
       }
 
       result.departmentCode = departmentValue;
       i++;
-    } else if (args[i] === "--instructor") {
-      result.asInstructor = true;
+    } else if (args[i] === "--port" || args[i]?.startsWith("--port=")) {
+      const portFlag = args[i]!;
+      const inlineValue = portFlag.split("=")[1];
+      if (inlineValue !== undefined) {
+        result.port = /^(on|1|true|yes)$/i.test(inlineValue);
+      } else {
+        const next = args[i + 1];
+        if (next && /^(on|off|1|0|true|false|yes|no)$/i.test(next)) {
+          result.port = /^(on|1|true|yes)$/i.test(next);
+          i++;
+        } else {
+          result.port = true;
+        }
+      }
     }
   }
 
-  if (!result.count) {
+  if (result.count === undefined) {
     throw new Error(
       "Missing required parameter --count.\n" +
-        "Usage: npm run submit-mock-applicant --count <number> --dept <code> [--instructor]\n" +
+        "Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]\n" +
         "Example: npm run submit-mock-applicant --count 500 --dept CS\n" +
-        "Example: npm run submit-mock-applicant --count 100 --dept CS --instructor"
+        "Example: npm run submit-mock-applicant --count 100 --dept CS --port"
     );
   }
 
   if (!result.departmentCode) {
     throw new Error(
       "Missing required parameter --dept.\n" +
-        "Usage: npm run submit-mock-applicant --count <number> --dept <code> [--instructor]\n" +
+        "Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]\n" +
         "Example: npm run submit-mock-applicant --count 500 --dept CS\n" +
-        "Example: npm run submit-mock-applicant --count 100 --dept CS --instructor"
+        "Example: npm run submit-mock-applicant --count 100 --dept CS --port"
     );
   }
 
@@ -115,63 +126,62 @@ const cleanupPartialApplicant = async (
   }
 };
 
-// const getNextApplicationNumber = async (): Promise<number> => {
-//   const rows = await db.admission.findMany({
-//     select: { applicationId: true },
-//     where: {
-//       applicationId: {
-//         startsWith: "APP",
-//       },
-//     },
-//     orderBy: {
-//       createdAt: "desc",
-//     },
-//     take: 500,
-//   });
+const ADMISSION_INSTRUCTOR = {
+  name: "admission-instructor",
+  email: "admission-instructor@webcampus.com",
+  username: "admission-instructor",
+  password: "password",
+} as const;
 
-//   let maxNumber = 2026000;
-//   for (const row of rows) {
-//     const parsed = extractNumericId(row.applicationId);
-//     if (parsed && parsed > maxNumber) {
-//       maxNumber = parsed;
-//     }
-//   }
-
-//   return maxNumber + 1;
-// };
-
-const resolveContext = async (
-  departmentCode: string,
-  asInstructor: boolean
-) => {
-  const { ADMIN_USER_EMAIL, ADMIN_USER_PASSWORD } = backendEnv();
-
-  const actorEmail = asInstructor
-    ? "admission-instructor@webcampus.com"
-    : ADMIN_USER_EMAIL;
-  const actorPassword = asInstructor ? "password" : ADMIN_USER_PASSWORD;
-
-  const signInResponse = await auth.api.signInEmail({
-    body: {
-      email: actorEmail,
-      password: actorPassword,
-    },
-  });
-
-  if (!signInResponse.token) {
-    throw new Error(
-      `${asInstructor ? "Instructor" : "Admin"} sign-in failed: token missing`
-    );
-  }
-
-  const actor = await db.user.findUnique({
-    where: { email: actorEmail },
+const ensureInstructorUser = async (adminHeaders: {
+  Authorization: string;
+}): Promise<string> => {
+  const existing = await db.user.findUnique({
+    where: { email: ADMISSION_INSTRUCTOR.email },
     select: { id: true },
   });
 
-  if (!actor) {
-    throw new Error("Actor user was not found after sign-in");
+  if (existing) {
+    return existing.id;
   }
+
+  const userService = new UserService({
+    request: {
+      ...ADMISSION_INSTRUCTOR,
+      role: "admission-instructor",
+    },
+    headers: adminHeaders,
+  });
+
+  const response = await userService.create();
+  if (response.status === "error" || !response.data?.id) {
+    throw new Error(
+      response.message || "Failed to create admission-instructor user"
+    );
+  }
+
+  logger.info("Admission instructor user created by mock script", {
+    id: response.data.id,
+  });
+  return response.data.id;
+};
+
+const resolveContext = async (departmentCode: string) => {
+  const { ADMIN_USER_EMAIL, ADMIN_USER_PASSWORD } = backendEnv();
+
+  const adminSignIn = await auth.api.signInEmail({
+    body: {
+      email: ADMIN_USER_EMAIL,
+      password: ADMIN_USER_PASSWORD,
+    },
+  });
+
+  if (!adminSignIn.token) {
+    throw new Error("Admin sign-in failed: token missing");
+  }
+
+  const adminHeaders = { Authorization: `Bearer ${adminSignIn.token}` };
+  const filledById = await ensureInstructorUser(adminHeaders);
 
   const department = await db.department.findFirst({
     where: { code: departmentCode },
@@ -221,8 +231,8 @@ const resolveContext = async (
   }
 
   return {
-    headers: { Authorization: `Bearer ${signInResponse.token}` },
-    filledById: actor.id,
+    headers: adminHeaders,
+    filledById,
     departmentId: department.id,
     semesterId: semester.id,
   };
@@ -239,31 +249,17 @@ const submitAndApprove = async (
 ): Promise<void> => {
   const data: Record<string, string> = {
     nameAsPer10th: fullName,
+    modeOfAdmission: "KCET",
+    categoryClaimed: "GM",
+    categoryAllotted: "GM",
+    quota: "CET-AIDED",
     primaryEmail: email,
     semesterId,
     departmentId,
+    admissionType: "REGULAR",
+    scholarship: "false",
     primaryPhoneNumber: randomPhone(serial),
     aadharNumber: deterministicAadhar(serial),
-    admissionType: "REGULAR",
-    modeOfAdmission: "KCET",
-    categoryClaimed: "GENERAL",
-    categoryAllotted: "GENERAL",
-    quota: "MERIT",
-    scholarship: "false",
-    admissionBasedOn: "CLASS_12_PUC",
-    hasClass12: "true",
-    hasDiploma: "false",
-    class10thRollRegNumber: `10TH-${serial}`,
-    class12thRollRegNumber: `PUC-${serial}`,
-    physicsMarks: "78",
-    physicsMaxMarks: "100",
-    physicsMinMarks: "35",
-    chemistryMarks: "82",
-    chemistryMaxMarks: "100",
-    chemistryMinMarks: "35",
-    mathematicsMarks: "91",
-    mathematicsMaxMarks: "100",
-    mathematicsMinMarks: "35",
     dob: faker.date
       .birthdate({ min: 17, max: 21, mode: "age" })
       .toISOString()
@@ -315,12 +311,9 @@ async function main() {
     process.exit(1);
   }
 
-  const context = await resolveContext(args.departmentCode, args.asInstructor);
-  // let nextApplicationNumber = await getNextApplicationNumber();
+  const context = await resolveContext(args.departmentCode);
   let approvedCreated = 0;
-  let nextSerial = 1;
-  let attempts = 0;
-  const maxAttempts = Math.max(args.count * 10, 100);
+  const failedApplicants: { email: string; error: string }[] = [];
 
   logger.info("Starting bulk applicant generation", {
     targetCount: args.count,
@@ -328,24 +321,15 @@ async function main() {
     department: args.departmentCode,
     term: "odd 2026",
     semester: "UG 1",
-    quota: "MERIT",
-    category: "GENERAL",
-    porting: false,
-    attributedTo: args.asInstructor ? "admission-instructor" : "admin",
+    quota: "CET-AIDED",
+    category: "GM",
+    porting: args.port,
   });
 
-  while (approvedCreated < args.count) {
-    attempts += 1;
-    if (attempts > maxAttempts) {
-      throw new Error(
-        `Stopped after ${maxAttempts} attempts with ${approvedCreated}/${args.count} applicants created`
-      );
-    }
-
-    const serial = nextSerial++;
-    const email = `mock${serial}.${args.departmentCode.toLowerCase()}26@bmsce.ac.in`;
+  for (let attempt = 1; attempt <= args.count; attempt++) {
+    const deptCode = args.departmentCode.toLowerCase();
+    const email = `mock${attempt}.${deptCode}26@bmsce.ac.in`;
     const password = "password";
-    // nextApplicationNumber += 1;
 
     const existing = await db.admission.findUnique({
       where: {
@@ -357,7 +341,7 @@ async function main() {
     });
 
     if (existing) {
-      logger.info("Skipping existing mock applicant", { email });
+      logger.info("Skipping existing applicant", { email });
       continue;
     }
 
@@ -367,8 +351,7 @@ async function main() {
     });
 
     try {
-      // Generate the name BEFORE creating the shell
-      const name = `${faker.person.firstName()} ${faker.person.lastName()}`;
+      const fullName = `${faker.person.firstName()} ${faker.person.lastName()}`;
 
       const shellResponse = await AdmissionService.createShell(
         {
@@ -386,45 +369,78 @@ async function main() {
         );
       }
 
-      // createShell returns the applicant user, not the Admission record.
-      // Always resolve the admission ID from the database before approving.
-      const admissionId = (
-        await db.admission.findUnique({
-          where: { primaryEmail: email },
-          select: { id: true },
-        })
-      )?.id;
+      const admission = await db.admission.findFirst({
+        where: {
+          primaryEmail: email,
+          semesterId: context.semesterId,
+        },
+        select: { id: true },
+      });
 
-      if (!admissionId) {
+      if (!admission?.id) {
         throw new Error(`Admission id not found for ${email}`);
       }
 
+      logger.info("Resolved admission", {
+        email,
+        admissionId: admission.id,
+      });
+
       await submitAndApprove(
         email,
-        serial,
-        admissionId,
-        name,
+        attempt,
+        admission.id,
+        fullName,
         context.filledById,
         context.departmentId,
         context.semesterId
       );
       approvedCreated += 1;
 
-      if (approvedCreated % 50 === 0 || approvedCreated === args.count) {
+      if (approvedCreated % 50 === 0 || attempt === args.count) {
         logger.info("Bulk progress", {
           approvedCreated,
+          attempt,
           targetCount: args.count,
           latestEmail: email,
         });
       }
     } catch (error) {
-      logger.warn("Skipping failed applicant and continuing", {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.error("Applicant processing failed", {
         email,
-        serial,
-        attempt: attempts,
+        error: errorMsg,
+      });
+      failedApplicants.push({ email, error: errorMsg });
+      await cleanupPartialApplicant(email, !existingApplicantUser);
+    }
+  }
+
+  if (failedApplicants.length > 0) {
+    logger.error("Applicant failures summary", {
+      failedCount: failedApplicants.length,
+      failures: failedApplicants.slice(0, 10),
+    });
+  }
+
+  if (args.port) {
+    logger.warn(
+      "Porting is semester-wide: all APPROVED admissions in this semester will be ported to students, not only the mock applicants created by this script."
+    );
+
+    try {
+      const portResponse = await AdmissionService.portStudents(
+        { semesterId: context.semesterId },
+        context.headers
+      );
+
+      logger.info("Port result", {
+        data: (portResponse as { data?: unknown }).data,
+      });
+    } catch (error) {
+      logger.error("Failed to port applicants to students", {
         error: error instanceof Error ? error.message : String(error),
       });
-      await cleanupPartialApplicant(email, !existingApplicantUser);
     }
   }
 
@@ -432,8 +448,13 @@ async function main() {
     approvedCreated,
     targetCount: args.count,
     status: "APPROVED",
-    portingTriggered: false,
+    porting: args.port,
+    failedCount: failedApplicants.length,
   });
+
+  if (failedApplicants.length > 0) {
+    process.exitCode = 1;
+  }
 }
 
 main()
