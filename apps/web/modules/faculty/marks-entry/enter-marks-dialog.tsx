@@ -282,6 +282,11 @@ export function EnterMarksDialog({
     }));
   };
 
+  const isStudentDisabled = (studentId: string): boolean => {
+    const status = studentStatuses[studentId];
+    return !!status && DISABLED_STATUSES.includes(status);
+  };
+
   const validationErrors = useMemo(() => {
     const errors: {
       [studentId: string]: { [questionId: string]: boolean } | boolean;
@@ -317,11 +322,6 @@ export function EnterMarksDialog({
 
     return { errors, hasError };
   }, [assessmentData, studentMarks, studentTotals, studentStatuses]);
-
-  const isStudentDisabled = (studentId: string): boolean => {
-    const status = studentStatuses[studentId];
-    return !!status && DISABLED_STATUSES.includes(status);
-  };
 
   const handleSave = (): void => {
     if (!assessmentData) return;
