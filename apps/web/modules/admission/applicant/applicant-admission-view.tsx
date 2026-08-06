@@ -1,6 +1,7 @@
 "use client";
 
 import { useAdmissionDepartments } from "@/lib/use-departments";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import {
@@ -44,6 +45,7 @@ type ApplicantAdmissionData = {
   categoryAllotted?: string;
   quota?: string;
   primaryEmail: string;
+  filledBy?: { name: string; email: string; role?: string | null } | null;
   admissionType?: string | null;
   scholarship?: boolean | null;
   sspId?: string | null;
@@ -74,6 +76,13 @@ type ApplicantAdmissionData = {
 
 type StepKey = "admission" | "personal" | "education" | "parent" | "review";
 
+const EMPTY_ADMISSION: ApplicantAdmissionData = {
+  applicationId: "",
+  modeOfAdmission: "KCET",
+  status: "PENDING",
+  primaryEmail: "",
+};
+
 const STEP_ORDER: StepKey[] = [
   "admission",
   "personal",
@@ -97,7 +106,11 @@ const VISIBLE_STEPS: StepKey[] = [
   "parent",
 ];
 
-export const ApplicantAdmissionView = () => {
+export const ApplicantAdmissionView = ({
+  staffMode = false,
+}: {
+  staffMode?: boolean;
+}) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSameAddress, setIsSameAddress] = useState(false);
@@ -189,7 +202,22 @@ export const ApplicantAdmissionView = () => {
     useState<keyof typeof categoriesClaimed>("KCET");
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedQuota, setSelectedQuota] = useState("");
+  const [staffPrimaryEmail, setStaffPrimaryEmail] = useState("");
+  const [staffSemesterId, setStaffSemesterId] = useState("");
   const { data: departments } = useAdmissionDepartments();
+  const { data: academicTermsData } = useAcademicTerms(undefined, {
+    enabled: staffMode,
+  });
+  const academicTerms = academicTermsData ?? [];
+  const staffSemesterOptions = academicTerms.flatMap((term) =>
+    (term.Semester ?? []).map((semester) => ({
+      ...semester,
+      termLabel: `${term.type} ${term.year}`,
+    }))
+  );
+  const selectedStaffSemester = staffSemesterOptions.find(
+    (semester) => semester.id === staffSemesterId
+  );
 
   const updatePcmMark = (field: keyof typeof pcmMarks, value: string) => {
     setPcmMarks((current) => ({ ...current, [field]: value }));
@@ -228,7 +256,7 @@ export const ApplicantAdmissionView = () => {
 
   // Fetch the applicant's existing shell
   const {
-    data: admission,
+    data: fetchedAdmission,
     isLoading,
     error,
     refetch,
@@ -242,8 +270,10 @@ export const ApplicantAdmissionView = () => {
       if (res.data.status === "success") return res.data.data;
       return null;
     },
+    enabled: !staffMode,
     retry: false,
   });
+  const admission = fetchedAdmission ?? EMPTY_ADMISSION;
   console.log("Admission:", admission);
   console.log("Primary Email:", admission?.primaryEmail);
 
@@ -279,19 +309,18 @@ export const ApplicantAdmissionView = () => {
       console.log(key, value);
     }
     try {
-      await axios.put(
-        `${NEXT_PUBLIC_API_BASE_URL}/admission/submit`,
-        formData,
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      await axios({
+        method: staffMode ? "post" : "put",
+        url: `${NEXT_PUBLIC_API_BASE_URL}/admission/${staffMode ? "admission-submit" : "submit"}`,
+        data: formData,
+        withCredentials: true,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       toast.success("Application submitted successfully!");
-      refetch();
+      if (!staffMode) refetch();
     } catch (error: unknown) {
       if (isAxiosError(error)) {
         toast.error(
@@ -784,10 +813,13 @@ export const ApplicantAdmissionView = () => {
     if (domicileStateOption) setDomicileState(domicileStateOption.isoCode);
   }, [admission, birthStates]);
 
+  const semesterNumber = staffMode
+    ? selectedStaffSemester?.semesterNumber
+    : admission?.semester?.semesterNumber;
   const validAdmissionTypes =
-    admission?.semester?.semesterNumber === 1
+    semesterNumber === 1
       ? admissionTypes.filter((type) => type.value === "REGULAR")
-      : admission?.semester?.semesterNumber === 3
+      : semesterNumber === 3
         ? admissionTypes.filter((type) => type.value !== "REGULAR")
         : [];
 
@@ -817,10 +849,10 @@ export const ApplicantAdmissionView = () => {
     );
   }
 
-  if (!admission) {
+  if (!staffMode && !fetchedAdmission) {
     return <div className="p-6 text-center">No admission profile found.</div>;
   }
-  if (admission.status !== "PENDING") {
+  if (!staffMode && admission.status !== "PENDING") {
     return (
       <div className="bg-secondary/20 flex flex-col items-center justify-center rounded-lg border p-12 text-center">
         <h2 className="text-2xl font-bold tracking-tight">
@@ -1009,20 +1041,46 @@ export const ApplicantAdmissionView = () => {
               </Select>
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="semesterDisplay">Semester</Label>
-              <Input
-                id="semesterDisplay"
-                value={
-                  admission.semester
-                    ? `${admission.semester.programType} Semester ${admission.semester.semesterNumber}`
-                    : ""
-                }
-                readOnly
-              />
+              <Label htmlFor="semesterDisplay">Semester *</Label>
+              {staffMode ? (
+                <Select
+                  value={staffSemesterId}
+                  onValueChange={(value) => {
+                    setStaffSemesterId(value);
+                    setSelectedAdmissionType("");
+                  }}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select semester" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {staffSemesterOptions.map((semester) => (
+                      <SelectItem key={semester.id} value={semester.id}>
+                        {semester.termLabel} - {semester.programType} Semester{" "}
+                        {semester.semesterNumber}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="semesterDisplay"
+                  value={
+                    admission.semester
+                      ? `${admission.semester.programType} Semester ${admission.semester.semesterNumber}`
+                      : ""
+                  }
+                  readOnly
+                />
+              )}
               <input
                 type="hidden"
                 name="semesterId"
-                value={admission.semester?.id ?? ""}
+                value={
+                  staffMode ? staffSemesterId : (admission.semester?.id ?? "")
+                }
+                required
               />
             </div>
             <div className="space-y-2 md:col-span-4">
@@ -1030,9 +1088,11 @@ export const ApplicantAdmissionView = () => {
               <Input
                 id="termDisplay"
                 value={
-                  admission.semester?.academicTerm
-                    ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`
-                    : ""
+                  staffMode
+                    ? (selectedStaffSemester?.termLabel ?? "")
+                    : admission.semester?.academicTerm
+                      ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`
+                      : ""
                 }
                 readOnly
               />
@@ -1343,15 +1403,28 @@ export const ApplicantAdmissionView = () => {
             </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-1">
               <Label htmlFor="primaryEmail">Primary Email Address *</Label>
-              <div className="border-input bg-background text-muted-foreground flex h-9 w-full items-center rounded-md border px-3 py-1 text-sm">
-                {admission.primaryEmail}
-              </div>
-
-              <input
-                type="hidden"
-                name="primaryEmail"
-                value={admission.primaryEmail ?? ""}
-              />
+              {staffMode ? (
+                <Input
+                  id="primaryEmail"
+                  name="primaryEmail"
+                  type="email"
+                  value={staffPrimaryEmail}
+                  onChange={(event) => setStaffPrimaryEmail(event.target.value)}
+                  required
+                  placeholder="student@example.com"
+                />
+              ) : (
+                <>
+                  <div className="border-input bg-background text-muted-foreground flex h-9 w-full items-center rounded-md border px-3 py-1 text-sm">
+                    {admission.primaryEmail}
+                  </div>
+                  <input
+                    type="hidden"
+                    name="primaryEmail"
+                    value={admission.primaryEmail ?? ""}
+                  />
+                </>
+              )}
             </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-1">
               <Label htmlFor="secondaryEmail">Secondary Email Address *</Label>

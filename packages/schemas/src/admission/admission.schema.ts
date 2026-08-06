@@ -27,6 +27,7 @@ export const AdmissionStatusSchema = z.enum([
   "APPROVED",
   "REJECTED",
   "EXITED",
+  "CANCELLED",
 ]);
 
 export const AdmissionTypeSchema = z.enum(
@@ -137,6 +138,27 @@ export const GetAdmissionsQuerySchema = z
   );
 
 export const ExitAdmissionSchema = z.object({});
+
+export const AdmissionCancellationReasonSchema = z.enum([
+  "LEAVE_COLLEGE",
+  "CHANGE_ADMISSION_MODE",
+  "OTHER",
+]);
+
+export const CancelAdmissionSchema = z
+  .object({
+    reason: AdmissionCancellationReasonSchema,
+    otherReason: z.string().trim().max(500).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.reason === "OTHER" && !data.otherReason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["otherReason"],
+        message: "A reason is required when Other is selected",
+      });
+    }
+  });
 
 export const SubmitApplicationSchema = z
   .object({
@@ -253,3 +275,5 @@ export type PortStudentsType = z.infer<typeof PortStudentsSchema>;
 export type ChangeAdmissionModeType = z.infer<typeof ChangeAdmissionModeSchema>;
 
 export type ExitAdmissionType = z.infer<typeof ExitAdmissionSchema>;
+
+export type CancelAdmissionType = z.infer<typeof CancelAdmissionSchema>;

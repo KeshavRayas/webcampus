@@ -15,12 +15,15 @@ import {
 import axios, { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
-export const useAcademicTerms = (filters?: {
-  status?: SemesterLifecycleStatusType;
-  type?: "even" | "odd";
-  year?: string;
-  isCurrent?: boolean;
-}) => {
+export const useAcademicTerms = (
+  filters?: {
+    status?: SemesterLifecycleStatusType;
+    type?: "even" | "odd";
+    year?: string;
+    isCurrent?: boolean;
+  },
+  options?: { enabled?: boolean }
+) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
   return useQuery({
@@ -47,6 +50,7 @@ export const useAcademicTerms = (filters?: {
       }
       return [];
     },
+    enabled: options?.enabled ?? true,
     staleTime: 0,
     refetchOnWindowFocus: true,
   });

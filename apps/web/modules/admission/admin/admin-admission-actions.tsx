@@ -295,6 +295,10 @@ export const AdminAdmissionActions = ({
                           label="Branch"
                           value={admission.department?.name}
                         />
+                        <DataField
+                          label="Filled By"
+                          value={`${admission.filledBy.name} (${admission.filledBy.role ?? admission.filledBy.email})`}
+                        />
                         <DataField label="Quota" value={admission.quota} />
                         <DataField
                           label="Entrance Exam Rank"

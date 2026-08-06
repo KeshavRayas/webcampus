@@ -81,6 +81,33 @@ const deterministicAadhar = (serial: number): string => {
   return `9${tail}`;
 };
 
+const cleanupPartialApplicant = async (
+  email: string,
+  removeApplicantUser: boolean
+): Promise<void> => {
+  try {
+    await db.admission.deleteMany({
+      where: { primaryEmail: email },
+    });
+
+    if (removeApplicantUser) {
+      const applicant = await db.user.findFirst({
+        where: { email, role: "applicant" },
+        select: { id: true },
+      });
+
+      if (applicant) {
+        await db.user.delete({ where: { id: applicant.id } });
+      }
+    }
+  } catch (cleanupError) {
+    logger.error("Failed to clean up partial mock applicant", {
+      email,
+      cleanupError,
+    });
+  }
+};
+
 // const getNextApplicationNumber = async (): Promise<number> => {
 //   const rows = await db.admission.findMany({
 //     select: { applicationId: true },
@@ -118,6 +145,15 @@ const resolveContext = async (departmentCode: string) => {
 
   if (!signInResponse.token) {
     throw new Error("Admin sign-in failed: token missing");
+  }
+
+  const actor = await db.user.findUnique({
+    where: { email: ADMIN_USER_EMAIL },
+    select: { id: true },
+  });
+
+  if (!actor) {
+    throw new Error("Admin user was not found after sign-in");
   }
 
   const department = await db.department.findFirst({
@@ -169,6 +205,7 @@ const resolveContext = async (departmentCode: string) => {
 
   return {
     headers: { Authorization: `Bearer ${signInResponse.token}` },
+    filledById: actor.id,
     departmentId: department.id,
     semesterId: semester.id,
   };
@@ -180,6 +217,7 @@ const submitAndApprove = async (
   admissionId: string,
   firstName: string,
   lastName: string,
+  filledById: string,
   departmentId: string,
   semesterId: string
 ): Promise<void> => {
@@ -235,7 +273,8 @@ const submitAndApprove = async (
   const submitResponse = await AdmissionService.submitApplication(
     email,
     data,
-    fileUrls
+    fileUrls,
+    filledById
   );
 
   if (submitResponse.status !== "success") {
@@ -267,6 +306,9 @@ async function main() {
   const context = await resolveContext(args.departmentCode);
   // let nextApplicationNumber = await getNextApplicationNumber();
   let approvedCreated = 0;
+  let nextSerial = 1;
+  let attempts = 0;
+  const maxAttempts = Math.max(args.count * 10, 100);
 
   logger.info("Starting bulk applicant generation", {
     targetCount: args.count,
@@ -280,7 +322,15 @@ async function main() {
   });
 
   while (approvedCreated < args.count) {
-    const email = `mock${approvedCreated + 1}.${args.departmentCode.toLowerCase()}26@bmsce.ac.in`;
+    attempts += 1;
+    if (attempts > maxAttempts) {
+      throw new Error(
+        `Stopped after ${maxAttempts} attempts with ${approvedCreated}/${args.count} applicants created`
+      );
+    }
+
+    const serial = nextSerial++;
+    const email = `mock${serial}.${args.departmentCode.toLowerCase()}26@bmsce.ac.in`;
     const password = "password";
     // nextApplicationNumber += 1;
 
@@ -294,8 +344,14 @@ async function main() {
     });
 
     if (existing) {
+      logger.info("Skipping existing mock applicant", { email });
       continue;
     }
+
+    const existingApplicantUser = await db.user.findFirst({
+      where: { email, role: "applicant" },
+      select: { id: true },
+    });
 
     try {
       // Generate the names BEFORE creating the shell
@@ -318,16 +374,14 @@ async function main() {
         );
       }
 
-      const admissionId =
-        (shellResponse.data as { id?: string } | null)?.id ??
-        (
-          await db.admission.findFirst({
-            where: {
-              primaryEmail: email,
-            },
-            select: { id: true },
-          })
-        )?.id;
+      // createShell returns the applicant user, not the Admission record.
+      // Always resolve the admission ID from the database before approving.
+      const admissionId = (
+        await db.admission.findUnique({
+          where: { primaryEmail: email },
+          select: { id: true },
+        })
+      )?.id;
 
       if (!admissionId) {
         throw new Error(`Admission id not found for ${email}`);
@@ -335,10 +389,11 @@ async function main() {
 
       await submitAndApprove(
         email,
-        approvedCreated + 1,
+        serial,
         admissionId,
         firstName,
         lastName,
+        context.filledById,
         context.departmentId,
         context.semesterId
       );
@@ -354,8 +409,11 @@ async function main() {
     } catch (error) {
       logger.warn("Skipping failed applicant and continuing", {
         email,
+        serial,
+        attempt: attempts,
         error: error instanceof Error ? error.message : String(error),
       });
+      await cleanupPartialApplicant(email, !existingApplicantUser);
     }
   }
 

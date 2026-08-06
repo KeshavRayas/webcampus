@@ -8,7 +8,13 @@ export type AdmissionResponse = {
   id: string;
   applicationId: string;
   modeOfAdmission: string;
-  status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | "EXITED";
+  status:
+    | "PENDING"
+    | "SUBMITTED"
+    | "APPROVED"
+    | "REJECTED"
+    | "EXITED"
+    | "CANCELLED";
   createdAt: string;
 
   departmentId?: string | null;
@@ -19,6 +25,16 @@ export type AdmissionResponse = {
       name: string;
     };
   } | null;
+  archive?: {
+    reason: string;
+    cancelledAt: string;
+  } | null;
+  filledBy: {
+    id: string;
+    name: string;
+    email: string;
+    role?: string | null;
+  };
 
   // Added all the fields from the database
   firstName?: string | null;
@@ -167,6 +183,18 @@ const baseColumns: ColumnDef<AdmissionResponse>[] = [
 
       return <Badge variant={variant}>{status}</Badge>;
     },
+  },
+  {
+    id: "filledBy",
+    header: "Filled By",
+    cell: ({ row }) => (
+      <div>
+        <div className="font-medium">{row.original.filledBy.name}</div>
+        <div className="text-muted-foreground text-xs">
+          {row.original.filledBy.role ?? row.original.filledBy.email}
+        </div>
+      </div>
+    ),
   },
 ];
 

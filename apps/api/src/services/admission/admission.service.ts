@@ -1,9 +1,11 @@
 import { IncomingHttpHeaders } from "http";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
+import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
   AdmissionActionParamType,
+  CancelAdmissionType,
   ChangeAdmissionModeType,
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
@@ -254,6 +256,15 @@ export class AdmissionService {
     headers: IncomingHttpHeaders
   ): Promise<BaseResponse<unknown>> {
     try {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(headers),
+      });
+      const filledById = session?.user?.id;
+
+      if (!filledById) {
+        throw new Error("Unauthorized");
+      }
+
       const applicantEmail = data.primaryEmail.trim().toLowerCase();
 
       const existingApplicantUser = await db.user.findFirst({
@@ -323,6 +334,7 @@ export class AdmissionService {
 
           semesterId: data.semesterId,
           departmentId: department.id,
+          filledById,
 
           status: "PENDING",
         },
@@ -400,6 +412,20 @@ export class AdmissionService {
                   name: true,
                 },
               },
+            },
+          },
+          filledBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
+          archive: {
+            select: {
+              reason: true,
+              cancelledAt: true,
             },
           },
         },
@@ -564,7 +590,8 @@ export class AdmissionService {
   static async submitApplication(
     primaryEmail: string,
     data: Record<string, string>,
-    fileUrls: { [key: string]: string }
+    fileUrls: { [key: string]: string },
+    filledById?: string
   ): Promise<BaseResponse<unknown>> {
     try {
       logger.info("submitApplication called", {
@@ -586,6 +613,19 @@ export class AdmissionService {
 
       if (!admission) {
         throw new Error("Admission application not found.");
+      }
+
+      const actorId =
+        filledById ??
+        (
+          await db.user.findUnique({
+            where: { email: primaryEmail },
+            select: { id: true },
+          })
+        )?.id;
+
+      if (!actorId) {
+        throw new Error("Unable to identify the user who filled the form.");
       }
 
       if (admission.status === "SUBMITTED") {
@@ -735,6 +775,7 @@ export class AdmissionService {
           secondaryPhoneNumber: data.secondaryPhoneNumber,
           emergencyContactNumber: data.emergencyContactNumber,
           primaryEmail,
+          filledById: actorId,
           secondaryEmail: data.secondaryEmail,
 
           currentAddress: data.currentAddress,
@@ -884,6 +925,48 @@ export class AdmissionService {
     }
   }
 
+  static async createAndSubmitApplication(
+    primaryEmail: string,
+    data: Record<string, string>,
+    fileUrls: { [key: string]: string },
+    filledById: string
+  ): Promise<BaseResponse<unknown>> {
+    if (!data.semesterId || !data.departmentId) {
+      throw new Error("Semester and department are required");
+    }
+
+    const existingAdmission = await db.admission.findUnique({
+      where: { primaryEmail },
+      select: { id: true },
+    });
+
+    if (existingAdmission) {
+      throw new Error("An admission already exists for this email address.");
+    }
+
+    await db.admission.create({
+      data: {
+        primaryEmail,
+        semesterId: data.semesterId,
+        departmentId: data.departmentId,
+        filledById,
+        status: "PENDING",
+      },
+    });
+
+    try {
+      return await AdmissionService.submitApplication(
+        primaryEmail,
+        data,
+        fileUrls,
+        filledById
+      );
+    } catch (error) {
+      await db.admission.delete({ where: { primaryEmail } });
+      throw error;
+    }
+  }
+
   static async approveAdmission(
     params: AdmissionActionParamType
   ): Promise<BaseResponse<unknown>> {
@@ -1012,6 +1095,83 @@ export class AdmissionService {
 
       throw new Error(
         error instanceof Error ? error.message : "Failed to exit admission"
+      );
+    }
+  }
+
+  static async cancelAdmission(
+    id: string,
+    data: CancelAdmissionType,
+    headers: IncomingHttpHeaders
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(headers),
+      });
+      const cancelledById = session?.user?.id;
+
+      if (!cancelledById) {
+        throw new Error("Unauthorized");
+      }
+
+      const reason =
+        data.reason === "OTHER"
+          ? `OTHER: ${data.otherReason!.trim()}`
+          : data.reason;
+
+      const result = await db.$transaction(async (tx) => {
+        const admission = await tx.admission.findUnique({
+          where: { id },
+          select: { id: true, status: true },
+        });
+
+        if (!admission) {
+          throw new Error("Admission not found");
+        }
+
+        if (admission.status !== "SUBMITTED") {
+          throw new Error("Only submitted admissions can be cancelled");
+        }
+
+        const existingArchive = await tx.admissionArchive.findUnique({
+          where: { admissionId: id },
+        });
+
+        if (existingArchive) {
+          throw new Error("Admission has already been cancelled");
+        }
+
+        const archive = await tx.admissionArchive.create({
+          data: {
+            admissionId: id,
+            reason,
+            cancelledById,
+          },
+          include: {
+            admission: true,
+            cancelledBy: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+        });
+
+        await tx.admission.update({
+          where: { id },
+          data: { status: "CANCELLED" },
+        });
+
+        return archive;
+      });
+
+      return {
+        status: "success",
+        message: "Admission cancelled successfully",
+        data: result,
+      };
+    } catch (error) {
+      logger.error("Failed to cancel admission", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to cancel admission"
       );
     }
   }
