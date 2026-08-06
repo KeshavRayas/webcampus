@@ -1,5 +1,7 @@
 "use client";
 
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
+import { useSemestersByTerm } from "@/modules/admin/semester/use-semester-config";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -31,12 +33,15 @@ type ReportRow = {
   section: string;
   batch: string | null;
   roundNumber: number;
+  roundName: string;
   responseCount: number;
   questionAverages: number[];
   average: number;
   percentage: number;
 };
 type Filters = {
+  academicTermId: string;
+  semesterId: string;
   courseId: string;
   facultyId: string;
   sectionId: string;
@@ -44,7 +49,14 @@ type Filters = {
   feedbackRoundId: string;
   assignmentType: string;
 };
+type Semester = {
+  id: string;
+  programType: "UG" | "PG";
+  semesterNumber: number;
+};
 const EMPTY_FILTERS: Filters = {
+  academicTermId: "",
+  semesterId: "",
   courseId: "",
   facultyId: "",
   sectionId: "",
@@ -63,9 +75,25 @@ export function FeedbackReportView({
   const [draftFilters, setDraftFilters] = useState<Filters>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<Filters>(EMPTY_FILTERS);
   const [hasRunReport, setHasRunReport] = useState(false);
+  const { data: loadedTerms } = useAcademicTerms();
+  const terms = loadedTerms ?? [];
+  const { data: loadedSemesters } = useSemestersByTerm(
+    draftFilters.academicTermId
+  );
+  const semesters = (loadedSemesters ?? []) as Semester[];
   const { data: options } = useQuery({
-    queryKey: ["feedback-filter-options", role],
-    queryFn: () => getFeedbackFilterOptions(role),
+    queryKey: [
+      "feedback-filter-options",
+      role,
+      draftFilters.academicTermId,
+      draftFilters.semesterId,
+    ],
+    queryFn: () =>
+      getFeedbackFilterOptions(role, {
+        academicTermId: draftFilters.academicTermId,
+        semesterId: draftFilters.semesterId,
+      }),
+    enabled: Boolean(draftFilters.academicTermId && draftFilters.semesterId),
   });
   const queryFilters = Object.fromEntries(
     Object.entries(appliedFilters).filter(
@@ -92,7 +120,7 @@ export function FeedbackReportView({
     Type: row.assignmentType,
     Section: row.section,
     Batch: row.batch ?? "",
-    Round: row.roundNumber,
+    Round: row.roundName || `Round ${row.roundNumber}`,
     Responses: row.responseCount,
     ...Object.fromEntries(
       row.questionAverages.map((average, index) => [
@@ -104,6 +132,10 @@ export function FeedbackReportView({
     Percentage: `${row.percentage.toFixed(2)}%`,
   }));
   const applyFilters = () => {
+    if (!draftFilters.academicTermId || !draftFilters.semesterId) {
+      toast.error("Select an academic term and semester");
+      return;
+    }
     if (
       !draftFilters.courseId &&
       !draftFilters.facultyId &&
@@ -122,6 +154,16 @@ export function FeedbackReportView({
     setDraftFilters((current) => ({ ...current, [key]: value }));
     setHasRunReport(false);
   };
+  const changeTerm = (termId: string) => {
+    setDraftFilters({ ...EMPTY_FILTERS, academicTermId: termId });
+    setAppliedFilters(EMPTY_FILTERS);
+    setHasRunReport(false);
+  };
+  const changeSemester = (semester: string) => {
+    setDraftFilters((current) => ({ ...current, semesterId: semester }));
+    setAppliedFilters(EMPTY_FILTERS);
+    setHasRunReport(false);
+  };
   const resetFilters = () => {
     setDraftFilters(EMPTY_FILTERS);
     setAppliedFilters(EMPTY_FILTERS);
@@ -134,7 +176,8 @@ export function FeedbackReportView({
         <div>
           <h1 className="text-2xl font-semibold">{title}</h1>
           <p className="text-muted-foreground text-sm">
-            Set filters, click Apply, and view completed-round results.
+            Pick an academic term and semester, set filters, click Apply, and
+            view completed-round results.
           </p>
         </div>
         <Button
@@ -150,6 +193,33 @@ export function FeedbackReportView({
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
+          <select
+            className={selectClass}
+            value={draftFilters.academicTermId}
+            onChange={(event) => changeTerm(event.target.value)}
+          >
+            <option value="">Select academic term</option>
+            {terms.map((term) => (
+              <option key={term.id} value={term.id}>
+                {term.type.toUpperCase()} {term.year}
+                {term.isCurrent ? " (Current)" : ""}
+              </option>
+            ))}
+          </select>
+          <select
+            className={selectClass}
+            value={draftFilters.semesterId}
+            onChange={(event) => changeSemester(event.target.value)}
+            disabled={!draftFilters.academicTermId}
+          >
+            <option value="">Select semester</option>
+            {semesters.map((semester) => (
+              <option key={semester.id} value={semester.id}>
+                {semester.programType.toUpperCase()} - Semester{" "}
+                {semester.semesterNumber}
+              </option>
+            ))}
+          </select>
           {canSelectFaculty && (
             <select
               className={selectClass}
@@ -221,7 +291,7 @@ export function FeedbackReportView({
             <option value="">All rounds</option>
             {options?.rounds.map((round) => (
               <option key={round.id} value={round.id}>
-                Round {round.roundNumber}
+                {round.name || `Round ${round.roundNumber}`}
               </option>
             ))}
           </select>
@@ -236,7 +306,8 @@ export function FeedbackReportView({
       {!hasRunReport ? (
         <Card>
           <CardContent className="text-muted-foreground p-6 text-sm">
-            Select filters and click Apply Filters to load the report.
+            Select an academic term, semester, and at least one filter, then
+            click Apply Filters to load the report.
           </CardContent>
         </Card>
       ) : isLoading ? (
@@ -276,7 +347,9 @@ export function FeedbackReportView({
                       {row.section}
                       {row.batch ? ` / ${row.batch}` : ""}
                     </TableCell>
-                    <TableCell>Round {row.roundNumber}</TableCell>
+                    <TableCell>
+                      {row.roundName || `Round ${row.roundNumber}`}
+                    </TableCell>
                     <TableCell>{row.responseCount}</TableCell>
                     {row.questionAverages.map((average, index) => (
                       <TableCell key={index}>{average.toFixed(2)}</TableCell>

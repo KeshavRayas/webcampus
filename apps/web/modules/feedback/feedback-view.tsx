@@ -15,13 +15,14 @@ import {
   RadioGroupItem,
 } from "@webcampus/ui/components/radio-group";
 import axios from "axios";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
 type Question = { id: string; questionNumber: number; questionText: string };
 type Round = {
   id: string;
   roundNumber: number;
+  name: string;
   startsAt: string;
   endsAt: string;
   isEnabled: boolean;
@@ -53,6 +54,7 @@ export function FeedbackView() {
     round: Round;
   } | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["student-feedback"],
@@ -63,6 +65,16 @@ export function FeedbackView() {
         })
       ).data.data as { rounds: Round[]; assignments: Assignment[] },
   });
+
+  useEffect(() => {
+    if (!data) return;
+    const active = data.rounds.filter((round) => round.isActive);
+    setActiveRoundId((current) =>
+      current && active.some((round) => round.id === current)
+        ? current
+        : (active[0]?.id ?? null)
+    );
+  }, [data]);
   const submit = useMutation({
     mutationFn: async () => {
       if (!selected) throw new Error("Select a course first");
@@ -105,7 +117,9 @@ export function FeedbackView() {
       </div>
     );
 
-  const activeRound = data.rounds.find((round) => round.isActive);
+  const activeRounds = data.rounds.filter((round) => round.isActive);
+  const activeRound =
+    activeRounds.find((round) => round.id === activeRoundId) ?? activeRounds[0];
   if (selected) {
     return (
       <Card>
@@ -115,6 +129,8 @@ export function FeedbackView() {
             {selected.assignment.assignmentType} feedback
           </CardTitle>
           <p className="text-muted-foreground text-sm">
+            Round:{" "}
+            {selected.round.name || `Round ${selected.round.roundNumber}`} |
             Faculty: {selected.assignment.faculty.user.name} | Section:{" "}
             {selected.assignment.section.name}
             {selected.assignment.batch
@@ -179,45 +195,58 @@ export function FeedbackView() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {data.assignments.map((assignment) => {
-            const submitted = assignment.submissions.some(
-              (submission) => submission.feedbackRoundId === activeRound.id
-            );
-            return (
-              <Card key={assignment.id}>
-                <CardHeader>
-                  <CardTitle>
-                    {assignment.course.code} - {assignment.assignmentType}
-                  </CardTitle>
-                  <p className="text-muted-foreground text-sm">
-                    {assignment.course.name}
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <p>Faculty: {assignment.faculty.user.name}</p>
-                  <p>
-                    Section: {assignment.section.name}
-                    {assignment.batch
-                      ? ` | Batch: ${assignment.batch.name}`
-                      : ""}
-                  </p>
-                  {submitted ? (
-                    <p className="text-primary font-medium">Submitted</p>
-                  ) : (
-                    <Button
-                      onClick={() => {
-                        setSelected({ assignment, round: activeRound });
-                        setAnswers({});
-                      }}
-                    >
-                      Give feedback
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {activeRounds.map((round) => (
+              <Button
+                key={round.id}
+                variant={round.id === activeRound.id ? "default" : "outline"}
+                onClick={() => setActiveRoundId(round.id)}
+              >
+                {round.name || `Round ${round.roundNumber}`}
+              </Button>
+            ))}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {data.assignments.map((assignment) => {
+              const submitted = assignment.submissions.some(
+                (submission) => submission.feedbackRoundId === activeRound.id
+              );
+              return (
+                <Card key={assignment.id}>
+                  <CardHeader>
+                    <CardTitle>
+                      {assignment.course.code} - {assignment.assignmentType}
+                    </CardTitle>
+                    <p className="text-muted-foreground text-sm">
+                      {assignment.course.name}
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <p>Faculty: {assignment.faculty.user.name}</p>
+                    <p>
+                      Section: {assignment.section.name}
+                      {assignment.batch
+                        ? ` | Batch: ${assignment.batch.name}`
+                        : ""}
+                    </p>
+                    {submitted ? (
+                      <p className="text-primary font-medium">Submitted</p>
+                    ) : (
+                      <Button
+                        onClick={() => {
+                          setSelected({ assignment, round: activeRound });
+                          setAnswers({});
+                        }}
+                      >
+                        Give feedback
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

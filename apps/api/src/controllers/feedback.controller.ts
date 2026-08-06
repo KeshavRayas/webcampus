@@ -57,7 +57,8 @@ export class FeedbackController {
       reply(
         res,
         await FeedbackService.getTermConfiguration(
-          req.params.academicTermId as string
+          req.params.academicTermId as string,
+          req.params.semesterId as string
         ),
         "Term feedback configuration fetched successfully"
       );
@@ -116,10 +117,19 @@ export class FeedbackController {
       ) {
         throw new Error("Feedback reports are unavailable for this role");
       }
+      const academicTermId =
+        typeof req.query.academicTermId === "string"
+          ? req.query.academicTermId
+          : undefined;
+      const semesterId =
+        typeof req.query.semesterId === "string"
+          ? req.query.semesterId
+          : undefined;
       reply(
         res,
         await FeedbackService.getFilterOptions(
-          await resolveFeedbackScope(userId(req), role as never)
+          await resolveFeedbackScope(userId(req), role as never),
+          { academicTermId, semesterId }
         ),
         "Feedback filters fetched successfully"
       );
@@ -177,6 +187,18 @@ export class FeedbackController {
     }
   }
 
+  static async deleteRound(req: Request, res: Response) {
+    try {
+      reply(
+        res,
+        await FeedbackService.deleteRound(req.params.id as string),
+        "Feedback round deleted successfully"
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  }
+
   static async report(req: Request, res: Response) {
     try {
       const query = req.query as FeedbackReportQuery;
@@ -192,6 +214,78 @@ export class FeedbackController {
         res,
         await FeedbackService.getReport(query, scope),
         "Feedback report fetched successfully"
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  }
+
+  static async dashboard(req: Request, res: Response) {
+    try {
+      reply(
+        res,
+        await FeedbackService.getDashboard(),
+        "Feedback dashboard fetched successfully"
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  }
+
+  static async roundFaculties(req: Request, res: Response) {
+    try {
+      reply(
+        res,
+        await FeedbackService.getRoundFaculties(req.params.roundId as string),
+        "Feedback faculties fetched successfully"
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  }
+
+  static async facultyCourses(req: Request, res: Response) {
+    try {
+      reply(
+        res,
+        await FeedbackService.getRoundFacultyCourses(
+          req.params.roundId as string,
+          req.params.facultyId as string
+        ),
+        "Feedback courses fetched successfully"
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  }
+
+  static async courseSections(req: Request, res: Response) {
+    try {
+      reply(
+        res,
+        await FeedbackService.getRoundCourseSections(
+          req.params.roundId as string,
+          req.params.facultyId as string,
+          req.params.courseId as string
+        ),
+        "Feedback sections fetched successfully"
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  }
+
+  static async sectionStudents(req: Request, res: Response) {
+    try {
+      reply(
+        res,
+        await FeedbackService.getRoundSectionStudents(
+          req.params.roundId as string,
+          req.params.facultyId as string,
+          req.params.courseId as string,
+          req.params.sectionId as string
+        ),
+        "Feedback students fetched successfully"
       );
     } catch (error) {
       fail(res, error);

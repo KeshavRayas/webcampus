@@ -31,6 +31,7 @@ export const FeedbackQuestionSetSchema = z.object({
 
 export const FeedbackTermConfigurationSchema = z.object({
   academicTermId: z.string().uuid(),
+  semesterId: z.string().uuid(),
   presetId: z.string().uuid(),
 });
 
@@ -50,8 +51,9 @@ export const FeedbackPresetUpdateSchema = FeedbackPresetSchema.partial().extend(
 export const FeedbackRoundSchema = z
   .object({
     academicTermId: z.string().uuid(),
-    semesterId: z.string().uuid().optional(),
-    roundNumber: z.number().int().min(1).max(3),
+    semesterId: z.string().uuid(),
+    roundNumber: z.number().int().min(1),
+    name: z.string().trim().max(100).default(""),
     startsAt: z.coerce.date(),
     endsAt: z.coerce.date(),
     isEnabled: z.boolean().default(false),
@@ -65,6 +67,7 @@ export const FeedbackRoundUpdateSchema = z
   .object({
     startsAt: z.coerce.date(),
     endsAt: z.coerce.date(),
+    name: z.string().trim().max(100).optional(),
   })
   .refine((value) => value.startsAt < value.endsAt, {
     path: ["endsAt"],
@@ -94,6 +97,8 @@ export const FeedbackReportQuerySchema = z.object({
   batchId: z.string().uuid().optional(),
   feedbackRoundId: z.string().uuid().optional(),
   assignmentType: z.enum(["THEORY", "LAB"]).optional(),
+  minScore: z.coerce.number().min(1).max(5).optional(),
+  includeOpen: z.coerce.boolean().optional(),
 });
 
 export const FeedbackReportFiltersSchema = z.object({

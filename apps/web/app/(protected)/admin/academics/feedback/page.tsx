@@ -1,5 +1,5 @@
-import { FeedbackReportView } from "@/modules/feedback/feedback-report-view";
+import { FeedbackDashboardView } from "@/modules/feedback/feedback-dashboard-view";
 
 export default function AdminAcademicFeedbackPage() {
-  return <FeedbackReportView role="admin" title="Feedback Reports" />;
+  return <FeedbackDashboardView />;
 }

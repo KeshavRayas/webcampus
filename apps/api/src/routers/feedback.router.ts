@@ -12,7 +12,7 @@ import { Router, type Router as ExpressRouter } from "express";
 const admin: ExpressRouter = Router();
 admin.use(protect({ role: "admin", permissions: { feedback: ["manage"] } }));
 admin.get(
-  "/configuration/term/:academicTermId",
+  "/configuration/term/:academicTermId/semester/:semesterId",
   FeedbackController.getTermConfiguration
 );
 admin.post(
@@ -27,6 +27,7 @@ admin.post(
   FeedbackController.createPreset
 );
 admin.get("/filter-options", FeedbackController.filterOptions);
+admin.get("/dashboard", FeedbackController.dashboard);
 admin.post(
   "/rounds",
   validateRequest(FeedbackRoundSchema),
@@ -39,6 +40,20 @@ admin.patch(
 );
 admin.post("/rounds/:id/enable", FeedbackController.enableRound);
 admin.post("/rounds/:id/disable", FeedbackController.disableRound);
+admin.delete("/rounds/:id", FeedbackController.deleteRound);
+admin.get("/rounds/:roundId/faculties", FeedbackController.roundFaculties);
+admin.get(
+  "/rounds/:roundId/faculties/:facultyId/courses",
+  FeedbackController.facultyCourses
+);
+admin.get(
+  "/rounds/:roundId/faculties/:facultyId/courses/:courseId/sections",
+  FeedbackController.courseSections
+);
+admin.get(
+  "/rounds/:roundId/faculties/:facultyId/courses/:courseId/sections/:sectionId/students",
+  FeedbackController.sectionStudents
+);
 admin.get(
   "/report",
   validateRequest(FeedbackReportQuerySchema, "query"),

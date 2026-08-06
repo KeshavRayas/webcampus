@@ -136,7 +136,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
               children: [
                 { name: "Question Presets", url: "/admin/feedback/presets" },
                 { name: "Configure Feedback", url: "/admin/feedback" },
-                { name: "Feedback Reports", url: "/admin/academics/feedback" },
+                {
+                  name: "Feedback Dashboard",
+                  url: "/admin/academics/feedback",
+                },
               ],
             },
           ],

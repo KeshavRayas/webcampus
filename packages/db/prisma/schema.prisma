@@ -516,14 +516,14 @@ model CourseRegistration {
 model FeedbackQuestionSet {
   id             String   @id @default(uuid())
   academicTermId String
-  semesterId     String?  @unique
+  semesterId     String   @unique
   isLocked       Boolean  @default(false)
   createdById    String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   academicTerm AcademicTerm      @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
-  semester     Semester?         @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  semester     Semester          @relation(fields: [semesterId], references: [id], onDelete: Cascade)
   createdBy    User              @relation(fields: [createdById], references: [id])
   questions    FeedbackQuestion[]
   rounds       FeedbackRound[]
@@ -578,9 +578,10 @@ model FeedbackQuestion {
 model FeedbackRound {
   id             String             @id @default(uuid())
   academicTermId String
-  semesterId     String?
+  semesterId     String
   questionSetId  String
   roundNumber    Int
+  name           String             @default("")
   startsAt       DateTime
   endsAt         DateTime
   isEnabled      Boolean            @default(false)
@@ -589,12 +590,12 @@ model FeedbackRound {
   updatedAt      DateTime           @updatedAt
 
   academicTerm AcademicTerm      @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
-  semester     Semester?         @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  semester     Semester          @relation(fields: [semesterId], references: [id], onDelete: Cascade)
   questionSet  FeedbackQuestionSet @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
   createdBy    User              @relation(fields: [createdById], references: [id])
   responses    FeedbackResponse[]
 
-  @@unique([academicTermId, roundNumber])
+  @@unique([academicTermId, semesterId, roundNumber])
   @@index([semesterId, startsAt, endsAt])
 }
 

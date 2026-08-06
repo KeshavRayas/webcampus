@@ -1,8 +1,11 @@
 "use client";
 
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
+import { useSemestersByTerm } from "@/modules/admin/semester/use-semester-config";
+import { dayjs } from "@webcampus/common/dayjs";
 import { frontendEnv } from "@webcampus/common/env";
 import { Button } from "@webcampus/ui/components/button";
+import { Calendar } from "@webcampus/ui/components/calendar";
 import {
   Card,
   CardContent,
@@ -10,7 +13,13 @@ import {
   CardTitle,
 } from "@webcampus/ui/components/card";
 import { Input } from "@webcampus/ui/components/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@webcampus/ui/components/popover";
 import axios from "axios";
+import { CalendarIcon, ClockIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -21,24 +30,33 @@ type Preset = {
   questions: Array<{ questionNumber: number; questionText: string }>;
 };
 
+type Semester = {
+  id: string;
+  programType: "UG" | "PG";
+  semesterNumber: number;
+};
+
 type Question = { questionNumber: number; questionText: string };
 
 type RoundState = {
   id: string;
   roundNumber: number;
+  name: string;
   startsAt: string;
   endsAt: string;
   isEnabled: boolean;
 };
 
-const emptyRounds = (): RoundState[] =>
-  [1, 2, 3].map((roundNumber) => ({
+const emptyRounds = (): RoundState[] => [
+  {
     id: "",
-    roundNumber,
+    roundNumber: 1,
+    name: "Round 1",
     startsAt: "",
     endsAt: "",
     isEnabled: false,
-  }));
+  },
+];
 
 const errorMessage = (error: unknown, fallback: string) =>
   axios.isAxiosError(error)
@@ -47,11 +65,73 @@ const errorMessage = (error: unknown, fallback: string) =>
       ? error.message
       : fallback;
 
+function DateTimePickerField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const datePart = value.slice(0, 10);
+  const timePart = value.length > 10 ? value.slice(11, 16) : "";
+  const selectedDate = datePart ? dayjs(datePart).toDate() : undefined;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="border-input focus-within:ring-ring text-muted-foreground flex h-9 w-full items-center justify-between rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-within:ring-1"
+        >
+          <span>
+            {value
+              ? dayjs(value).format("MMM D, YYYY h:mm A")
+              : "Select date & time"}
+          </span>
+          <CalendarIcon className="h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end">
+        <div className="space-y-3 p-3">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={(date) =>
+              onChange(
+                date
+                  ? `${dayjs(date).format("YYYY-MM-DD")}T${timePart || "00:00"}`
+                  : ""
+              )
+            }
+            captionLayout="dropdown"
+            fromYear={new Date().getFullYear() - 1}
+            toYear={new Date().getFullYear() + 2}
+          />
+          <div className="flex items-center gap-2">
+            <ClockIcon className="text-muted-foreground h-4 w-4" />
+            <input
+              type="time"
+              className="border-input focus-within:ring-ring flex h-9 w-full items-center rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-within:ring-1"
+              value={timePart}
+              onChange={(event) =>
+                onChange(datePart ? `${datePart}T${event.target.value}` : "")
+              }
+            />
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function FeedbackConfigView() {
   const { data: loadedTerms } = useAcademicTerms();
   const terms = loadedTerms ?? [];
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [academicTermId, setAcademicTermId] = useState("");
+  const [semesterId, setSemesterId] = useState("");
+  const { data: loadedSemesters } = useSemestersByTerm(academicTermId);
+  const semesters = (loadedSemesters ?? []) as Semester[];
   const [presets, setPresets] = useState<Preset[]>([]);
   const [presetId, setPresetId] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -60,11 +140,11 @@ export function FeedbackConfigView() {
   const [loadingConfig, setLoadingConfig] = useState(false);
 
   const loadTermConfig = useCallback(
-    (termId: string) => {
+    (termId: string, semester: string) => {
       setLoadingConfig(true);
       void axios
         .get(
-          `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/configuration/term/${termId}`,
+          `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/configuration/term/${termId}/semester/${semester}`,
           { withCredentials: true }
         )
         .then((response) => {
@@ -87,21 +167,23 @@ export function FeedbackConfigView() {
           setLocked(Boolean(config?.isLocked) || hasRounds);
           if (hasRounds) {
             setRounds(
-              emptyRounds().map((round) => {
-                const saved = config.rounds.find(
-                  (item: { roundNumber: number }) =>
-                    item.roundNumber === round.roundNumber
-                );
-                return saved
-                  ? {
-                      id: saved.id,
-                      roundNumber: saved.roundNumber,
-                      startsAt: saved.startsAt.slice(0, 16),
-                      endsAt: saved.endsAt.slice(0, 16),
-                      isEnabled: saved.isEnabled,
-                    }
-                  : round;
-              })
+              (
+                config.rounds as Array<{
+                  id: string;
+                  roundNumber: number;
+                  name: string;
+                  startsAt: string;
+                  endsAt: string;
+                  isEnabled: boolean;
+                }>
+              ).map((saved) => ({
+                id: saved.id,
+                roundNumber: saved.roundNumber,
+                name: saved.name || `Round ${saved.roundNumber}`,
+                startsAt: saved.startsAt.slice(0, 16),
+                endsAt: saved.endsAt.slice(0, 16),
+                isEnabled: saved.isEnabled,
+              }))
             );
           } else {
             setRounds(emptyRounds());
@@ -128,44 +210,46 @@ export function FeedbackConfigView() {
   }, [NEXT_PUBLIC_API_BASE_URL]);
 
   useEffect(() => {
-    if (!academicTermId) {
+    if (!academicTermId || !semesterId) {
       setPresetId("");
       setQuestions([]);
       setRounds(emptyRounds());
       setLocked(false);
       return;
     }
-    loadTermConfig(academicTermId);
-  }, [academicTermId, loadTermConfig]);
+    loadTermConfig(academicTermId, semesterId);
+  }, [academicTermId, semesterId, loadTermConfig]);
 
   const selectedPreset = presets.find((preset) => preset.id === presetId);
   const displayQuestions =
     questions.length > 0 ? questions : (selectedPreset?.questions ?? []);
 
   const saveQuestionSet = async () => {
-    if (!academicTermId || !presetId) return;
+    if (!academicTermId || !semesterId || !presetId) return;
     try {
       await axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/configuration/term`,
-        { academicTermId, presetId },
+        { academicTermId, semesterId, presetId },
         { withCredentials: true }
       );
       toast.success("Feedback question set saved");
-      loadTermConfig(academicTermId);
+      loadTermConfig(academicTermId, semesterId);
     } catch (error) {
       toast.error(errorMessage(error, "Could not save question set"));
     }
   };
 
   const saveRounds = async () => {
-    if (!academicTermId) return;
+    if (!academicTermId || !semesterId) return;
     try {
       for (const round of rounds) {
         if (!round.startsAt || !round.endsAt)
           throw new Error(`Set dates for round ${round.roundNumber}`);
         const payload = {
           academicTermId,
+          semesterId,
           roundNumber: round.roundNumber,
+          name: round.name || `Round ${round.roundNumber}`,
           startsAt: new Date(round.startsAt).toISOString(),
           endsAt: new Date(round.endsAt).toISOString(),
           isEnabled: round.isEnabled,
@@ -192,7 +276,7 @@ export function FeedbackConfigView() {
         }
       }
       toast.success("Feedback rounds saved");
-      loadTermConfig(academicTermId);
+      loadTermConfig(academicTermId, semesterId);
     } catch (error) {
       toast.error(errorMessage(error, "Could not save rounds"));
     }
@@ -222,20 +306,52 @@ export function FeedbackConfigView() {
     }
   };
 
-  const isRoundActive = (round: RoundState) =>
-    round.isEnabled &&
-    round.startsAt.length > 0 &&
-    round.endsAt.length > 0 &&
-    new Date() >= new Date(round.startsAt) &&
-    new Date() <= new Date(round.endsAt);
+  const addRound = () => {
+    const nextNumber =
+      rounds.reduce((max, round) => Math.max(max, round.roundNumber), 0) + 1;
+    setRounds((current) => [
+      ...current,
+      {
+        id: "",
+        roundNumber: nextNumber,
+        name: `Round ${nextNumber}`,
+        startsAt: "",
+        endsAt: "",
+        isEnabled: false,
+      },
+    ]);
+  };
+
+  const removeRound = async (round: RoundState) => {
+    const confirmMessage = round.id
+      ? `Delete ${round.name || `Round ${round.roundNumber}`}? This will remove all responses collected for it.`
+      : `Remove ${round.name || `Round ${round.roundNumber}`}?`;
+    if (!window.confirm(confirmMessage)) return;
+    if (round.id) {
+      try {
+        await axios.delete(
+          `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/rounds/${round.id}`,
+          { withCredentials: true }
+        );
+        toast.success("Feedback round deleted");
+      } catch (error) {
+        toast.error(errorMessage(error, "Could not delete round"));
+        return;
+      }
+    }
+    setRounds((current) =>
+      current.filter((item) => item.roundNumber !== round.roundNumber)
+    );
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Feedback Configuration</h1>
         <p className="text-muted-foreground text-sm">
-          Select an academic term, choose a question preset, set three round
-          date ranges, save, then enable each round when ready.
+          Select an academic term and semester, choose a question preset, add
+          round date ranges with custom names, save, then enable each round when
+          ready. Each semester is configured independently.
         </p>
       </div>
       <Card>
@@ -246,13 +362,30 @@ export function FeedbackConfigView() {
           <select
             className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
             value={academicTermId}
-            onChange={(event) => setAcademicTermId(event.target.value)}
+            onChange={(event) => {
+              setAcademicTermId(event.target.value);
+              setSemesterId("");
+            }}
           >
             <option value="">Select academic term</option>
             {terms.map((term) => (
               <option key={term.id} value={term.id}>
                 {term.type.toUpperCase()} {term.year}
                 {term.isCurrent ? " (Current)" : ""}
+              </option>
+            ))}
+          </select>
+          <select
+            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            value={semesterId}
+            onChange={(event) => setSemesterId(event.target.value)}
+            disabled={!academicTermId}
+          >
+            <option value="">Select semester</option>
+            {semesters.map((semester) => (
+              <option key={semester.id} value={semester.id}>
+                {semester.programType.toUpperCase()} - Semester{" "}
+                {semester.semesterNumber}
               </option>
             ))}
           </select>
@@ -270,7 +403,7 @@ export function FeedbackConfigView() {
               setPresetId(event.target.value);
               setQuestions([]);
             }}
-            disabled={!academicTermId || locked}
+            disabled={!academicTermId || !semesterId || locked}
           >
             <option value="">Select question preset</option>
             {presets.map((preset) => (
@@ -282,7 +415,7 @@ export function FeedbackConfigView() {
           {locked && (
             <p className="text-muted-foreground text-sm">
               Question set is locked because feedback rounds have been
-              configured for this term.
+              configured for this semester.
             </p>
           )}
           {loadingConfig ? (
@@ -305,7 +438,7 @@ export function FeedbackConfigView() {
           )}
           <Button
             onClick={saveQuestionSet}
-            disabled={!academicTermId || !presetId || locked}
+            disabled={!academicTermId || !semesterId || !presetId || locked}
           >
             Save question set
           </Button>
@@ -317,64 +450,91 @@ export function FeedbackConfigView() {
         </CardHeader>
         <CardContent className="space-y-4">
           {rounds.map((round, index) => {
-            const active = isRoundActive(round);
+            const active = round.isEnabled;
+            const updateField = (field: Partial<RoundState>) =>
+              setRounds((current) =>
+                current.map((item, itemIndex) =>
+                  itemIndex === index ? { ...item, ...field } : item
+                )
+              );
             return (
               <div
                 key={round.roundNumber}
-                className="grid gap-3 md:grid-cols-5"
+                className="border-input space-y-3 rounded-md border p-3"
               >
-                <p className="self-center font-medium">
-                  Round {round.roundNumber}
-                </p>
-                <Input
-                  type="datetime-local"
-                  value={round.startsAt}
-                  onChange={(event) =>
-                    setRounds((current) =>
-                      current.map((item, itemIndex) =>
-                        itemIndex === index
-                          ? { ...item, startsAt: event.target.value }
-                          : item
-                      )
-                    )
-                  }
-                />
-                <Input
-                  type="datetime-local"
-                  value={round.endsAt}
-                  onChange={(event) =>
-                    setRounds((current) =>
-                      current.map((item, itemIndex) =>
-                        itemIndex === index
-                          ? { ...item, endsAt: event.target.value }
-                          : item
-                      )
-                    )
-                  }
-                />
-                <span className="text-muted-foreground self-center text-sm">
-                  {active ? "Active" : "Inactive"}
-                </span>
-                {round.id ? (
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      updateRound(round, active ? "disable" : "enable")
+                <div className="flex flex-wrap items-center gap-3">
+                  <Input
+                    className="flex-1"
+                    placeholder="Round name"
+                    value={round.name}
+                    onChange={(event) =>
+                      updateField({ name: event.target.value })
                     }
-                  >
-                    {active ? "Disable" : "Enable"}
-                  </Button>
-                ) : (
+                  />
                   <span className="text-muted-foreground self-center text-sm">
-                    Save first
+                    {active ? "Active" : "Inactive"}
                   </span>
-                )}
+                  <div className="flex gap-2 self-center">
+                    {round.id ? (
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          updateRound(round, active ? "disable" : "enable")
+                        }
+                      >
+                        {active ? "Disable" : "Enable"}
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground self-center text-sm">
+                        Save first
+                      </span>
+                    )}
+                    <Button
+                      variant="ghost"
+                      onClick={() => void removeRound(round)}
+                      disabled={rounds.length === 1}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-muted-foreground text-xs font-semibold">
+                      Starts at
+                    </label>
+                    <DateTimePickerField
+                      value={round.startsAt}
+                      onChange={(value) => updateField({ startsAt: value })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-muted-foreground text-xs font-semibold">
+                      Ends at
+                    </label>
+                    <DateTimePickerField
+                      value={round.endsAt}
+                      onChange={(value) => updateField({ endsAt: value })}
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}
-          <Button onClick={saveRounds} disabled={!academicTermId}>
-            Save rounds
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={addRound}
+              disabled={!academicTermId || !semesterId}
+            >
+              Add round
+            </Button>
+            <Button
+              onClick={saveRounds}
+              disabled={!academicTermId || !semesterId}
+            >
+              Save rounds
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
