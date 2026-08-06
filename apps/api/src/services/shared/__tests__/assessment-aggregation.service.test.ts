@@ -707,7 +707,11 @@ describe("final CIE eligibility", () => {
         ],
         10
       ),
-      baseCourseConfig({ cieMaxMarks: 10, theoryCieContribution: 0 }),
+      baseCourseConfig({
+        cieMaxMarks: 10,
+        theoryCieContribution: 0,
+        cieEligibilityPolicy: "OVERALL_ONLY",
+      }),
       "student-1"
     );
 
