@@ -1,5 +1,5 @@
 import { logger } from "@webcampus/common/logger";
-import { db } from "@webcampus/db";
+import { db, Prisma } from "@webcampus/db";
 import {
   AssessmentWithStudentsType,
   CreateMarkType,
@@ -29,6 +29,36 @@ export class MarksExcelValidationError extends Error {
     super("Marks upload rejected");
     this.name = "MarksExcelValidationError";
   }
+}
+
+type DbLike = Prisma.TransactionClient | typeof db;
+
+const EXCEL_STATUS_LABELS = {
+  PRESENT: "Present",
+  ABSENT: "Absent",
+  MP: "MP",
+} as const;
+
+const EXCEL_STATUS_VALUES = ["Present", "Absent", "MP"] as const;
+
+type ExcelStatusValue = keyof typeof EXCEL_STATUS_LABELS;
+
+export function resolveExcelStatus(
+  raw: unknown
+):
+  | { status: ExcelStatusValue; error?: undefined }
+  | { status: null; error: string } {
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (value === "") return { status: "PRESENT" };
+  if (value === "present") return { status: "PRESENT" };
+  if (value === "absent") return { status: "ABSENT" };
+  if (value === "mp") return { status: "MP" };
+  return {
+    status: null,
+    error: `Invalid Status "${String(raw ?? "").trim()}". Allowed values: ${EXCEL_STATUS_VALUES.join(", ")}.`,
+  };
 }
 
 export class Mark {
@@ -326,6 +356,10 @@ export class Mark {
                   id: true,
                   title: true,
                   totalMarks: true,
+                  studentRecords: {
+                    select: { id: true },
+                    take: 1,
+                  },
                 },
               },
             },
@@ -334,10 +368,23 @@ export class Mark {
         orderBy: { course: { code: "asc" } },
       });
 
+      const formattedAssignments = assignments.map((assignment) => ({
+        ...assignment,
+        course: {
+          ...assignment.course,
+          assessments: assignment.course.assessments.map((assessment) => ({
+            id: assessment.id,
+            title: assessment.title,
+            totalMarks: assessment.totalMarks,
+            hasMarks: assessment.studentRecords.length > 0,
+          })),
+        },
+      }));
+
       return {
         status: "success",
         message: "Marks dashboard data retrieved successfully",
-        data: assignments,
+        data: formattedAssignments,
       };
     } catch (error) {
       logger.error("Error fetching marks dashboard", error);
@@ -500,10 +547,12 @@ export class Mark {
    */
   static async saveAssessmentMarks(
     userId: string,
-    data: SaveAssessmentMarksType
+    data: SaveAssessmentMarksType,
+    tx?: Prisma.TransactionClient
   ): Promise<BaseResponse<null>> {
+    const prisma: DbLike = tx ?? db;
     try {
-      const faculty = await db.faculty.findUnique({
+      const faculty = await prisma.faculty.findUnique({
         where: { userId },
         select: { id: true },
       });
@@ -512,7 +561,7 @@ export class Mark {
         throw new Error("Faculty profile not found");
       }
 
-      const assessment = await db.assessmentTemplate.findUnique({
+      const assessment = await prisma.assessmentTemplate.findUnique({
         where: { id: data.assessmentId },
         include: {
           questions: true,
@@ -527,7 +576,7 @@ export class Mark {
       assertFacultyCourseApproved(assessment.course.approvalStatus, true);
 
       // Verify faculty is assigned to this course
-      const isAssigned = await db.courseAssignment.findFirst({
+      const isAssigned = await prisma.courseAssignment.findFirst({
         where: {
           courseId: assessment.courseId,
           facultyId: faculty.id,
@@ -539,7 +588,7 @@ export class Mark {
       }
 
       // Check freeze state before allowing marks to be saved
-      const freezeRecord = await db.courseAssignment.findFirst({
+      const freezeRecord = await prisma.courseAssignment.findFirst({
         where: {
           courseId: assessment.courseId,
           facultyId: faculty.id,
@@ -581,7 +630,7 @@ export class Mark {
       // Process each student's totals
       for (const [studentId, totalEntry] of totalsByStudent.entries()) {
         // Verify student is registered for this course
-        const registration = await db.courseRegistration.findFirst({
+        const registration = await prisma.courseRegistration.findFirst({
           where: {
             studentId,
             courseId: assessment.courseId,
@@ -597,7 +646,7 @@ export class Mark {
         }
 
         // Create or update StudentAssessment record
-        const studentAssess = await db.studentAssessment.upsert({
+        const studentAssess = await prisma.studentAssessment.upsert({
           where: {
             studentId_assessmentId: {
               studentId,
@@ -621,7 +670,7 @@ export class Mark {
         if (hasQuestions) {
           const studentMarks = marksByStudent.get(studentId) ?? [];
           for (const mark of studentMarks) {
-            await db.studentQuestionMark.upsert({
+            await prisma.studentQuestionMark.upsert({
               where: {
                 recordId_questionId: {
                   recordId: studentAssess.id,
@@ -642,7 +691,7 @@ export class Mark {
       }
 
       for (const studentId of totalsByStudent.keys()) {
-        await recomputeStudentMark(studentId, data.courseId);
+        await recomputeStudentMark(studentId, data.courseId, tx);
       }
 
       logger.info("Assessment marks saved successfully", {
@@ -740,26 +789,32 @@ export class Mark {
       "USN",
       "Student Name",
       "Student Email",
+      "Status",
       ...assessment.questions.map((q) => q.qNumber),
-      "Total",
     ]);
     headerRow.font = { bold: true };
 
     registrations.forEach((reg) => {
-      worksheet.addRow([
+      const rosterRow = worksheet.addRow([
         reg.student.usn,
         reg.student.user.name,
         reg.student.user.email,
+        EXCEL_STATUS_LABELS.PRESENT,
         ...assessment.questions.map(() => ""),
-        "",
       ]);
+      rosterRow.getCell(4).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [`"${EXCEL_STATUS_VALUES.join(",")}"`],
+      };
     });
 
     worksheet.getColumn(1).width = 18;
     worksheet.getColumn(2).width = 30;
     worksheet.getColumn(3).width = 30;
+    worksheet.getColumn(4).width = 12;
     assessment.questions.forEach((_, index) => {
-      worksheet.getColumn(index + 4).width = 10;
+      worksheet.getColumn(index + 5).width = 10;
     });
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -877,6 +932,21 @@ export class Mark {
       if (header) columnByHeader.set(header, colNumber);
     });
 
+    const statusColumns = [...columnByHeader.entries()].filter(
+      ([header]) => header.trim().toLowerCase() === "status"
+    );
+    if (statusColumns.length > 1) {
+      throw new MarksExcelValidationError([
+        {
+          row: headerRowNumber,
+          usn: "-",
+          question: "Status",
+          message: `Invalid template: found ${statusColumns.length} Status columns. Keep exactly one "Status" column.`,
+        },
+      ]);
+    }
+    const statusColumnIndex: number | undefined = statusColumns[0]?.[1];
+
     const missingColumns = assessment.questions.filter(
       (q) => !columnByHeader.has(q.qNumber)
     );
@@ -895,6 +965,7 @@ export class Mark {
     const seenUsns = new Set<string>();
     const parsed: Array<{
       studentId: string;
+      status: "PRESENT" | "ABSENT" | "MP";
       marks: Array<{ questionId: string; marksObtained: number }>;
     }> = [];
 
@@ -924,37 +995,54 @@ export class Mark {
       }
       seenUsns.add(usn);
 
-      const marks: Array<{ questionId: string; marksObtained: number }> = [];
-      assessment.questions.forEach((q) => {
-        const colNumber = columnByHeader.get(q.qNumber);
-        const raw = colNumber ? row.getCell(colNumber).text.trim() : "";
-        if (raw === "") {
-          marks.push({ questionId: q.id, marksObtained: 0 });
-          return;
-        }
+      const rawStatus =
+        statusColumnIndex != null ? row.getCell(statusColumnIndex).text : "";
+      const resolved = resolveExcelStatus(rawStatus);
+      if (resolved.status === null) {
+        errors.push({
+          row: rowNumber,
+          usn,
+          question: "Status",
+          message: `Row ${rowNumber}: ${resolved.error}`,
+        });
+        return;
+      }
+      const status = resolved.status;
 
-        const num = Number(raw);
-        if (Number.isNaN(num) || !Number.isFinite(num)) {
-          errors.push({
-            row: rowNumber,
-            usn,
-            question: q.qNumber,
-            message: "Marks must be numeric",
-          });
-          return;
-        }
-        if (num < 0 || num > q.marks) {
-          errors.push({
-            row: rowNumber,
-            usn,
-            question: q.qNumber,
-            message: `Marks ${num} exceed maximum ${q.marks}`,
-          });
-          return;
-        }
-        marks.push({ questionId: q.id, marksObtained: num });
-      });
-      parsed.push({ studentId, marks });
+      const marks: Array<{ questionId: string; marksObtained: number }> = [];
+      if (status === "PRESENT") {
+        assessment.questions.forEach((q) => {
+          const colNumber = columnByHeader.get(q.qNumber);
+          const raw = colNumber ? row.getCell(colNumber).text.trim() : "";
+          if (raw === "") {
+            marks.push({ questionId: q.id, marksObtained: 0 });
+            return;
+          }
+
+          const num = Number(raw);
+          if (Number.isNaN(num) || !Number.isFinite(num)) {
+            errors.push({
+              row: rowNumber,
+              usn,
+              question: q.qNumber,
+              message: "Marks must be numeric",
+            });
+            return;
+          }
+          if (num < 0 || num > q.marks) {
+            errors.push({
+              row: rowNumber,
+              usn,
+              question: q.qNumber,
+              message: `Marks ${num} exceed maximum ${q.marks}`,
+            });
+            return;
+          }
+          marks.push({ questionId: q.id, marksObtained: num });
+        });
+      }
+
+      parsed.push({ studentId, status, marks });
     });
 
     if (errors.length > 0) {
@@ -968,34 +1056,59 @@ export class Mark {
       });
       return {
         studentId: entry.studentId,
-        totalMarks: Mark.computeTotalWithOrLogic(
-          assessment.questions,
-          marksRecord
-        ),
-        status: "PRESENT" as const,
+        totalMarks:
+          entry.status === "PRESENT"
+            ? Mark.computeTotalWithOrLogic(assessment.questions, marksRecord)
+            : 0,
+        status: entry.status,
       };
     });
 
     const marks = parsed.flatMap((entry) =>
-      entry.marks.map((mark) => ({
-        studentId: entry.studentId,
-        questionId: mark.questionId,
-        marksObtained: mark.marksObtained,
-      }))
+      entry.status === "PRESENT"
+        ? entry.marks.map((mark) => ({
+            studentId: entry.studentId,
+            questionId: mark.questionId,
+            marksObtained: mark.marksObtained,
+          }))
+        : []
     );
 
-    return Mark.saveAssessmentMarks(userId, {
-      assessmentId,
-      courseId: assessment.courseId,
-      marks,
-      studentTotals,
+    const absentMpStudentIds = parsed
+      .filter((entry) => entry.status !== "PRESENT")
+      .map((entry) => entry.studentId);
+
+    return db.$transaction(async (tx) => {
+      if (absentMpStudentIds.length > 0) {
+        const records = await tx.studentAssessment.findMany({
+          where: { assessmentId, studentId: { in: absentMpStudentIds } },
+          select: { id: true },
+        });
+        if (records.length > 0) {
+          await tx.studentQuestionMark.deleteMany({
+            where: { recordId: { in: records.map((r) => r.id) } },
+          });
+        }
+      }
+      return Mark.saveAssessmentMarks(
+        userId,
+        {
+          assessmentId,
+          courseId: assessment.courseId,
+          marks,
+          studentTotals,
+        },
+        tx
+      );
     });
   }
 
   static async getMarksReport(
     userId: string,
     courseId: string,
-    sectionId?: string
+    sectionId?: string,
+    assessmentId?: string,
+    detailed?: boolean
   ): Promise<BaseResponse<MarksReportDTO>> {
     try {
       const faculty = await db.faculty.findUnique({
@@ -1042,7 +1155,17 @@ export class Mark {
       assertFacultyCourseApproved(course.approvalStatus);
 
       const assessments = await db.assessmentTemplate.findMany({
-        where: { courseId },
+        where: {
+          courseId,
+          ...(assessmentId ? { id: assessmentId } : {}),
+        },
+        include: detailed
+          ? {
+              questions: {
+                orderBy: [{ part: "asc" }, { qNumber: "asc" }],
+              },
+            }
+          : undefined,
         orderBy: { title: "asc" },
       });
 
@@ -1080,6 +1203,11 @@ export class Mark {
           studentId: { in: studentIds },
           courseId,
         },
+        include: detailed
+          ? {
+              questionMarks: true,
+            }
+          : undefined,
       });
 
       const marksMap = new Map<
@@ -1118,11 +1246,25 @@ export class Mark {
 
         const assessmentScores = assessments.map((a) => {
           const sa = assessmentMap.get(`${reg.student.id}_${a.id}`);
+          let questionMarks: Record<string, number> | undefined;
+
+          if (detailed && sa && "questionMarks" in sa) {
+            questionMarks = {};
+            const qms = sa.questionMarks as {
+              questionId: string;
+              marksObtained: number;
+            }[];
+            for (const qm of qms) {
+              questionMarks[qm.questionId] = qm.marksObtained;
+            }
+          }
+
           return {
             assessmentId: a.id,
             assessmentTitle: a.title,
             totalMarks: sa?.totalMarks ?? null,
             maxMarks: a.totalMarks,
+            questionMarks,
           };
         });
 
@@ -1140,14 +1282,30 @@ export class Mark {
           id: course.id,
           code: course.code,
           name: course.name,
-          cumulativeMinMarks:
-            (course.cieEligibility / 100) * course.cieMaxMarks,
+          cieMinMarks: (course.cieEligibility / 100) * course.cieMaxMarks,
           cieEligibilityPercent: course.cieEligibility,
         },
         assessments: assessments.map((a) => ({
           id: a.id,
           title: a.title,
           totalMarks: a.totalMarks,
+          componentType: a.componentType,
+          questions:
+            detailed && "questions" in a
+              ? (
+                  a.questions as {
+                    id: string;
+                    part: string | null;
+                    qNumber: number;
+                    marks: number;
+                  }[]
+                ).map((q) => ({
+                  id: q.id,
+                  part: q.part ?? "",
+                  qNumber: String(q.qNumber),
+                  marks: q.marks,
+                }))
+              : undefined,
         })),
         semester: {
           id: course.semester.id,
@@ -1219,10 +1377,17 @@ export class Mark {
         semesterId: a.course.semesterId,
       }));
 
+      const courseIds = [...new Set(courses.map((c) => c.id))];
+      const assessmentsRaw = await db.assessmentTemplate.findMany({
+        where: { courseId: { in: courseIds } },
+        select: { id: true, title: true, courseId: true },
+        orderBy: { title: "asc" },
+      });
+
       return {
         status: "success",
         message: "Filter options retrieved successfully",
-        data: { courses },
+        data: { courses, assessments: assessmentsRaw },
       };
     } catch (error) {
       logger.error("Error fetching marks report filter options", error);

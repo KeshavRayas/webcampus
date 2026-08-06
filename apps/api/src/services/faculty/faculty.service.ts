@@ -14,7 +14,7 @@ import {
 import { BaseResponse } from "@webcampus/types/api";
 import { resolveFacultyIdForUser } from "./resolve-faculty-for-user";
 
-const ADMIN_ONLY_UPDATE_KEYS = ["staffType", "dob"] as const;
+const ADMIN_ONLY_UPDATE_KEYS = ["staffType", "dob", "phoneNumber"] as const;
 
 const monthDiff = (startDate: Date, endDate: Date) => {
   const years = endDate.getFullYear() - startDate.getFullYear();

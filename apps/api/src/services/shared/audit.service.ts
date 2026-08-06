@@ -19,14 +19,16 @@ export type AuditLogEntry = {
     | "COURSE_ASSIGNMENT"
     | "COORDINATOR"
     | "BATCH"
-    | "ASSESSMENT";
+    | "ASSESSMENT"
+    | "STUDENT_PROFILE";
   entityId: string;
-  courseId: string;
+  courseId?: string;
   action:
     | "SUPER_EDIT"
     | "UPSERT_MAPPING"
     | "DELETE_MAPPING"
-    | "UPDATE_COORDINATOR";
+    | "UPDATE_COORDINATOR"
+    | "UPDATE_STUDENT_PROFILE";
 };
 
 export type FieldChange = {

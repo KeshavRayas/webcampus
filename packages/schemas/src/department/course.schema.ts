@@ -47,6 +47,7 @@ const BaseCourseSchema = z.object({
   theoryMaxExams: z.number().int().min(0),
   theoryExamMaxMarks: z.number().int().min(0),
   theoryMinExams: z.number().int().min(0),
+  theoryCieContribution: z.number().int().min(0),
   theoryEligibility: z.number().int().min(0).max(100).default(40),
 
   labMaxMarks: z.number().int().min(0),
@@ -66,24 +67,25 @@ const MODE_LOCKED_VALUES = {
     practicalCredits: 0,
     skillCredits: 0,
     labMaxMarks: 0,
+    labEligibility: 0,
   },
   FINAL_SUMMARY: {
-    tutorialCredits: 0,
-    practicalCredits: 0,
-    skillCredits: 0,
     labMaxMarks: 0,
+    labEligibility: 0,
     aatMaxMarks: 0,
-    theoryExamMaxMarks: 0,
+    aatEligibility: 0,
   },
   NCMC: {
+    lectureCredits: 0,
     tutorialCredits: 0,
     practicalCredits: 0,
     skillCredits: 0,
     seeMaxMarks: 0,
-    cieMaxMarks: 0,
-    theoryExamMaxMarks: 0,
+    seeEligibility: 0,
     labMaxMarks: 0,
+    labEligibility: 0,
     aatMaxMarks: 0,
+    aatEligibility: 0,
   },
 } as const;
 
@@ -122,6 +124,61 @@ const validateModeLockedValues = (
     }
   );
 };
+
+const validateAssessmentBounds = (
+  value: Record<string, unknown>,
+  ctx: z.RefinementCtx
+) => {
+  const cieMaxMarks = value.cieMaxMarks as number | undefined;
+  const theoryCieContribution = value.theoryCieContribution as
+    | number
+    | undefined;
+  const labMaxMarks = value.labMaxMarks as number | undefined;
+  const aatMaxMarks = value.aatMaxMarks as number | undefined;
+  const theoryExamMaxMarks = value.theoryExamMaxMarks as number | undefined;
+  const theoryMinExams = value.theoryMinExams as number | undefined;
+  const theoryMaxExams = value.theoryMaxExams as number | undefined;
+
+  if (
+    cieMaxMarks !== undefined &&
+    theoryCieContribution !== undefined &&
+    labMaxMarks !== undefined &&
+    aatMaxMarks !== undefined &&
+    theoryCieContribution + labMaxMarks + aatMaxMarks > cieMaxMarks
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["theoryCieContribution"],
+      message: "Theory, Lab, and AAT contributions cannot exceed CIE max marks",
+    });
+  }
+
+  if (
+    theoryCieContribution !== undefined &&
+    theoryExamMaxMarks !== undefined &&
+    theoryMinExams !== undefined &&
+    theoryCieContribution > theoryExamMaxMarks * theoryMinExams
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["theoryCieContribution"],
+      message:
+        "Theory contribution cannot exceed selected Theory exam capacity",
+    });
+  }
+
+  if (
+    theoryMinExams !== undefined &&
+    theoryMaxExams !== undefined &&
+    theoryMinExams > theoryMaxExams
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["theoryMinExams"],
+      message: "Minimum Theory exams cannot exceed the number of Theory exams",
+    });
+  }
+};
 export const CreateCourseSchema = BaseCourseSchema.superRefine((value, ctx) => {
   if (!value.departmentId && !value.departmentName) {
     ctx.addIssue({
@@ -136,6 +193,7 @@ export const CreateCourseSchema = BaseCourseSchema.superRefine((value, ctx) => {
     ctx,
     true
   );
+  validateAssessmentBounds(value as unknown as Record<string, unknown>, ctx);
 });
 
 export const UpdateCourseSchema = BaseCourseSchema.partial()
@@ -150,6 +208,7 @@ export const UpdateCourseSchema = BaseCourseSchema.partial()
       ctx,
       false
     );
+    validateAssessmentBounds(value as unknown as Record<string, unknown>, ctx);
   });
 
 export const DeleteCourseSchema = z.object({

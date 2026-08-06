@@ -284,7 +284,7 @@ export const AdminCondonationReportView = ({
     const dept = appliedFilters.departmentName || "N/A";
     const section =
       sections.find((s) => s.id === appliedFilters.sectionId)?.name ||
-      "All Sections";
+      "All sections";
 
     return [
       `Department: ${dept}`,
@@ -413,7 +413,7 @@ export const AdminCondonationReportView = ({
         label: "Academic Term",
         type: "select" as const,
         options: terms.map((term) => ({
-          label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)}${term.year}`,
+          label: `${term.type.toUpperCase()} ${term.year}`,
           value: term.id,
         })),
         hideAllOption: true,
@@ -532,7 +532,6 @@ export const AdminCondonationReportView = ({
               return next;
             });
           }}
-          className="md:grid-cols-2 xl:grid-cols-5"
         />
         <div className="mt-4 flex justify-end">
           <FilterActions

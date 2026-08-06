@@ -238,6 +238,17 @@ describe("Route Resolution Tests", () => {
       expect(res.status).toBeLessThan(600);
     });
 
+    it("PUT /student/profile is no longer an exposed route", async () => {
+      const res = await fetchWithTimeout(`${BASE_URL}/student/profile`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fullName: "Should Not Update" }),
+      });
+
+      expect(res.status).not.toBe(404);
+      expect([401, 403]).toContain(res.status);
+    });
+
     it("GET /student/course-registration/dashboard resolves", async () => {
       const url = `${BASE_URL}/student/course-registration/dashboard`;
       const res = await fetchWithTimeout(url, { method: "GET" });
@@ -298,6 +309,21 @@ describe("Route Resolution Tests", () => {
       const res = await fetchWithTimeout(url, { method: "GET" });
       expect(res.status).toBeGreaterThanOrEqual(200);
       expect(res.status).toBeLessThan(600);
+    });
+
+    it("admin student profile routes are protected and mounted", async () => {
+      const url = `${BASE_URL}/admin/students/student-id/profile`;
+
+      for (const method of ["GET", "PUT"] as const) {
+        const res = await fetchWithTimeout(url, {
+          method,
+          headers: { "content-type": "application/json" },
+          body: method === "PUT" ? JSON.stringify({}) : undefined,
+        });
+
+        expect(res.status).not.toBe(404);
+        expect([401, 403]).toContain(res.status);
+      }
     });
   });
 

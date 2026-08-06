@@ -1,4 +1,4 @@
-import { db } from "@webcampus/db";
+import { db, Prisma } from "@webcampus/db";
 import {
   buildComponentInputs,
   toCourseAggregationConfig,
@@ -10,15 +10,17 @@ import type { AggregationResult } from "./assessment-aggregation.types";
 
 export async function buildAggregationResultsForStudents(
   courseId: string,
-  studentIds: string[]
+  studentIds: string[],
+  tx?: Prisma.TransactionClient
 ): Promise<Map<string, AggregationResult>> {
+  const prisma = tx ?? db;
   const results = new Map<string, AggregationResult>();
 
   if (studentIds.length === 0) {
     return results;
   }
 
-  const course = await db.course.findUnique({
+  const course = await prisma.course.findUnique({
     where: { id: courseId },
     select: {
       id: true,
@@ -28,6 +30,7 @@ export async function buildAggregationResultsForStudents(
       theoryMaxExams: true,
       theoryMinExams: true,
       theoryExamMaxMarks: true,
+      theoryCieContribution: true,
       theoryEligibility: true,
       labMaxMarks: true,
       labEligibility: true,
@@ -40,7 +43,7 @@ export async function buildAggregationResultsForStudents(
     throw new Error(`Course ${courseId} not found`);
   }
 
-  const templates = await db.assessmentTemplate.findMany({
+  const templates = await prisma.assessmentTemplate.findMany({
     where: { courseId },
     select: {
       id: true,
@@ -65,7 +68,7 @@ export async function buildAggregationResultsForStudents(
   const courseConfig = toCourseAggregationConfig(course, theoryTemplateCount);
   const layoutWarnings = validateCourseTemplateLayout(course, templates);
 
-  const studentAssessments = await db.studentAssessment.findMany({
+  const studentAssessments = await prisma.studentAssessment.findMany({
     where: {
       courseId,
       studentId: { in: studentIds },

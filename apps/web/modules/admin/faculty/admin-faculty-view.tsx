@@ -150,11 +150,10 @@ export const AdminFacultyView = () => {
             draftFilters={{ departmentId: selectedDepartmentId }}
             onDraftChange={(key, value) => {
               if (key === "departmentId") {
-                setSelectedDepartmentId(value);
+                setSelectedDepartmentId(value || ALL_DEPARTMENTS_VALUE);
               }
             }}
             allValue={ALL_DEPARTMENTS_VALUE}
-            className="md:grid-cols-1 xl:grid-cols-4"
           />
         </FilterPanel>
       </div>
@@ -272,6 +271,24 @@ export const AdminFacultyView = () => {
                             onChange={(event) =>
                               field.onChange(event.target.value)
                             }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="phoneNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., +91 9876543210"
+                            {...field}
+                            value={field.value ?? ""}
                           />
                         </FormControl>
                         <FormMessage />

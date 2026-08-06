@@ -83,7 +83,7 @@ export const MarksView = () => {
       if (!options.has(term.id)) {
         options.set(term.id, {
           value: term.id,
-          label: `${term.type} ${term.year}`,
+          label: `${term.type.toUpperCase()} ${term.year}`,
         });
       }
     });
@@ -342,7 +342,7 @@ export const MarksView = () => {
               fields={filterFields}
               draftFilters={draftFilters}
               onDraftChange={handleDraftChange}
-              className="md:grid-cols-2"
+              className="md:grid-cols-4"
             />
             <div className="mt-4 flex justify-end">
               <FilterActions onApply={handleApply} onReset={handleReset} />
@@ -377,6 +377,15 @@ export const MarksView = () => {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
+                      {assessment.hasMarks ? (
+                        <span className="rounded-md bg-green-50 px-2.5 py-1 text-sm font-medium text-green-600">
+                          Completed
+                        </span>
+                      ) : (
+                        <span className="rounded-md bg-amber-50 px-2.5 py-1 text-sm font-medium text-amber-600">
+                          Pending
+                        </span>
+                      )}
                       <input
                         id={`marks-excel-input-${assessment.id}`}
                         type="file"
@@ -421,7 +430,7 @@ export const MarksView = () => {
                         }
                         variant="outline"
                       >
-                        Enter Marks
+                        {assessment.hasMarks ? "Edit Marks" : "Enter Marks"}
                       </Button>
                     </div>
                   </div>

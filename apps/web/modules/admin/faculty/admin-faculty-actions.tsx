@@ -67,6 +67,7 @@ const editSchema = z.object({
   staffType: StaffTypeEnum.optional(),
   dob: z.coerce.date().optional(),
   dateOfJoining: z.coerce.date().optional(),
+  phoneNumber: z.string().optional(),
 });
 
 const hodCreateSchema = z.object({
@@ -121,6 +122,7 @@ export const AdminFacultyActions = ({
       dateOfJoining: faculty.dateOfJoining
         ? new Date(faculty.dateOfJoining)
         : undefined,
+      phoneNumber: faculty.phoneNumber || "",
     },
   });
 
@@ -364,6 +366,20 @@ export const AdminFacultyActions = ({
                             field.onChange(event.target.value)
                           }
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g., +91 9876543210" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -1,3 +1,4 @@
+export * from "./archive.schema";
 export * from "./admission-user.schema";
 export * from "./finance-user.schema";
 export * from "./course-assignment.schema";

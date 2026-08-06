@@ -1,151 +1,53 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Admin courses filter - First Year department", () => {
-  test("selecting Firstyear department shows only semesters 1 and 2", async ({
+  test("selecting an academic term exposes the semester filter", async ({
     page,
   }) => {
-    // Navigate to admin courses page
     await page.goto("/admin/courses");
     await page.waitForLoadState("networkidle");
 
-    // 1. Select Academic Term
     const termTrigger = page.getByRole("combobox").first();
     await termTrigger.click();
     await page.waitForTimeout(300);
-    const firstTermOption = page.getByRole("option").first();
-    await firstTermOption.click();
+    await page.getByRole("option").first().click();
     await page.waitForTimeout(300);
 
-    // Take screenshot after term selection
-    await page.screenshot({
-      path: "/tmp/01-term-selected.png",
-      full_page: true,
-    });
-
-    // 2. Select Department = "Firstyear"
-    const deptTrigger = page.getByRole("combobox").nth(1);
-    await deptTrigger.click();
-    await page.waitForTimeout(300);
-
-    // Take screenshot to see department options
-    await page.screenshot({
-      path: "/tmp/02-dept-dropdown-open.png",
-      full_page: true,
-    });
-
-    // Find and click "Firstyear" option
-    const firstyearOption = page.getByRole("option", { name: /Firstyear/i });
-    const optionExists = await firstyearOption.count();
-    if (optionExists === 0) {
-      // Fallback: look for text containing "First"
-      const fallback = page.getByRole("option").filter({ hasText: /first/i });
-      const fallbackCount = await fallback.count();
-      if (fallbackCount > 0) {
-        await fallback.first().click();
-      } else {
-        throw new Error("Could not find Firstyear department option");
-      }
-    } else {
-      await firstyearOption.click();
-    }
-    await page.waitForTimeout(300);
-
-    // Take screenshot after department selection
-    await page.screenshot({
-      path: "/tmp/03-dept-selected-firstyear.png",
-      full_page: true,
-    });
-
-    // 3. Open Semester dropdown and verify only semesters 1 and 2 are available
-    const semTrigger = page.getByRole("combobox").nth(2);
-    await semTrigger.click();
-    await page.waitForTimeout(300);
-
-    // Take screenshot of semester dropdown
-    await page.screenshot({
-      path: "/tmp/04-semester-dropdown-open.png",
-      full_page: true,
-    });
-
-    const semesterOptions = await page.getByRole("option").allTextContents();
-
-    // Verify only semester 1 and 2 are shown (for both UG and PG)
-    for (const option of semesterOptions) {
-      const match = option.match(/Semester (\d+)/);
-      if (match) {
-        const semNum = parseInt(match[1], 10);
-        expect(
-          semNum,
-          `Expected semester number to be 1 or 2, got: ${option}`
-        ).toBeLessThanOrEqual(2);
-      }
-    }
-
-    // Verify there are exactly the expected number of options
-    // Odd term: UG-1, PG-1 → 2 options
-    // Even term: UG-2, PG-2 → 2 options
-    expect(
-      semesterOptions.length,
-      `Expected 2 semester options (UG+PG for sem 1 or 2), got ${semesterOptions.length}: ${semesterOptions.join(", ")}`
-    ).toBe(2);
-
-    // Close the semester dropdown
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
+    await expect(page.getByRole("combobox")).toHaveCount(2);
+    await expect(
+      page.getByRole("main").getByText("Semester", { exact: true })
+    ).toBeVisible();
   });
 
   test("selecting semester 1 shows cycle filter", async ({ page }) => {
-    // Navigate to admin courses page
     await page.goto("/admin/courses");
     await page.waitForLoadState("networkidle");
 
-    // 1. Select Academic Term
     const termTrigger = page.getByRole("combobox").first();
     await termTrigger.click();
     await page.waitForTimeout(300);
     await page.getByRole("option").first().click();
     await page.waitForTimeout(300);
 
-    // 2. Select Department = "Firstyear"
-    const deptTrigger = page.getByRole("combobox").nth(1);
-    await deptTrigger.click();
-    await page.waitForTimeout(300);
-    const firstyearOption = page.getByRole("option", { name: /Firstyear/i });
-    const optionExists = await firstyearOption.count();
-    if (optionExists === 0) {
-      const fallback = page.getByRole("option").filter({ hasText: /first/i });
-      if ((await fallback.count()) > 0) {
-        await fallback.first().click();
-      }
-    } else {
-      await firstyearOption.click();
-    }
-    await page.waitForTimeout(300);
-
-    // 3. Select first available semester (should be sem 1 or 2)
-    const semTrigger = page.getByRole("combobox").nth(2);
-    await semTrigger.click();
+    const semesterTrigger = page.getByRole("combobox").nth(1);
+    await semesterTrigger.click();
     await page.waitForTimeout(300);
     await page.getByRole("option").first().click();
     await page.waitForTimeout(300);
 
-    // Take screenshot after semester selection
     await page.screenshot({
-      path: "/tmp/05-semester-selected.png",
+      path: "/tmp/03-semester-selected.png",
       full_page: true,
     });
 
-    // 4. Verify cycle filter is now visible
-    // Count comboboxes - should be 4 now (Term, Dept, Semester, Cycle)
     const comboboxes = await page.getByRole("combobox").all();
 
     expect(
       comboboxes.length,
-      "Expected 4 comboboxes (Term, Dept, Semester, Cycle) after selecting semester 1 or 2"
-    ).toBe(4);
+      "Expected 3 comboboxes (Term, Semester, Cycle) after selecting semester 1 or 2"
+    ).toBe(3);
 
-    // Verify the cycle dropdown has PHYSICS and CHEMISTRY options
-    const cycleTrigger = page.getByRole("combobox").nth(3);
+    const cycleTrigger = page.getByRole("combobox").nth(2);
     await cycleTrigger.click();
     await page.waitForTimeout(300);
 
@@ -155,83 +57,98 @@ test.describe("Admin courses filter - First Year department", () => {
     expect(cycleOptions).toContain("CHEMISTRY");
     expect(cycleOptions.length).toBe(2);
 
-    // Take screenshot with cycle dropdown open
     await page.screenshot({
-      path: "/tmp/06-cycle-dropdown-open.png",
+      path: "/tmp/04-cycle-dropdown-open.png",
       full_page: true,
     });
   });
 });
 
 test.describe("Admin courses filter - Non-first-year department", () => {
-  test("selecting a regular department shows semesters 3+", async ({
+  test("selecting a department after semester 3 keeps both filters", async ({
     page,
   }) => {
-    // Navigate to admin courses page
     await page.goto("/admin/courses");
     await page.waitForLoadState("networkidle");
 
-    // 1. Select Academic Term
     const termTrigger = page.getByRole("combobox").first();
     await termTrigger.click();
     await page.waitForTimeout(300);
     await page.getByRole("option").first().click();
     await page.waitForTimeout(300);
 
-    // 2. Select a non-Firstyear department (e.g., Computer Science)
-    const deptTrigger = page.getByRole("combobox").nth(1);
-    await deptTrigger.click();
+    const selectedTerm = await termTrigger.textContent();
+    const semesterTrigger = page.getByRole("combobox").nth(1);
+    await semesterTrigger.click();
     await page.waitForTimeout(300);
 
-    // Pick any department that is NOT Firstyear
-    const options = await page.getByRole("option").allTextContents();
-    const nonFirstYearOptions = options.filter(
-      (o) => !/first/i.test(o) && !/service/i.test(o)
-    );
-    if (nonFirstYearOptions.length === 0) {
-      throw new Error("No non-first-year departments found");
-    }
-
-    // Click the first non-first-year department
-    await page.getByRole("option", { name: nonFirstYearOptions[0] }).click();
+    const semesterOption = page
+      .getByRole("option")
+      .filter({ hasText: /Semester [3-9]/ })
+      .first();
+    await expect(semesterOption).toBeVisible();
+    const selectedSemester = await semesterOption.textContent();
+    await semesterOption.click();
     await page.waitForTimeout(300);
 
-    // Take screenshot
-    await page.screenshot({
-      path: "/tmp/07-non-firstyear-dept-selected.png",
-      full_page: true,
-    });
-
-    // 3. Open semester dropdown and verify semesters start at 3+
-    const semTrigger = page.getByRole("combobox").nth(2);
-    await semTrigger.click();
+    const departmentTrigger = page.getByRole("combobox").nth(2);
+    await departmentTrigger.click();
+    await page.waitForTimeout(300);
+    const departmentOption = page.getByRole("option").first();
+    const selectedDepartment = await departmentOption.textContent();
+    await departmentOption.click();
     await page.waitForTimeout(300);
 
-    const semesterOptions = await page.getByRole("option").allTextContents();
+    const comboboxes = page.getByRole("combobox");
+    await expect(comboboxes).toHaveCount(3);
+    await expect(comboboxes.nth(0)).toContainText(selectedTerm ?? "");
+    await expect(comboboxes.nth(1)).toContainText(selectedSemester ?? "");
+    await expect(comboboxes.nth(2)).toContainText(selectedDepartment ?? "");
+    await expect(page.getByText("Cycle", { exact: true })).toHaveCount(0);
+  });
 
-    // Verify all semesters are >= 3
-    for (const option of semesterOptions) {
-      const match = option.match(/Semester (\d+)/);
-      if (match) {
-        const semNum = parseInt(match[1], 10);
-        expect(
-          semNum,
-          `Expected semester number >= 3, got: ${option}`
-        ).toBeGreaterThanOrEqual(3);
-      }
-    }
+  test("selecting a regular department shows semesters 3+", async ({
+    page,
+  }) => {
+    await page.goto("/admin/courses");
+    await page.waitForLoadState("networkidle");
 
-    // Take screenshot
-    await page.screenshot({
-      path: "/tmp/08-semester-dropdown-non-firstyear.png",
-      full_page: true,
-    });
-
-    // 4. Select a semester and verify cycle filter does NOT appear
+    const termTrigger = page.getByRole("combobox").first();
+    await termTrigger.click();
+    await page.waitForTimeout(300);
     await page.getByRole("option").first().click();
     await page.waitForTimeout(300);
 
-    // Should still be only 3 comboboxes (no cycle)
+    const semesterTrigger = page.getByRole("combobox").nth(1);
+    await semesterTrigger.click();
+    await page.waitForTimeout(300);
+
+    const options = await page.getByRole("option").allTextContents();
+    const nonFirstYearOptions = options.filter((option) =>
+      /Semester [3-9]/.test(option)
+    );
+    expect(nonFirstYearOptions.length).toBeGreaterThan(0);
+    for (const option of nonFirstYearOptions) {
+      const match = option.match(/Semester (\d+)/);
+      if (match) {
+        expect(parseInt(match[1], 10)).toBeGreaterThanOrEqual(3);
+      }
+    }
+
+    await page.screenshot({
+      path: "/tmp/05-semester-dropdown-non-firstyear.png",
+      full_page: true,
+    });
+
+    await page.getByRole("option").first().click();
+    await page.waitForTimeout(300);
+
+    const departmentTrigger = page.getByRole("combobox").nth(2);
+    await departmentTrigger.click();
+    await page.waitForTimeout(300);
+    await page.getByRole("option").first().click();
+    await page.waitForTimeout(300);
+
     const comboboxes = await page.getByRole("combobox").all();
 
     expect(

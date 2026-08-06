@@ -50,7 +50,6 @@ export const FacultyEditableProfileSchema = z.object({
   otherInformation: z.string().trim().max(3000).optional().nullable(),
   researchArea: z.string().trim().max(300).optional().nullable(),
   nationality: z.string().trim().max(120).optional().nullable(),
-  phoneNumber: z.string().trim().max(30).optional().nullable(),
   personalEmail: z.string().email().optional().nullable(),
   contactInformation: z.string().trim().max(300).optional().nullable(),
   mobileNumber: z.string().trim().max(30).optional().nullable(),
@@ -64,6 +63,7 @@ export const FacultyAdminOnlySchema = z.object({
   dateOfJoining: requiredDateString,
   departmentId: z.string().uuid("Invalid department ID"),
   designation: DesignationEnum,
+  phoneNumber: z.string().trim().max(30).optional().nullable(),
 });
 
 export const BaseFacultySchema = z
@@ -79,6 +79,7 @@ export const CreateFacultySchema = FacultyAdminOnlySchema;
 
 export const UpdateFacultySchema = BaseFacultySchema.partial().extend({
   name: z.string().trim().min(1, "Name is required").optional(),
+  email: z.email("Invalid email address").optional(),
   username: z.string().trim().min(1, "Username is required").optional(),
   displayUsername: z
     .string()
@@ -94,6 +95,7 @@ export const UpdateFacultyProfileSchema = FacultyEditableProfileSchema.extend(
     // Admin-only fields are accepted only for admin endpoints.
     staffType: StaffTypeEnum.optional().nullable(),
     dob: optionalDateString,
+    phoneNumber: z.string().trim().max(30).optional().nullable(),
   })
   .partial();
 

@@ -1,5 +1,6 @@
 import AcademicsReportRouter from "@webcampus/api/src/routers/admin/academics-report.router";
 import AdmissionUserRouter from "@webcampus/api/src/routers/admin/admission-user.router";
+import ArchiveRouter from "@webcampus/api/src/routers/admin/archive.router";
 import AttendanceWindowRouter from "@webcampus/api/src/routers/admin/attendance-window.router";
 import AuditRouter from "@webcampus/api/src/routers/admin/audit.router";
 import CoeRouter from "@webcampus/api/src/routers/admin/coe.router";
@@ -10,6 +11,7 @@ import FinanceRouter from "@webcampus/api/src/routers/admin/finance.router";
 import RegistrationTrackingRouter from "@webcampus/api/src/routers/admin/registration-tracking.router";
 import RegistrationWindowRouter from "@webcampus/api/src/routers/admin/registration-window.router";
 import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
+import StudentProfileRouter from "@webcampus/api/src/routers/admin/student-profile.router";
 import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
 import UserRouter from "@webcampus/api/src/routers/admin/user.router";
 import { Router } from "express";
@@ -29,9 +31,12 @@ router.use("/academics/reports", AcademicsReportRouter);
 
 router.use("/semester", SemesterRouter);
 
+router.use("/archive", ArchiveRouter);
+
 router.use("/faculty", facultyRouter);
 
 router.use("/student", StudentRouter);
+router.use("/students", StudentProfileRouter);
 
 router.use("/course", AdminCourseRouter);
 

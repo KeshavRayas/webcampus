@@ -110,9 +110,13 @@ export const HodFacultyView = () => {
             <FilterBuilder<FacultyFilters>
               fields={FACULTY_FILTER_FIELDS}
               draftFilters={draftFilters}
-              onDraftChange={(key, value) =>
-                setDraftFilters((prev) => ({ ...prev, [key]: value }))
-              }
+              onDraftChange={(key, value) => {
+                setDraftFilters((prev) => ({ ...prev, [key]: value }));
+
+                if (key === "search") {
+                  setAppliedSearch(value);
+                }
+              }}
             />
             <FilterActions
               onApply={() => {

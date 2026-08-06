@@ -23,6 +23,7 @@ export type AdminFacultyResponse = {
   otherInformation?: string | null;
   mobileNumber?: string | null;
   alternateContactNumber?: string | null;
+  phoneNumber?: string | null;
   personalEmail?: string | null;
   presentAddressLine?: string | null;
   presentCity?: string | null;
@@ -95,9 +96,9 @@ export const getAdminFacultyColumns = (
       ),
     },
     {
-      accessorKey: "mobileNumber",
+      accessorKey: "phoneNumber",
       header: "Phone Number",
-      cell: ({ row }) => <div>{row.original.mobileNumber || "-"}</div>,
+      cell: ({ row }) => <div>{row.original.phoneNumber || "-"}</div>,
     },
   ];
 

@@ -216,7 +216,7 @@ export const HodCondonationReportView = () => {
     if (!reportData) return [];
     const section =
       sections.find((section) => section.id === appliedFilters.sectionId)
-        ?.name || "All Sections";
+        ?.name || "All sections";
     return [
       `Department: ${departmentInfo?.departmentName ?? "N/A"}`,
       `Course: ${reportData.course.code} - ${reportData.course.name}`,
@@ -354,7 +354,7 @@ export const HodCondonationReportView = () => {
         type: "select",
         hideAllOption: true,
         options: terms.map((term) => ({
-          label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+          label: `${term.type.toUpperCase()} ${term.year}`,
           value: term.id,
         })),
       },
@@ -472,7 +472,6 @@ export const HodCondonationReportView = () => {
           fields={filterFields}
           draftFilters={draftFilters}
           onDraftChange={updateDraftFilter}
-          className="md:grid-cols-2 xl:grid-cols-5"
         />
         <div className="mt-4 flex justify-end">
           <FilterActions

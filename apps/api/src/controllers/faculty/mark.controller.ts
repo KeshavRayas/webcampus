@@ -439,6 +439,8 @@ export class MarkController {
 
       const courseId = req.query.courseId as string;
       const sectionId = req.query.sectionId as string | undefined;
+      const assessmentId = req.query.assessmentId as string | undefined;
+      const detailed = req.query.detailed === "true";
 
       if (!courseId) {
         sendResponse({
@@ -451,7 +453,13 @@ export class MarkController {
         return;
       }
 
-      const response = await Mark.getMarksReport(user.id, courseId, sectionId);
+      const response = await Mark.getMarksReport(
+        user.id,
+        courseId,
+        sectionId,
+        assessmentId,
+        detailed
+      );
       if (response.status === "success") {
         sendResponse({
           res,

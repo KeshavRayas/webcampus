@@ -147,7 +147,7 @@ export const AdminCoursesView = () => {
       label: "Academic Term",
       type: "select",
       options: terms.map((term) => ({
-        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)}${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
       hideAllOption: true,
@@ -290,7 +290,6 @@ export const AdminCoursesView = () => {
               } else if (key === "departmentName") {
                 const selected = departments.find((d) => d.name === value);
                 next.departmentId = selected?.id ?? "";
-                next.semesterId = "";
                 next.cycle = "";
               } else if (key === "semesterId") {
                 const semester = allSemestersForSelectedDraftTerm.find(
@@ -314,7 +313,6 @@ export const AdminCoursesView = () => {
               return next;
             });
           }}
-          className="md:grid-cols-2 xl:grid-cols-4"
         />
         <FilterActions
           onApply={applyFilters}

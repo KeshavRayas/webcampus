@@ -22,12 +22,14 @@ export const getMarksReportFilterOptions =
 
 export const getMarksReport = async (
   courseId: string,
-  sectionId?: string
+  sectionId?: string,
+  assessmentId?: string,
+  detailed?: boolean
 ): Promise<MarksReportData> => {
   const params: Record<string, string> = { courseId };
-  if (sectionId) {
-    params.sectionId = sectionId;
-  }
+  if (sectionId) params.sectionId = sectionId;
+  if (assessmentId) params.assessmentId = assessmentId;
+  if (detailed) params.detailed = "true";
 
   const response = await apiClient.get<BaseResponse<MarksReportData>>(
     "/faculty/marks/report",

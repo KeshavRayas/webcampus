@@ -57,7 +57,9 @@ export const useFinanceUsers = () => {
       form.reset();
     },
     onError: (error: AxiosError<{ message?: string }>) => {
-      toast.error(error.response?.data?.message || "Failed to create Finance user");
+      toast.error(
+        error.response?.data?.message || "Failed to create Finance user"
+      );
     },
   });
 
@@ -113,7 +115,9 @@ export const useFinanceUserEdit = () => {
       toast.success("Finance user updated successfully");
     },
     onError: (error: AxiosError<{ message?: string }>) => {
-      toast.error(error.response?.data?.message || "Failed to update Finance user");
+      toast.error(
+        error.response?.data?.message || "Failed to update Finance user"
+      );
     },
   });
 
@@ -137,7 +141,9 @@ export const useFinanceUserDelete = () => {
       toast.success("Finance user deleted successfully");
     },
     onError: (error: AxiosError<{ message?: string }>) => {
-      toast.error(error.response?.data?.message || "Failed to delete Finance user");
+      toast.error(
+        error.response?.data?.message || "Failed to delete Finance user"
+      );
     },
   });
 

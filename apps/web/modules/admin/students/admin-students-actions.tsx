@@ -29,6 +29,11 @@ import axios, { AxiosError } from "axios";
 import { Eye, MoreHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+import { StudentProfileForm } from "../../student/profile/student-profile-view";
+import {
+  useAdminStudentProfile,
+  useUpdateAdminStudentProfile,
+} from "./use-admin-student-profile";
 
 type AdminStudentDetailResponse = {
   id: string;
@@ -236,6 +241,11 @@ export const AdminStudentActions = ({
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const { data: editableProfile, isLoading: isLoadingEditableProfile } =
+    useAdminStudentProfile(student.id, isEditOpen);
+  const updateProfile = useUpdateAdminStudentProfile(student.id);
 
   const {
     data: details,
@@ -388,9 +398,14 @@ export const AdminStudentActions = ({
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="max-h-[92vh] w-full overflow-hidden p-0 sm:max-w-6xl">
           <DialogHeader className="px-8 pt-8">
-            <DialogTitle className="text-left text-2xl">
-              Student Details
-            </DialogTitle>
+            <div className="flex items-center justify-between gap-4">
+              <DialogTitle className="text-left text-2xl">
+                Student Details
+              </DialogTitle>
+              <Button variant="outline" onClick={() => setIsEditOpen(true)}>
+                Edit Profile
+              </Button>
+            </div>
             <DialogDescription>USN: {student.usn}</DialogDescription>
           </DialogHeader>
 
@@ -1070,6 +1085,30 @@ export const AdminStudentActions = ({
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-h-[92vh] w-full overflow-y-auto sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Edit Student Profile</DialogTitle>
+            <DialogDescription>USN: {student.usn}</DialogDescription>
+          </DialogHeader>
+          {isLoadingEditableProfile ? (
+            <p className="text-muted-foreground py-6 text-sm">
+              Loading profile...
+            </p>
+          ) : editableProfile ? (
+            <StudentProfileForm
+              profile={editableProfile}
+              onSave={(payload) => updateProfile.mutate(payload)}
+              isSaving={updateProfile.isPending}
+            />
+          ) : (
+            <p className="text-muted-foreground py-6 text-sm">
+              Profile details are unavailable.
+            </p>
+          )}
         </DialogContent>
       </Dialog>
     </>

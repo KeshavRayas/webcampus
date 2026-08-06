@@ -293,10 +293,12 @@ export function FinanceView() {
   // Comment Modal state
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentCategory, setCommentCategory] = useState("Select Category");
-  const [commentText, setCommentText] = useState("");
+  const [commentText, setCommentText] = useState("")
+  const [, setCommentFile] = useState<File | null>(null);
 
   // Search state
   const [usnSearch, setUsnSearch] = useState("1BM24EC0059-T");
+  const [, setSearchSubmitted] = useState("1BM24EC0059-T");
 
   // Add Tuition Fee form state
   const [tuitionFeeForm, setTuitionFeeForm] = useState({
@@ -1191,7 +1193,9 @@ export function FinanceView() {
                 <div className="flex items-center gap-2">
                   <input
                     type="file"
-                    onChange={(e) => void e.target.files?.[0]}
+                    onChange={(e) =>
+                      setCommentFile(e.target.files?.[0] || null)
+                    }
                     className="block w-full cursor-pointer text-xs text-gray-500 file:mr-4 file:rounded file:border file:border-gray-300 file:bg-gray-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold hover:file:bg-gray-200"
                   />
                 </div>

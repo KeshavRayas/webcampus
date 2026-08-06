@@ -130,7 +130,9 @@ export class AdminFinanceService {
         }
       }
 
-      throw error instanceof Error ? error : new Error("Failed to create Finance user");
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to create Finance user");
     }
   }
 
@@ -278,7 +280,11 @@ export class AdminFinanceService {
 
       await db.user.delete({ where: { id } });
 
-      return { status: "success", message: "Finance user deleted successfully", data: null };
+      return {
+        status: "success",
+        message: "Finance user deleted successfully",
+        data: null,
+      };
     } catch (error) {
       logger.error("Failed to delete Finance user", error);
       throw error instanceof Error

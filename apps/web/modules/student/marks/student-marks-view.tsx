@@ -59,7 +59,7 @@ export const StudentMarksView = () => {
       type: "select",
       options:
         terms?.map((term) => ({
-          label: `${term.type} ${term.year}`,
+          label: `${term.type.toUpperCase()} ${term.year}`,
           value: term.id,
         })) || [],
       placeholder: termsLoading ? "Loading terms..." : "Select Term",
@@ -160,7 +160,6 @@ export const StudentMarksView = () => {
             }
             setDraftFilters((prev) => ({ ...prev, [key]: value }));
           }}
-          className="md:grid-cols-2"
         />
         <FilterActions onApply={handleApply} onReset={handleReset} />
       </FilterPanel>

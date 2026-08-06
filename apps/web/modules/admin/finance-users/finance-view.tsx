@@ -2,11 +2,11 @@
 
 import { frontendEnv } from "@webcampus/common/env";
 import { DataTable } from "@webcampus/ui/components/data-table";
-import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { FinanceUserColumns } from "./finance-users-columns";
+import React, { useEffect, useState } from "react";
 import { FinanceForm } from "./finance-form";
 import { FinanceUser } from "./finance-types";
+import { FinanceUserColumns } from "./finance-users-columns";
 
 export const FinanceView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
@@ -40,7 +40,9 @@ export const FinanceView = () => {
     <div className="space-y-8">
       <div className="bg-card text-card-foreground space-y-4 rounded-lg border p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold tracking-tight">Finance Users</h3>
+          <h3 className="text-xl font-semibold tracking-tight">
+            Finance Users
+          </h3>
           <FinanceForm />
         </div>
 
