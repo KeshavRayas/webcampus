@@ -207,17 +207,17 @@ export const CourseMappingFilters = ({
   const filterFields: FilterFieldConfig<typeof EMPTY_FILTERS>[] = [
     {
       key: "termId",
-      label: "Academic Term *",
+      label: "Academic Term",
       type: "select",
       hideAllOption: true,
       options: terms.map((t) => ({
-        label: `${t.type.charAt(0).toUpperCase() + t.type.slice(1)} ${t.year}`,
+        label: `${t.type.toUpperCase()} ${t.year}`,
         value: t.id,
       })),
     },
     {
       key: "semesterId",
-      label: "Semester *",
+      label: "Semester",
       type: "select",
       hideAllOption: true,
       options: nestedSemesters.map((s) => ({
@@ -229,7 +229,7 @@ export const CourseMappingFilters = ({
       ? [
           {
             key: "cycle",
-            label: "Cycle *",
+            label: "Cycle",
             type: "select",
             hideAllOption: true,
             options: BASIC_SCIENCES_CYCLE_OPTIONS.map((c) => ({
@@ -241,7 +241,7 @@ export const CourseMappingFilters = ({
       : [
           {
             key: "departmentId",
-            label: "Branch *",
+            label: "Department",
             type: "select",
             hideAllOption: true,
             options: departments
@@ -254,7 +254,7 @@ export const CourseMappingFilters = ({
         ]),
     {
       key: "courseId",
-      label: "Course *",
+      label: "Course",
       type: "select",
       hideAllOption: true,
       placeholder: loadingCourses
@@ -286,7 +286,6 @@ export const CourseMappingFilters = ({
             return next;
           });
         }}
-        className="md:grid-cols-2 lg:grid-cols-4"
       />
       <div className="mt-4 flex justify-end">
         <FilterActions

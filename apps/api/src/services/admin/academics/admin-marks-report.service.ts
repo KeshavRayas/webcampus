@@ -122,8 +122,7 @@ export class AdminMarksReportService {
           id: course.id,
           code: course.code,
           name: course.name,
-          cumulativeMinMarks:
-            (course.cieEligibility / 100) * course.cieMaxMarks,
+          cieMinMarks: (course.cieEligibility / 100) * course.cieMaxMarks,
           cieEligibilityPercent: course.cieEligibility,
         },
         assessments: assessments.map((a) => ({

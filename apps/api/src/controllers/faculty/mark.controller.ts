@@ -1,10 +1,14 @@
-import { Mark } from "@webcampus/api/src/services/faculty/mark.service";
+import {
+  Mark,
+  MarksExcelValidationError,
+} from "@webcampus/api/src/services/faculty/mark.service";
 import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { UpdateMarkType } from "@webcampus/schemas/faculty";
 import { Request, Response } from "express";
+import { CourseApprovalError } from "../../services/shared/course-approval";
 
 const resolveSessionUser = async (req: Request) => {
   const session = await auth.api.getSession({
@@ -18,9 +22,16 @@ const resolveSessionUser = async (req: Request) => {
   return session.user;
 };
 
+const errorMessageRequiresApproval = (message: string): boolean =>
+  message === "Course has not been submitted for approval." ||
+  message === "Course must be approved before this operation can be performed.";
+
 const getStatusCodeForError = (message: string): number => {
   if (message === ERRORS.UNAUTHENTICATED || message === ERRORS.UNAUTHORIZED) {
     return 401;
+  }
+  if (errorMessageRequiresApproval(message)) {
+    return 403;
   }
   if (message.toLowerCase().includes("not found")) {
     return 404;
@@ -148,14 +159,30 @@ export class MarkController {
           data: response.data,
           statusCode: response.data ? 200 : 404,
         });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: errorMessageRequiresApproval(response.message)
+            ? 403
+            : 400,
+          error: response.error,
+        });
       }
     } catch (error) {
       logger.error("Error updating mark:", { error });
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode:
+          error instanceof CourseApprovalError
+            ? error.statusCode
+            : error instanceof Error
+              ? 400
+              : 500,
         error,
       });
     }
@@ -175,14 +202,30 @@ export class MarkController {
           data: response.data,
           statusCode: 200,
         });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: errorMessageRequiresApproval(response.message)
+            ? 403
+            : 400,
+          error: response.error,
+        });
       }
     } catch (error) {
       logger.error("Error deleting mark:", { error });
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode:
+          error instanceof CourseApprovalError
+            ? error.statusCode
+            : error instanceof Error
+              ? 400
+              : 500,
         error,
       });
     }
@@ -292,6 +335,92 @@ export class MarkController {
       }
     } catch (error) {
       logger.error("Error saving assessment marks:", { error });
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: getStatusCodeForError(message),
+        error,
+      });
+    }
+  }
+
+  static async downloadMarksTemplate(
+    req: Request<{ assessmentId: string }>,
+    res: Response
+  ): Promise<void> {
+    try {
+      const user = await resolveSessionUser(req);
+      const sectionId = req.query.sectionId as string | undefined;
+
+      const buffer = await Mark.generateMarksTemplate(
+        user.id,
+        req.params.assessmentId,
+        sectionId
+      );
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=marks_template_${req.params.assessmentId}.xlsx`
+      );
+      res.send(buffer);
+    } catch (error) {
+      logger.error("Error generating marks template:", { error });
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: getStatusCodeForError(message),
+        error,
+      });
+    }
+  }
+
+  static async uploadMarksExcel(
+    req: Request<{ assessmentId: string }>,
+    res: Response
+  ): Promise<void> {
+    try {
+      const user = await resolveSessionUser(req);
+      const sectionId = req.body.sectionId as string | undefined;
+      if (!req.file) throw new Error("No file uploaded");
+
+      const response = await Mark.uploadMarksFromExcel(
+        user.id,
+        req.params.assessmentId,
+        sectionId,
+        req.file.buffer
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error uploading marks excel:", { error });
+
+      if (error instanceof MarksExcelValidationError) {
+        res.status(400).json({
+          status: "error",
+          message: "Marks upload rejected",
+          data: { errors: error.errors },
+        });
+        return;
+      }
+
       const message =
         error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
       sendResponse({

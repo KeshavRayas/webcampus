@@ -85,6 +85,7 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
       theoryMaxExams: course.theoryMaxExams ?? 0,
       theoryExamMaxMarks: course.theoryExamMaxMarks ?? 0,
       theoryMinExams: course.theoryMinExams ?? 0,
+      theoryCieContribution: course.theoryCieContribution ?? 0,
       theoryEligibility: course.theoryEligibility ?? 40,
       labMaxMarks: course.labMaxMarks ?? 0,
       labEligibility: course.labEligibility ?? 40,

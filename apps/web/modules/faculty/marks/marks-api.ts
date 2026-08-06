@@ -1,5 +1,13 @@
 import { apiClient } from "@/lib/api-client";
 import { BaseResponse } from "@webcampus/types/api";
+import axios from "axios";
+
+interface ExcelImportError {
+  row: number;
+  usn: string;
+  question: string;
+  message: string;
+}
 
 export interface MarksAssessmentInfo {
   id: string;
@@ -47,4 +55,79 @@ export const getMarksDashboardAssignments = async (): Promise<
   }
 
   return response.data.data ?? [];
+};
+
+export const downloadMarksTemplate = async (
+  assessmentId: string,
+  sectionId: string | undefined,
+  courseCode: string,
+  assessmentTitle: string
+): Promise<void> => {
+  const params: Record<string, string> = {};
+  if (sectionId) params.sectionId = sectionId;
+
+  const response = await apiClient.get(
+    `/faculty/marks/assessments/${assessmentId}/marks/template`,
+    { params, responseType: "blob" }
+  );
+
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute(
+    "download",
+    `${courseCode}_${assessmentTitle.replace(
+      /[^a-z0-9]+/gi,
+      "_"
+    )}_marks_template.xlsx`
+  );
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+export const uploadMarksExcel = async (
+  assessmentId: string,
+  sectionId: string | undefined,
+  file: File
+): Promise<void> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (sectionId) formData.append("sectionId", sectionId);
+
+  try {
+    const response = await apiClient.post<BaseResponse<null>>(
+      `/faculty/marks/assessments/${assessmentId}/marks/excel/upload`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    if (response.data.status !== "success") {
+      throw new Error(response.data.message || "Failed to upload marks");
+    }
+  } catch (error) {
+    const errors = (
+      axios.isAxiosError(error)
+        ? (error.response?.data as { data?: { errors?: ExcelImportError[] } })
+            ?.data?.errors
+        : undefined
+    ) as ExcelImportError[] | undefined;
+
+    if (errors && errors.length > 0) {
+      throw new Error(
+        `Marks upload rejected (${errors.length} error(s)):\n` +
+          errors
+            .map(
+              (entry) =>
+                `Row ${entry.row} (USN ${entry.usn})` +
+                (entry.question !== "-" ? ` - ${entry.question}` : "") +
+                `: ${entry.message}`
+            )
+            .join("\n")
+      );
+    }
+
+    throw error;
+  }
 };

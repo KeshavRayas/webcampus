@@ -39,7 +39,6 @@ import { useMemo, useState } from "react";
 import {
   useRequestStudentProfileApproval,
   useStudentProfile,
-  useUpdateStudentProfile,
   type StudentProfilePayload,
 } from "./use-student-profile";
 
@@ -137,16 +136,18 @@ const DataField = ({
 const CardShell = ({
   title,
   trigger,
+  readOnly = false,
   children,
 }: {
   title: string;
   trigger?: React.ReactNode;
+  readOnly?: boolean;
   children: React.ReactNode;
 }) => (
   <section className="bg-card rounded-xl border p-6">
     <div className="mb-4 flex items-center justify-between gap-3">
       <h4 className="text-lg font-semibold">{title}</h4>
-      {trigger}
+      {!readOnly && trigger}
     </div>
     {children}
   </section>
@@ -172,7 +173,6 @@ const isAllowedFile = (file: File) => {
 
 export const StudentProfileView = () => {
   const { data: profile, isLoading, isError, error } = useStudentProfile();
-  const updateProfile = useUpdateStudentProfile();
   const requestApproval = useRequestStudentProfileApproval();
 
   if (isLoading) {
@@ -262,46 +262,67 @@ export const StudentProfileView = () => {
         </div>
       </div>
 
-      <div className="space-y-6">
-        <PersonalDetailsCard
-          profile={profile}
-          onSave={(payload) => updateProfile.mutate(payload)}
-          isSaving={updateProfile.isPending}
-        />
-        <AddressDetailsCard
-          profile={profile}
-          onSave={(payload) => updateProfile.mutate(payload)}
-          isSaving={updateProfile.isPending}
-        />
-        <FamilyDetailsCard
-          profile={profile}
-          onSave={(payload) => updateProfile.mutate(payload)}
-          isSaving={updateProfile.isPending}
-        />
-        <AcademicDetailsCard profile={profile} />
-        <EducationDetailsCard
-          profile={profile}
-          onSave={(payload) => updateProfile.mutate(payload)}
-          isSaving={updateProfile.isPending}
-        />
-        <DocumentsCard
-          profile={profile}
-          onSave={(payload) => updateProfile.mutate(payload)}
-          isSaving={updateProfile.isPending}
-        />
-      </div>
+      <StudentProfileForm profile={profile} readOnly />
     </div>
   );
 };
+
+export const StudentProfileForm = ({
+  profile,
+  readOnly = false,
+  onSave = () => undefined,
+  isSaving = false,
+}: {
+  profile: StudentProfilePayload;
+  readOnly?: boolean;
+  onSave?: (payload: Record<string, unknown>) => void;
+  isSaving?: boolean;
+}) => (
+  <div className="space-y-6">
+    <PersonalDetailsCard
+      profile={profile}
+      onSave={onSave}
+      isSaving={isSaving}
+      readOnly={readOnly}
+    />
+    <AddressDetailsCard
+      profile={profile}
+      onSave={onSave}
+      isSaving={isSaving}
+      readOnly={readOnly}
+    />
+    <FamilyDetailsCard
+      profile={profile}
+      onSave={onSave}
+      isSaving={isSaving}
+      readOnly={readOnly}
+    />
+    <AcademicDetailsCard profile={profile} />
+    <EducationDetailsCard
+      profile={profile}
+      onSave={onSave}
+      isSaving={isSaving}
+      readOnly={readOnly}
+    />
+    <DocumentsCard
+      profile={profile}
+      onSave={onSave}
+      isSaving={isSaving}
+      readOnly={readOnly}
+    />
+  </div>
+);
 
 const PersonalDetailsCard = ({
   profile,
   onSave,
   isSaving,
+  readOnly,
 }: {
   profile: StudentProfilePayload;
   onSave: (payload: Record<string, unknown>) => void;
   isSaving: boolean;
+  readOnly: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const [aadhaarError, setAadhaarError] = useState("");
@@ -326,6 +347,7 @@ const PersonalDetailsCard = ({
   return (
     <CardShell
       title="Personal Details"
+      readOnly={readOnly}
       trigger={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -600,10 +622,12 @@ const AddressDetailsCard = ({
   profile,
   onSave,
   isSaving,
+  readOnly,
 }: {
   profile: StudentProfilePayload;
   onSave: (payload: Record<string, unknown>) => void;
   isSaving: boolean;
+  readOnly: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const [presentAddress, setPresentAddress] = useState(
@@ -619,6 +643,7 @@ const AddressDetailsCard = ({
   return (
     <CardShell
       title="Address Details"
+      readOnly={readOnly}
       trigger={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -705,10 +730,12 @@ const FamilyDetailsCard = ({
   profile,
   onSave,
   isSaving,
+  readOnly,
 }: {
   profile: StudentProfilePayload;
   onSave: (payload: Record<string, unknown>) => void;
   isSaving: boolean;
+  readOnly: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const [father, setFather] = useState({
@@ -729,6 +756,7 @@ const FamilyDetailsCard = ({
   return (
     <CardShell
       title="Family Details"
+      readOnly={readOnly}
       trigger={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -932,14 +960,7 @@ const AcademicDetailsCard = ({
   );
 
   return (
-    <CardShell
-      title="Academic Details"
-      trigger={
-        <Button variant="outline" size="sm" disabled>
-          Update Details
-        </Button>
-      }
-    >
+    <CardShell title="Academic Details">
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -972,10 +993,12 @@ const EducationDetailsCard = ({
   profile,
   onSave,
   isSaving,
+  readOnly,
 }: {
   profile: StudentProfilePayload;
   onSave: (payload: Record<string, unknown>) => void;
   isSaving: boolean;
+  readOnly: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -999,6 +1022,7 @@ const EducationDetailsCard = ({
   return (
     <CardShell
       title="Education Details"
+      readOnly={readOnly}
       trigger={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -1192,10 +1216,12 @@ const DocumentsCard = ({
   profile,
   onSave,
   isSaving,
+  readOnly,
 }: {
   profile: StudentProfilePayload;
   onSave: (payload: Record<string, unknown>) => void;
   isSaving: boolean;
+  readOnly: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -1225,6 +1251,7 @@ const DocumentsCard = ({
   return (
     <CardShell
       title="Documents"
+      readOnly={readOnly}
       trigger={
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>

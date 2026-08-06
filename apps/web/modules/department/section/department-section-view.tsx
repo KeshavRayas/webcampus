@@ -250,7 +250,7 @@ export const DepartmentSectionView = () => {
       type: "select",
       hideAllOption: true,
       options: terms.map((t) => ({
-        label: `${t.type.charAt(0).toUpperCase() + t.type.slice(1)} ${t.year}`,
+        label: `${t.type.toUpperCase()} ${t.year}`,
         value: t.id,
       })),
     },
@@ -316,7 +316,6 @@ export const DepartmentSectionView = () => {
 
             updateDraftFilter(key, value);
           }}
-          className="md:grid-cols-2 xl:grid-cols-3"
         />
         <FilterActions onApply={applyFilters} onReset={resetFilters} />
       </FilterPanel>

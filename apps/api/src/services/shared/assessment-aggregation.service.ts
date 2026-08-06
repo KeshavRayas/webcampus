@@ -184,7 +184,7 @@ export function computeEligibility(
   },
   cieTotal: number,
   courseConfig: CourseAggregationConfig,
-  theoryAttemptedExams: number = 0
+  theoryAttempted: number
 ): {
   cie: AggregationResult["cie"];
   status: EligibilityStatus;
@@ -206,7 +206,7 @@ export function computeEligibility(
 
   const hasMetMinTheoryExams =
     courseConfig.theoryMinExams > 0
-      ? theoryAttemptedExams >= courseConfig.theoryMinExams
+      ? theoryAttempted >= courseConfig.theoryMinExams
       : true;
 
   let status: EligibilityStatus;
@@ -267,12 +267,7 @@ export function computeAggregation(
   const aatAggregate = aatComputed.result.obtained;
 
   const theoryMax = theoryInput?.maxForEligibility ?? 0;
-  const theoryContributionMax = Math.max(
-    0,
-    courseConfig.cieMaxMarks -
-      (courseConfig.labMaxMarks ?? 0) -
-      (courseConfig.aatMaxMarks ?? 0)
-  );
+  const theoryContributionMax = courseConfig.theoryCieContribution;
   const theoryContribution =
     theoryMax > 0
       ? Math.min(
@@ -304,17 +299,20 @@ export function computeAggregation(
     aat: aatComputed.result,
   };
 
-  const theoryAttemptedExams = theoryInput
-    ? theoryInput.assessments.filter(
-        (a) => a.score !== null && a.status !== null && a.status !== "ABSENT"
-      ).length
-    : 0;
+  // Attempts come only from normalized persisted StudentAssessment scores.
+  const theoryAttempted =
+    theoryInput?.assessments.filter(
+      (assessment) =>
+        assessment.score !== null &&
+        assessment.status !== "ABSENT" &&
+        assessment.status !== "MP"
+    ).length ?? 0;
 
   const { cie, status } = computeEligibility(
     componentResults,
     cieTotal,
     courseConfig,
-    theoryAttemptedExams
+    theoryAttempted
   );
 
   return {

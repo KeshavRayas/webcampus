@@ -300,6 +300,7 @@ export const RegistrationTrackingView = () => {
                 <TableRow>
                   <TableHead>Student Name</TableHead>
                   <TableHead>USN</TableHead>
+                  <TableHead>Student Email</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Courses</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -312,6 +313,9 @@ export const RegistrationTrackingView = () => {
                       {student.studentName}
                     </TableCell>
                     <TableCell>{student.usn}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {student.studentEmail}
+                    </TableCell>
                     <TableCell>
                       {student.isRegistered ? (
                         <Badge variant="default" className="bg-green-600">

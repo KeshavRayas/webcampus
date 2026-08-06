@@ -57,7 +57,7 @@ export class StudentProfileController {
   ): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
-      const response = await StudentProfileService.updateProfileByUserId(
+      const response = await StudentProfileService.updateOwnProfile(
         user.id,
         req.body
       );

@@ -39,7 +39,7 @@ export const CourseApprovalsFilters = ({
         return true;
       })
       .map((t) => ({
-        label: `${t.type.charAt(0).toUpperCase() + t.type.slice(1)} ${t.year}`,
+        label: `${t.type.toUpperCase()} ${t.year}`,
         value: `${t.type}_${t.year}`,
       }));
   }, [groups]);
@@ -105,7 +105,7 @@ export const CourseApprovalsFilters = ({
   }, [groups]);
 
   const statusOptions = [
-    { label: "All Statuses", value: "" },
+    { label: "All statuses", value: "" },
     { label: "Draft", value: "DRAFT" },
     { label: "Pending", value: "PENDING" },
     { label: "Approved", value: "APPROVED" },
@@ -118,14 +118,14 @@ export const CourseApprovalsFilters = ({
       label: "Academic Term",
       type: "select",
       options: termOptions,
-      placeholder: "All Terms",
+      placeholder: "All terms",
     },
     {
       key: "semesterId",
       label: "Semester",
       type: "select",
       options: semesterOptions,
-      placeholder: draftFilters.termId ? "All Semesters" : "Select term first",
+      placeholder: draftFilters.termId ? "All semesters" : "Select term first",
     },
     ...(cycleOptions.length > 0
       ? [
@@ -134,7 +134,7 @@ export const CourseApprovalsFilters = ({
             label: "Cycle",
             type: "select",
             options: cycleOptions,
-            placeholder: "All Cycles",
+            placeholder: "All cycles",
           } as FilterFieldConfig<Record<string, string>>,
         ]
       : []),
@@ -143,14 +143,14 @@ export const CourseApprovalsFilters = ({
       label: "Department",
       type: "select",
       options: departmentOptions,
-      placeholder: "All Departments",
+      placeholder: "All departments",
     },
     {
       key: "status",
       label: "Status",
       type: "select",
       options: statusOptions,
-      placeholder: "All Statuses",
+      placeholder: "All statuses",
     },
   ];
 
@@ -160,7 +160,6 @@ export const CourseApprovalsFilters = ({
         fields={filterFields}
         draftFilters={draftFilters}
         onDraftChange={onDraftChange}
-        className="md:grid-cols-2 xl:grid-cols-5"
       />
       <FilterActions onApply={onApply} onReset={onReset} />
     </FilterPanel>

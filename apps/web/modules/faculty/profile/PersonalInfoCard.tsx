@@ -254,10 +254,8 @@ export const PersonalInfoCard = ({
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <DataField
-          label="Mobile"
-          value={profile.mobileNumber || profile.phoneNumber}
-        />
+        <DataField label="Mobile" value={profile.mobileNumber} />
+        <DataField label="Phone Number" value={profile.phoneNumber} />
         <DataField
           label="Alt. Contact"
           value={profile.alternateContactNumber}

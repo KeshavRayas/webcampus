@@ -27,6 +27,7 @@ const baseCourseConfig = (
   cieEligibilityPolicy: "COMPONENT_AND_OVERALL",
   theoryMaxExams: 3,
   theoryMinExams: 2,
+  theoryCieContribution: 40,
   theoryTemplateCount: 3,
   labMaxMarks: 0,
   aatMaxMarks: 10,
@@ -119,12 +120,12 @@ describe("computeEligibility", () => {
     eligible: false,
   };
 
-  it("COMPONENT_AND_OVERALL fails when a component fails", () => {
+  it("returns NOT_ELIGIBLE when overall CIE passes but a required component fails", () => {
     const { status } = computeEligibility(
       { theory: activePass, lab: emptyInactive(), aat: activeFail },
       41,
       baseCourseConfig(),
-      2 // Passing 2 attempted exams
+      2
     );
     expect(status).toBe("NOT_ELIGIBLE");
   });
@@ -134,7 +135,7 @@ describe("computeEligibility", () => {
       { theory: activePass, lab: emptyInactive(), aat: activeFail },
       41,
       baseCourseConfig({ cieEligibilityPolicy: "OVERALL_ONLY" }),
-      2 // Passing 2 attempted exams
+      2
     );
     expect(status).toBe("ELIGIBLE");
   });
@@ -159,6 +160,7 @@ describe("computeAggregation", () => {
       cieEligibilityPolicy: "COMPONENT_AND_OVERALL" as const,
       theoryMaxExams: 3,
       theoryMinExams: 2,
+      theoryCieContribution: 30,
       theoryExamMaxMarks: 20,
       theoryEligibility: 40,
       labMaxMarks: 0,
@@ -279,6 +281,7 @@ describe("computeAggregation", () => {
       cieEligibilityPolicy: "COMPONENT_AND_OVERALL" as const,
       theoryMaxExams: 3,
       theoryMinExams: 2,
+      theoryCieContribution: 30,
       theoryExamMaxMarks: 40,
       theoryEligibility: 40,
       labMaxMarks: 0,
@@ -341,6 +344,7 @@ describe("computeAggregation", () => {
       cieEligibilityPolicy: "COMPONENT_AND_OVERALL" as const,
       theoryMaxExams: 3,
       theoryMinExams: 2,
+      theoryCieContribution: 30,
       theoryExamMaxMarks: 40,
       theoryEligibility: 40,
       labMaxMarks: 0,
@@ -401,6 +405,7 @@ describe("computeAggregation", () => {
       cieEligibilityPolicy: "COMPONENT_AND_OVERALL" as const,
       theoryMaxExams: 3,
       theoryMinExams: 2,
+      theoryCieContribution: 30,
       theoryExamMaxMarks: 40,
       theoryEligibility: 40,
       labMaxMarks: 0,
@@ -461,6 +466,7 @@ describe("computeAggregation", () => {
       cieEligibilityPolicy: "COMPONENT_AND_OVERALL" as const,
       theoryMaxExams: 2,
       theoryMinExams: 2,
+      theoryCieContribution: 30,
       theoryExamMaxMarks: 30,
       theoryEligibility: 40,
       labMaxMarks: 0,
@@ -516,6 +522,7 @@ describe("computeAggregation", () => {
       theoryMinExams: 2,
       theoryExamMaxMarks: 30,
       theoryEligibility: 40,
+      theoryCieContribution: 50,
       labMaxMarks: 0,
       labEligibility: 40,
       aatMaxMarks: 0,
@@ -639,6 +646,305 @@ describe("computeAggregation", () => {
   });
 });
 
+describe("final CIE eligibility", () => {
+  const componentsFor = (
+    theoryAssessments: AssessmentScoreInput[],
+    aatScore = 10
+  ): ComponentInput[] => [
+    {
+      componentType: "THEORY",
+      rule: "BEST_N",
+      ruleParams: { bestN: 2 },
+      maxForEligibility: 40,
+      eligibilityPct: 40,
+      active: true,
+      assessments: theoryAssessments,
+    },
+    {
+      componentType: "LAB",
+      rule: "SINGLE",
+      ruleParams: { cap: 0 },
+      maxForEligibility: 0,
+      eligibilityPct: 40,
+      active: false,
+      assessments: [],
+    },
+    {
+      componentType: "AAT",
+      rule: "SINGLE",
+      ruleParams: { cap: 10 },
+      maxForEligibility: 10,
+      eligibilityPct: 40,
+      active: true,
+      assessments: [
+        { sequence: 1, score: aatScore, status: "PRESENT", templateMax: 10 },
+      ],
+    },
+  ];
+
+  it("uses the explicit Theory contribution instead of deriving it", () => {
+    const result = computeAggregation(
+      componentsFor([
+        { sequence: 1, score: 20, status: "PRESENT", templateMax: 20 },
+        { sequence: 2, score: 20, status: "PRESENT", templateMax: 20 },
+      ]),
+      baseCourseConfig({ theoryCieContribution: 20 }),
+      "student-1"
+    );
+
+    expect(result.cieTotal).toBe(30);
+    expect(result.cie.eligible).toBe(true);
+    expect(result.status).toBe("ELIGIBLE");
+  });
+
+  it("counts only submitted PRESENT StudentAssessment scores, including zero", () => {
+    const result = computeAggregation(
+      componentsFor(
+        [
+          { sequence: 1, score: 0, status: "PRESENT", templateMax: 20 },
+          { sequence: 2, score: 0, status: "PRESENT", templateMax: 20 },
+          { sequence: 3, score: 0, status: "ABSENT", templateMax: 20 },
+        ],
+        10
+      ),
+      baseCourseConfig({ cieMaxMarks: 10, theoryCieContribution: 0 }),
+      "student-1"
+    );
+
+    expect(result.cieTotal).toBe(10);
+    expect(result.cie.eligible).toBe(true);
+    expect(result.status).toBe("ELIGIBLE");
+  });
+
+  it("rejects a CIE-passing student with too few submitted Theory attempts", () => {
+    const course = {
+      id: "course-1",
+      cieMaxMarks: 50,
+      cieEligibility: 40,
+      cieEligibilityPolicy: "COMPONENT_AND_OVERALL" as const,
+      theoryMaxExams: 3,
+      theoryMinExams: 2,
+      theoryExamMaxMarks: 40,
+      theoryCieContribution: 40,
+      theoryEligibility: 40,
+      labMaxMarks: 25,
+      labEligibility: 40,
+      aatMaxMarks: 5,
+      aatEligibility: 40,
+    };
+    const templates = [
+      {
+        id: "t1",
+        componentType: "THEORY" as const,
+        sequence: 1,
+        totalMarks: 40,
+      },
+      {
+        id: "t2",
+        componentType: "THEORY" as const,
+        sequence: 2,
+        totalMarks: 40,
+      },
+      {
+        id: "t3",
+        componentType: "THEORY" as const,
+        sequence: 3,
+        totalMarks: 40,
+      },
+      { id: "lab", componentType: "LAB" as const, sequence: 1, totalMarks: 25 },
+      { id: "aat", componentType: "AAT" as const, sequence: 1, totalMarks: 5 },
+    ];
+    const studentAssessments = [
+      { assessmentId: "t1", totalMarks: 0, status: "ABSENT" },
+      { assessmentId: "t2", totalMarks: 0, status: "ABSENT" },
+      { assessmentId: "t3", totalMarks: 39, status: "PRESENT" },
+      { assessmentId: "lab", totalMarks: 25, status: "PRESENT" },
+      { assessmentId: "aat", totalMarks: 5, status: "PRESENT" },
+    ];
+
+    const result = computeAggregation(
+      buildComponentInputs(course, templates, studentAssessments),
+      baseCourseConfig({
+        cieMaxMarks: 50,
+        theoryMinExams: 2,
+        theoryCieContribution: 40,
+        theoryTemplateCount: 3,
+        labMaxMarks: 25,
+        aatMaxMarks: 5,
+      }),
+      "student-1"
+    );
+
+    expect(result.cieTotal).toBe(49.5);
+    expect(result.cie.eligible).toBe(true);
+    expect(result.status).toBe("NOT_ELIGIBLE");
+  });
+
+  it("counts two submitted attempts when one submitted score is zero", () => {
+    const result = computeAggregation(
+      buildComponentInputs(
+        {
+          id: "course-1",
+          cieMaxMarks: 50,
+          cieEligibility: 40,
+          cieEligibilityPolicy: "COMPONENT_AND_OVERALL" as const,
+          theoryMaxExams: 3,
+          theoryMinExams: 2,
+          theoryExamMaxMarks: 40,
+          theoryCieContribution: 40,
+          theoryEligibility: 40,
+          labMaxMarks: 25,
+          labEligibility: 40,
+          aatMaxMarks: 5,
+          aatEligibility: 40,
+        },
+        [
+          {
+            id: "t1",
+            componentType: "THEORY" as const,
+            sequence: 1,
+            totalMarks: 40,
+          },
+          {
+            id: "t2",
+            componentType: "THEORY" as const,
+            sequence: 2,
+            totalMarks: 40,
+          },
+          {
+            id: "t3",
+            componentType: "THEORY" as const,
+            sequence: 3,
+            totalMarks: 40,
+          },
+          {
+            id: "lab",
+            componentType: "LAB" as const,
+            sequence: 1,
+            totalMarks: 25,
+          },
+          {
+            id: "aat",
+            componentType: "AAT" as const,
+            sequence: 1,
+            totalMarks: 5,
+          },
+        ],
+        [
+          { assessmentId: "t1", totalMarks: 0, status: "PRESENT" },
+          { assessmentId: "t2", totalMarks: 38, status: "PRESENT" },
+          { assessmentId: "t3", totalMarks: 0, status: "ABSENT" },
+          { assessmentId: "lab", totalMarks: 25, status: "PRESENT" },
+          { assessmentId: "aat", totalMarks: 5, status: "PRESENT" },
+        ]
+      ),
+      baseCourseConfig({
+        cieMaxMarks: 50,
+        theoryMinExams: 2,
+        theoryCieContribution: 40,
+        theoryTemplateCount: 3,
+        labMaxMarks: 25,
+        aatMaxMarks: 5,
+      }),
+      "student-1"
+    );
+
+    expect(result.cieTotal).toBe(49);
+    expect(result.cie.eligible).toBe(true);
+    expect(result.status).toBe("ELIGIBLE");
+  });
+
+  it("treats unopened Theory assessments as unattempted", () => {
+    const course = {
+      id: "course-1",
+      cieMaxMarks: 50,
+      cieEligibility: 40,
+      cieEligibilityPolicy: "COMPONENT_AND_OVERALL" as const,
+      theoryMaxExams: 3,
+      theoryMinExams: 2,
+      theoryExamMaxMarks: 40,
+      theoryCieContribution: 40,
+      theoryEligibility: 40,
+      labMaxMarks: 25,
+      labEligibility: 40,
+      aatMaxMarks: 5,
+      aatEligibility: 40,
+    };
+    const templates = [
+      {
+        id: "t1",
+        componentType: "THEORY" as const,
+        sequence: 1,
+        totalMarks: 40,
+      },
+      {
+        id: "t2",
+        componentType: "THEORY" as const,
+        sequence: 2,
+        totalMarks: 40,
+      },
+      {
+        id: "t3",
+        componentType: "THEORY" as const,
+        sequence: 3,
+        totalMarks: 40,
+      },
+      { id: "lab", componentType: "LAB" as const, sequence: 1, totalMarks: 25 },
+      { id: "aat", componentType: "AAT" as const, sequence: 1, totalMarks: 5 },
+    ];
+
+    const result = computeAggregation(
+      buildComponentInputs(course, templates, [
+        { assessmentId: "t3", totalMarks: 39, status: "PRESENT" },
+        { assessmentId: "lab", totalMarks: 25, status: "PRESENT" },
+        { assessmentId: "aat", totalMarks: 5, status: "PRESENT" },
+      ]),
+      baseCourseConfig({
+        cieMaxMarks: 50,
+        theoryMinExams: 2,
+        theoryCieContribution: 40,
+        theoryTemplateCount: 3,
+        labMaxMarks: 25,
+        aatMaxMarks: 5,
+      }),
+      "student-1"
+    );
+
+    expect(result.cieTotal).toBe(49.5);
+    expect(result.cie.eligible).toBe(true);
+    expect(result.status).toBe("NOT_ELIGIBLE");
+  });
+
+  it("allows a course with no Theory assessments when theoryMinExams is zero", () => {
+    const result = computeAggregation(
+      [
+        {
+          componentType: "THEORY",
+          rule: "BEST_N",
+          ruleParams: { bestN: 0 },
+          maxForEligibility: 0,
+          eligibilityPct: 40,
+          active: false,
+          assessments: [],
+        },
+        ...componentsFor([]).slice(1),
+      ],
+      baseCourseConfig({
+        cieMaxMarks: 10,
+        theoryMaxExams: 0,
+        theoryMinExams: 0,
+        theoryCieContribution: 0,
+        aatMaxMarks: 10,
+      }),
+      "student-1"
+    );
+
+    expect(result.cieTotal).toBe(10);
+    expect(result.cie.eligible).toBe(true);
+    expect(result.status).toBe("ELIGIBLE");
+  });
+});
+
 describe("validateCourseTemplateLayout", () => {
   it("throws DuplicateComponentSequenceError for duplicate THEORY sequence", () => {
     const templates = [
@@ -707,6 +1013,7 @@ describe("validateCourseTemplateLayout", () => {
       cieEligibilityPolicy: "COMPONENT_AND_OVERALL" as const,
       theoryMaxExams: 3,
       theoryMinExams: 2,
+      theoryCieContribution: 30,
       theoryExamMaxMarks: 20,
       theoryEligibility: 40,
       labMaxMarks: 0,

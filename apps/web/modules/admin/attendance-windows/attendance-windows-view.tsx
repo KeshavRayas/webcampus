@@ -300,7 +300,6 @@ export const AttendanceWindowsView = () => {
               return { ...current, [key]: value };
             });
           }}
-          className="md:grid-cols-2 xl:grid-cols-3"
         />
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Input

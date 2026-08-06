@@ -15,6 +15,7 @@ import type {
   UpdateCourseDTO,
 } from "@webcampus/schemas/department";
 import type { Request, Response } from "express";
+import { CourseApprovalError } from "../../services/shared/course-approval";
 
 // import { GetBucketEncryptionRequest$ } from "@aws-sdk/client-s3";
 
@@ -155,7 +156,12 @@ export class AdminCourseController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: error instanceof Error ? 404 : 500,
+        statusCode:
+          error instanceof CourseApprovalError
+            ? error.statusCode
+            : error instanceof Error
+              ? 404
+              : 500,
         error,
       });
     }
@@ -216,8 +222,9 @@ export class AdminCourseController {
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: error instanceof CourseApprovalError ? 403 : 500,
         error,
       });
     }

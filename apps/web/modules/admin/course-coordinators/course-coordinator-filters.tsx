@@ -181,7 +181,7 @@ export const AdminCourseCoordinatorFilters = ({
       type: "select",
       hideAllOption: true,
       options: terms.map((t) => ({
-        label: `${t.type.charAt(0).toUpperCase() + t.type.slice(1)} ${t.year}`,
+        label: `${t.type.toUpperCase()} ${t.year}`,
         value: t.id,
       })),
     },
@@ -243,7 +243,6 @@ export const AdminCourseCoordinatorFilters = ({
             return next;
           });
         }}
-        className="md:grid-cols-2 lg:grid-cols-4"
       />
       <div className="mt-4 flex justify-end">
         <FilterActions

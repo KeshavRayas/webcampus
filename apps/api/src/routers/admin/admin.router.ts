@@ -7,9 +7,11 @@ import CoeRouter from "@webcampus/api/src/routers/admin/coe.router";
 import AdminCourseAssignmentRouter from "@webcampus/api/src/routers/admin/course-assignment.router";
 import AdminCourseRouter from "@webcampus/api/src/routers/admin/course.router";
 import DepartmentRouter from "@webcampus/api/src/routers/admin/department.router";
+import FinanceRouter from "@webcampus/api/src/routers/admin/finance.router";
 import RegistrationTrackingRouter from "@webcampus/api/src/routers/admin/registration-tracking.router";
 import RegistrationWindowRouter from "@webcampus/api/src/routers/admin/registration-window.router";
 import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
+import StudentProfileRouter from "@webcampus/api/src/routers/admin/student-profile.router";
 import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
 import UserRouter from "@webcampus/api/src/routers/admin/user.router";
 import { Router } from "express";
@@ -21,6 +23,7 @@ const router: Router = Router();
 
 router.use("/user", UserRouter);
 router.use("/coe", CoeRouter);
+router.use("/finance", FinanceRouter);
 router.use("/admission-users", AdmissionUserRouter);
 
 router.use("/department", DepartmentRouter);
@@ -33,6 +36,7 @@ router.use("/archive", ArchiveRouter);
 router.use("/faculty", facultyRouter);
 
 router.use("/student", StudentRouter);
+router.use("/students", StudentProfileRouter);
 
 router.use("/course", AdminCourseRouter);
 

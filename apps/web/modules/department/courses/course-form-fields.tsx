@@ -44,7 +44,6 @@ type ModeRule = {
   helperText: string;
 };
 
-// Simplified mode rules for the new schema - adjust preset defaults as needed
 const MODE_RULES: Partial<Record<CreateCourseDTO["courseMode"], ModeRule>> = {
   INTEGRATED: {
     preset: { tutorialCredits: 0, skillCredits: 0 },
@@ -56,30 +55,31 @@ const MODE_RULES: Partial<Record<CreateCourseDTO["courseMode"], ModeRule>> = {
       practicalCredits: 0,
       skillCredits: 0,
       labMaxMarks: 0,
+      labEligibility: 0,
     },
     helperText: "Non-Integrated Course Configuration.",
   },
   FINAL_SUMMARY: {
     preset: {
-      tutorialCredits: 0,
-      practicalCredits: 0,
-      skillCredits: 0,
       labMaxMarks: 0,
+      labEligibility: 0,
       aatMaxMarks: 0,
-      theoryExamMaxMarks: 0,
+      aatEligibility: 0,
     },
     helperText: "Final Summary Mode.",
   },
   NCMC: {
     preset: {
+      lectureCredits: 0,
       tutorialCredits: 0,
       practicalCredits: 0,
       skillCredits: 0,
       seeMaxMarks: 0,
-      cieMaxMarks: 0,
-      theoryExamMaxMarks: 0,
+      seeEligibility: 0,
       labMaxMarks: 0,
+      labEligibility: 0,
       aatMaxMarks: 0,
+      aatEligibility: 0,
     },
     helperText: "Non-Credit Mandatory Course.",
   },
@@ -191,6 +191,10 @@ export const CourseFormFields = ({
     });
   }, [courseMode, form]);
 
+  const modeRule = MODE_RULES[courseMode as keyof typeof MODE_RULES];
+  const isLocked = (field: NumericCourseField) =>
+    modeRule?.preset[field] !== undefined;
+
   return (
     <>
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -266,20 +270,41 @@ export const CourseFormFields = ({
         />
       </div>
 
+      {modeRule && (
+        <p
+          className="text-muted-foreground bg-muted/50 rounded-md px-3 py-2 text-xs"
+          role="status"
+        >
+          {modeRule.helperText} Fields disabled for this mode are fixed at 0.
+        </p>
+      )}
+
       <FormSection title="Credits (L-T-P-S)">
         <div className="grid grid-cols-4 gap-3">
-          <NumberField form={form} name="lectureCredits" label="Lecture (L)" />
+          <NumberField
+            form={form}
+            name="lectureCredits"
+            label="Lecture (L)"
+            disabled={isLocked("lectureCredits")}
+          />
           <NumberField
             form={form}
             name="tutorialCredits"
             label="Tutorial (T)"
+            disabled={isLocked("tutorialCredits")}
           />
           <NumberField
             form={form}
             name="practicalCredits"
             label="Practical (P)"
+            disabled={isLocked("practicalCredits")}
           />
-          <NumberField form={form} name="skillCredits" label="Skill (S)" />
+          <NumberField
+            form={form}
+            name="skillCredits"
+            label="Skill (S)"
+            disabled={isLocked("skillCredits")}
+          />
         </div>
       </FormSection>
 
@@ -290,12 +315,18 @@ export const CourseFormFields = ({
               SEE
             </p>
             <div className="grid max-w-[50%] grid-cols-2 gap-3 pr-2">
-              <NumberField form={form} name="seeMaxMarks" label="Max Marks" />
+              <NumberField
+                form={form}
+                name="seeMaxMarks"
+                label="Max Marks"
+                disabled={isLocked("seeMaxMarks")}
+              />
               <NumberField
                 form={form}
                 name="seeEligibility"
                 label="Eligibility (%)"
                 placeholder="40"
+                disabled={isLocked("seeEligibility")}
               />
             </div>
           </div>
@@ -304,22 +335,19 @@ export const CourseFormFields = ({
             <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
               CIE
             </p>
-            <div className="grid grid-cols-3 gap-3">
-              <NumberField
-                form={form}
-                name="theoryMaxExams"
-                label="No. of Exams"
-              />
+            <div className="grid max-w-[50%] grid-cols-2 gap-3 pr-2">
               <NumberField
                 form={form}
                 name="cieMaxMarks"
                 label="CIE Max Marks"
+                disabled={isLocked("cieMaxMarks")}
               />
               <NumberField
                 form={form}
                 name="cieEligibility"
                 label="Eligibility (%)"
                 placeholder="40"
+                disabled={isLocked("cieEligibility")}
               />
             </div>
 
@@ -328,19 +356,34 @@ export const CourseFormFields = ({
                 <div className="grid grid-cols-3 gap-3">
                   <NumberField
                     form={form}
+                    name="theoryMaxExams"
+                    label="No. of Exams"
+                    disabled={isLocked("theoryMaxExams")}
+                  />
+                  <NumberField
+                    form={form}
                     name="theoryExamMaxMarks"
                     label="Max Marks"
+                    disabled={isLocked("theoryExamMaxMarks")}
                   />
                   <NumberField
                     form={form}
                     name="theoryMinExams"
-                    label="Min Required"
+                    label="Min. Exams Required"
+                    disabled={isLocked("theoryMinExams")}
                   />
                   <NumberField
                     form={form}
                     name="theoryEligibility"
                     label="Eligibility (%)"
                     placeholder="40"
+                    disabled={isLocked("theoryEligibility")}
+                  />
+                  <NumberField
+                    form={form}
+                    name="theoryCieContribution"
+                    label="Theory Contribution to CIE"
+                    disabled={isLocked("theoryCieContribution")}
                   />
                 </div>
               </FormSection>
@@ -351,12 +394,14 @@ export const CourseFormFields = ({
                     form={form}
                     name="labMaxMarks"
                     label="Max Marks"
+                    disabled={isLocked("labMaxMarks")}
                   />
                   <NumberField
                     form={form}
                     name="labEligibility"
                     label="Eligibility (%)"
                     placeholder="40"
+                    disabled={isLocked("labEligibility")}
                   />
                 </div>
               </FormSection>
@@ -367,12 +412,14 @@ export const CourseFormFields = ({
                     form={form}
                     name="aatMaxMarks"
                     label="Max Marks"
+                    disabled={isLocked("aatMaxMarks")}
                   />
                   <NumberField
                     form={form}
                     name="aatEligibility"
                     label="Eligibility (%)"
                     placeholder="40"
+                    disabled={isLocked("aatEligibility")}
                   />
                 </div>
               </FormSection>

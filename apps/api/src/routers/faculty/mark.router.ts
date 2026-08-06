@@ -6,8 +6,10 @@ import {
   UpdateMarkSchema,
 } from "@webcampus/schemas/faculty";
 import { Router } from "express";
+import multer from "multer";
 
 const router: Router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 // All mark routes require faculty authentication
 router.use(
@@ -30,6 +32,17 @@ router.post(
   "/assessments/save-marks",
   validateRequest(SaveAssessmentMarksSchema),
   MarkController.saveAssessmentMarks
+);
+
+router.get(
+  "/assessments/:assessmentId/marks/template",
+  MarkController.downloadMarksTemplate
+);
+
+router.post(
+  "/assessments/:assessmentId/marks/excel/upload",
+  upload.single("file"),
+  MarkController.uploadMarksExcel
 );
 
 // Marks Report routes

@@ -124,6 +124,8 @@ export const CourseMappingByCourseItemSchema = z.object({
   assignmentType: assignmentTypeEnum,
   batchId: z.uuid().nullable(),
   batchName: z.string().nullable(),
+  facultyName: z.string().nullable(),
+  sectionName: z.string().nullable(),
 });
 
 export const DownloadMappingTemplateQuerySchema = z.object({

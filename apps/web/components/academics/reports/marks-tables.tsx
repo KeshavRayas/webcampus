@@ -121,7 +121,7 @@ export const MarksReportTable = ({
                       {student.cieTotal != null ? student.cieTotal : "-"}
                     </TableCell>
                     <TableCell className="text-center">
-                      {`${reportData.course.cumulativeMinMarks} (${reportData.course.cieEligibilityPercent}%)`}
+                      {`${reportData.course.cieMinMarks} (${reportData.course.cieEligibilityPercent}%)`}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge

@@ -26,7 +26,6 @@ import {
   FilterFieldConfig,
   FilterPanel,
 } from "@webcampus/ui/components/filter-builder";
-import { capitalize } from "@webcampus/ui/lib/utils";
 import axios from "axios";
 import { ClipboardList, Loader2, PlusCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -59,6 +58,7 @@ export interface CoordinatedCourse {
   theoryMaxExams: number;
   theoryExamMaxMarks: number;
   theoryMinExams: number;
+  theoryCieContribution: number;
   theoryEligibility: number;
   labMaxMarks: number;
   labEligibility: number;
@@ -98,7 +98,7 @@ const EMPTY_FILTERS: DashboardFilters = {
 };
 
 const formatAcademicTerm = (term: AcademicTermResponseType) =>
-  `${capitalize(term.type)} ${term.year}`;
+  `${term.type.toUpperCase()} ${term.year}`;
 
 const isFirstYearUgSemester = (semester?: {
   programType: string;

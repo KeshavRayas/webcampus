@@ -322,9 +322,15 @@ export const DepartmentStudentView = () => {
             }
 
             updateDraftFilter(key, value);
+
+            if (key === "usn" || key === "name") {
+              setAppliedFilters((current) => ({
+                ...current,
+                [key]: value,
+              }));
+            }
           }}
           allValue={DEFAULT_FILTER_ALL_VALUE}
-          className="md:grid-cols-2 xl:grid-cols-6"
         />
 
         <FilterActions onApply={applyFilters} onReset={resetFilters} />

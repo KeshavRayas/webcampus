@@ -31,7 +31,11 @@ export class AdminCourseService {
 
   // Updated to accept optional department filters as passed by the controller
   static getById(id: string, departmentId?: string, departmentName?: string) {
-    return CourseService.getById(id, { departmentId, departmentName });
+    return CourseService.getById(id, {
+      departmentId,
+      departmentName,
+      adminView: true,
+    });
   }
 
   static getByDepartment(
@@ -57,7 +61,8 @@ export class AdminCourseService {
       semesterId as string,
       departmentId,
       departmentName,
-      cycle
+      cycle,
+      { adminView: true }
     ) as unknown as Promise<
       BaseResponse<
         Array<

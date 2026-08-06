@@ -26,7 +26,6 @@ import { SemesterCourseBlock } from "./semester-course-block";
 const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 const BASIC_SCIENCES_CYCLE_OPTIONS = ["PHYSICS", "CHEMISTRY"] as const;
 type CourseCycle = "PHYSICS" | "CHEMISTRY" | "NONE";
-
 type CoursesFilters = {
   termId: string;
   semesterId: string;
@@ -262,7 +261,7 @@ export const CoursesView: React.FC = () => {
       placeholder: "Select term...",
       hideAllOption: true,
       options: terms.map((term) => ({
-        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
     },
@@ -298,13 +297,18 @@ export const CoursesView: React.FC = () => {
 
   // Fetch courses ONLY for the selected semester instance
   const { data: courses, isLoading: coursesLoading } = useQuery({
-    queryKey: ["courses", appliedFilters.semesterId],
+    queryKey: [
+      "courses",
+      appliedFilters.semesterId,
+      appliedFilters.cycle || "NONE",
+    ],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<CourseResponseDTO[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/course/branch`,
         {
           params: {
             semesterId: appliedFilters.semesterId,
+            ...(appliedFilters.cycle ? { cycle: appliedFilters.cycle } : {}),
           },
           withCredentials: true,
         }
@@ -315,21 +319,11 @@ export const CoursesView: React.FC = () => {
     enabled: !!appliedFilters.semesterId,
   });
 
+  const filteredCourses = courses ?? [];
   const appliedCycle =
     isBasicSciences && appliedFilters.cycle
       ? (appliedFilters.cycle as CourseCycle)
       : "NONE";
-
-  const filteredCourses = useMemo(() => {
-    const courseList = courses ?? [];
-    if (!isBasicSciences || !appliedFilters.cycle) {
-      return courseList;
-    }
-
-    return courseList.filter(
-      (course) => (course.cycle ?? "NONE") === appliedCycle
-    );
-  }, [appliedCycle, appliedFilters.cycle, courses, isBasicSciences]);
 
   const isSemesterLocked = useMemo(() => {
     return filteredCourses.some(
@@ -370,7 +364,6 @@ export const CoursesView: React.FC = () => {
 
             updateDraftFilter(key, value);
           }}
-          className="md:grid-cols-2 xl:grid-cols-3"
         />
         <FilterActions onApply={applyFilters} onReset={resetFilters} />
       </FilterPanel>

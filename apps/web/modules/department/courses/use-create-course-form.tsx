@@ -46,6 +46,7 @@ export const useCreateCourseForm = (
       theoryMaxExams: 0,
       theoryExamMaxMarks: 0,
       theoryMinExams: 0,
+      theoryCieContribution: 0,
       theoryEligibility: 40,
       labMaxMarks: 0,
       labEligibility: 40,

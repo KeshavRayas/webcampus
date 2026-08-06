@@ -527,6 +527,11 @@ const CourseDetailContent = ({
                     </div>
 
                     <div className="text-muted-foreground font-medium">
+                      Theory Contribution to CIE:
+                    </div>
+                    <div>{course.theoryCieContribution}</div>
+
+                    <div className="text-muted-foreground font-medium">
                       AAT:
                     </div>
                     <div>
