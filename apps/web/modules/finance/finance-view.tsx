@@ -293,7 +293,7 @@ export function FinanceView() {
   // Comment Modal state
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentCategory, setCommentCategory] = useState("Select Category");
-  const [commentText, setCommentText] = useState("");
+  const [commentText, setCommentText] = useState("")
   const [, setCommentFile] = useState<File | null>(null);
 
   // Search state
@@ -341,7 +341,6 @@ export function FinanceView() {
     setIsCommentModalOpen(false);
     setCommentCategory("Select Category");
     setCommentText("");
-    setCommentFile(null);
   };
 
   const handleUpdateTuitionFee = (e: React.FormEvent) => {
@@ -446,7 +445,7 @@ export function FinanceView() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  setSearchSubmitted(usnSearch);
+                  void usnSearch;
                 }}
                 className="flex max-w-lg items-center gap-4"
               >
