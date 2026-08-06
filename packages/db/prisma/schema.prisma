@@ -34,6 +34,8 @@ model User {
   accounts              Account[]
   sessions              Session[]
   adminEditLogs         AdminEditLog[]
+  admissionArchives     AdmissionArchive[]
+  filledAdmissions      Admission[] @relation("AdmissionFilledBy")
 
   courseMappingAuditLogs CourseMappingAuditLog[]
   @@map("user")
@@ -700,6 +702,7 @@ model Admission {
   permanentState                  String?
   placeOfBirth                    String?
   primaryEmail                    String         @unique
+  filledById                      String
   primaryPhoneNumber              String?
   religion                        String?
   secondaryEmail                  String?
@@ -713,12 +716,14 @@ model Admission {
   visaValidityDetails             String?
   departmentId                    String
   studentId                       String?         @unique
+  archive                         AdmissionArchive?
   categoryAllotted                String?
   categoryClaimed                 String?
   quota                           String?
   department                      Department      @relation(fields: [departmentId], references: [id])
   semester                        Semester        @relation(fields: [semesterId], references: [id])
   student                         Student?        @relation(fields: [studentId], references: [id])
+  filledBy                        User            @relation("AdmissionFilledBy", fields: [filledById], references: [id])
 
   @@index([semesterId])
   @@index([departmentId])
@@ -927,6 +932,21 @@ enum AdmissionStatus {
   APPROVED
   REJECTED
   EXITED
+  CANCELLED
+}
+
+model AdmissionArchive {
+  id            String    @id @default(uuid())
+  admissionId   String    @unique
+  reason        String
+  cancelledById String
+  cancelledAt   DateTime  @default(now())
+
+  admission     Admission @relation(fields: [admissionId], references: [id])
+  cancelledBy   User      @relation(fields: [cancelledById], references: [id])
+
+  @@index([cancelledById])
+  @@index([cancelledAt])
 }
 
 

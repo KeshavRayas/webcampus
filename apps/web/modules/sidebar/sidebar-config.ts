@@ -407,19 +407,19 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: LayoutDashboard,
         },
         {
+          name: "Fill Applicant Form",
+          url: "/admission/fill-applicant",
+          icon: BookOpenText,
+        },
+        {
           name: "View Admissions",
           url: "/admission/view-admissions",
           icon: BookCopy,
         },
         {
-          name: "Leave College",
-          url: "/admission/leave-college",
+          name: "Cancel Admission",
+          url: "/admission/cancel-admission",
           icon: GraduationCap,
-        },
-        {
-          name: "Change Admission Mode",
-          url: "/admission/change-mode",
-          icon: BookCopy,
         },
         {
           name: "Upload Documents",
