@@ -38,9 +38,7 @@ type ApplicantAdmissionData = {
   modeOfAdmission: string;
   status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
   department?: { id: string; name: string };
-  firstName?: string;
-  middleName?: string;
-  lastName?: string;
+  nameAsPer10th?: string;
   categoryClaimed?: string;
   categoryAllotted?: string;
   quota?: string;
@@ -277,13 +275,6 @@ export const ApplicantAdmissionView = ({
   console.log("Admission:", admission);
   console.log("Primary Email:", admission?.primaryEmail);
 
-  const fullName = [
-    admission?.firstName,
-    admission?.middleName,
-    admission?.lastName,
-  ]
-    .filter(Boolean)
-    .join(" ");
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -482,9 +473,7 @@ export const ApplicantAdmissionView = ({
           "feeReceiptNumber",
           "scholarship",
           "sspId",
-          "firstName",
-          "middleName",
-          "lastName",
+          "nameAsPer10th",
           "departmentId",
           "categoryClaimed",
           "categoryAllotted",
@@ -955,35 +944,6 @@ export const ApplicantAdmissionView = ({
               </Select>
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="firstName">First Name *</Label>
-
-              <Input
-                id="firstName"
-                name="firstName"
-                defaultValue={admission.firstName ?? ""}
-                required
-              />
-            </div>
-            <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="middleName">Middle Name</Label>
-
-              <Input
-                id="middleName"
-                name="middleName"
-                defaultValue={admission.middleName ?? ""}
-              />
-            </div>
-            <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="lastName">Last Name *</Label>
-
-              <Input
-                id="lastName"
-                name="lastName"
-                defaultValue={admission.lastName ?? ""}
-                required
-              />
-            </div>
-            <div className="space-y-2 md:col-span-4">
               <Label htmlFor="departmentId">Branch *</Label>
               <Select
                 name="departmentId"
@@ -1306,7 +1266,7 @@ export const ApplicantAdmissionView = ({
               <Input
                 id="nameAsPer10th"
                 name="nameAsPer10th"
-                defaultValue={fullName}
+                defaultValue={admission.nameAsPer10th ?? ""}
                 required
               />
             </div>

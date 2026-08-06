@@ -164,9 +164,7 @@ export const SubmitApplicationSchema = z
   .object({
     applicationId: z.string().min(1, "Application ID is required"),
 
-    firstName: z.string().min(1, "First Name is required"),
-    middleName: z.string().optional(),
-    lastName: z.string().min(1, "Last Name is required"),
+    nameAsPer10th: z.string().min(1, "Name as per 10th grade is required"),
 
     modeOfAdmission: z.string().min(1, "Mode of Admission is required"),
 

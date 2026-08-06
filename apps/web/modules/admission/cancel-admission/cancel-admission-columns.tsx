@@ -7,11 +7,7 @@ import { CancelAdmissionActions } from "./cancel-admission-actions";
 
 const nameFor = (admission: AdmissionResponse) => {
   const studentName = admission.student?.user?.name?.trim();
-  const admissionName = [
-    admission.firstName?.trim(),
-    admission.middleName?.trim(),
-    admission.lastName?.trim(),
-  ]
+  const admissionName = [admission.nameAsPer10th?.trim()]
     .filter((value): value is string => Boolean(value))
     .join(" ")
     .trim();

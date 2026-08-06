@@ -11,9 +11,7 @@ export type UploadDocsResponse = {
 
   primaryEmail: string;
 
-  firstName?: string | null;
-  middleName?: string | null;
-  lastName?: string | null;
+  nameAsPer10th?: string | null;
 
   student?: {
     usn: string;
@@ -71,13 +69,7 @@ export const uploadDocsColumns: ColumnDef<UploadDocsResponse>[] = [
     cell: ({ row }) => {
       const studentName = row.original.student?.user?.name?.trim();
 
-      const admissionName = [
-        row.original.firstName?.trim(),
-        row.original.middleName?.trim(),
-        row.original.lastName?.trim(),
-      ]
-        .filter((value): value is string => Boolean(value))
-        .join(" ");
+      const admissionName = row.original.nameAsPer10th?.trim();
 
       return <div>{studentName || admissionName || "-"}</div>;
     },

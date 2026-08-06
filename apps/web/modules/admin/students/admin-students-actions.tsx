@@ -66,9 +66,7 @@ type AdminStudentDetailResponse = {
     feePaid?: number | null;
     tempUsn?: string | null;
     uniqueId?: string | null;
-    firstName?: string | null;
-    middleName?: string | null;
-    lastName?: string | null;
+    nameAsPer10th?: string | null;
     primaryPhoneNumber?: string | null;
     secondaryPhoneNumber?: string | null;
     primaryEmail?: string | null;
@@ -89,7 +87,6 @@ type AdminStudentDetailResponse = {
     passportNumber?: string | null;
     placeOfBirth?: string | null;
     stateOfBirth?: string | null;
-    nameAsPer10th?: string | null;
 
     disability?: boolean | null;
     disabilityType?: string | null;
@@ -365,13 +362,7 @@ export const AdminStudentActions = ({
 
   // Compute Full Name from admission data
   const fullName = details?.admission
-    ? [
-        details.admission.firstName,
-        details.admission.middleName,
-        details.admission.lastName,
-      ]
-        .filter(Boolean)
-        .join(" ")
+    ? details.admission.nameAsPer10th?.trim() || ""
     : details?.user.name || student.name || "-";
 
   return (

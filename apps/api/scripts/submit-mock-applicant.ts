@@ -15,18 +15,21 @@ const PDF_URL =
 interface ParsedArgs {
   count: number;
   departmentCode: string;
+  asInstructor: boolean;
 }
 
 const parseCliArguments = (): ParsedArgs => {
   const args = process.argv.slice(2);
-  const result: Partial<ParsedArgs> = {};
+  const result: Partial<ParsedArgs> = {
+    asInstructor: false,
+  };
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--count") {
       const countValue = args[i + 1];
       if (typeof countValue !== "string") {
         throw new Error(
-          "Missing value for --count. Usage: npm run submit-mock-applicant --count <number> --dept <code>"
+          "Missing value for --count. Usage: npm run submit-mock-applicant --count <number> --dept <code> [--instructor]"
         );
       }
 
@@ -43,28 +46,32 @@ const parseCliArguments = (): ParsedArgs => {
       const departmentValue = args[i + 1];
       if (typeof departmentValue !== "string") {
         throw new Error(
-          "Missing value for --dept. Usage: npm run submit-mock-applicant --count <number> --dept <code>"
+          "Missing value for --dept. Usage: npm run submit-mock-applicant --count <number> --dept <code> [--instructor]"
         );
       }
 
       result.departmentCode = departmentValue;
       i++;
+    } else if (args[i] === "--instructor") {
+      result.asInstructor = true;
     }
   }
 
   if (!result.count) {
     throw new Error(
       "Missing required parameter --count.\n" +
-        "Usage: npm run submit-mock-applicant --count <number> --dept <code>\n" +
-        "Example: npm run submit-mock-applicant --count 500 --dept CS"
+        "Usage: npm run submit-mock-applicant --count <number> --dept <code> [--instructor]\n" +
+        "Example: npm run submit-mock-applicant --count 500 --dept CS\n" +
+        "Example: npm run submit-mock-applicant --count 100 --dept CS --instructor"
     );
   }
 
   if (!result.departmentCode) {
     throw new Error(
       "Missing required parameter --dept.\n" +
-        "Usage: npm run submit-mock-applicant --count <number> --dept <code>\n" +
-        "Example: npm run submit-mock-applicant --count 500 --dept CS"
+        "Usage: npm run submit-mock-applicant --count <number> --dept <code> [--instructor]\n" +
+        "Example: npm run submit-mock-applicant --count 500 --dept CS\n" +
+        "Example: npm run submit-mock-applicant --count 100 --dept CS --instructor"
     );
   }
 
@@ -133,27 +140,37 @@ const cleanupPartialApplicant = async (
 //   return maxNumber + 1;
 // };
 
-const resolveContext = async (departmentCode: string) => {
+const resolveContext = async (
+  departmentCode: string,
+  asInstructor: boolean
+) => {
   const { ADMIN_USER_EMAIL, ADMIN_USER_PASSWORD } = backendEnv();
+
+  const actorEmail = asInstructor
+    ? "admission-instructor@webcampus.com"
+    : ADMIN_USER_EMAIL;
+  const actorPassword = asInstructor ? "password" : ADMIN_USER_PASSWORD;
 
   const signInResponse = await auth.api.signInEmail({
     body: {
-      email: ADMIN_USER_EMAIL,
-      password: ADMIN_USER_PASSWORD,
+      email: actorEmail,
+      password: actorPassword,
     },
   });
 
   if (!signInResponse.token) {
-    throw new Error("Admin sign-in failed: token missing");
+    throw new Error(
+      `${asInstructor ? "Instructor" : "Admin"} sign-in failed: token missing`
+    );
   }
 
   const actor = await db.user.findUnique({
-    where: { email: ADMIN_USER_EMAIL },
+    where: { email: actorEmail },
     select: { id: true },
   });
 
   if (!actor) {
-    throw new Error("Admin user was not found after sign-in");
+    throw new Error("Actor user was not found after sign-in");
   }
 
   const department = await db.department.findFirst({
@@ -215,17 +232,12 @@ const submitAndApprove = async (
   email: string,
   serial: number,
   admissionId: string,
-  firstName: string,
-  lastName: string,
+  fullName: string,
   filledById: string,
   departmentId: string,
   semesterId: string
 ): Promise<void> => {
-  const fullName = `${firstName} ${lastName}`;
-
   const data: Record<string, string> = {
-    firstName,
-    lastName,
     nameAsPer10th: fullName,
     primaryEmail: email,
     semesterId,
@@ -303,7 +315,7 @@ async function main() {
     process.exit(1);
   }
 
-  const context = await resolveContext(args.departmentCode);
+  const context = await resolveContext(args.departmentCode, args.asInstructor);
   // let nextApplicationNumber = await getNextApplicationNumber();
   let approvedCreated = 0;
   let nextSerial = 1;
@@ -319,6 +331,7 @@ async function main() {
     quota: "MERIT",
     category: "GENERAL",
     porting: false,
+    attributedTo: args.asInstructor ? "admission-instructor" : "admin",
   });
 
   while (approvedCreated < args.count) {
@@ -354,9 +367,8 @@ async function main() {
     });
 
     try {
-      // Generate the names BEFORE creating the shell
-      const firstName = faker.person.firstName();
-      const lastName = faker.person.lastName();
+      // Generate the name BEFORE creating the shell
+      const name = `${faker.person.firstName()} ${faker.person.lastName()}`;
 
       const shellResponse = await AdmissionService.createShell(
         {
@@ -391,8 +403,7 @@ async function main() {
         email,
         serial,
         admissionId,
-        firstName,
-        lastName,
+        name,
         context.filledById,
         context.departmentId,
         context.semesterId

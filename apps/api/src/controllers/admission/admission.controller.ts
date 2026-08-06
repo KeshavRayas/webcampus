@@ -49,8 +49,17 @@ export class AdmissionController {
   static async getBySemester(req: Request, res: Response): Promise<void> {
     try {
       const { semesterId } = req.params;
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(req.headers),
+      });
+      const filledById =
+        session?.user?.role === "admission-instructor"
+          ? session.user.id
+          : undefined;
+
       const response = await AdmissionService.getAdmissionsBySemester(
-        semesterId as string
+        semesterId as string,
+        filledById
       );
 
       if (response.status === "success") {
@@ -76,8 +85,17 @@ export class AdmissionController {
 
   static async getAdmissions(req: Request, res: Response): Promise<void> {
     try {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(req.headers),
+      });
+      const filledById =
+        session?.user?.role === "admission-instructor"
+          ? session.user.id
+          : undefined;
+
       const response = await AdmissionService.getAdmissions(
-        req.query as GetAdmissionsQueryType
+        req.query as GetAdmissionsQueryType,
+        filledById
       );
 
       if (response.status === "success") {

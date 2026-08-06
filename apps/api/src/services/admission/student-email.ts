@@ -11,7 +11,20 @@ export type StudentEmailGenerationInput = {
 };
 
 export const normalizeStudentEmailToken = (value: string): string => {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+};
+
+export const splitStudentName = (
+  fullName: string
+): { firstName: string; middleName: string; lastName: string } => {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0] ?? "";
+  const middleName = parts.length > 2 ? parts.slice(1, -1).join(" ") : "";
+  const lastName = parts.length > 1 ? (parts[parts.length - 1] ?? "") : "";
+  return { firstName, middleName, lastName };
 };
 
 export const getStudentEmailYearSuffix = (academicYear: string): string => {
@@ -52,10 +65,9 @@ export const buildStudentEmailAddress = ({
   );
 
   const baseLocalPart = `${normalizedFirstName}.${emailSuffix}`;
-  const normalizedLastInitial = normalizeStudentEmailToken(lastName ?? "").slice(
-    0,
-    1
-  );
+  const normalizedLastInitial = normalizeStudentEmailToken(
+    lastName ?? ""
+  ).slice(0, 1);
   const lastInitialLocalPart = normalizedLastInitial
     ? `${normalizedFirstName}${normalizedLastInitial}.${emailSuffix}`
     : null;

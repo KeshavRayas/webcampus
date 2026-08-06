@@ -32,7 +32,7 @@ router.get(
   "/",
   validateRequest(GetAdmissionsQuerySchema, "query"),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission", "admission-instructor"],
     permissions: {
       admission: ["read"],
     },
@@ -45,7 +45,7 @@ router.post(
   "/shell",
   validateRequest(CreateAdmissionShellSchema),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission", "admission-instructor"],
     permissions: {
       admission: ["create"],
       user: ["set-role"], // Needed to create the applicant user
@@ -58,7 +58,7 @@ router.post(
 router.get(
   "/semester/:semesterId",
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission", "admission-instructor"],
     permissions: {
       admission: ["read"],
     },
@@ -79,7 +79,7 @@ router.get(
 router.get(
   "/departments",
   protect({
-    role: ["applicant", "admin", "admission"],
+    role: ["applicant", "admin", "admission", "admission-instructor"],
     permissions: { department: ["read"] },
   }),
   DepartmentController.getPublicDepartments
@@ -160,7 +160,7 @@ router.put(
 router.post(
   "/admission-submit",
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission", "admission-instructor"],
     permissions: { admission: ["create"] },
   }),
   upload.fields(applicationUploadFields),

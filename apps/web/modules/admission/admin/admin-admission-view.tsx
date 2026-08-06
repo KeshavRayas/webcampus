@@ -97,7 +97,11 @@ export const AdminAdmissionView = ({
 
   const { data: session } = authClient.useSession();
   const role = session?.user?.role;
-  const canCreate = isMounted && (role === "admin" || role === "admission");
+  const canCreate =
+    isMounted &&
+    (role === "admin" ||
+      role === "admission" ||
+      role === "admission-instructor");
   const canPort = isMounted && (role === "admin" || role === "admission");
 
   const router = useRouter();
@@ -534,13 +538,7 @@ export const AdminAdmissionView = ({
                         </thead>
                         <tbody>
                           {admissionsToPort.map((admission) => {
-                            const fullName = [
-                              admission.firstName,
-                              admission.middleName,
-                              admission.lastName,
-                            ]
-                              .filter(Boolean)
-                              .join(" ");
+                            const fullName = admission.nameAsPer10th?.trim();
                             return (
                               <tr key={admission.id} className="border-t">
                                 <td className="px-3 py-2">

@@ -417,6 +417,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: BookCopy,
         },
         {
+          name: "Fee Payment",
+          url: "/admission/fee-payment",
+          icon: IndianRupee,
+        },
+        {
           name: "Cancel Admission",
           url: "/admission/cancel-admission",
           icon: GraduationCap,
@@ -425,6 +430,29 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Upload Documents",
           url: "/admission/upload-documents",
           icon: Upload,
+        },
+      ],
+    },
+    navSecondary,
+  },
+
+  "admission-instructor": {
+    navMain: {
+      items: [
+        {
+          name: "Add Admission",
+          url: "/admission-instructor",
+          icon: LayoutDashboard,
+        },
+        {
+          name: "Fill Applicant Form",
+          url: "/admission-instructor/fill-applicant",
+          icon: BookOpenText,
+        },
+        {
+          name: "View Admissions",
+          url: "/admission-instructor/view-admissions",
+          icon: BookCopy,
         },
       ],
     },

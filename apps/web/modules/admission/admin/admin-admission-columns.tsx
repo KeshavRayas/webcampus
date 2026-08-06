@@ -37,9 +37,6 @@ export type AdmissionResponse = {
   };
 
   // Added all the fields from the database
-  firstName?: string | null;
-  middleName?: string | null;
-  lastName?: string | null;
   categoryClaimed?: string | null;
   categoryAllotted?: string | null;
   quota?: string | null;
@@ -209,14 +206,7 @@ export const getAdminAdmissionColumns = (
           header: "Name",
           cell: ({ row }: { row: { original: AdmissionResponse } }) => {
             const studentName = row.original.student?.user?.name?.trim();
-            const admissionName = [
-              row.original.firstName?.trim(),
-              row.original.middleName?.trim(),
-              row.original.lastName?.trim(),
-            ]
-              .filter((value): value is string => Boolean(value))
-              .join(" ")
-              .trim();
+            const admissionName = row.original.nameAsPer10th?.trim();
 
             return <div>{studentName || admissionName || "-"}</div>;
           },

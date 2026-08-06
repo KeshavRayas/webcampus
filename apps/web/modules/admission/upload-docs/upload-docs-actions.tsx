@@ -201,13 +201,7 @@ export function UploadDocsActions({ admission }: Props) {
     }));
   };
 
-  const fullName = [
-    admission.firstName,
-    admission.middleName,
-    admission.lastName,
-  ]
-    .filter((value): value is string => Boolean(value))
-    .join(" ");
+  const fullName = admission.nameAsPer10th?.trim() || "";
 
   const hasFiles = Object.values(files).some(Boolean);
 

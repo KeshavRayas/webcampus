@@ -22,9 +22,12 @@ describe("admission schemas", () => {
   test("preserves education country fields on submit", () => {
     const result = SubmitApplicationSchema.safeParse({
       applicationId: "APP-001",
-      firstName: "Asha",
-      lastName: "Rao",
+      nameAsPer10th: "Asha Rao",
       modeOfAdmission: "KCET",
+      admissionType: "REGULAR",
+      scholarship: "false",
+      studiedKannadaIn10th: "false",
+      admissionBasedOn: "CLASS_12_PUC",
       semesterId: "11111111-1111-4111-8111-111111111111",
       departmentId: "22222222-2222-4222-8222-222222222222",
       categoryClaimed: "GM",

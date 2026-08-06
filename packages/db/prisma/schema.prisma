@@ -666,7 +666,6 @@ model Admission {
   fatherOccupation                String?
   fatherPermanentAddress          String?
   feePaid                         Float?
-  firstName                       String?
   guardianEmail                   String?
   guardianName                    String?
   guardianNumber                  String?
@@ -674,8 +673,6 @@ model Admission {
   guardianPermanentAddress        String?
   hostel                          Boolean?
   hostelRoomNumber                String?
-  lastName                        String?
-  middleName                      String?
   motherQualification             String?
   motherOccupation                String?
   motherPermanentAddress          String?

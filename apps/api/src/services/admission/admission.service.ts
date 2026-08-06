@@ -16,6 +16,7 @@ import {
   buildStudentEmailAddress,
   getStudentEmailYearSuffix,
   normalizeStudentEmailToken,
+  splitStudentName,
 } from "./student-email";
 
 const parseOptionalNumber = (value: string | undefined): number | null => {
@@ -34,26 +35,14 @@ const calculatePercentage = (
 
 export class AdmissionService {
   private static getStudentFullName(admission: {
-    firstName?: string | null;
-    middleName?: string | null;
-    lastName?: string | null;
+    nameAsPer10th?: string | null;
   }): string | null {
-    const fullName = [
-      admission.firstName?.trim(),
-      admission.middleName?.trim(),
-      admission.lastName?.trim(),
-    ]
-      .filter((value): value is string => Boolean(value))
-      .join(" ")
-      .trim();
-
-    return fullName.length > 0 ? fullName : null;
+    const fullName = admission.nameAsPer10th?.trim();
+    return fullName && fullName.length > 0 ? fullName : null;
   }
 
   private static getSortableApplicantName(admission: {
-    firstName?: string | null;
-    middleName?: string | null;
-    lastName?: string | null;
+    nameAsPer10th?: string | null;
   }): string {
     return (
       AdmissionService.getStudentFullName(admission)?.toLocaleLowerCase() || ""
@@ -312,7 +301,7 @@ export class AdmissionService {
         request: {
           email: applicantEmail,
           name: "Applicant",
-          username: applicantEmail,
+          username: (applicantEmail.split("@")[0] ?? "").trim().toLowerCase(),
           password: data.password,
           role: "applicant",
         },
@@ -357,7 +346,8 @@ export class AdmissionService {
   }
 
   static async getAdmissions(
-    filters: GetAdmissionsQueryType
+    filters: GetAdmissionsQueryType,
+    filledById?: string
   ): Promise<BaseResponse<unknown>> {
     try {
       const createdTo = filters.createdTo
@@ -370,6 +360,7 @@ export class AdmissionService {
 
       const admissions = await db.admission.findMany({
         where: {
+          filledById,
           applicationId: filters.applicationId
             ? {
                 contains: filters.applicationId,
@@ -443,9 +434,10 @@ export class AdmissionService {
   }
 
   static async getAdmissionsBySemester(
-    semesterId: string
+    semesterId: string,
+    filledById?: string
   ): Promise<BaseResponse<unknown>> {
-    return this.getAdmissions({ semester: semesterId });
+    return this.getAdmissions({ semester: semesterId }, filledById);
   }
 
   static async getByApplicationId(
@@ -741,9 +733,6 @@ export class AdmissionService {
           // Admission Details
           applicationId: data.applicationId,
           admissionType: data.admissionType,
-          firstName: data.firstName,
-          middleName: data.middleName,
-          lastName: data.lastName,
           modeOfAdmission: data.modeOfAdmission,
           semesterId: admission.semesterId,
           departmentId: data.departmentId,
@@ -1211,9 +1200,7 @@ export class AdmissionService {
               departmentId: true,
               tempUsn: true,
               studentId: true,
-              firstName: true,
-              middleName: true,
-              lastName: true,
+              nameAsPer10th: true,
               primaryEmail: true,
               photo: true,
             },
@@ -1259,16 +1246,16 @@ export class AdmissionService {
           continue;
         }
 
-        const firstNameKey = normalizeStudentEmailToken(
-          admission.firstName ?? ""
+        const { firstName, lastName } = splitStudentName(
+          admission.nameAsPer10th ?? ""
         );
+
+        const firstNameKey = normalizeStudentEmailToken(firstName);
         if (!firstNameKey) {
           continue;
         }
 
-        const lastInitial = normalizeStudentEmailToken(
-          admission.lastName ?? ""
-        ).slice(0, 1);
+        const lastInitial = normalizeStudentEmailToken(lastName).slice(0, 1);
 
         const counts = studentEmailCollisionCountsByDepartmentId.get(
           admission.departmentId
@@ -1358,8 +1345,7 @@ export class AdmissionService {
             }
 
             const fullName = AdmissionService.getStudentFullName(admission);
-            const firstName = admission.firstName?.trim();
-            const lastName = admission.lastName?.trim();
+            const { firstName, lastName } = splitStudentName(fullName ?? "");
 
             if (!fullName) {
               throw new Error(

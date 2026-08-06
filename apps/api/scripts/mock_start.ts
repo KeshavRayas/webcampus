@@ -479,6 +479,12 @@ const ADMISSION_USERS = [
     email: "admission@webcampus.com",
     role: "admission" as const,
   },
+  {
+    name: "Admission Instructor",
+    username: "admission-instructor",
+    email: "admission-instructor@webcampus.com",
+    role: "admission-instructor" as const,
+  },
 ];
 
 const ODD_2026_SEMESTERS = [
