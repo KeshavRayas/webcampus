@@ -604,7 +604,10 @@ model Admission {
   hasClass12                      Boolean?
   hasDiploma                      Boolean?
   class10thSchoolName             String?
+  class10thRollRegNumber          String?
+  admissionBasedOn                String?
   modeOfAdmission                 String?
+  admissionType                   String?
   photo                           String?
   createdAt                       DateTime        @default(now())
   applicationId                   String?         @unique
@@ -614,21 +617,32 @@ model Admission {
   updatedAt                       DateTime        @updatedAt
   aadharCard                      String?
   aadharNumber                    String?         @unique
+  abcAparId                       String?
+  scholarship                     Boolean?
+  sspId                           String?
+  counsellingRound                String?
+  feeReceiptNumber                String?
+  dateOfAdmission                 DateTime?
   bloodGroup                      String?
   caste                           String?
   class10thAggregateScore         Float?
   class10thAggregateTotal         Float?
   class10thMediumOfTeaching       String?
+  studiedKannadaIn10th            Boolean?
   class10thSchoolCity             String?
   class10thSchoolCode             String?
   class10thSchoolState            String?
   class10thSchoolType             String?
+  schoolCountry                   String?
   class10thYearOfPassing          String?
   class12thAggregateScore         Float?
   class12thAggregateTotal         Float?
+  class12thRollRegNumber          String?
   class12thBranch                 String?
+  instituteCountry                String?
   diplomaInstituteName            String?
   diplomaInstituteType            String?
+  diplomaCountry                  String?
   diplomaInstituteCity            String?
   diplomaInstituteState           String?
   diplomaYearOfPassing            String?
@@ -643,6 +657,19 @@ model Admission {
   class12thInstituteType          String?
   class12thMediumOfTeaching       String?
   class12thYearOfPassing          String?
+  physicsMarks                    Float?
+  physicsMaxMarks                 Float?
+  physicsMinMarks                 Float?
+  physicsPercentage               Float?
+  chemistryMarks                  Float?
+  chemistryMaxMarks               Float?
+  chemistryMinMarks               Float?
+  chemistryPercentage             Float?
+  mathematicsMarks                Float?
+  mathematicsMaxMarks             Float?
+  mathematicsMinMarks             Float?
+  mathematicsPercentage           Float?
+  pcmPercentage                   Float?
   currentAddress                  String?
   currentArea                     String?
   currentCity                     String?
@@ -682,6 +709,13 @@ model Admission {
   originalAdmissionOrderDate      DateTime?
   originalAdmissionOrderNumber    String?
   passportNumber                  String?
+  passportExpiryDate              DateTime?
+  visaNumber                      String?
+  visaExpiryDate                  DateTime?
+  embassyPermissionLetter         String?
+  parentPassportNumber            String?
+  parentVisaNumber                String?
+  parentVisaExpiryDate            DateTime?
   permanentAddress                String?
   permanentArea                   String?
   permanentCity                   String?

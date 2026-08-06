@@ -10,7 +10,7 @@ import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { admissionModes } from "@webcampus/schemas/constants";
+import { admissionModes, admissionTypes } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
@@ -67,6 +67,7 @@ type AdmissionFilters = {
   applicationId: string;
   status: string;
   mode: string;
+  admissionType: string;
   academicTerm: string;
   semester: string;
   createdFrom: string;
@@ -77,6 +78,7 @@ const EMPTY_FILTERS: AdmissionFilters = {
   applicationId: "",
   status: "",
   mode: "",
+  admissionType: "",
   academicTerm: "",
   semester: "",
   createdFrom: "",
@@ -157,7 +159,10 @@ export const AdminAdmissionView = ({
   console.log("selectedSemesterId =", showFilters ? draftFilters.semester : "");
   console.log("pathname:", pathname);
   console.log("showFilters:", showFilters);
-  const { form, onSubmit } = useCreateAdmissionShellForm(selectedSemesterId);
+  const { form, onSubmit } = useCreateAdmissionShellForm(
+    selectedSemesterId,
+    departments
+  );
   const { onPortStudents, isPorting } = usePortStudents();
 
   const selectedSemester = nestedSemesters.find(
@@ -284,6 +289,17 @@ export const AdminAdmissionView = ({
       options: admissionModes.map((mode) => ({
         label: mode,
         value: mode,
+      })),
+    },
+    {
+      key: "admissionType",
+      label: "Admission Type",
+      type: "select",
+      placeholder: "All admission types",
+      allOptionLabel: "All admission types",
+      options: admissionTypes.map((type) => ({
+        label: type.label,
+        value: type.value,
       })),
     },
     {

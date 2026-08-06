@@ -11,6 +11,7 @@ import {
 } from "@webcampus/schemas/admission";
 import { Router } from "express";
 import multer from "multer";
+import admissionUploadRouter from "./admission.upload.router";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router: Router = Router();
@@ -71,6 +72,8 @@ router.get(
   }),
   DepartmentController.getPublicDepartments
 );
+
+router.use(admissionUploadRouter);
 
 // Endpoint for admin to delete an admission record (and its S3 files)
 router.delete(
@@ -161,6 +164,7 @@ router.put(
     { name: "aadharCard", maxCount: 1 },
     { name: "transferCertificate", maxCount: 1 },
     { name: "studyCertificate", maxCount: 1 },
+    { name: "embassyPermissionLetter", maxCount: 1 },
   ]),
   AdmissionController.submit
 );

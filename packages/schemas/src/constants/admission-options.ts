@@ -9,6 +9,12 @@ export const admissionModes = [
   "GOI",
 ] as const;
 
+export const admissionTypes = [
+  { value: "REGULAR", label: "Regular" },
+  { value: "LATERAL_ENTRY", label: "Lateral Entry" },
+  { value: "COLLEGE_CHANGE", label: "College Change" },
+] as const;
+
 export const categoriesClaimed = {
   KCET: [
     "GM",

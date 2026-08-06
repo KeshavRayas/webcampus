@@ -1,0 +1,18 @@
+-- AlterTable
+ALTER TABLE "Admission"
+ADD COLUMN "admissionBasedOn" TEXT,
+ADD COLUMN "class10thRollRegNumber" TEXT,
+ADD COLUMN "class12thRollRegNumber" TEXT,
+ADD COLUMN "physicsMarks" DOUBLE PRECISION,
+ADD COLUMN "physicsMaxMarks" DOUBLE PRECISION,
+ADD COLUMN "physicsMinMarks" DOUBLE PRECISION,
+ADD COLUMN "physicsPercentage" DOUBLE PRECISION,
+ADD COLUMN "chemistryMarks" DOUBLE PRECISION,
+ADD COLUMN "chemistryMaxMarks" DOUBLE PRECISION,
+ADD COLUMN "chemistryMinMarks" DOUBLE PRECISION,
+ADD COLUMN "chemistryPercentage" DOUBLE PRECISION,
+ADD COLUMN "mathematicsMarks" DOUBLE PRECISION,
+ADD COLUMN "mathematicsMaxMarks" DOUBLE PRECISION,
+ADD COLUMN "mathematicsMinMarks" DOUBLE PRECISION,
+ADD COLUMN "mathematicsPercentage" DOUBLE PRECISION,
+ADD COLUMN "pcmPercentage" DOUBLE PRECISION;

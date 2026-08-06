@@ -16,6 +16,20 @@ import {
   normalizeStudentEmailToken,
 } from "./student-email";
 
+const parseOptionalNumber = (value: string | undefined): number | null => {
+  if (value === undefined || value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const calculatePercentage = (
+  marks: number | null,
+  maxMarks: number | null
+): number | null => {
+  if (marks === null || maxMarks === null || maxMarks <= 0) return null;
+  return Number(((marks / maxMarks) * 100).toFixed(2));
+};
+
 export class AdmissionService {
   private static getStudentFullName(admission: {
     firstName?: string | null;
@@ -255,6 +269,34 @@ export class AdmissionService {
         throw new Error("An account with this email already exists");
       }
 
+      const departmentCode = applicantEmail
+        .split("@")[0]
+        ?.match(/\.([a-z]+)\d{2,4}$/i)?.[1];
+
+      if (!departmentCode) {
+        throw new Error(
+          "Applicant email must follow the name.departmentCodeYear format"
+        );
+      }
+
+      const department = await db.department.findFirst({
+        where: {
+          code: {
+            equals: departmentCode,
+            mode: "insensitive",
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!department) {
+        throw new Error(`Department code ${departmentCode} was not found`);
+      }
+
+      if (department.id !== data.departmentId) {
+        throw new Error("The selected department does not match the email");
+      }
+
       const userService = new UserService({
         request: {
           email: applicantEmail,
@@ -274,21 +316,13 @@ export class AdmissionService {
         );
       }
 
-      const placeholderDepartment = await db.department.findFirst({
-        select: { id: true },
-      });
-
-      if (!placeholderDepartment) {
-        throw new Error("No departments found to use as placeholder");
-      }
-
       await db.admission.create({
         data: {
           // applicationId: crypto.randomUUID(), // or primaryEmail for now
           primaryEmail: data.primaryEmail,
 
           semesterId: data.semesterId,
-          departmentId: placeholderDepartment.id,
+          departmentId: department.id,
 
           status: "PENDING",
         },
@@ -334,6 +368,12 @@ export class AdmissionService {
           modeOfAdmission: filters.mode
             ? {
                 equals: filters.mode,
+                mode: "insensitive",
+              }
+            : undefined,
+          admissionType: filters.admissionType
+            ? {
+                equals: filters.admissionType,
                 mode: "insensitive",
               }
             : undefined,
@@ -429,6 +469,7 @@ export class AdmissionService {
         admission.aadharCard,
         admission.transferCertificate,
         admission.studyCertificate,
+        admission.embassyPermissionLetter,
       ].filter(
         (url): url is string => typeof url === "string" && url.length > 0
       );
@@ -538,6 +579,9 @@ export class AdmissionService {
         where: {
           primaryEmail,
         },
+        include: {
+          semester: true,
+        },
       });
 
       if (!admission) {
@@ -547,6 +591,88 @@ export class AdmissionService {
       if (admission.status === "SUBMITTED") {
         throw new Error("Application has already been submitted.");
       }
+
+      if (!data.admissionType) {
+        throw new Error("Admission type is required.");
+      }
+
+      const validAdmissionTypes =
+        admission.semester.semesterNumber === 1
+          ? ["REGULAR"]
+          : admission.semester.semesterNumber === 3
+            ? ["LATERAL_ENTRY", "COLLEGE_CHANGE"]
+            : [];
+
+      if (!validAdmissionTypes.includes(data.admissionType)) {
+        throw new Error(
+          `Admission type ${data.admissionType} is not valid for semester ${admission.semester.semesterNumber}.`
+        );
+      }
+
+      if (data.semesterId && data.semesterId !== admission.semesterId) {
+        throw new Error("The submitted semester does not match the admission.");
+      }
+
+      if (data.scholarship !== "true" && data.scholarship !== "false") {
+        throw new Error("Scholarship selection is required.");
+      }
+
+      if (data.scholarship === "true" && !data.sspId?.trim()) {
+        throw new Error("SSP ID is required when scholarship is enabled.");
+      }
+
+      const physicsMarks = parseOptionalNumber(data.physicsMarks);
+      const physicsMaxMarks = parseOptionalNumber(data.physicsMaxMarks);
+      const chemistryMarks = parseOptionalNumber(data.chemistryMarks);
+      const chemistryMaxMarks = parseOptionalNumber(data.chemistryMaxMarks);
+      const mathematicsMarks = parseOptionalNumber(data.mathematicsMarks);
+      const mathematicsMaxMarks = parseOptionalNumber(data.mathematicsMaxMarks);
+      const physicsMinMarks = parseOptionalNumber(data.physicsMinMarks);
+      const chemistryMinMarks = parseOptionalNumber(data.chemistryMinMarks);
+      const mathematicsMinMarks = parseOptionalNumber(data.mathematicsMinMarks);
+      const pcmMaxMarks = [
+        physicsMaxMarks,
+        chemistryMaxMarks,
+        mathematicsMaxMarks,
+      ];
+      const pcmMarks = [physicsMarks, chemistryMarks, mathematicsMarks];
+      const pcmMinMarks = [
+        physicsMinMarks,
+        chemistryMinMarks,
+        mathematicsMinMarks,
+      ];
+      if (
+        [...pcmMarks, ...pcmMaxMarks, ...pcmMinMarks].some(
+          (value) => value !== null
+        ) &&
+        [...pcmMarks, ...pcmMaxMarks, ...pcmMinMarks].some(
+          (value) => value === null
+        )
+      ) {
+        throw new Error(
+          "Physics, Chemistry, and Mathematics marks, maximum marks, and minimum marks are all required."
+        );
+      }
+      for (let index = 0; index < pcmMarks.length; index++) {
+        if (pcmMarks[index]! > pcmMaxMarks[index]!) {
+          throw new Error("Obtained marks cannot exceed maximum marks.");
+        }
+        if (pcmMinMarks[index]! > pcmMaxMarks[index]!) {
+          throw new Error("Minimum marks cannot exceed maximum marks.");
+        }
+      }
+      const pcmPercentage =
+        pcmMarks.every((value) => value !== null) &&
+        pcmMaxMarks.every((value) => value !== null) &&
+        pcmMaxMarks.every((value) => value! > 0)
+          ? Number(
+              (
+                (pcmMarks.reduce((sum, value) => sum + value!, 0) /
+                  pcmMaxMarks.reduce((sum, value) => sum + value!, 0)) *
+                100
+              ).toFixed(2)
+            )
+          : null;
 
       if (data.aadharNumber && data.aadharNumber !== admission.aadharNumber) {
         const existingAadhar = await db.admission.findFirst({
@@ -574,11 +700,12 @@ export class AdmissionService {
 
           // Admission Details
           applicationId: data.applicationId,
+          admissionType: data.admissionType,
           firstName: data.firstName,
           middleName: data.middleName,
           lastName: data.lastName,
           modeOfAdmission: data.modeOfAdmission,
-          semesterId: data.semesterId,
+          semesterId: admission.semesterId,
           departmentId: data.departmentId,
           categoryClaimed: data.categoryClaimed,
           categoryAllotted: data.categoryAllotted,
@@ -590,6 +717,12 @@ export class AdmissionService {
             ? new Date(data.originalAdmissionOrderDate)
             : null,
           feePaid: data.feePaid ? parseFloat(data.feePaid) : null,
+          feeReceiptNumber: data.feeReceiptNumber ?? null,
+          scholarship: data.scholarship === "true",
+          sspId: data.scholarship === "true" ? data.sspId?.trim() : null,
+          abcAparId: data.abcAparId ?? null,
+          counsellingRound: data.counsellingRound ?? null,
+          dateOfAdmission: admission.dateOfAdmission ?? new Date(),
           hostel: data.hostel === "true",
           hostelRoomNumber: data.hostelRoomNumber ?? null,
 
@@ -632,9 +765,26 @@ export class AdmissionService {
           disabilityType: data.disabilityType ?? null,
           economicallyBackward: data.economicallyBackward === "true",
           aadharNumber: data.aadharNumber,
+          studiedKannadaIn10th: data.studiedKannadaIn10th === "true",
+          passportNumber: data.passportNumber ?? null,
+          passportExpiryDate: data.passportExpiryDate
+            ? new Date(data.passportExpiryDate)
+            : null,
+          visaNumber: data.visaNumber ?? null,
+          visaExpiryDate: data.visaExpiryDate
+            ? new Date(data.visaExpiryDate)
+            : null,
+          parentPassportNumber: data.parentPassportNumber ?? null,
+          parentVisaNumber: data.parentVisaNumber ?? null,
+          parentVisaExpiryDate: data.parentVisaExpiryDate
+            ? new Date(data.parentVisaExpiryDate)
+            : null,
 
           class10thSchoolName: data.class10thSchoolName,
+          class10thRollRegNumber: data.class10thRollRegNumber ?? null,
+          admissionBasedOn: data.admissionBasedOn ?? null,
           class10thSchoolType: data.class10thSchoolType,
+          schoolCountry: data.schoolCountry ?? null,
           class10thSchoolCity: data.class10thSchoolCity,
           class10thSchoolState: data.class10thSchoolState,
           class10thYearOfPassing: data.class10thYearOfPassing,
@@ -649,7 +799,9 @@ export class AdmissionService {
           hasClass12: data.hasClass12 === "true",
           hasDiploma: data.hasDiploma === "true",
           class12thInstituteName: data.class12thInstituteName,
+          class12thRollRegNumber: data.class12thRollRegNumber ?? null,
           class12thInstituteType: data.class12thInstituteType,
+          instituteCountry: data.instituteCountry ?? null,
           class12thInstituteCity: data.class12thInstituteCity,
           class12thInstituteState: data.class12thInstituteState,
           class12thYearOfPassing: data.class12thYearOfPassing,
@@ -661,9 +813,29 @@ export class AdmissionService {
             ? parseFloat(data.class12thAggregateTotal)
             : null,
           class12thMediumOfTeaching: data.class12thMediumOfTeaching,
+          physicsMarks,
+          physicsMaxMarks,
+          physicsMinMarks,
+          physicsPercentage: calculatePercentage(physicsMarks, physicsMaxMarks),
+          chemistryMarks,
+          chemistryMaxMarks,
+          chemistryMinMarks,
+          chemistryPercentage: calculatePercentage(
+            chemistryMarks,
+            chemistryMaxMarks
+          ),
+          mathematicsMarks,
+          mathematicsMaxMarks,
+          mathematicsMinMarks,
+          mathematicsPercentage: calculatePercentage(
+            mathematicsMarks,
+            mathematicsMaxMarks
+          ),
+          pcmPercentage,
 
           diplomaInstituteName: data.diplomaInstituteName ?? null,
           diplomaInstituteType: data.diplomaInstituteType ?? null,
+          diplomaCountry: data.diplomaCountry ?? null,
           diplomaInstituteCity: data.diplomaInstituteCity ?? null,
           diplomaInstituteState: data.diplomaInstituteState ?? null,
           diplomaYearOfPassing: data.diplomaYearOfPassing ?? null,
@@ -768,7 +940,7 @@ export class AdmissionService {
           modeOfAdmission: data.modeOfAdmission,
           categoryClaimed: data.categoryClaimed,
           categoryAllotted: data.categoryAllotted,
-          quota: data.modeOfAdmission ? data.quota : undefined,
+          quota: data.modeOfAdmission === "KCET" ? (data.quota ?? null) : null,
           entranceExamRank:
             data.entranceExamRank != null
               ? String(data.entranceExamRank)
