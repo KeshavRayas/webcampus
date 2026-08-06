@@ -1,5 +1,10 @@
 import { CancelAdmissionView } from "@/modules/admission/cancel-admission/cancel-admission-view";
+import { Suspense } from "react";
 
 export default function CancelAdmissionPage() {
-  return <CancelAdmissionView />;
+  return (
+    <Suspense>
+      <CancelAdmissionView />
+    </Suspense>
+  );
 }
