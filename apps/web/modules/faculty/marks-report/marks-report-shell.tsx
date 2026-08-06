@@ -36,6 +36,7 @@ interface MarksReportShellProps {
   cycleOptions?: SelectOption[];
   showAssessmentFilter?: boolean;
   assessmentOptions?: SelectOption[];
+  children?: React.ReactNode;
 }
 
 export const MarksReportShell = ({
@@ -59,6 +60,7 @@ export const MarksReportShell = ({
   cycleOptions = [],
   showAssessmentFilter = false,
   assessmentOptions = [],
+  children,
 }: MarksReportShellProps) => {
   const filterFields: FilterFieldConfig<MarksReportFilters>[] = useMemo(
     () => [
@@ -182,13 +184,15 @@ export const MarksReportShell = ({
         </div>
       </FilterPanel>
       <main>
-        <MarksReportTable
-          reportData={reportData}
-          isLoading={isLoading}
-          onDownloadPDF={onDownloadPDF}
-          onDownloadExcel={onDownloadExcel}
-          emptyMessage={getEmptyMessage()}
-        />
+        {children || (
+          <MarksReportTable
+            reportData={reportData}
+            isLoading={isLoading}
+            onDownloadPDF={onDownloadPDF}
+            onDownloadExcel={onDownloadExcel}
+            emptyMessage={getEmptyMessage()}
+          />
+        )}
       </main>
     </div>
   );

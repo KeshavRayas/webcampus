@@ -356,6 +356,10 @@ export class Mark {
                   id: true,
                   title: true,
                   totalMarks: true,
+                  studentRecords: {
+                    select: { id: true },
+                    take: 1,
+                  },
                 },
               },
             },
@@ -364,10 +368,23 @@ export class Mark {
         orderBy: { course: { code: "asc" } },
       });
 
+      const formattedAssignments = assignments.map((assignment) => ({
+        ...assignment,
+        course: {
+          ...assignment.course,
+          assessments: assignment.course.assessments.map((assessment) => ({
+            id: assessment.id,
+            title: assessment.title,
+            totalMarks: assessment.totalMarks,
+            hasMarks: assessment.studentRecords.length > 0,
+          })),
+        },
+      }));
+
       return {
         status: "success",
         message: "Marks dashboard data retrieved successfully",
-        data: assignments,
+        data: formattedAssignments,
       };
     } catch (error) {
       logger.error("Error fetching marks dashboard", error);
@@ -1089,7 +1106,9 @@ export class Mark {
   static async getMarksReport(
     userId: string,
     courseId: string,
-    sectionId?: string
+    sectionId?: string,
+    assessmentId?: string,
+    detailed?: boolean
   ): Promise<BaseResponse<MarksReportDTO>> {
     try {
       const faculty = await db.faculty.findUnique({
@@ -1136,7 +1155,17 @@ export class Mark {
       assertFacultyCourseApproved(course.approvalStatus);
 
       const assessments = await db.assessmentTemplate.findMany({
-        where: { courseId },
+        where: {
+          courseId,
+          ...(assessmentId ? { id: assessmentId } : {}),
+        },
+        include: detailed
+          ? {
+              questions: {
+                orderBy: [{ part: "asc" }, { qNumber: "asc" }],
+              },
+            }
+          : undefined,
         orderBy: { title: "asc" },
       });
 
@@ -1174,6 +1203,11 @@ export class Mark {
           studentId: { in: studentIds },
           courseId,
         },
+        include: detailed
+          ? {
+              questionMarks: true,
+            }
+          : undefined,
       });
 
       const marksMap = new Map<
@@ -1212,11 +1246,25 @@ export class Mark {
 
         const assessmentScores = assessments.map((a) => {
           const sa = assessmentMap.get(`${reg.student.id}_${a.id}`);
+          let questionMarks: Record<string, number> | undefined;
+
+          if (detailed && sa && "questionMarks" in sa) {
+            questionMarks = {};
+            const qms = sa.questionMarks as {
+              questionId: string;
+              marksObtained: number;
+            }[];
+            for (const qm of qms) {
+              questionMarks[qm.questionId] = qm.marksObtained;
+            }
+          }
+
           return {
             assessmentId: a.id,
             assessmentTitle: a.title,
             totalMarks: sa?.totalMarks ?? null,
             maxMarks: a.totalMarks,
+            questionMarks,
           };
         });
 
@@ -1241,6 +1289,23 @@ export class Mark {
           id: a.id,
           title: a.title,
           totalMarks: a.totalMarks,
+          componentType: a.componentType,
+          questions:
+            detailed && "questions" in a
+              ? (
+                  a.questions as {
+                    id: string;
+                    part: string | null;
+                    qNumber: number;
+                    marks: number;
+                  }[]
+                ).map((q) => ({
+                  id: q.id,
+                  part: q.part ?? "",
+                  qNumber: String(q.qNumber),
+                  marks: q.marks,
+                }))
+              : undefined,
         })),
         semester: {
           id: course.semester.id,
@@ -1312,10 +1377,17 @@ export class Mark {
         semesterId: a.course.semesterId,
       }));
 
+      const courseIds = [...new Set(courses.map((c) => c.id))];
+      const assessmentsRaw = await db.assessmentTemplate.findMany({
+        where: { courseId: { in: courseIds } },
+        select: { id: true, title: true, courseId: true },
+        orderBy: { title: "asc" },
+      });
+
       return {
         status: "success",
         message: "Filter options retrieved successfully",
-        data: { courses },
+        data: { courses, assessments: assessmentsRaw },
       };
     } catch (error) {
       logger.error("Error fetching marks report filter options", error);

@@ -177,7 +177,7 @@ export function computeComponent(
 }
 
 export function computeEligibility(
-  _components: {
+  components: {
     theory: ComponentResult;
     lab: ComponentResult;
     aat: ComponentResult;
@@ -197,9 +197,27 @@ export function computeEligibility(
 
   const ciePct = cieMax > 0 ? (cieTotal / cieMax) * 100 : null;
 
-  const theoryAttemptsEligible = theoryAttempted >= courseConfig.theoryMinExams;
-  const status: EligibilityStatus =
-    cieEligible && theoryAttemptsEligible ? "ELIGIBLE" : "NOT_ELIGIBLE";
+  const activeComponents = [
+    components.theory,
+    components.lab,
+    components.aat,
+  ].filter((c) => c.active);
+  const allComponentsEligible = activeComponents.every((c) => c.eligible);
+
+  const hasMetMinTheoryExams =
+    courseConfig.theoryMinExams > 0
+      ? theoryAttempted >= courseConfig.theoryMinExams
+      : true;
+
+  let status: EligibilityStatus;
+  if (courseConfig.cieEligibilityPolicy === "OVERALL_ONLY") {
+    status = cieEligible && hasMetMinTheoryExams ? "ELIGIBLE" : "NOT_ELIGIBLE";
+  } else {
+    status =
+      cieEligible && allComponentsEligible && hasMetMinTheoryExams
+        ? "ELIGIBLE"
+        : "NOT_ELIGIBLE";
+  }
 
   return {
     cie: {
