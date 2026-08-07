@@ -98,8 +98,10 @@ export const AdminAdmissionActions = ({
 }) => {
   const { data: session } = authClient.useSession();
   const role = session?.user?.role;
-  const canReview = role === "admin" || "admission";
-  const canDelete = role === "admin" || role === "admission";
+  const canReview =
+    role === "admin" || role === "super_admin" || role === "admission";
+  const canDelete =
+    role === "admin" || role === "super_admin" || role === "admission";
 
   const isPending = admission.status === "PENDING";
   const isSubmitted = admission.status === "SUBMITTED";

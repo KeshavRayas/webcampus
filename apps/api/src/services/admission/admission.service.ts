@@ -10,6 +10,7 @@ import {
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
   PortStudentsType,
+  UpdateAdmissionFeeType,
 } from "@webcampus/schemas/admission";
 import { BaseResponse } from "@webcampus/types/api";
 import {
@@ -249,6 +250,41 @@ export class AdmissionService {
       message: `Admission ${status.toLowerCase()} successfully`,
       data: updatedAdmission,
     };
+  }
+
+  static async updateFee(
+    id: string,
+    data: UpdateAdmissionFeeType
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const admission = await db.admission.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!admission) {
+        throw new Error("Admission not found");
+      }
+
+      const updatedAdmission = await db.admission.update({
+        where: { id },
+        data: {
+          feePaid: data.feePaid,
+          feeReceiptNumber: data.feeReceiptNumber?.trim() ?? null,
+          scholarship: data.scholarship ?? false,
+          sspId: data.scholarship ? (data.sspId?.trim() ?? null) : null,
+        },
+      });
+
+      return {
+        status: "success",
+        message: "Fee payment recorded successfully",
+        data: updatedAdmission,
+      };
+    } catch (error) {
+      logger.error("Failed to update admission fee", error);
+      throw error;
+    }
   }
 
   static async createShell(

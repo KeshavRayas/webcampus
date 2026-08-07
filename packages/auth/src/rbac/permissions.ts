@@ -26,24 +26,27 @@ const statement = {
 
 export const ac = createAccessControl(statement);
 
+const adminStatements = {
+  ...adminAc.statements,
+  courses: ["create", "read", "update", "delete"] as const,
+  courseAssignment: ["create", "read"] as const,
+  courseCoordinator: ["create", "read", "update"] as const,
+  courseApprovalOverride: ["read", "update"] as const,
+  section: ["read"] as const,
+  semester: ["create", "read", "delete", "update"] as const,
+  department: ["create", "read", "update", "delete"] as const,
+  sectionAssignment: ["create", "read", "update", "delete"] as const,
+  faculty: ["create", "read", "update", "delete"] as const,
+  admission: ["create", "read", "update", "delete", "port"] as const,
+  student: ["read", "delete"] as const,
+  registrationWindow: ["create", "read", "update"] as const,
+  freeze: ["read", "lock"] as const,
+  support: ["create", "read", "reply", "updateStatus"] as const,
+} as const;
+
 export const roles = {
-  admin: ac.newRole({
-    ...adminAc.statements,
-    courses: ["create", "read", "update", "delete"],
-    courseAssignment: ["create", "read"],
-    courseCoordinator: ["create", "read", "update"],
-    courseApprovalOverride: ["read", "update"],
-    section: ["read"],
-    semester: ["create", "read", "delete", "update"],
-    department: ["create", "read", "update", "delete"],
-    sectionAssignment: ["create", "read", "update", "delete"],
-    faculty: ["create", "read", "update", "delete"],
-    admission: ["create", "read", "update", "delete", "port"],
-    student: ["read", "delete"],
-    registrationWindow: ["create", "read", "update"],
-    freeze: ["read", "lock"],
-    support: ["create", "read", "reply", "updateStatus"],
-  }),
+  admin: ac.newRole(adminStatements),
+  super_admin: ac.newRole(adminStatements),
   applicant: ac.newRole({
     admission: ["read", "update"],
     department: ["read"],

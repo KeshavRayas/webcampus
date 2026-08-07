@@ -97,8 +97,12 @@ export const AdminAdmissionView = ({
 
   const { data: session } = authClient.useSession();
   const role = session?.user?.role;
-  const canCreate = isMounted && (role === "admin" || role === "admission");
-  const canPort = isMounted && (role === "admin" || role === "admission");
+  const canCreate =
+    isMounted &&
+    (role === "admin" || role === "super_admin" || role === "admission");
+  const canPort =
+    isMounted &&
+    (role === "admin" || role === "super_admin" || role === "admission");
 
   const router = useRouter();
   const pathname = usePathname();

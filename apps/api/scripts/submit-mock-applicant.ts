@@ -5,6 +5,10 @@ import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
+import { config } from "dotenv";
+
+config({ path: "packages/db/.env" });
+config({ path: "apps/api/.env" });
 
 const IMAGE_URL =
   "https://adminportal-fileupload.s3.ap-southeast-2.amazonaws.com/department_logo_39bc77d3-dc17-4679-952e-2bab6d716229.jpg";
@@ -16,6 +20,38 @@ interface ParsedArgs {
   count: number;
   departmentCode: string;
 }
+
+const ensureDefaultDepartments = async () => {
+  const existing = await db.department.findMany({
+    select: { code: true, name: true },
+  });
+  const required = [
+    { code: "CSE", name: "Computer Science & Engineering" },
+    { code: "ECE", name: "Electronics & Communication Engineering" },
+    { code: "ISE", name: "Information Science & Engineering" },
+    { code: "ME", name: "Mechanical Engineering" },
+  ];
+
+  const existingCodes = new Set(existing.map((department) => department.code));
+  for (const department of required) {
+    if (!existingCodes.has(department.code)) {
+      await db.department.create({
+        data: {
+          code: department.code,
+          name: department.name,
+          abbreviation: department.code,
+          userId:
+            (
+              await db.user.findFirst({
+                where: { role: "admin" },
+                select: { id: true },
+              })
+            )?.id ?? "",
+        },
+      });
+    }
+  }
+};
 
 const parseCliArguments = (): ParsedArgs => {
   const args = process.argv.slice(2);
@@ -186,13 +222,41 @@ const resolveContext = async (departmentCode: string) => {
     select: { id: true },
   });
 
-  if (!term) {
-    throw new Error("Academic term odd 2026 not found");
+  const fallbackTerm =
+    term ??
+    (await db.academicTerm.findFirst({
+      select: { id: true },
+      orderBy: { year: "desc" },
+    }));
+
+  if (!fallbackTerm) {
+    const createdTerm = await db.academicTerm.create({
+      data: { type: "odd", year: "2026", isCurrent: true },
+      select: { id: true },
+    });
+    return {
+      headers: { Authorization: `Bearer ${signInResponse.token}` },
+      filledById: actor.id,
+      departmentId: department.id,
+      semesterId: (
+        await db.semester.create({
+          data: {
+            academicTermId: createdTerm.id,
+            semesterNumber: 1,
+            programType: "UG",
+            startDate: new Date("2026-08-01"),
+            endDate: new Date("2026-12-31"),
+            userId: actor.id,
+          },
+          select: { id: true },
+        })
+      ).id,
+    };
   }
 
   const semester = await db.semester.findFirst({
     where: {
-      academicTermId: term.id,
+      academicTermId: fallbackTerm.id,
       programType: "UG",
       semesterNumber: 1,
     },
@@ -200,7 +264,23 @@ const resolveContext = async (departmentCode: string) => {
   });
 
   if (!semester) {
-    throw new Error("Semester odd 2026 UG 1 not found");
+    const createdSemester = await db.semester.create({
+      data: {
+        academicTermId: fallbackTerm.id,
+        semesterNumber: 1,
+        programType: "UG",
+        startDate: new Date("2026-08-01"),
+        endDate: new Date("2026-12-31"),
+        userId: actor.id,
+      },
+      select: { id: true },
+    });
+    return {
+      headers: { Authorization: `Bearer ${signInResponse.token}` },
+      filledById: actor.id,
+      departmentId: department.id,
+      semesterId: createdSemester.id,
+    };
   }
 
   return {
@@ -303,6 +383,7 @@ async function main() {
     process.exit(1);
   }
 
+  await ensureDefaultDepartments();
   const context = await resolveContext(args.departmentCode);
   // let nextApplicationNumber = await getNextApplicationNumber();
   let approvedCreated = 0;

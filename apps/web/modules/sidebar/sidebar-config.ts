@@ -36,113 +36,116 @@ const navSecondary: NavSecondaryProps = {
   ],
 };
 
-export const sidebarConfig: Record<Role, SidebarData> = {
-  admin: {
-    navMain: {
-      items: [
-        {
-          name: "Dashboard",
-          url: "/admin",
-          icon: LayoutDashboard,
-        },
-        {
-          name: "Department",
-          url: "/admin/department",
-          icon: Building,
-        },
-        {
-          name: "Semester",
-          url: "/admin/semester",
-          icon: CalendarDays,
-        },
-        {
-          name: "Faculty",
-          url: "/admin/faculty",
-          icon: Users,
-        },
-        {
-          name: "Users",
-          url: "/admin/admission-users",
-          icon: Users,
-          children: [
-            { name: "Admission Users", url: "/admin/admission-users" },
-            { name: "COE Users", url: "/admin/coe" },
-            { name: "Finance Users", url: "/admin/finance" },
-          ],
-        },
-        {
-          name: "Students",
-          url: "/admin/students",
-          icon: GraduationCap,
-        },
-        {
-          name: "Courses",
-          url: "/admin/courses",
-          icon: Library,
-          children: [
-            { name: "Course Configuration", url: "/admin/courses" },
-            { name: "Course Mapping", url: "/admin/course-mapping" },
-            { name: "Appoint Coordinators", url: "/admin/course-coordinators" },
-            { name: "Course Approvals", url: "/admin/course-approvals" },
-            {
-              name: "Registration Windows",
-              url: "/admin/registration-windows",
-            },
-            {
-              name: "Registration Tracking",
-              url: "/admin/registration-tracking",
-            },
-          ],
-        },
-        {
-          name: "Academics",
-          url: "/admin/academics/freezing",
-          icon: GraduationCap,
-          children: [
-            {
-              name: "Freezing",
-              url: "/admin/academics/freezing",
-            },
-            {
-              name: "Attendance",
-              url: "/admin/academics/attendance",
-              children: [
-                {
-                  name: "Attendance Report",
-                  url: "/admin/academics/attendance",
-                },
-              ],
-            },
-            {
-              name: "Marks",
-              url: "/admin/academics/marks",
-              children: [
-                {
-                  name: "Marks Report",
-                  url: "/admin/academics/marks",
-                },
-              ],
-            },
-            {
-              name: "Condonation",
-              url: "/admin/academics/condonation",
-              children: [
-                {
-                  name: "Condonation Report",
-                  url: "/admin/academics/condonation",
-                },
-              ],
-            },
-            {
-              name: "Hall Tickets",
-              url: "/admin/academics/hall-ticket",
-            },
-          ],
-        },
-      ],
-    },
-    navSecondary,
+const adminSidebar: SidebarData = {
+  navMain: {
+    items: [
+      {
+        name: "Dashboard",
+        url: "/admin",
+        icon: LayoutDashboard,
+      },
+      {
+        name: "Department",
+        url: "/admin/department",
+        icon: Building,
+      },
+      {
+        name: "Semester",
+        url: "/admin/semester",
+        icon: CalendarDays,
+      },
+      {
+        name: "Faculty",
+        url: "/admin/faculty",
+        icon: Users,
+      },
+      {
+        name: "Users",
+        url: "/admin/admission-users",
+        icon: Users,
+        children: [
+          { name: "Admission Users", url: "/admin/admission-users" },
+          { name: "COE Users", url: "/admin/coe" },
+          { name: "Finance Users", url: "/admin/finance" },
+        ],
+      },
+      {
+        name: "Students",
+        url: "/admin/students",
+        icon: GraduationCap,
+      },
+      {
+        name: "Courses",
+        url: "/admin/courses",
+        icon: Library,
+        children: [
+          { name: "Course Configuration", url: "/admin/courses" },
+          { name: "Course Mapping", url: "/admin/course-mapping" },
+          { name: "Appoint Coordinators", url: "/admin/course-coordinators" },
+          { name: "Course Approvals", url: "/admin/course-approvals" },
+          {
+            name: "Registration Windows",
+            url: "/admin/registration-windows",
+          },
+          {
+            name: "Registration Tracking",
+            url: "/admin/registration-tracking",
+          },
+        ],
+      },
+      {
+        name: "Academics",
+        url: "/admin/academics/freezing",
+        icon: GraduationCap,
+        children: [
+          {
+            name: "Freezing",
+            url: "/admin/academics/freezing",
+          },
+          {
+            name: "Attendance",
+            url: "/admin/academics/attendance",
+            children: [
+              {
+                name: "Attendance Report",
+                url: "/admin/academics/attendance",
+              },
+            ],
+          },
+          {
+            name: "Marks",
+            url: "/admin/academics/marks",
+            children: [
+              {
+                name: "Marks Report",
+                url: "/admin/academics/marks",
+              },
+            ],
+          },
+          {
+            name: "Condonation",
+            url: "/admin/academics/condonation",
+            children: [
+              {
+                name: "Condonation Report",
+                url: "/admin/academics/condonation",
+              },
+            ],
+          },
+          {
+            name: "Hall Tickets",
+            url: "/admin/academics/hall-ticket",
+          },
+        ],
+      },
+    ],
   },
+  navSecondary,
+};
+
+export const sidebarConfig: Record<Role, SidebarData> = {
+  admin: adminSidebar,
+  super_admin: adminSidebar,
   department: {
     navMain: {
       items: [
@@ -462,6 +465,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: GraduationCap,
         },
         {
+          name: "Fee Payment",
+          url: "/admission/fee-payment",
+          icon: IndianRupee,
+        },
+        {
           name: "Upload Documents",
           url: "/admission/upload-documents",
           icon: Upload,
@@ -476,8 +484,13 @@ export const sidebarConfig: Record<Role, SidebarData> = {
       items: [
         {
           name: "My Application",
-          url: "/applicant",
+          url: "/admission",
           icon: BookOpenText,
+        },
+        {
+          name: "Fee Payment",
+          url: "/admission/fee-payment",
+          icon: IndianRupee,
         },
       ],
     },

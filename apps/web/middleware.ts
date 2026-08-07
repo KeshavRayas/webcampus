@@ -49,16 +49,20 @@ export async function middleware(request: NextRequest) {
   }
 
   if (session && roleFromPath) {
-    if (
+    const sessionRole = session.user?.role as string;
+    const isAllowedRole =
+      sessionRole === roleFromPath ||
+      (roleFromPath === "admin" && sessionRole === "super_admin");
+    const isAdmissionAllowed =
       roleFromPath === "admission" &&
-      !["admission"].includes(session.user?.role as string)
-    ) {
+      ["admission", "applicant", "admin", "super_admin"].includes(sessionRole);
+
+    if (roleFromPath !== "admission" && !isAllowedRole) {
       url.pathname = "/403";
       return NextResponse.redirect(url);
-    } else if (
-      roleFromPath !== "admission" &&
-      session.user?.role !== roleFromPath
-    ) {
+    }
+
+    if (roleFromPath === "admission" && !isAdmissionAllowed) {
       url.pathname = "/403";
       return NextResponse.redirect(url);
     }

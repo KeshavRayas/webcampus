@@ -11,6 +11,7 @@ import {
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
   PortStudentsType,
+  UpdateAdmissionFeeType,
 } from "@webcampus/schemas/admission";
 import { Request, Response } from "express";
 
@@ -174,6 +175,35 @@ export class AdmissionController {
       });
     }
   }
+  static async updateFee(req: Request, res: Response): Promise<void> {
+    try {
+      const response = await AdmissionService.updateFee(
+        req.params.id as string,
+        req.body as UpdateAdmissionFeeType
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error recording admission fee payment", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
   static async deleteAdmission(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;

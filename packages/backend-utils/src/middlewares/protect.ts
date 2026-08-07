@@ -109,9 +109,20 @@ export const protect =
 
       req.requestContext = requestContext;
 
+      const isRoleAllowed = (sessionRoleValue: Role, allowedRoles: Role[]) => {
+        if (allowedRoles.includes(sessionRoleValue)) return true;
+        if (
+          sessionRoleValue === "super_admin" &&
+          allowedRoles.includes("admin")
+        ) {
+          return true;
+        }
+        return false;
+      };
+
       if (role) {
         const allowedRoles = Array.isArray(role) ? role : [role];
-        if (!allowedRoles.includes(sessionRole)) {
+        if (!isRoleAllowed(sessionRole, allowedRoles)) {
           logger.error(ERRORS.FORBIDDEN);
           sendResponse({
             status: "error",

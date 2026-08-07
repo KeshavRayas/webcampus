@@ -7,6 +7,7 @@ import {
   CreateAdmissionShellSchema,
   GetAdmissionsQuerySchema,
   PortStudentsSchema,
+  UpdateAdmissionFeeSchema,
 } from "@webcampus/schemas/admission";
 import { Router } from "express";
 import multer from "multer";
@@ -121,6 +122,19 @@ router.patch(
     },
   }),
   AdmissionController.reject
+);
+
+router.patch(
+  "/:id/fee",
+  validateRequest(AdmissionActionParamSchema, "params"),
+  validateRequest(UpdateAdmissionFeeSchema),
+  protect({
+    role: ["admin", "admission"],
+    permissions: {
+      admission: ["update"],
+    },
+  }),
+  AdmissionController.updateFee
 );
 router.patch(
   "/:id/cancel",

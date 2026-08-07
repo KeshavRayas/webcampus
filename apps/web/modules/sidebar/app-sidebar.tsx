@@ -20,12 +20,17 @@ import { sidebarConfig } from "./sidebar-config";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session, isPending } = authClient.useSession();
-  if (isPending || !session) {
+  const [hasMounted, setHasMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted || isPending || !session) {
     return <SidebarSkeleton />;
   }
-  console.log("Role:", session?.user.role);
-  console.log("Sidebar config:", sidebarConfig);
-  const { navMain, navSecondary } = sidebarConfig[session?.user.role as Role];
+
+  const { navMain, navSecondary } = sidebarConfig[session.user.role as Role];
 
   return (
     <Sidebar variant="inset" {...props}>

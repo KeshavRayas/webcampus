@@ -40,7 +40,7 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "sh scripts/dev.sh",
+    "dev": "node scripts/dev.mjs",
     "start": "turbo run start",
     "lint": "eslint \"**/*.{ts,tsx}\"",
     "format:write": "turbo run format:write",

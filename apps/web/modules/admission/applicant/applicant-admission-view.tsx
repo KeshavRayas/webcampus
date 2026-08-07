@@ -17,7 +17,6 @@ import { Checkbox } from "@webcampus/ui/components/checkbox";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
 import { PhoneNumberInput } from "@webcampus/ui/components/phone-input";
-import { Progress } from "@webcampus/ui/components/progress";
 import {
   Select,
   SelectContent,
@@ -52,8 +51,10 @@ type ApplicantAdmissionData = {
   abcAparId?: string | null;
   counsellingRound?: string | null;
   feeReceiptNumber?: string | null;
+  feePaid?: number | null;
   dateOfAdmission?: string | null;
   studiedKannadaIn10th?: boolean | null;
+  photo?: string | null;
   passportNumber?: string | null;
   passportExpiryDate?: string | null;
   visaNumber?: string | null;
@@ -74,7 +75,13 @@ type ApplicantAdmissionData = {
   };
 };
 
-type StepKey = "admission" | "personal" | "education" | "parent" | "review";
+type StepKey =
+  | "admission"
+  | "personal"
+  | "education"
+  | "parent"
+  | "payment"
+  | "receipt";
 
 const EMPTY_ADMISSION: ApplicantAdmissionData = {
   applicationId: "",
@@ -88,15 +95,17 @@ const STEP_ORDER: StepKey[] = [
   "personal",
   "education",
   "parent",
-  "review",
+  "payment",
+  "receipt",
 ];
 
 const STEP_LABELS: Record<StepKey, string> = {
   admission: "Admission Details",
   personal: "Personal Information",
   education: "Education Details",
-  parent: "Parent / Guardian Details",
-  review: "Review",
+  parent: "Parental Details",
+  payment: "Upload Image",
+  receipt: "Document Verification",
 };
 
 const VISIBLE_STEPS: StepKey[] = [
@@ -104,31 +113,353 @@ const VISIBLE_STEPS: StepKey[] = [
   "personal",
   "education",
   "parent",
+  "payment",
+  "receipt",
 ];
+
+const PRIMARY_DOCUMENTS = [
+  "SSLC / 10th Marks Card",
+  "PUC / 12th Marks Card",
+  "Transfer Certificate (TC)",
+  "Migration Certificate",
+  "Study Certificate (CET – 7 Years)",
+  "Study Certificate (COMED-K & MGMT – 2 Years)",
+  "Fees Receipt / Allotment Letter",
+  "Rank Card",
+  "Caste Certificate",
+  "Income Certificate",
+  "Rural (if applicable)",
+];
+
+const ADDITIONAL_DOCUMENTS = [
+  "371J (if applicable)",
+  "Domicile Certificate (if applicable)",
+  "Physically Challenged Certificate",
+  "Defence / NCC / Sports Certificate",
+  "Non-Creamy Layer Certificate",
+  "Kannada Medium",
+  "Indian Bank Account Number",
+];
+
+type MemberSource = "current" | "permanent" | "custom";
+
+const MAX_PHOTO_SIZE = 2 * 1024 * 1024;
+
+const INDIAN_PASSPORT_PATTERN = "[A-Za-z][0-9]{7}";
+const INDIAN_PASSPORT_HINT =
+  "Indian passport: 1 letter followed by 7 digits (8 characters)";
+
+const INCOME_RANGES = [
+  "Less than ₹2,50,000",
+  "₹2,50,000 – ₹5,00,000",
+  "₹5,00,000 – ₹10,00,000",
+  "More than ₹10,00,000",
+];
+
+function MemberAddressBlock({
+  memberKey,
+  source,
+  onSourceChange,
+  autoAddress,
+}: {
+  memberKey: "father" | "mother" | "guardian";
+  source: MemberSource;
+  onSourceChange: (source: MemberSource) => void;
+  autoAddress: string;
+}) {
+  const [line1, setLine1] = useState("");
+  const [line2, setLine2] = useState("");
+  const [line3, setLine3] = useState("");
+  const [country, setCountry] = useState("India");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
+  const [pincode, setPincode] = useState("");
+
+  const custom = source === "custom";
+  const customAddress = [line1, line2, line3, city, state, pincode, country]
+    .filter(Boolean)
+    .join(", ");
+
+  const setSource = (checked: boolean, value: MemberSource) =>
+    onSourceChange(checked ? value : "custom");
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-background/40 rounded-lg border p-3">
+        <p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+          Address : Same As Student
+        </p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+            <Checkbox
+              id={`${memberKey}-current`}
+              checked={source === "current"}
+              onCheckedChange={(checked) =>
+                setSource(Boolean(checked), "current")
+              }
+            />
+            <Label htmlFor={`${memberKey}-current`} className="cursor-pointer">
+              Same as Student Current Address
+            </Label>
+          </div>
+          <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+            <Checkbox
+              id={`${memberKey}-permanent`}
+              checked={source === "permanent"}
+              onCheckedChange={(checked) =>
+                setSource(Boolean(checked), "permanent")
+              }
+            />
+            <Label
+              htmlFor={`${memberKey}-permanent`}
+              className="cursor-pointer"
+            >
+              Same as Student Permanent Address
+            </Label>
+          </div>
+        </div>
+      </div>
+
+      {custom ? (
+        <div className="bg-background/40 grid grid-cols-1 gap-3 rounded-lg border p-3 sm:grid-cols-2">
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor={`${memberKey}-line1`}>Address Line 1 *</Label>
+            <Input
+              id={`${memberKey}-line1`}
+              value={line1}
+              onChange={(event) => setLine1(event.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${memberKey}-line2`}>Address Line 2</Label>
+            <Input
+              id={`${memberKey}-line2`}
+              value={line2}
+              onChange={(event) => setLine2(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${memberKey}-line3`}>Address Line 3</Label>
+            <Input
+              id={`${memberKey}-line3`}
+              value={line3}
+              onChange={(event) => setLine3(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${memberKey}-country`}>Country *</Label>
+            <Input
+              id={`${memberKey}-country`}
+              value={country}
+              onChange={(event) => setCountry(event.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${memberKey}-state`}>State *</Label>
+            <Input
+              id={`${memberKey}-state`}
+              value={state}
+              onChange={(event) => setState(event.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${memberKey}-city`}>City *</Label>
+            <Input
+              id={`${memberKey}-city`}
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${memberKey}-pincode`}>Pin Code *</Label>
+            <Input
+              id={`${memberKey}-pincode`}
+              value={pincode}
+              type="text"
+              inputMode="numeric"
+              onChange={(event) => setPincode(event.target.value)}
+              required
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="bg-background/40 rounded-lg border p-3">
+          <Label>Address</Label>
+          <Input
+            value={autoAddress}
+            readOnly
+            className="bg-muted text-muted-foreground"
+          />
+        </div>
+      )}
+
+      <input
+        type="hidden"
+        name={`${memberKey}PermanentAddress`}
+        value={custom ? customAddress : autoAddress}
+      />
+    </div>
+  );
+}
+
+function ParentMemberCard({
+  title,
+  optional = false,
+  memberKey,
+  nameRequired = false,
+  occupationRequired = false,
+  income = "none",
+  incomeRequired = false,
+  mobileRequired = false,
+  emailRequired = false,
+  phone,
+  onPhoneChange,
+  autoCurrent,
+  autoPermanent,
+  wide = false,
+  children,
+}: {
+  title: string;
+  optional?: boolean;
+  memberKey: "father" | "mother" | "guardian";
+  nameRequired?: boolean;
+  occupationRequired?: boolean;
+  income?: "input" | "range" | "none";
+  incomeRequired?: boolean;
+  mobileRequired?: boolean;
+  emailRequired?: boolean;
+  phone: string;
+  onPhoneChange: (value: string) => void;
+  autoCurrent: string;
+  autoPermanent: string;
+  wide?: boolean;
+  children?: React.ReactNode;
+}) {
+  const [source, setSource] = useState<MemberSource>("custom");
+
+  return (
+    <div
+      className={`bg-muted/30 space-y-4 rounded-lg border p-4 ${
+        wide ? "lg:col-span-2" : ""
+      }`}
+    >
+      <div className="border-b pb-2">
+        <h4 className="text-lg font-semibold">
+          {title}
+          {optional ? (
+            <span className="text-muted-foreground ml-2 text-sm font-normal">
+              (Optional)
+            </span>
+          ) : null}
+        </h4>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor={`${memberKey}Name`}>
+            Full Name {nameRequired ? "*" : ""}
+          </Label>
+          <Input
+            id={`${memberKey}Name`}
+            name={`${memberKey}Name`}
+            required={nameRequired}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={`${memberKey}Occupation`}>
+            Occupation {occupationRequired ? "*" : ""}
+          </Label>
+          <Input
+            id={`${memberKey}Occupation`}
+            name={`${memberKey}Occupation`}
+            required={occupationRequired}
+          />
+        </div>
+        {income !== "none" ? (
+          <div className="space-y-2">
+            <Label htmlFor={`${memberKey}AnnualIncome`}>
+              Annual Income {incomeRequired ? "*" : ""}
+            </Label>
+            {income === "range" ? (
+              <Select name={`${memberKey}AnnualIncome`}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select income range" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INCOME_RANGES.map((range) => (
+                    <SelectItem key={range} value={range}>
+                      {range}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id={`${memberKey}AnnualIncome`}
+                name={`${memberKey}AnnualIncome`}
+                type="number"
+                min="0"
+                required={incomeRequired}
+              />
+            )}
+          </div>
+        ) : null}
+        <div className="space-y-2">
+          <Label htmlFor={`${memberKey}Number`}>
+            Mobile No {mobileRequired ? "*" : ""}
+          </Label>
+          <PhoneNumberInput
+            id={`${memberKey}Number`}
+            value={phone}
+            onChange={onPhoneChange}
+            defaultCountry="IN"
+            required={mobileRequired}
+          />
+          <input type="hidden" name={`${memberKey}Number`} value={phone} />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor={`${memberKey}Email`}>
+            Email ID {emailRequired ? "*" : ""}
+          </Label>
+          <Input
+            id={`${memberKey}Email`}
+            name={`${memberKey}Email`}
+            type="email"
+            required={emailRequired}
+          />
+        </div>
+      </div>
+
+      <MemberAddressBlock
+        memberKey={memberKey}
+        source={source}
+        onSourceChange={setSource}
+        autoAddress={source === "current" ? autoCurrent : autoPermanent}
+      />
+
+      {children}
+    </div>
+  );
+}
 
 export const ApplicantAdmissionView = ({
   staffMode = false,
+  initialStep = "admission",
 }: {
   staffMode?: boolean;
+  initialStep?: StepKey;
 }) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSameAddress, setIsSameAddress] = useState(false);
-  const [activeStep, setActiveStep] = useState<StepKey>("admission");
+  const [activeStep, setActiveStep] = useState<StepKey>(initialStep);
   const [hostelEnabled, setHostelEnabled] = useState(false);
   const [nriEnabled, setNriEnabled] = useState(false);
   const [disabilityEnabled, setDisabilityEnabled] = useState(false);
-  const [fatherAddressSource, setFatherAddressSource] = useState<
-    "current" | "permanent" | "custom"
-  >("current");
-
-  const [motherAddressSource, setMotherAddressSource] = useState<
-    "current" | "permanent" | "custom"
-  >("current");
-
-  const [guardianAddressSource, setGuardianAddressSource] = useState<
-    "current" | "permanent" | "custom"
-  >("current");
   const [currentCountry, setCurrentCountry] = useState("IN");
   const [currentState, setCurrentState] = useState("");
   const [currentDistrict, setCurrentDistrict] = useState("");
@@ -161,13 +492,17 @@ export const ApplicantAdmissionView = ({
   const [diplomaEnabled, setDiplomaEnabled] = useState(false);
   const [reviewPdfUrl, setReviewPdfUrl] = useState<string | null>(null);
   const reviewPdfRef = useRef<string | null>(null);
+  const [verifiedDocs, setVerifiedDocs] = useState<Record<string, boolean>>({});
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const photoPreviewRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const sectionRefs = useRef<Record<StepKey, HTMLDivElement | null>>({
     admission: null,
     personal: null,
     education: null,
     parent: null,
-    review: null,
+    payment: null,
+    receipt: null,
   });
   const [birthState, setBirthState] = useState("");
   const [domicileState, setDomicileState] = useState("");
@@ -202,6 +537,16 @@ export const ApplicantAdmissionView = ({
     useState<keyof typeof categoriesClaimed>("KCET");
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedQuota, setSelectedQuota] = useState("");
+  const [selectedCategoryClaimed, setSelectedCategoryClaimed] = useState("");
+  const [selectedCategoryAllotted, setSelectedCategoryAllotted] = useState("");
+  const [selectedBloodGroup, setSelectedBloodGroup] = useState("");
+  const [selectedGender, setSelectedGender] = useState("Male");
+  const [selectedClass10SchoolType, setSelectedClass10SchoolType] =
+    useState("");
+  const [selectedClass12InstituteType, setSelectedClass12InstituteType] =
+    useState("");
+  const [selectedDiplomaInstituteType, setSelectedDiplomaInstituteType] =
+    useState("");
   const [staffPrimaryEmail, setStaffPrimaryEmail] = useState("");
   const [staffSemesterId, setStaffSemesterId] = useState("");
   const { data: departments } = useAdmissionDepartments();
@@ -274,6 +619,7 @@ export const ApplicantAdmissionView = ({
     retry: false,
   });
   const admission = fetchedAdmission ?? EMPTY_ADMISSION;
+  const countries = Country.getAllCountries();
   console.log("Admission:", admission);
   console.log("Primary Email:", admission?.primaryEmail);
 
@@ -294,6 +640,25 @@ export const ApplicantAdmissionView = ({
       return;
     }
 
+    const invalid = findFirstInvalid(STEP_ORDER.length - 1);
+
+    if (invalid) {
+      warnAndNavigate(invalid);
+      return;
+    }
+
+    const photoFile = formData.get("photo");
+    const hasPhoto =
+      (photoFile instanceof File && photoFile.size > 0) ||
+      Boolean(admission.photo);
+    if (!hasPhoto) {
+      toast.error(
+        "Please upload a passport-size photograph before submitting."
+      );
+      setActiveStep("payment");
+      return;
+    }
+
     setIsSubmitting(true);
 
     formData.set("hostel", hostelEnabled ? "true" : "false");
@@ -305,6 +670,57 @@ export const ApplicantAdmissionView = ({
     );
     formData.set("hasClass12", class12Enabled ? "true" : "false");
     formData.set("hasDiploma", diplomaEnabled ? "true" : "false");
+    formData.set("modeOfAdmission", selectedMode);
+    formData.set("departmentId", selectedDepartment);
+    formData.set("admissionType", selectedAdmissionType || "REGULAR");
+    formData.set("admissionBasedOn", admissionBasedOn || "CLASS_12_PUC");
+    formData.set("categoryClaimed", selectedCategoryClaimed);
+    formData.set("categoryAllotted", selectedCategoryAllotted);
+    formData.set("quota", selectedQuota);
+    formData.set(
+      "semesterId",
+      staffMode ? staffSemesterId : (admission.semester?.id ?? "")
+    );
+    formData.set(
+      "primaryEmail",
+      staffMode ? staffPrimaryEmail : (admission.primaryEmail ?? "")
+    );
+    formData.set("bloodGroup", selectedBloodGroup);
+    formData.set("gender", selectedGender);
+    formData.set("class10thSchoolType", selectedClass10SchoolType);
+    formData.set("class12thInstituteType", selectedClass12InstituteType);
+    formData.set("diplomaInstituteType", selectedDiplomaInstituteType);
+    formData.set(
+      "currentCountry",
+      countries.find((country) => country.isoCode === currentCountry)?.name ??
+        currentCountry
+    );
+    formData.set(
+      "currentState",
+      currentStates.find((state) => state.isoCode === currentState)?.name ??
+        currentState
+    );
+    formData.set("currentDistrict", currentDistrict);
+    formData.set(
+      "permanentCountry",
+      countries.find((country) => country.isoCode === permanentCountry)?.name ??
+        permanentCountry
+    );
+    formData.set(
+      "permanentState",
+      permanentStates.find((state) => state.isoCode === permanentState)?.name ??
+        permanentState
+    );
+    formData.set("permanentDistrict", permanentDistrict);
+    formData.set("schoolCountry", class10Country);
+    formData.set("class10thSchoolCity", class10City);
+    formData.set("class10thSchoolState", class10State);
+    formData.set("instituteCountry", class12Country);
+    formData.set("class12thInstituteCity", class12City);
+    formData.set("class12thInstituteState", class12State);
+    formData.set("diplomaCountry", diplomaCountry);
+    formData.set("diplomaInstituteCity", diplomaCity);
+    formData.set("diplomaInstituteState", diplomaState);
     for (const [key, value] of formData.entries()) {
       console.log(key, value);
     }
@@ -334,10 +750,7 @@ export const ApplicantAdmissionView = ({
     }
   };
 
-  const activeIndex = STEP_ORDER.indexOf(activeStep);
-  const progressValue = ((activeIndex + 1) / STEP_ORDER.length) * 100;
-
-  const validateStep = (step: StepKey) => {
+  const checkStepValid = (step: StepKey) => {
     const section = sectionRefs.current[step];
 
     if (!section) return true;
@@ -348,41 +761,64 @@ export const ApplicantAdmissionView = ({
       >("input, select, textarea")
     );
 
-    // Validate normal fields only
     for (const field of fields) {
       if (field instanceof HTMLInputElement && field.type === "file") {
         continue;
       }
 
       if (!field.checkValidity()) {
-        field.reportValidity();
-        field.focus();
         return false;
       }
     }
 
     return true;
   };
+
+  const findFirstInvalid = (upToIndex: number): StepKey | null => {
+    for (const step of STEP_ORDER.slice(0, upToIndex + 1)) {
+      if (!checkStepValid(step)) {
+        return step;
+      }
+    }
+    return null;
+  };
+
+  const hasPhotoUploaded = () => {
+    const photoInput = formRef.current?.querySelector<HTMLInputElement>(
+      'input[name="photo"]'
+    );
+    return (
+      (photoInput?.files?.[0] && photoInput.files[0].size > 0) ||
+      Boolean(admission.photo)
+    );
+  };
+
+  const warnAndNavigate = (step: StepKey) => {
+    toast.error(`Please fill ${STEP_LABELS[step]} before proceeding`);
+    setActiveStep(step);
+  };
+
   const saveAndNext = (step: StepKey) => {
-    if (!validateStep(step)) {
+    const currentIndex = STEP_ORDER.indexOf(step);
+
+    if (step === "payment" && !hasPhotoUploaded()) {
+      toast.error(
+        "Please upload a passport-size photograph before continuing."
+      );
       return;
     }
 
-    const nextIndex = STEP_ORDER.indexOf(step) + 1;
+    const invalid = findFirstInvalid(currentIndex);
 
+    if (invalid) {
+      warnAndNavigate(invalid);
+      return;
+    }
+
+    const nextIndex = currentIndex + 1;
     const nextStep = STEP_ORDER[
       Math.min(nextIndex, STEP_ORDER.length - 1)
     ] as StepKey;
-    const form = formRef.current;
-
-    if (form) {
-      const fd = new FormData(form);
-
-      console.log("====== FORM DATA ======");
-      for (const [k, v] of fd.entries()) {
-        console.log(k, v);
-      }
-    }
     setActiveStep(nextStep);
   };
 
@@ -466,7 +902,49 @@ export const ApplicantAdmissionView = ({
 
     cursorY += 20;
 
-    const get = (key: string) => formatReviewValue(key, formData.get(key));
+    const get = (key: string) => {
+      const directValue = formData.get(key);
+      if (directValue !== null) {
+        return formatReviewValue(key, directValue);
+      }
+
+      const fallbackValues: Record<string, string> = {
+        modeOfAdmission: selectedMode,
+        departmentId: selectedDepartment,
+        admissionType: selectedAdmissionType || "REGULAR",
+        admissionBasedOn: admissionBasedOn || "CLASS_12_PUC",
+        categoryClaimed: selectedCategoryClaimed,
+        categoryAllotted: selectedCategoryAllotted,
+        quota: selectedQuota,
+        bloodGroup: selectedBloodGroup,
+        gender: selectedGender,
+        class10thSchoolType: selectedClass10SchoolType,
+        class12thInstituteType: selectedClass12InstituteType,
+        diplomaInstituteType: selectedDiplomaInstituteType,
+        currentCountry:
+          countries.find((country) => country.isoCode === currentCountry)
+            ?.name ?? currentCountry,
+        currentState:
+          currentStates.find((state) => state.isoCode === currentState)?.name ??
+          currentState,
+        currentDistrict,
+        permanentCountry:
+          countries.find((country) => country.isoCode === permanentCountry)
+            ?.name ?? permanentCountry,
+        permanentState:
+          permanentStates.find((state) => state.isoCode === permanentState)
+            ?.name ?? permanentState,
+        permanentDistrict,
+        primaryEmail: staffMode
+          ? staffPrimaryEmail
+          : (admission.primaryEmail ?? ""),
+        semesterId: staffMode
+          ? staffSemesterId
+          : (admission.semester?.id ?? ""),
+      };
+
+      return formatReviewValue(key, fallbackValues[key] ?? null);
+    };
 
     const reviewSections = [
       {
@@ -618,6 +1096,16 @@ export const ApplicantAdmissionView = ({
           "guardianPermanentAddress",
         ],
       },
+      {
+        title: "Payment & Approval",
+        fields: [
+          "feeReceiptNumber",
+          "feePaid",
+          "scholarship",
+          "sspId",
+          "status",
+        ],
+      },
     ];
 
     for (const section of reviewSections) {
@@ -670,32 +1158,7 @@ export const ApplicantAdmissionView = ({
     return url;
   };
 
-  const handleReviewStep = () => {
-    if (!validateStep("parent")) {
-      return;
-    }
-
-    if (!class12Enabled && !diplomaEnabled) {
-      toast.error("Please fill either Class 12 / PUC or Diploma details.");
-      return;
-    }
-
-    const nextUrl = generateReviewPdf();
-    if (!nextUrl) {
-      return;
-    }
-
-    setActiveStep("review");
-  };
-
   const handleTabChange = (nextStep: StepKey) => {
-    const currentIndex = STEP_ORDER.indexOf(activeStep);
-    const nextIndex = STEP_ORDER.indexOf(nextStep);
-
-    if (nextIndex > currentIndex && !validateStep(activeStep)) {
-      return;
-    }
-
     setActiveStep(nextStep);
   };
 
@@ -704,8 +1167,48 @@ export const ApplicantAdmissionView = ({
       if (reviewPdfRef.current) {
         URL.revokeObjectURL(reviewPdfRef.current);
       }
+      if (photoPreviewRef.current) {
+        URL.revokeObjectURL(photoPreviewRef.current);
+      }
     };
   }, []);
+
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_PHOTO_SIZE) {
+      toast.error("Photo size must be 2 MB or less.");
+      event.target.value = "";
+      return;
+    }
+    if (file.type && !file.type.startsWith("image/")) {
+      toast.error("Please upload a valid image file (JPG / PNG).");
+      event.target.value = "";
+      return;
+    }
+    if (photoPreviewRef.current) {
+      URL.revokeObjectURL(photoPreviewRef.current);
+    }
+    const url = URL.createObjectURL(file);
+    photoPreviewRef.current = url;
+    setPhotoPreviewUrl(url);
+  };
+
+  const toggleVerifiedDoc = (documentName: string, checked: boolean) => {
+    setVerifiedDocs((current) => ({ ...current, [documentName]: checked }));
+  };
+
+  const clearPhoto = () => {
+    if (photoPreviewRef.current) {
+      URL.revokeObjectURL(photoPreviewRef.current);
+    }
+    photoPreviewRef.current = null;
+    setPhotoPreviewUrl(null);
+    const input = document.getElementById("photo") as HTMLInputElement | null;
+    if (input) {
+      input.value = "";
+    }
+  };
 
   const getAddress = (type: "current" | "permanent") => {
     if (type === "current") {
@@ -786,8 +1289,6 @@ export const ApplicantAdmissionView = ({
     currentPincode,
   ]);
 
-  const countries = Country.getAllCountries();
-
   const currentStates = State.getStatesOfCountry(currentCountry);
 
   const currentDistricts = City.getCitiesOfState(currentCountry, currentState);
@@ -840,11 +1341,21 @@ export const ApplicantAdmissionView = ({
   if (error) {
     const errorMessage = isAxiosError(error)
       ? error.response?.data?.message || error.message
-      : "An unexpected error occurred";
+      : "An unexpected error occurred.";
+
     return (
-      <div className="border-destructive bg-destructive/10 text-destructive rounded-lg border p-6 text-center">
-        <h3 className="text-lg font-bold">Failed to load application</h3>
-        <p className="mt-2 text-sm">{errorMessage}</p>
+      <div className="bg-muted/30 space-y-4 rounded-xl border p-6 text-center">
+        <h3 className="text-lg font-semibold">
+          No application profile available
+        </h3>
+        <p className="text-muted-foreground text-sm">{errorMessage}</p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="bg-primary hover:bg-primary/90 rounded-lg px-4 py-2 text-sm font-semibold text-white"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -876,32 +1387,36 @@ export const ApplicantAdmissionView = ({
       <div className="mb-6 space-y-4">
         <div>
           <h3 className="text-lg font-medium">Complete Your Application</h3>
+          <p className="text-muted-foreground text-sm">
+            Fill out each section in order. Use the tabs below to move between
+            sections.
+          </p>
         </div>
 
-        <Tabs
-          value={activeStep}
-          onValueChange={(value) => handleTabChange(value as StepKey)}
-          className="space-y-4"
-        >
-          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 p-1 md:grid-cols-4">
-            {VISIBLE_STEPS.map((step) => (
-              <TabsTrigger
-                key={step}
-                value={step}
-                className="text-xs md:text-sm"
-              >
-                {STEP_LABELS[step]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-
-        <div className="space-y-2">
-          <div className="text-muted-foreground flex items-center justify-between text-xs">
-            <span>Progress</span>
-            <span>{Math.round(progressValue)}%</span>
-          </div>
-          <Progress value={progressValue} />
+        <div className="border-border border-b">
+          <Tabs
+            value={activeStep}
+            onValueChange={(value) => handleTabChange(value as StepKey)}
+          >
+            <TabsList className="flex w-full flex-wrap gap-1 md:gap-2">
+              {VISIBLE_STEPS.map((step, index) => (
+                <TabsTrigger
+                  key={step}
+                  value={step}
+                  className="hover:text-foreground data-[state=active]:text-foreground text-muted-foreground hover:border-border data-[state=active]:border-primary group flex min-h-0 flex-col items-center justify-center gap-1.5 border-b-2 border-transparent px-3 pb-2.5 pt-1.5 text-left transition data-[state=active]:bg-transparent"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="bg-muted-foreground/15 text-muted-foreground group-data-[state=active]:bg-primary inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-semibold group-data-[state=active]:text-white">
+                      {index + 1}
+                    </span>
+                    <span className="text-xs font-medium md:text-sm">
+                      {STEP_LABELS[step]}
+                    </span>
+                  </span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
       </div>
 
@@ -909,7 +1424,7 @@ export const ApplicantAdmissionView = ({
         ref={formRef}
         noValidate
         onSubmit={handleSubmit}
-        className="space-y-10"
+        className="mt-6 space-y-10"
       >
         {/* ADMISSION DETAILS */}
         <div
@@ -1101,7 +1616,12 @@ export const ApplicantAdmissionView = ({
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
             <div className="space-y-2 md:col-span-4">
               <Label htmlFor="categoryClaimed">Category Claimed *</Label>
-              <Select name="categoryClaimed" required>
+              <Select
+                name="categoryClaimed"
+                value={selectedCategoryClaimed}
+                onValueChange={setSelectedCategoryClaimed}
+                required
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
@@ -1116,7 +1636,12 @@ export const ApplicantAdmissionView = ({
             </div>
             <div className="space-y-2 md:col-span-4">
               <Label htmlFor="categoryAllotted">Category Allotted *</Label>
-              <Select name="categoryAllotted" required>
+              <Select
+                name="categoryAllotted"
+                value={selectedCategoryAllotted}
+                onValueChange={setSelectedCategoryAllotted}
+                required
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
@@ -1198,50 +1723,13 @@ export const ApplicantAdmissionView = ({
                 id="abcAparId"
                 name="abcAparId"
                 defaultValue={admission.abcAparId ?? ""}
+                inputMode="numeric"
+                pattern="[0-9]{12}"
+                maxLength={12}
+                minLength={12}
+                title="ABC/APAAR ID must be 12 digits"
+                placeholder="12-digit ID"
               />
-            </div>
-            <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="feeReceiptNumber">Fee Receipt No.</Label>
-              <Input
-                id="feeReceiptNumber"
-                name="feeReceiptNumber"
-                defaultValue={admission.feeReceiptNumber ?? ""}
-              />
-            </div>
-            <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="scholarship">Scholarship *</Label>
-              <input
-                type="hidden"
-                name="scholarship"
-                value={scholarshipEnabled ? "true" : "false"}
-              />
-              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                <Checkbox
-                  id="scholarship"
-                  checked={scholarshipEnabled}
-                  onCheckedChange={(checked) =>
-                    setScholarshipEnabled(Boolean(checked))
-                  }
-                />
-                <Label htmlFor="scholarship" className="cursor-pointer">
-                  Receiving scholarship
-                </Label>
-              </div>
-            </div>
-            {scholarshipEnabled && (
-              <div className="space-y-2 md:col-span-4">
-                <Label htmlFor="sspId">SSP ID *</Label>
-                <Input
-                  id="sspId"
-                  name="sspId"
-                  defaultValue={admission.sspId ?? ""}
-                  required
-                />
-              </div>
-            )}
-            <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="feePaid">Fee Paid (₹) *</Label>
-              <Input id="feePaid" name="feePaid" type="number" required />
             </div>
             <div className="space-y-2 md:col-span-4">
               <Label htmlFor="hostel-toggle">Hostel Required *</Label>
@@ -1317,7 +1805,12 @@ export const ApplicantAdmissionView = ({
             </div>
             <div className="space-y-2">
               <Label htmlFor="bloodGroup">Blood Group *</Label>
-              <Select name="bloodGroup" required>
+              <Select
+                name="bloodGroup"
+                value={selectedBloodGroup}
+                onValueChange={setSelectedBloodGroup}
+                required
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -1334,7 +1827,12 @@ export const ApplicantAdmissionView = ({
             </div>
             <div className="space-y-2">
               <Label htmlFor="gender">Gender *</Label>
-              <Select name="gender" required>
+              <Select
+                name="gender"
+                value={selectedGender}
+                onValueChange={setSelectedGender}
+                required
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -1948,6 +2446,11 @@ export const ApplicantAdmissionView = ({
                     id="passportNumber"
                     name="passportNumber"
                     defaultValue={admission.passportNumber ?? ""}
+                    pattern={INDIAN_PASSPORT_PATTERN}
+                    minLength={8}
+                    maxLength={8}
+                    placeholder="A1234567"
+                    title={INDIAN_PASSPORT_HINT}
                   />
                 </div>
                 <div className="space-y-2">
@@ -2039,7 +2542,12 @@ export const ApplicantAdmissionView = ({
             </div>
             <div className="space-y-2">
               <Label htmlFor="class10thSchoolType">School Type *</Label>
-              <Select name="class10thSchoolType" required>
+              <Select
+                name="class10thSchoolType"
+                value={selectedClass10SchoolType}
+                onValueChange={setSelectedClass10SchoolType}
+                required
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -2276,7 +2784,12 @@ export const ApplicantAdmissionView = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="class12thInstituteType">Institute Type *</Label>
-                <Select name="class12thInstituteType" required>
+                <Select
+                  name="class12thInstituteType"
+                  value={selectedClass12InstituteType}
+                  onValueChange={setSelectedClass12InstituteType}
+                  required
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
@@ -2453,99 +2966,143 @@ export const ApplicantAdmissionView = ({
                 />
               </div>
 
-              {(
-                [
-                  ["Physics", "physics"],
-                  ["Chemistry", "chemistry"],
-                  ["Mathematics", "mathematics"],
-                ] as const
-              ).map(([label, key]) => (
-                <React.Fragment key={key}>
-                  <div className="space-y-2">
-                    <Label htmlFor={`${key}Marks`}>{label} Marks *</Label>
-                    <Input
-                      id={`${key}Marks`}
-                      name={`${key}Marks`}
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={pcmMarks[`${key}Marks` as keyof typeof pcmMarks]}
-                      onChange={(event) =>
-                        updatePcmMark(
-                          `${key}Marks` as keyof typeof pcmMarks,
-                          event.target.value
-                        )
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`${key}MaxMarks`}>
-                      {label} Max Marks *
-                    </Label>
-                    <Input
-                      id={`${key}MaxMarks`}
-                      name={`${key}MaxMarks`}
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={
-                        pcmMarks[`${key}MaxMarks` as keyof typeof pcmMarks]
-                      }
-                      onChange={(event) =>
-                        updatePcmMark(
-                          `${key}MaxMarks` as keyof typeof pcmMarks,
-                          event.target.value
-                        )
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`${key}MinMarks`}>
-                      {label} Min / Pass Marks *
-                    </Label>
-                    <Input
-                      id={`${key}MinMarks`}
-                      name={`${key}MinMarks`}
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={
-                        pcmMarks[`${key}MinMarks` as keyof typeof pcmMarks]
-                      }
-                      onChange={(event) =>
-                        updatePcmMark(
-                          `${key}MinMarks` as keyof typeof pcmMarks,
-                          event.target.value
-                        )
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`${key}Percentage`}>
-                      {label} Percentage
-                    </Label>
-                    <Input
-                      id={`${key}Percentage`}
-                      name={`${key}Percentage`}
-                      value={percentage(
-                        pcmMarks[`${key}Marks` as keyof typeof pcmMarks],
-                        pcmMarks[`${key}MaxMarks` as keyof typeof pcmMarks]
-                      )}
-                      readOnly
-                    />
-                  </div>
-                </React.Fragment>
-              ))}
-              <div className="space-y-2">
-                <Label htmlFor="pcmPercentage">PCM Grade (%)</Label>
+              <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                <Label className="text-base font-semibold">
+                  Subject-wise Marks (Physics, Chemistry & Mathematics)
+                </Label>
+                <div className="border-border/60 bg-card overflow-hidden rounded-xl border">
+                  <table className="w-full table-fixed text-sm">
+                    <thead>
+                      <tr className="bg-muted/60 text-muted-foreground text-xs uppercase tracking-wide">
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Subject
+                        </th>
+                        <th className="px-2 py-3 text-center font-semibold">
+                          Obtained *
+                        </th>
+                        <th className="px-2 py-3 text-center font-semibold">
+                          Max *
+                        </th>
+                        <th className="px-2 py-3 text-center font-semibold">
+                          Min / Pass *
+                        </th>
+                        <th className="px-4 py-3 text-center font-semibold">
+                          %
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(
+                        [
+                          ["Physics", "physics"],
+                          ["Chemistry", "chemistry"],
+                          ["Mathematics", "mathematics"],
+                        ] as const
+                      ).map(([label, key]) => (
+                        <tr
+                          key={key}
+                          className="border-border/60 hover:bg-muted/30 border-t last:border-b-0"
+                        >
+                          <td className="px-4 py-3 font-medium">{label}</td>
+                          <td className="px-2 py-3">
+                            <Input
+                              id={`${key}Marks`}
+                              name={`${key}Marks`}
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={
+                                pcmMarks[`${key}Marks` as keyof typeof pcmMarks]
+                              }
+                              onChange={(event) =>
+                                updatePcmMark(
+                                  `${key}Marks` as keyof typeof pcmMarks,
+                                  event.target.value
+                                )
+                              }
+                              required
+                              className="mx-auto w-24 text-center"
+                            />
+                          </td>
+                          <td className="px-2 py-3">
+                            <Input
+                              id={`${key}MaxMarks`}
+                              name={`${key}MaxMarks`}
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={
+                                pcmMarks[
+                                  `${key}MaxMarks` as keyof typeof pcmMarks
+                                ]
+                              }
+                              onChange={(event) =>
+                                updatePcmMark(
+                                  `${key}MaxMarks` as keyof typeof pcmMarks,
+                                  event.target.value
+                                )
+                              }
+                              required
+                              className="mx-auto w-24 text-center"
+                            />
+                          </td>
+                          <td className="px-2 py-3">
+                            <Input
+                              id={`${key}MinMarks`}
+                              name={`${key}MinMarks`}
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={
+                                pcmMarks[
+                                  `${key}MinMarks` as keyof typeof pcmMarks
+                                ]
+                              }
+                              onChange={(event) =>
+                                updatePcmMark(
+                                  `${key}MinMarks` as keyof typeof pcmMarks,
+                                  event.target.value
+                                )
+                              }
+                              required
+                              className="mx-auto w-24 text-center"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <Input
+                              id={`${key}Percentage`}
+                              name={`${key}Percentage`}
+                              value={percentage(
+                                pcmMarks[
+                                  `${key}Marks` as keyof typeof pcmMarks
+                                ],
+                                pcmMarks[
+                                  `${key}MaxMarks` as keyof typeof pcmMarks
+                                ]
+                              )}
+                              readOnly
+                              className="bg-muted/60 mx-auto w-24 text-center font-semibold"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2 md:col-span-2 lg:col-span-3">
+                <Label htmlFor="pcmPercentage">
+                  PCM Aggregate Percentage (%)
+                </Label>
+                <div className="text-muted-foreground text-xs">
+                  Auto-calculated from the marks entered above.
+                </div>
                 <Input
                   id="pcmPercentage"
                   name="pcmPercentage"
                   value={pcmPercentage}
                   readOnly
+                  className="bg-muted/60 font-semibold md:max-w-xs"
                 />
               </div>
             </fieldset>
@@ -2564,7 +3121,12 @@ export const ApplicantAdmissionView = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="diplomaInstituteType">Institute Type *</Label>
-                <Select name="diplomaInstituteType" required={diplomaEnabled}>
+                <Select
+                  name="diplomaInstituteType"
+                  value={selectedDiplomaInstituteType}
+                  onValueChange={setSelectedDiplomaInstituteType}
+                  required={diplomaEnabled}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
@@ -2742,303 +3304,90 @@ export const ApplicantAdmissionView = ({
         >
           <div className="border-b pb-2">
             <h3 className="text-xl font-semibold tracking-tight">
-              4. Parent / Guardian Details
+              4. Parental Details
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {/* Father */}
-            <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
-              <h4 className="text-lg font-semibold">Father's Details</h4>
-              <div className="space-y-2">
-                <Label htmlFor="fatherName">Name *</Label>
-                <Input id="fatherName" name="fatherName" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fatherEmail">Email Address *</Label>
-                <Input
-                  id="fatherEmail"
-                  name="fatherEmail"
-                  type="email"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fatherNumber">Phone Number *</Label>
-
-                <PhoneNumberInput
-                  id="fatherNumber"
-                  value={fatherPhone}
-                  onChange={(value) => setFatherPhone(value ?? "")}
-                  defaultCountry="IN"
-                  required
-                />
-
-                <input type="hidden" name="fatherNumber" value={fatherPhone} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fatherOccupation">Occupation </Label>
-                <Input id="fatherOccupation" name="fatherOccupation" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="parentPassportNumber">
-                  Parent Passport Number
-                </Label>
-                <Input
-                  id="parentPassportNumber"
-                  name="parentPassportNumber"
-                  defaultValue={admission.parentPassportNumber ?? ""}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="parentVisaNumber">Parent Visa Number</Label>
-                <Input
-                  id="parentVisaNumber"
-                  name="parentVisaNumber"
-                  defaultValue={admission.parentVisaNumber ?? ""}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="parentVisaExpiryDate">
-                  Parent Visa Expiry Date
-                </Label>
-                <Input
-                  id="parentVisaExpiryDate"
-                  name="parentVisaExpiryDate"
-                  type="date"
-                  defaultValue={
-                    admission.parentVisaExpiryDate?.slice(0, 10) ?? ""
-                  }
-                />
-              </div>
-              <div className="space-y-3">
-                <Label>Address *</Label>
-
-                <div className="space-y-2 rounded-md border p-3">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="father-current"
-                      checked={fatherAddressSource === "current"}
-                      onCheckedChange={(checked) =>
-                        setFatherAddressSource(checked ? "current" : "custom")
-                      }
-                    />
-                    <Label htmlFor="father-current">
-                      Same as Current Address
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ParentMemberCard
+              title="Father's Details"
+              memberKey="father"
+              nameRequired
+              occupationRequired
+              income="input"
+              incomeRequired
+              mobileRequired
+              phone={fatherPhone}
+              onPhoneChange={(value) => setFatherPhone(value ?? "")}
+              autoCurrent={getAddress("current")}
+              autoPermanent={getAddress("permanent")}
+            >
+              <div className="border-t pt-4">
+                <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">
+                  Parent Passport / Visa (Optional)
+                </p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="parentPassportNumber">
+                      Passport Number
                     </Label>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="father-permanent"
-                      checked={fatherAddressSource === "permanent"}
-                      onCheckedChange={(checked) =>
-                        setFatherAddressSource(checked ? "permanent" : "custom")
-                      }
-                    />
-                    <Label htmlFor="father-permanent">
-                      Same as Permanent Address
-                    </Label>
-                  </div>
-                </div>
-
-                {fatherAddressSource === "custom" ? (
-                  <Input
-                    key="father-custom"
-                    name="fatherPermanentAddress"
-                    placeholder="Enter father's address"
-                    defaultValue=""
-                  />
-                ) : (
-                  <Input
-                    key="father-auto"
-                    value={
-                      fatherAddressSource === "current"
-                        ? getAddress("current")
-                        : getAddress("permanent")
-                    }
-                    readOnly
-                    className="bg-muted text-muted-foreground"
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Mother */}
-            <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
-              <h4 className="text-lg font-semibold">Mother's Details</h4>
-              <div className="space-y-2">
-                <Label htmlFor="motherName">Name *</Label>
-                <Input id="motherName" name="motherName" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="motherEmail">Email Address</Label>
-                <Input id="motherEmail" name="motherEmail" type="email" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="motherNumber">Phone Number *</Label>
-
-                <PhoneNumberInput
-                  id="motherNumber"
-                  value={motherPhone}
-                  onChange={(value) => setMotherPhone(value ?? "")}
-                  defaultCountry="IN"
-                  required
-                />
-
-                <input type="hidden" name="motherNumber" value={motherPhone} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="motherOccupation">Occupation </Label>
-                <Input id="motherOccupation" name="motherOccupation" />
-              </div>
-              <div className="space-y-3">
-                <Label>Address *</Label>
-
-                <div className="space-y-2 rounded-md border p-3">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="mother-current"
-                      checked={motherAddressSource === "current"}
-                      onCheckedChange={(checked) =>
-                        setMotherAddressSource(checked ? "current" : "custom")
-                      }
-                    />
-                    <Label htmlFor="mother-current">
-                      Same as Current Address
-                    </Label>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="mother-permanent"
-                      checked={motherAddressSource === "permanent"}
-                      onCheckedChange={(checked) =>
-                        setMotherAddressSource(checked ? "permanent" : "custom")
-                      }
-                    />
-                    <Label htmlFor="mother-permanent">
-                      Same as Permanent Address
-                    </Label>
-                  </div>
-                </div>
-
-                {motherAddressSource === "custom" ? (
-                  <Input
-                    key="mother-custom"
-                    name="motherPermanentAddress"
-                    placeholder="Enter mother's address"
-                    defaultValue=""
-                  />
-                ) : (
-                  <Input
-                    key="mother-auto"
-                    value={
-                      motherAddressSource === "current"
-                        ? getAddress("current")
-                        : getAddress("permanent")
-                    }
-                    readOnly
-                    className="bg-muted text-muted-foreground"
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Guardian */}
-            <div className="bg-muted/30 space-y-4 rounded-lg border p-4 md:col-span-2">
-              <h4 className="text-lg font-semibold">
-                Guardian's Details{" "}
-                <span className="text-muted-foreground text-sm font-normal">
-                  (Optional)
-                </span>
-              </h4>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="guardianName">Name</Label>
-                  <Input id="guardianName" name="guardianName" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="guardianEmail">Email Address</Label>
-                  <Input id="guardianEmail" name="guardianEmail" type="email" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="guardianNumber">Phone Number</Label>
-
-                  <PhoneNumberInput
-                    id="guardianNumber"
-                    value={guardianPhone}
-                    onChange={(value) => setGuardianPhone(value ?? "")}
-                    defaultCountry="IN"
-                  />
-
-                  <input
-                    type="hidden"
-                    name="guardianNumber"
-                    value={guardianPhone}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="guardianOccupation">Occupation</Label>
-                  <Input id="guardianOccupation" name="guardianOccupation" />
-                </div>
-                <div className="space-y-3">
-                  <Label>Address</Label>
-
-                  <div className="space-y-2 rounded-md border p-3">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="guardian-current"
-                        checked={guardianAddressSource === "current"}
-                        onCheckedChange={(checked) =>
-                          setGuardianAddressSource(
-                            checked ? "current" : "custom"
-                          )
-                        }
-                      />
-                      <Label htmlFor="guardian-current">
-                        Same as Current Address
-                      </Label>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="guardian-permanent"
-                        checked={guardianAddressSource === "permanent"}
-                        onCheckedChange={(checked) =>
-                          setGuardianAddressSource(
-                            checked ? "permanent" : "custom"
-                          )
-                        }
-                      />
-                      <Label htmlFor="guardian-permanent">
-                        Same as Permanent Address
-                      </Label>
-                    </div>
-                  </div>
-
-                  {guardianAddressSource === "custom" ? (
                     <Input
-                      key="guardian-custom"
-                      name="guardianPermanentAddress"
-                      placeholder="Enter guardian's address"
-                      defaultValue=""
+                      id="parentPassportNumber"
+                      name="parentPassportNumber"
+                      defaultValue={admission.parentPassportNumber ?? ""}
+                      pattern={INDIAN_PASSPORT_PATTERN}
+                      minLength={8}
+                      maxLength={8}
+                      placeholder="A1234567"
+                      title={INDIAN_PASSPORT_HINT}
                     />
-                  ) : (
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="parentVisaNumber">Visa Number</Label>
                     <Input
-                      key="guardian-auto"
-                      value={
-                        guardianAddressSource === "current"
-                          ? getAddress("current")
-                          : getAddress("permanent")
-                      }
-                      readOnly
-                      className="bg-muted text-muted-foreground"
+                      id="parentVisaNumber"
+                      name="parentVisaNumber"
+                      defaultValue={admission.parentVisaNumber ?? ""}
                     />
-                  )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="parentVisaExpiryDate">
+                      Visa Expiry Date
+                    </Label>
+                    <Input
+                      id="parentVisaExpiryDate"
+                      name="parentVisaExpiryDate"
+                      type="date"
+                      defaultValue={
+                        admission.parentVisaExpiryDate?.slice(0, 10) ?? ""
+                      }
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            </ParentMemberCard>
+
+            <ParentMemberCard
+              title="Mother's Details"
+              memberKey="mother"
+              nameRequired
+              income="range"
+              phone={motherPhone}
+              onPhoneChange={(value) => setMotherPhone(value ?? "")}
+              autoCurrent={getAddress("current")}
+              autoPermanent={getAddress("permanent")}
+            />
+
+            <ParentMemberCard
+              title="Guardian's Details"
+              memberKey="guardian"
+              optional
+              wide
+              phone={guardianPhone}
+              onPhoneChange={(value) => setGuardianPhone(value ?? "")}
+              autoCurrent={getAddress("current")}
+              autoPermanent={getAddress("permanent")}
+            />
           </div>
 
           <div className="flex flex-wrap justify-between gap-3">
@@ -3049,8 +3398,105 @@ export const ApplicantAdmissionView = ({
             >
               Back
             </Button>
-            <Button type="button" onClick={handleReviewStep}>
-              Review Application
+            <Button type="button" onClick={() => saveAndNext("parent")}>
+              Save & Continue
+            </Button>
+          </div>
+        </div>
+
+        {/* UPLOAD IMAGE */}
+        <div
+          ref={(node) => {
+            sectionRefs.current.payment = node;
+          }}
+          className={
+            activeStep === "payment" ? "space-y-6" : "hidden space-y-6"
+          }
+        >
+          <div className="border-b pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-xl font-semibold tracking-tight">
+                5. Upload Image
+              </h3>
+              <div className="bg-muted/40 text-muted-foreground inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
+                <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                5 Verified out of 5
+              </div>
+            </div>
+            <div className="text-muted-foreground mt-2 space-y-2 text-sm">
+              <p>
+                Upload a recent passport-size photograph. The image is saved
+                with your application and used on your hall ticket.
+              </p>
+            </div>
+          </div>
+          <div className="border-muted/50 bg-muted/20 flex flex-col items-center gap-6 rounded-lg border p-6 md:flex-row">
+            <div className="bg-background relative flex h-48 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border">
+              {photoPreviewUrl ? (
+                <img
+                  src={photoPreviewUrl}
+                  alt="Applicant photo preview"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="text-muted-foreground flex flex-col items-center gap-3 p-4 text-center">
+                  <div className="border-muted/60 text-muted-foreground/60 flex h-12 w-12 items-center justify-center rounded-full border border-dashed text-2xl">
+                    +
+                  </div>
+                  <span className="text-xs">Upload Your Image</span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-1 flex-col items-center gap-4 sm:items-start">
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Input
+                  id="photo"
+                  name="photo"
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="sr-only"
+                />
+                <Button asChild variant="outline">
+                  <label htmlFor="photo" className="cursor-pointer">
+                    Change Photo
+                  </label>
+                </Button>
+                {photoPreviewUrl ? (
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-xs text-white">
+                      ✓
+                    </span>
+                    Verified
+                  </span>
+                ) : null}
+                {photoPreviewUrl ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearPhoto}
+                  >
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
+              <p className="text-muted-foreground text-center text-xs sm:text-left">
+                JPG / PNG passport-size photo, max 2 MB. Fields marked with an
+                asterisk (*) are mandatory.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap justify-between gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => goBack("payment")}
+            >
+              Back
+            </Button>
+            <Button type="button" onClick={() => saveAndNext("payment")}>
+              Save & Continue
             </Button>
           </div>
         </div>
@@ -3058,68 +3504,138 @@ export const ApplicantAdmissionView = ({
         {/* REVIEW */}
         <div
           ref={(node) => {
-            sectionRefs.current.review = node;
+            sectionRefs.current.receipt = node;
           }}
-          className={activeStep === "review" ? "space-y-6" : "hidden space-y-6"}
+          className={
+            activeStep === "receipt" ? "space-y-6" : "hidden space-y-6"
+          }
         >
           <div className="border-b pb-2">
             <h3 className="text-xl font-semibold tracking-tight">
-              5. Review Application
+              6. Document Verification
             </h3>
+            <div className="text-muted-foreground mt-2 space-y-2 text-sm">
+              <p>
+                Verify the list of documents below and confirm the originals are
+                available before submitting your application.
+              </p>
+            </div>
           </div>
 
-          <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
-            <p className="text-muted-foreground text-sm">
-              Review the details you entered in each section before submitting
-              your application. You can go back to any section using the section
-              buttons above.
-            </p>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="bg-background rounded-md border p-3">
-                <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                  Application
-                </p>
-                <p className="font-medium">{admission.applicationId}</p>
-                <p className="text-muted-foreground text-sm">
-                  {admission.modeOfAdmission}
-                </p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={generateReviewPdf}
-                >
-                  Generate PDF Preview
-                </Button>
-                {reviewPdfUrl ? (
-                  <Button asChild variant="outline">
-                    <a
-                      href={reviewPdfUrl}
-                      download={`application-review-${admission.applicationId}.pdf`}
-                    >
-                      Download PDF
-                    </a>
-                  </Button>
-                ) : null}
-              </div>
+          <input
+            type="hidden"
+            name="scholarship"
+            value={scholarshipEnabled ? "true" : "false"}
+          />
+          <input
+            type="hidden"
+            name="sspId"
+            defaultValue={admission.sspId ?? ""}
+          />
+          <input
+            type="hidden"
+            name="feeReceiptNumber"
+            defaultValue={admission.feeReceiptNumber ?? ""}
+          />
+          <input type="hidden" name="feePaid" value="" />
 
-              {reviewPdfUrl ? (
-                <div className="bg-background overflow-hidden rounded-lg border">
-                  <iframe
-                    title="Application review PDF preview"
-                    src={reviewPdfUrl}
-                    className="h-[70vh] w-full"
-                  />
+          <div className="border-muted/50 bg-muted/20 space-y-4 rounded-lg border p-4">
+            <h4 className="text-base font-semibold">
+              Student Document Verification
+            </h4>
+            <div className="border-muted/50 overflow-hidden rounded-lg border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-muted/50 border-b text-left">
+                    <th className="w-16 px-3 py-2 font-medium">SL.NO</th>
+                    <th className="px-3 py-2 font-medium">DOCUMENTS</th>
+                    <th className="w-28 px-3 py-2 font-medium">ORIGINALS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { label: "Primary Documents", docs: PRIMARY_DOCUMENTS },
+                    {
+                      label: "Additional Documents",
+                      docs: ADDITIONAL_DOCUMENTS,
+                    },
+                  ].map((group, groupIndex) => (
+                    <React.Fragment key={group.label}>
+                      <tr className="bg-muted/40">
+                        <td
+                          colSpan={3}
+                          className="text-muted-foreground px-3 py-2 text-xs font-semibold uppercase tracking-wide"
+                        >
+                          {group.label}
+                        </td>
+                      </tr>
+                      {group.docs.map((documentName, index) => {
+                        const slNo =
+                          (groupIndex === 0 ? 0 : PRIMARY_DOCUMENTS.length) +
+                          index +
+                          1;
+                        return (
+                          <tr
+                            key={documentName}
+                            className="border-muted/50 border-b last:border-b-0"
+                          >
+                            <td className="px-3 py-2">{slNo}</td>
+                            <td className="px-3 py-2">{documentName}</td>
+                            <td className="px-3 py-2">
+                              <Checkbox
+                                checked={verifiedDocs[documentName] ?? false}
+                                onCheckedChange={(checked) =>
+                                  toggleVerifiedDoc(
+                                    documentName,
+                                    Boolean(checked)
+                                  )
+                                }
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="border-muted/50 bg-muted/20 space-y-4 rounded-lg border p-4">
+              <h4 className="text-base font-semibold">Receipt PDF</h4>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-3">
+                  <Button type="button" onClick={generateReviewPdf}>
+                    Generate Receipt PDF
+                  </Button>
+                  {reviewPdfUrl ? (
+                    <Button asChild variant="outline">
+                      <a
+                        href={reviewPdfUrl}
+                        download={`receipt-${admission.applicationId || "application"}.pdf`}
+                      >
+                        Download Receipt
+                      </a>
+                    </Button>
+                  ) : null}
                 </div>
-              ) : (
-                <div className="bg-background text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
-                  Generate the PDF preview to review all submitted details in
-                  one document.
-                </div>
-              )}
+                {reviewPdfUrl ? (
+                  <div className="bg-background overflow-hidden rounded-lg border">
+                    <iframe
+                      title="Application receipt PDF preview"
+                      src={reviewPdfUrl}
+                      className="h-[60vh] w-full"
+                    />
+                  </div>
+                ) : (
+                  <div className="border-muted/50 bg-background/80 text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                    Generate the receipt PDF to preview and download the
+                    applicant receipt.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -3127,7 +3643,7 @@ export const ApplicantAdmissionView = ({
             <Button
               type="button"
               variant="outline"
-              onClick={() => goBack("review")}
+              onClick={() => goBack("receipt")}
             >
               Back
             </Button>
@@ -3137,7 +3653,7 @@ export const ApplicantAdmissionView = ({
               className="w-full px-8 md:w-auto"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Submitting..." : "Review and Submit"}
+              {isSubmitting ? "Submitting..." : "Submit Application"}
             </Button>
           </div>
         </div>
