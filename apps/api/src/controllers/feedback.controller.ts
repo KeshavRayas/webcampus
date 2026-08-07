@@ -1,7 +1,10 @@
 import { resolveFeedbackScope } from "@webcampus/api/src/services/shared/feedback-scope.service";
 import { FeedbackService } from "@webcampus/api/src/services/shared/feedback.service";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
-import type { FeedbackReportQuery } from "@webcampus/schemas/feedback";
+import type {
+  CourseDistributionQuery,
+  FeedbackReportQuery,
+} from "@webcampus/schemas/feedback";
 import type { Request, Response } from "express";
 
 const userId = (req: Request) => {
@@ -234,10 +237,38 @@ export class FeedbackController {
 
   static async roundFaculties(req: Request, res: Response) {
     try {
+      const departmentId = (req.query.departmentId ?? undefined) as
+        | string
+        | undefined;
       reply(
         res,
-        await FeedbackService.getRoundFaculties(req.params.roundId as string),
+        await FeedbackService.getRoundFaculties(
+          req.params.roundId as string,
+          departmentId
+        ),
         "Feedback faculties fetched successfully"
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  }
+
+  static async courseDistribution(req: Request, res: Response) {
+    try {
+      const query: CourseDistributionQuery = {
+        facultyId: req.query.facultyId as string,
+        courseId: req.query.courseId as string,
+        ...(req.query.sectionId
+          ? { sectionId: req.query.sectionId as string }
+          : {}),
+      };
+      reply(
+        res,
+        await FeedbackService.getCourseDistribution(
+          req.params.roundId as string,
+          query
+        ),
+        "Feedback course distribution fetched successfully"
       );
     } catch (error) {
       fail(res, error);

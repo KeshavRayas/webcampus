@@ -1,6 +1,7 @@
 import { FeedbackController } from "@webcampus/api/src/controllers/feedback.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
+  CourseDistributionQuerySchema,
   FeedbackPresetSchema,
   FeedbackReportQuerySchema,
   FeedbackRoundSchema,
@@ -53,6 +54,11 @@ admin.get(
 admin.get(
   "/rounds/:roundId/faculties/:facultyId/courses/:courseId/sections/:sectionId/students",
   FeedbackController.sectionStudents
+);
+admin.get(
+  "/rounds/:roundId/course-distribution",
+  validateRequest(CourseDistributionQuerySchema, "query"),
+  FeedbackController.courseDistribution
 );
 admin.get(
   "/report",

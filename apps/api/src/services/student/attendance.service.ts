@@ -49,8 +49,14 @@ export class StudentAttendanceService {
           },
         });
 
-        const totalClasses = attendanceRecords.reduce((acc, curr) => acc + (curr.total || 0), 0);
-        const attendedClasses = attendanceRecords.reduce((acc, curr) => acc + (curr.present || 0), 0);
+        const totalClasses = attendanceRecords.reduce(
+          (acc, curr) => acc + (curr.total || 0),
+          0
+        );
+        const attendedClasses = attendanceRecords.reduce(
+          (acc, curr) => acc + (curr.present || 0),
+          0
+        );
 
         let percentage = 100;
         if (totalClasses > 0) {
@@ -59,7 +65,8 @@ export class StudentAttendanceService {
 
         // Check if any attendance entry has an approved condonation (matching HOD service logic)
         const hasApprovedCondonation = attendanceRecords.some(
-          (record: { condonationStatus?: string }) => record.condonationStatus === "APPROVED"
+          (record: { condonationStatus?: string }) =>
+            record.condonationStatus === "APPROVED"
         );
 
         courseSummaries.push({
@@ -115,13 +122,23 @@ export class StudentAttendanceService {
         orderBy: { id: "asc" },
       });
 
-      const sessionDetails = attendanceRecords.map((record: { id: string; createdAt?: Date; present?: number; condonationStatus?: string }, index: number) => ({
-        sessionId: record.id,
-        sessionDate: record.createdAt || new Date(),
-        topic: `Session / Record ${index + 1}`,
-        status: (record.present ?? 0) > 0 ? "PRESENT" : "ABSENT",
-        condonationStatus: record.condonationStatus || "NONE",
-      }));
+      const sessionDetails = attendanceRecords.map(
+        (
+          record: {
+            id: string;
+            createdAt?: Date;
+            present?: number;
+            condonationStatus?: string;
+          },
+          index: number
+        ) => ({
+          sessionId: record.id,
+          sessionDate: record.createdAt || new Date(),
+          topic: `Session / Record ${index + 1}`,
+          status: (record.present ?? 0) > 0 ? "PRESENT" : "ABSENT",
+          condonationStatus: record.condonationStatus || "NONE",
+        })
+      );
 
       return {
         status: "success",

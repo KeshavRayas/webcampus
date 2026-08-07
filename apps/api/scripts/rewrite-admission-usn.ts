@@ -21,7 +21,10 @@ type AdmissionForRewrite = {
 };
 
 const getNormalizedBranchCode = (code: string): string => {
-  const normalized = code.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 4);
+  const normalized = code
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .substring(0, 4);
   if (!normalized) {
     throw new Error(`Invalid department code for USN generation: ${code}`);
   }
@@ -46,7 +49,11 @@ const getSortableName = (admission: AdmissionForRewrite): string => {
     .toLocaleLowerCase();
 };
 
-const buildTempUsn = (yearSuffix: string, branchCode: string, serial: number): string => {
+const buildTempUsn = (
+  yearSuffix: string,
+  branchCode: string,
+  serial: number
+): string => {
   return `TBM${yearSuffix}${branchCode}${serial.toString().padStart(4, "0")}`;
 };
 
@@ -96,7 +103,10 @@ async function rewriteAdmissionAndStudentUsn(): Promise<void> {
     groupedAdmissions.set(key, current);
   }
 
-  const admissionTempUsnUpdates: Array<{ admissionId: string; tempUsn: string }> = [];
+  const admissionTempUsnUpdates: Array<{
+    admissionId: string;
+    tempUsn: string;
+  }> = [];
   const studentUsnByStudentId = new Map<string, string>();
 
   for (const [key, group] of groupedAdmissions.entries()) {

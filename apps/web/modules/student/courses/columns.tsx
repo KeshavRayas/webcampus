@@ -75,7 +75,11 @@ export const buildCourseRegistrationColumns = ({
             onClick={() => onRegister(course)}
             disabled={course.isRegistered || isPending}
           >
-            {course.isRegistered ? "Registered" : isPending ? "Registering..." : "Register"}
+            {course.isRegistered
+              ? "Registered"
+              : isPending
+                ? "Registering..."
+                : "Register"}
           </Button>
         );
       },

@@ -8,11 +8,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@webcampus/ui/components/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@webcampus/ui/components/dialog";
+import {
+  DEFAULT_FILTER_ALL_VALUE,
+  FilterActions,
+  FilterBuilder,
+  type FilterFieldConfig,
+  type FilterOption,
+} from "@webcampus/ui/components/filter-builder";
 import { Input } from "@webcampus/ui/components/input";
 import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -21,7 +37,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import {
-  downloadFeedbackCsvRows,
+  getCourseDistribution,
   getFeedbackFilterOptions,
   getFeedbackReport,
   getRoundCourseSections,
@@ -38,6 +54,8 @@ type ReportRow = {
   section: string;
   roundNumber: number;
   roundName: string;
+  batch: string | null;
+  departmentName: string;
   responseCount: number;
   questionAverages: number[];
   average: number;
@@ -62,6 +80,7 @@ type CourseItem = {
   code: string;
   name: string;
   sectionCount: number;
+  departmentName?: string;
 };
 type SectionItem = {
   assignmentId: string;
@@ -74,30 +93,32 @@ type SectionItem = {
 };
 type StudentItem = { name: string; usn: string };
 
+type Card1Filters = {
+  departmentId: string;
+  facultyId: string;
+  courseId: string;
+  sectionId: string;
+};
+
+const EMPTY_CARD1_FILTERS: Card1Filters = {
+  departmentId: "",
+  facultyId: "",
+  courseId: "",
+  sectionId: "",
+};
+
 type AggregatedRow = {
   facultyName: string;
   courseCode: string;
   courseName: string;
   assignmentType: string;
+  departmentName: string;
   sections: number;
   responseCount: number;
   questionAverages: number[];
   average: number;
   percentage: number;
 };
-
-const SCORE_HEADERS = [
-  "Q1",
-  "Q2",
-  "Q3",
-  "Q4",
-  "Q5",
-  "Q6",
-  "Q7",
-  "Q8",
-  "Q9",
-  "Q10",
-];
 
 const aggregateReport = (rows: ReportRow[]): AggregatedRow[] => {
   const map = new Map<string, AggregatedRow>();
@@ -118,6 +139,7 @@ const aggregateReport = (rows: ReportRow[]): AggregatedRow[] => {
         courseCode: row.course.code,
         courseName: row.course.name,
         assignmentType: row.assignmentType,
+        departmentName: row.departmentName,
         sections: 1,
         responseCount: row.responseCount,
         questionAverages: row.questionAverages.map(
@@ -143,50 +165,124 @@ const aggregateReport = (rows: ReportRow[]): AggregatedRow[] => {
   });
 };
 
+const rowAverage = (q: {
+  excellent: number;
+  veryGood: number;
+  good: number;
+  fair: number;
+  poor: number;
+  rowTotal: number;
+}) => {
+  const total =
+    q.excellent * 5 + q.veryGood * 4 + q.good * 3 + q.fair * 2 + q.poor;
+  return q.rowTotal > 0 ? total / q.rowTotal : 0;
+};
+
+const DISTRIBUTION_HEADERS = [
+  "Q.No",
+  "Question",
+  "Excellent",
+  "Very Good",
+  "Good",
+  "Fair",
+  "Poor",
+  "Total",
+  "Average",
+];
+
 export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
-  const [facultyId, setFacultyId] = useState("");
-  const [courseId, setCourseId] = useState("");
-  const [sectionId, setSectionId] = useState("");
+  const [showStudents, setShowStudents] = useState(false);
+
+  const [draftFilters, setDraftFilters] =
+    useState<Card1Filters>(EMPTY_CARD1_FILTERS);
+  const [appliedFilters, setAppliedFilters] =
+    useState<Card1Filters>(EMPTY_CARD1_FILTERS);
 
   const [reportDeptId, setReportDeptId] = useState("");
   const [reportCourseId, setReportCourseId] = useState("");
-  const [reportMinScore, setReportMinScore] = useState("");
+  const [reportMaxPercentage, setReportMaxPercentage] = useState("");
   const [appliedReport, setAppliedReport] = useState<{
     departmentId?: string;
     courseId?: string;
-    minScore?: string;
+    maxPercentage?: string;
   } | null>(null);
 
   const { data: facultyData } = useQuery<{
     round: RoundMeta;
     faculties: FacultyItem[];
   }>({
-    queryKey: ["round-faculties", roundId],
-    queryFn: () => getRoundFaculties(roundId),
+    queryKey: ["round-faculties", roundId, draftFilters.departmentId],
+    queryFn: () =>
+      getRoundFaculties(roundId, draftFilters.departmentId || undefined),
   });
   const round: RoundMeta | undefined = facultyData?.round;
   const faculties = facultyData?.faculties ?? [];
 
-  const { data: courses } = useQuery<CourseItem[]>({
-    queryKey: ["round-courses", roundId, facultyId],
-    queryFn: () => getRoundFacultyCourses(roundId, facultyId),
-    enabled: Boolean(facultyId),
+  const { data: courses, isLoading: coursesLoading } = useQuery<CourseItem[]>({
+    queryKey: ["round-courses", roundId, draftFilters.facultyId],
+    queryFn: () => getRoundFacultyCourses(roundId, draftFilters.facultyId),
+    enabled: Boolean(draftFilters.facultyId),
   });
 
-  const { data: sections } = useQuery<SectionItem[]>({
-    queryKey: ["round-sections", roundId, facultyId, courseId],
-    queryFn: () => getRoundCourseSections(roundId, facultyId, courseId),
-    enabled: Boolean(facultyId && courseId),
+  const { data: sections, isLoading: sectionsLoading } = useQuery<
+    SectionItem[]
+  >({
+    queryKey: [
+      "round-sections",
+      roundId,
+      draftFilters.facultyId,
+      draftFilters.courseId,
+    ],
+    queryFn: () =>
+      getRoundCourseSections(
+        roundId,
+        draftFilters.facultyId,
+        draftFilters.courseId
+      ),
+    enabled: Boolean(draftFilters.facultyId && draftFilters.courseId),
   });
 
   const { data: students } = useQuery<{
     filled: StudentItem[];
     notFilled: StudentItem[];
   }>({
-    queryKey: ["round-students", roundId, facultyId, courseId, sectionId],
+    queryKey: [
+      "round-students",
+      roundId,
+      appliedFilters.facultyId,
+      appliedFilters.courseId,
+      appliedFilters.sectionId,
+    ],
     queryFn: () =>
-      getRoundSectionStudents(roundId, facultyId, courseId, sectionId),
-    enabled: Boolean(facultyId && courseId && sectionId),
+      getRoundSectionStudents(
+        roundId,
+        appliedFilters.facultyId,
+        appliedFilters.courseId,
+        appliedFilters.sectionId
+      ),
+    enabled: Boolean(
+      appliedFilters.facultyId &&
+        appliedFilters.courseId &&
+        appliedFilters.sectionId
+    ),
+  });
+
+  const { data: distribution } = useQuery({
+    queryKey: [
+      "course-distribution",
+      roundId,
+      appliedFilters.facultyId,
+      appliedFilters.courseId,
+      appliedFilters.sectionId,
+    ],
+    queryFn: () =>
+      getCourseDistribution(
+        roundId,
+        appliedFilters.facultyId,
+        appliedFilters.courseId,
+        appliedFilters.sectionId || undefined
+      ),
+    enabled: Boolean(appliedFilters.facultyId && appliedFilters.courseId),
   });
 
   const { data: filterOptions } = useQuery({
@@ -218,147 +314,175 @@ export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
     enabled: Boolean(appliedReport),
   });
 
-  const { data: courseReport = [] } = useQuery<ReportRow[]>({
-    queryKey: ["feedback-course-report", roundId, facultyId, courseId],
-    queryFn: () =>
-      getFeedbackReport(
-        {
-          feedbackRoundId: roundId,
-          facultyId,
-          courseId,
-          includeOpen: true,
-        } as never,
-        "admin"
-      ),
-    enabled: Boolean(facultyId && courseId),
-  });
-
   const aggregated = useMemo(() => aggregateReport(reportRows), [reportRows]);
 
-  const selectedFaculty = faculties.find((item) => item.id === facultyId);
-  const selectedCourse = courses?.find((item) => item.id === courseId);
+  const selectedFaculty = faculties.find(
+    (item) => item.id === appliedFilters.facultyId
+  );
+  const selectedCourse = courses?.find(
+    (item) => item.id === appliedFilters.courseId
+  );
 
-  const buildScoreRow = (row: ReportRow) => [
-    row.faculty.user.name,
-    `${row.course.code} - ${row.course.name}`,
-    row.assignmentType,
-    row.section,
-    row.responseCount,
-    ...row.questionAverages.map((value) => value.toFixed(2)),
-    row.average.toFixed(2),
-    `${row.percentage.toFixed(2)}%`,
-  ];
-
-  const downloadCourseReport = (format: "csv" | "pdf") => {
-    if (!courseReport.length) {
-      toast.error("No responses recorded for this course yet.");
-      return;
-    }
-    const headers = [
-      "Faculty",
-      "Course",
-      "Type",
-      "Section",
-      "Responses",
-      ...SCORE_HEADERS,
-      "Average / 5",
-      "Percentage",
-    ];
-    const rows = courseReport.map(buildScoreRow);
-    const filename = `feedback-${selectedFaculty?.shortName ?? "faculty"}-${selectedCourse?.code ?? "course"}.${format}`;
-    const metadata = [
-      `Round: ${round?.name ?? ""}`,
-      `Academic Term: ${round?.academicTerm.type.toUpperCase()} ${round?.academicTerm.year}`,
-      `Semester: ${round?.semester.programType} - ${round?.semester.semesterNumber}`,
-      `Faculty: ${selectedFaculty?.name ?? ""}`,
-      `Course: ${selectedCourse?.code ?? ""} - ${selectedCourse?.name ?? ""}`,
-      "Scores are averages on a 5-point scale.",
-    ];
-    if (format === "csv") {
-      downloadFeedbackCsvRows(headers, rows, filename);
-    } else {
-      downloadFeedbackPdf({
-        title: "Feedback Report",
-        metadata,
-        headers,
-        rows,
-        filename,
-      });
-    }
+  const resetDrillDown = () => {
+    setDraftFilters(EMPTY_CARD1_FILTERS);
+    setAppliedFilters(EMPTY_CARD1_FILTERS);
   };
 
-  const downloadReportTable = (format: "csv" | "pdf") => {
-    if (!aggregated.length) {
-      toast.error("No report rows to download.");
+  const downloadCourseReport = () => {
+    if (!distribution) {
+      toast.error("No distribution data to download.");
       return;
     }
-    const headers = [
-      "Faculty",
-      "Course",
-      "Type",
-      "Sections",
-      "Responses",
-      ...SCORE_HEADERS,
-      "Average / 5",
-      "Percentage",
-    ];
-    const rows = aggregated.map((row) => [
-      row.facultyName,
-      `${row.courseCode} - ${row.courseName}`,
-      row.assignmentType,
-      row.sections,
-      row.responseCount,
-      ...row.questionAverages.map((value) => value.toFixed(2)),
-      row.average.toFixed(2),
-      `${row.percentage.toFixed(2)}%`,
-    ]);
-    const metadata = [
-      `Round: ${round?.name ?? ""}`,
-      `Academic Term: ${round?.academicTerm.type.toUpperCase()} ${round?.academicTerm.year}`,
-      `Semester: ${round?.semester.programType} - ${round?.semester.semesterNumber}`,
-      "One row per faculty and course offering.",
-    ];
-    if (format === "csv") {
-      downloadFeedbackCsvRows(
-        headers,
-        rows,
-        `feedback-report-${round?.name}.csv`
-      );
-    } else {
-      downloadFeedbackPdf({
-        title: "Faculty Feedback Report",
-        metadata,
-        headers,
-        rows,
-        filename: `feedback-report-${round?.name}.pdf`,
-      });
-    }
+    const filename = `feedback-${selectedFaculty?.shortName ?? "faculty"}-${selectedCourse?.code ?? "course"}.pdf`;
+    downloadFeedbackPdf({
+      metadata: {
+        academicYear: distribution.metadata.academicYear,
+        semester: distribution.metadata.semester,
+        program: distribution.metadata.program,
+        branch: distribution.metadata.branch,
+        courseCode: distribution.metadata.courseCode,
+        courseName: distribution.metadata.courseName,
+        section: distribution.metadata.section,
+        facultyName: distribution.metadata.facultyName,
+        totalStudents: distribution.metadata.totalStudents,
+      },
+      questions: distribution.questions.map((q) => ({
+        qNo: q.questionNumber,
+        question: q.questionText,
+        excellent: q.excellent,
+        veryGood: q.veryGood,
+        good: q.good,
+        fair: q.fair,
+        poor: q.poor,
+        rowTotal: q.rowTotal,
+        rowAverage: rowAverage(q).toFixed(2),
+      })),
+      totals: {
+        excellent: distribution.totals.excellent,
+        veryGood: distribution.totals.veryGood,
+        good: distribution.totals.good,
+        fair: distribution.totals.fair,
+        poor: distribution.totals.poor,
+        overallAverage: distribution.totals.overallAverage.toFixed(2),
+      },
+      filename,
+    });
   };
 
   const applyReportFilters = () => {
-    if (!reportDeptId && !reportCourseId && !reportMinScore) {
+    if (!reportDeptId && !reportCourseId && !reportMaxPercentage) {
       toast.error("Select at least one filter");
       return;
     }
     setAppliedReport({
       ...(reportDeptId ? { departmentId: reportDeptId } : {}),
       ...(reportCourseId ? { courseId: reportCourseId } : {}),
-      ...(reportMinScore ? { minScore: reportMinScore } : {}),
+      ...(reportMaxPercentage ? { maxPercentage: reportMaxPercentage } : {}),
     });
   };
 
-  const resetDrillDown = () => {
-    setFacultyId("");
-    setCourseId("");
-    setSectionId("");
+  const resetAppliedReport = () => {
+    setReportDeptId("");
+    setReportCourseId("");
+    setReportMaxPercentage("");
+    setAppliedReport(null);
   };
 
   const termLabel = round
     ? `${round.academicTerm.type.toUpperCase()} ${round.academicTerm.year}`
     : "";
   const semesterLabel = round
-    ? `${round.semester.programType.toUpperCase()} - Semester ${round.semester.semesterNumber}`
+    ? `${round.semester.programType.toUpperCase()} - Semester ${round.semester.semesterNumber} (${round.semester.programType === "UG" ? "B.E" : "M.Tech"})`
     : "";
+
+  const selectClass =
+    "border-input bg-background h-9 rounded-md border px-3 text-sm";
+
+  const handleCard1DraftChange = (key: keyof Card1Filters, value: string) => {
+    setDraftFilters((current) => {
+      const next = { ...current, [key]: value };
+      if (key === "departmentId") {
+        next.facultyId = "";
+        next.courseId = "";
+        next.sectionId = "";
+      } else if (key === "facultyId") {
+        next.courseId = "";
+        next.sectionId = "";
+      } else if (key === "courseId") {
+        next.sectionId = "";
+      }
+      return next;
+    });
+  };
+
+  const applyCard1Filters = () => {
+    setAppliedFilters(draftFilters);
+  };
+
+  const resetCard1Filters = () => {
+    setDraftFilters(EMPTY_CARD1_FILTERS);
+    setAppliedFilters(EMPTY_CARD1_FILTERS);
+  };
+
+  const card1Fields: FilterFieldConfig<Card1Filters>[] = [
+    {
+      key: "departmentId",
+      label: "Department",
+      type: "select",
+      allOptionLabel: "All departments",
+      options:
+        filterOptions?.departments.map<FilterOption>((department) => ({
+          label: department.name,
+          value: department.id,
+        })) ?? [],
+    },
+    {
+      key: "facultyId",
+      label: "Faculty",
+      type: "select",
+      hideAllOption: true,
+      placeholder: "Select faculty",
+      options: faculties.map<FilterOption>((faculty) => ({
+        label: faculty.name,
+        value: faculty.id,
+      })),
+    },
+    {
+      key: "courseId",
+      label: "Course",
+      type: "select",
+      hideAllOption: true,
+      placeholder: coursesLoading ? "Loading courses..." : "Select course",
+      options:
+        courses?.map<FilterOption>((course) => ({
+          label: `${course.code} - ${course.name}`,
+          value: course.id,
+        })) ?? [],
+    },
+    {
+      key: "sectionId",
+      label: "Section",
+      type: "select",
+      allOptionLabel: "All sections (combined)",
+      placeholder: !draftFilters.courseId
+        ? "Select course first"
+        : sectionsLoading
+          ? "Loading sections..."
+          : "All sections (combined)",
+      options:
+        sections?.map<FilterOption>((section) => ({
+          label: section.sectionName,
+          value: section.sectionId,
+        })) ?? [],
+      formatOptionLabel: (option) => {
+        const section = sections?.find(
+          (item) => item.sectionId === option.value
+        );
+        if (!section) return option.label as string;
+        return `${section.sectionName} (${section.assignmentType}) - filled ${section.filledCount}/${section.enrolledCount}`;
+      },
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -369,27 +493,6 @@ export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
           </Link>
           {" / "}
           <span className="font-medium">{round?.name ?? "Round"}</span>
-          {selectedFaculty ? (
-            <>
-              {" / "}
-              <span className="font-medium">{selectedFaculty.name}</span>
-            </>
-          ) : null}
-          {selectedCourse ? (
-            <>
-              {" / "}
-              <span className="font-medium">{selectedCourse.code}</span>
-            </>
-          ) : null}
-          {sectionId ? (
-            <>
-              {" / "}
-              <span className="font-medium">
-                {sections?.find((item) => item.sectionId === sectionId)
-                  ?.sectionName ?? "Section"}
-              </span>
-            </>
-          ) : null}
         </p>
         <h1 className="text-2xl font-semibold">
           {round?.name ?? "Feedback Round"}
@@ -407,147 +510,201 @@ export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Browse Responses</CardTitle>
-          {(facultyId || courseId || sectionId) && (
+          <CardTitle>Faculty Report</CardTitle>
+          {appliedFilters.facultyId && (
             <Button variant="ghost" onClick={resetDrillDown}>
               Reset
             </Button>
           )}
         </CardHeader>
-        <CardContent>
-          {!facultyId ? (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {faculties.map((faculty) => (
-                <Button
-                  key={faculty.id}
-                  variant="outline"
-                  onClick={() => setFacultyId(faculty.id)}
-                  className="justify-start"
-                >
-                  {faculty.name}
-                </Button>
-              ))}
-            </div>
-          ) : !courseId ? (
-            <div className="space-y-3">
-              <p className="text-muted-foreground text-sm">
-                Courses handled by {selectedFaculty?.name} this semester:
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {courses?.map((course) => (
-                  <Button
-                    key={course.id}
-                    variant="outline"
-                    onClick={() => setCourseId(course.id)}
-                    className="justify-start"
-                  >
-                    {course.code} - {course.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ) : !sectionId ? (
+        <CardContent className="space-y-4">
+          <FilterBuilder
+            fields={card1Fields}
+            draftFilters={draftFilters}
+            onDraftChange={handleCard1DraftChange}
+            allValue={DEFAULT_FILTER_ALL_VALUE}
+          />
+          <FilterActions
+            onApply={applyCard1Filters}
+            onReset={resetCard1Filters}
+            applyLabel="Apply Filters"
+            resetLabel="Reset Filters"
+          />
+
+          {appliedFilters.facultyId && appliedFilters.courseId ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-sm">
-                  Sections for {selectedCourse?.code} - {selectedCourse?.name}:
+                  {distribution
+                    ? `${distribution.metadata.facultyName} - ${distribution.metadata.courseCode} (${distribution.metadata.section}) | ${distribution.metadata.totalStudents} respondent(s)`
+                    : "Loading distribution..."}
                 </p>
-                <Button
-                  variant="outline"
-                  onClick={() => downloadCourseReport("csv")}
-                >
-                  Download report (CSV)
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => downloadCourseReport("pdf")}
-                >
-                  Download report (PDF)
-                </Button>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {sections?.map((section) => (
+                <div className="flex gap-2">
                   <Button
-                    key={section.sectionId}
                     variant="outline"
-                    onClick={() => setSectionId(section.sectionId)}
-                    className="justify-start"
+                    size="sm"
+                    onClick={() => downloadCourseReport()}
                   >
-                    {section.sectionName} ({section.assignmentType}) - filled{" "}
-                    {section.filledCount}/{section.enrolledCount}
+                    Download report (PDF)
                   </Button>
-                ))}
+                  {appliedFilters.sectionId ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowStudents(true)}
+                    >
+                      Student Details
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {DISTRIBUTION_HEADERS.map((header) => (
+                        <TableHead key={header}>{header}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {distribution?.questions.map((q) => (
+                      <TableRow key={q.questionNumber}>
+                        <TableCell>{q.questionNumber}</TableCell>
+                        <TableCell className="text-left">
+                          {q.questionText}
+                        </TableCell>
+                        <TableCell>{q.excellent}</TableCell>
+                        <TableCell>{q.veryGood}</TableCell>
+                        <TableCell>{q.good}</TableCell>
+                        <TableCell>{q.fair}</TableCell>
+                        <TableCell>{q.poor}</TableCell>
+                        <TableCell>{q.rowTotal}</TableCell>
+                        <TableCell>{rowAverage(q).toFixed(2)}</TableCell>
+                      </TableRow>
+                    )) ?? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={DISTRIBUTION_HEADERS.length}
+                          className="text-muted-foreground text-center"
+                        >
+                          Loading distribution...
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                  {distribution ? (
+                    <TableFooter>
+                      <TableRow className="font-medium">
+                        <TableCell colSpan={2}>Total</TableCell>
+                        <TableCell>{distribution.totals.excellent}</TableCell>
+                        <TableCell>{distribution.totals.veryGood}</TableCell>
+                        <TableCell>{distribution.totals.good}</TableCell>
+                        <TableCell>{distribution.totals.fair}</TableCell>
+                        <TableCell>{distribution.totals.poor}</TableCell>
+                        <TableCell>
+                          {distribution.questions.reduce(
+                            (sum, q) => sum + q.rowTotal,
+                            0
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {distribution.totals.overallAverage.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  ) : null}
+                </Table>
               </div>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <h3 className="mb-2 font-medium">
-                  Students filled ({students?.filled.length ?? 0})
-                </h3>
-                {students?.filled.length ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>USN</TableHead>
-                        <TableHead>Name</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {students.filled.map((student) => (
-                        <TableRow key={student.usn}>
-                          <TableCell>{student.usn}</TableCell>
-                          <TableCell>{student.name}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No responses yet.
-                  </p>
-                )}
-              </div>
-              <div>
-                <h3 className="mb-2 font-medium">
-                  Students not filled ({students?.notFilled.length ?? 0})
-                </h3>
-                {students?.notFilled.length ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>USN</TableHead>
-                        <TableHead>Name</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {students.notFilled.map((student) => (
-                        <TableRow key={student.usn}>
-                          <TableCell>{student.usn}</TableCell>
-                          <TableCell>{student.name}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    Everyone has submitted.
-                  </p>
-                )}
-              </div>
-            </div>
+            <p className="text-muted-foreground text-sm">
+              Select a faculty, then a course to load the distribution report.
+            </p>
           )}
         </CardContent>
       </Card>
 
+      <Dialog open={showStudents} onOpenChange={setShowStudents}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Student Details</DialogTitle>
+            <DialogDescription>
+              Students who filled and did not fill feedback for{" "}
+              {selectedFaculty?.name ?? "faculty"} -{" "}
+              {selectedCourse?.code ?? "course"}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-muted-foreground mb-2 text-sm font-medium">
+                Filled ({students?.filled.length ?? 0})
+              </p>
+              {students?.filled.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>USN</TableHead>
+                      <TableHead>Name</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.filled.map((student) => (
+                      <TableRow key={student.usn}>
+                        <TableCell>{student.usn}</TableCell>
+                        <TableCell>{student.name}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  No students have filled the feedback yet.
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-2 text-sm font-medium">
+                Not filled ({students?.notFilled.length ?? 0})
+              </p>
+              {students?.notFilled.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>USN</TableHead>
+                      <TableHead>Name</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.notFilled.map((student) => (
+                      <TableRow key={student.usn}>
+                        <TableCell>{student.usn}</TableCell>
+                        <TableCell>{student.name}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  All students have filled the feedback.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowStudents(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
-          <CardTitle>Faculty Report</CardTitle>
+          <CardTitle>Course Report</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-4">
             <select
-              className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+              className={selectClass}
               value={reportDeptId}
               onChange={(event) => setReportDeptId(event.target.value)}
             >
@@ -559,7 +716,7 @@ export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
               ))}
             </select>
             <select
-              className="border-input bg-background h-9 rounded-md border px-3 text-sm"
+              className={selectClass}
               value={reportCourseId}
               onChange={(event) => setReportCourseId(event.target.value)}
             >
@@ -572,43 +729,19 @@ export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
             </select>
             <Input
               type="number"
-              min={1}
-              max={5}
-              step={0.1}
-              placeholder="Min average score (1-5)"
-              value={reportMinScore}
-              onChange={(event) => setReportMinScore(event.target.value)}
+              min={0}
+              max={100}
+              step={1}
+              placeholder="Below percentage (%)"
+              value={reportMaxPercentage}
+              onChange={(event) => setReportMaxPercentage(event.target.value)}
             />
             <div className="flex gap-2">
               <Button onClick={applyReportFilters}>Apply</Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setReportDeptId("");
-                  setReportCourseId("");
-                  setReportMinScore("");
-                  setAppliedReport(null);
-                }}
-              >
+              <Button variant="outline" onClick={resetAppliedReport}>
                 Reset
               </Button>
             </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => downloadReportTable("csv")}
-              disabled={!aggregated.length}
-            >
-              Export CSV
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => downloadReportTable("pdf")}
-              disabled={!aggregated.length}
-            >
-              Export PDF
-            </Button>
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -619,9 +752,6 @@ export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
                   <TableHead>Type</TableHead>
                   <TableHead>Sections</TableHead>
                   <TableHead>Responses</TableHead>
-                  {SCORE_HEADERS.map((header) => (
-                    <TableHead key={header}>{header}</TableHead>
-                  ))}
                   <TableHead>Average / 5</TableHead>
                   <TableHead>Percentage</TableHead>
                 </TableRow>
@@ -630,7 +760,7 @@ export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
                 {!appliedReport ? (
                   <TableRow>
                     <TableCell
-                      colSpan={20}
+                      colSpan={7}
                       className="text-muted-foreground text-center"
                     >
                       Apply filters to load the report.
@@ -639,7 +769,7 @@ export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
                 ) : aggregated.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={20}
+                      colSpan={7}
                       className="text-muted-foreground text-center"
                     >
                       No completed feedback matches the filters.
@@ -657,9 +787,6 @@ export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
                       <TableCell>{row.assignmentType}</TableCell>
                       <TableCell>{row.sections}</TableCell>
                       <TableCell>{row.responseCount}</TableCell>
-                      {row.questionAverages.map((value, index) => (
-                        <TableCell key={index}>{value.toFixed(2)}</TableCell>
-                      ))}
                       <TableCell>{row.average.toFixed(2)}</TableCell>
                       <TableCell>{row.percentage.toFixed(2)}%</TableCell>
                     </TableRow>
