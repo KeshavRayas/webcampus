@@ -293,12 +293,11 @@ export function FinanceView() {
   // Comment Modal state
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentCategory, setCommentCategory] = useState("Select Category");
-  const [commentText, setCommentText] = useState("")
+  const [commentText, setCommentText] = useState("");
   const [, setCommentFile] = useState<File | null>(null);
 
   // Search state
   const [usnSearch, setUsnSearch] = useState("1BM24EC0059-T");
-  const [, setSearchSubmitted] = useState("1BM24EC0059-T");
 
   // Add Tuition Fee form state
   const [tuitionFeeForm, setTuitionFeeForm] = useState({

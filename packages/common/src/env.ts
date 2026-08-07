@@ -20,6 +20,8 @@ const backendEnvSchema = commonEnvSchema.extend({
     .default("true"),
   GMAIL_APP_PASSWORD: z.string(),
   SENDER_EMAIL: z.string(),
+  TRUSTSIGNAL_API_KEY: z.string().optional(),
+  WHATSAPP_SENDER_NUMBER: z.string().optional(),
   AWS_ACCESS_KEY_ID: z.string(),
   AWS_SECRET_ACCESS_KEY: z.string(),
   AWS_REGION: z.string(),
