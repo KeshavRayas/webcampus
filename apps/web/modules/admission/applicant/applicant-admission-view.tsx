@@ -201,12 +201,17 @@ export const ApplicantAdmissionView = ({
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedQuota, setSelectedQuota] = useState("");
   const [staffPrimaryEmail, setStaffPrimaryEmail] = useState("");
+  const [staffTermId, setStaffTermId] = useState("");
   const [staffSemesterId, setStaffSemesterId] = useState("");
   const { data: departments } = useAdmissionDepartments();
   const { data: academicTermsData } = useAcademicTerms(undefined, {
     enabled: staffMode,
   });
   const academicTerms = academicTermsData ?? [];
+  const staffTermOptions = academicTerms.map((term) => ({
+    id: term.id,
+    label: `${term.type} ${term.year}`,
+  }));
   const staffSemesterOptions = academicTerms.flatMap((term) =>
     (term.Semester ?? []).map((semester) => ({
       ...semester,
@@ -724,6 +729,14 @@ export const ApplicantAdmissionView = ({
 
   const handleSameAsCurrentAddress = (checked: boolean) => {
     setIsSameAddress(checked);
+    if (checked) {
+      setPermanentCountry(currentCountry);
+      setPermanentState(currentState);
+      setPermanentDistrict(currentDistrict);
+      setPermanentAddress(currentAddress);
+      setPermanentArea(currentArea);
+      setPermanentPincode(currentPincode);
+    }
   };
   useEffect(() => {
     if (admission?.department?.id) {
@@ -917,6 +930,105 @@ export const ApplicantAdmissionView = ({
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
             <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="termDisplay">Admission Term *</Label>
+              {staffMode ? (
+                <Select
+                  name="staffTermId"
+                  value={staffTermId}
+                  onValueChange={(value) => {
+                    setStaffTermId(value);
+                    setStaffSemesterId("");
+                    setSelectedAdmissionType("");
+                  }}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select admission term" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {staffTermOptions.map((term) => (
+                      <SelectItem key={term.id} value={term.id}>
+                        {term.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="termDisplay"
+                  value={
+                    admission.semester?.academicTerm
+                      ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`
+                      : ""
+                  }
+                  readOnly
+                />
+              )}
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="semesterDisplay">Semester *</Label>
+              {staffMode ? (
+                <Select
+                  value={staffSemesterId}
+                  onValueChange={(value) => {
+                    setStaffSemesterId(value);
+                    setSelectedAdmissionType("");
+                  }}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select semester" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {staffSemesterOptions.map((semester) => (
+                      <SelectItem key={semester.id} value={semester.id}>
+                        {semester.termLabel} - {semester.programType} Semester{" "}
+                        {semester.semesterNumber}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="semesterDisplay"
+                  value={
+                    admission.semester
+                      ? `${admission.semester.programType} Semester ${admission.semester.semesterNumber}`
+                      : ""
+                  }
+                  readOnly
+                />
+              )}
+              <input
+                type="hidden"
+                name="semesterId"
+                value={
+                  staffMode ? staffSemesterId : (admission.semester?.id ?? "")
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="admissionType">Admission Type *</Label>
+              <Select
+                name="admissionType"
+                value={selectedAdmissionType}
+                onValueChange={setSelectedAdmissionType}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select admission type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {validAdmissionTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 md:col-span-4">
               <Label htmlFor="applicationId">Application ID *</Label>
 
               <Input id="applicationId" name="applicationId" required />
@@ -964,26 +1076,6 @@ export const ApplicantAdmissionView = ({
               </Select>
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="admissionType">Admission Type *</Label>
-              <Select
-                name="admissionType"
-                value={selectedAdmissionType}
-                onValueChange={setSelectedAdmissionType}
-                required
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select admission type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {validAdmissionTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2 md:col-span-4">
               <Label htmlFor="admissionBasedOn">Admission Based On *</Label>
               <Select
                 name="admissionBasedOn"
@@ -999,63 +1091,6 @@ export const ApplicantAdmissionView = ({
                   <SelectItem value="DIPLOMA">Diploma</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="semesterDisplay">Semester *</Label>
-              {staffMode ? (
-                <Select
-                  value={staffSemesterId}
-                  onValueChange={(value) => {
-                    setStaffSemesterId(value);
-                    setSelectedAdmissionType("");
-                  }}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select semester" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {staffSemesterOptions.map((semester) => (
-                      <SelectItem key={semester.id} value={semester.id}>
-                        {semester.termLabel} - {semester.programType} Semester{" "}
-                        {semester.semesterNumber}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  id="semesterDisplay"
-                  value={
-                    admission.semester
-                      ? `${admission.semester.programType} Semester ${admission.semester.semesterNumber}`
-                      : ""
-                  }
-                  readOnly
-                />
-              )}
-              <input
-                type="hidden"
-                name="semesterId"
-                value={
-                  staffMode ? staffSemesterId : (admission.semester?.id ?? "")
-                }
-                required
-              />
-            </div>
-            <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="termDisplay">Admission Term</Label>
-              <Input
-                id="termDisplay"
-                value={
-                  staffMode
-                    ? (selectedStaffSemester?.termLabel ?? "")
-                    : admission.semester?.academicTerm
-                      ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`
-                      : ""
-                }
-                readOnly
-              />
             </div>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
@@ -1188,17 +1223,16 @@ export const ApplicantAdmissionView = ({
                 </Label>
               </div>
             </div>
-            {scholarshipEnabled && (
-              <div className="space-y-2 md:col-span-4">
-                <Label htmlFor="sspId">SSP ID *</Label>
-                <Input
-                  id="sspId"
-                  name="sspId"
-                  defaultValue={admission.sspId ?? ""}
-                  required
-                />
-              </div>
-            )}
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="sspId">SSP ID {scholarshipEnabled && "*"}</Label>
+              <Input
+                id="sspId"
+                name="sspId"
+                defaultValue={admission.sspId ?? ""}
+                disabled={!scholarshipEnabled}
+                required
+              />
+            </div>
             <div className="space-y-2 md:col-span-4">
               <Label htmlFor="feePaid">Fee Paid (₹) *</Label>
               <Input id="feePaid" name="feePaid" type="number" required />
