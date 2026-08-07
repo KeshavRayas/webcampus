@@ -1336,3 +1336,130 @@ enum SupportTicketCategory {
   TECHNICAL
   OTHER
 }
+
+// ─── WHATSAPP / MESSAGE BROADCAST ───
+
+enum MessageCategory {
+  CIE
+  BALANCE_FEE
+  ANNUAL_FEE
+  PARENT_TEACHER_MEETING
+}
+
+enum MessageRecipientType {
+  STUDENT
+  PARENT
+}
+
+enum MessageScope {
+  STUDENT
+  PARENT
+  BOTH
+}
+
+enum MessageChannel {
+  WHATSAPP
+}
+
+enum MessageFieldSource {
+  STUDENT_NAME
+  USN
+  DEPARTMENT
+  SECTION
+  SEMESTER
+  ACADEMIC_YEAR
+  SUBJECT_CODE
+  SUBJECT_NAME
+  CIE_MARKS
+  CIE_MAX
+  FEE_DEMAND
+  AMOUNT_PAID
+  BALANCE
+  FEE_AMOUNT
+  DEADLINE
+  PTM_DATE
+  PTM_TIME
+  PTM_VENUE
+}
+
+enum ReceiptStatus {
+  SUCCESS
+  FAILURE
+  SKIPPED
+}
+
+model MessageTemplate {
+  id                 String                    @id @default(uuid())
+  name               String
+  category           MessageCategory
+  recipientType      MessageRecipientType
+  externalTemplateId String
+  messageBody        String
+  isActive           Boolean                   @default(true)
+  createdById        String
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  variables          MessageTemplateVariable[]
+  studentCampaigns   MessageCampaign[]         @relation("StudentTemplate")
+  parentCampaigns    MessageCampaign[]         @relation("ParentTemplate")
+  receipts           MessageCampaignReceipt[]
+
+  @@index([category, recipientType])
+  @@index([isActive])
+}
+
+model MessageTemplateVariable {
+  id          String             @id @default(uuid())
+  templateId  String
+  position    Int
+  label       String
+  fieldSource MessageFieldSource
+  template    MessageTemplate    @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, position])
+}
+
+model MessageCampaign {
+  id                String             @id @default(uuid())
+  channel           MessageChannel     @default(WHATSAPP)
+  category          MessageCategory
+  scope             MessageScope
+  filterSnapshot    Json
+  cieNumber         Int?
+  subjectIds        Json?
+  adHocData         Json?
+  studentTemplateId String?
+  parentTemplateId  String?
+  sentById          String
+  totalReceivers    Int
+  successCount      Int
+  failureCount      Int
+  skippedCount      Int
+  providerResponse  Json?
+  createdAt         DateTime           @default(now())
+  studentTemplate   MessageTemplate?   @relation("StudentTemplate", fields: [studentTemplateId], references: [id])
+  parentTemplate    MessageTemplate?   @relation("ParentTemplate", fields: [parentTemplateId], references: [id])
+  receipts          MessageCampaignReceipt[]
+
+  @@index([category])
+  @@index([createdAt])
+}
+
+model MessageCampaignReceipt {
+  id            String             @id @default(uuid())
+  campaignId    String
+  studentId     String
+  courseId      String?
+  recipientType MessageRecipientType
+  to            String
+  templateId    String
+  bodyvar       Json
+  status        ReceiptStatus
+  errorMessage  String?
+  createdAt     DateTime           @default(now())
+  campaign      MessageCampaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  template      MessageTemplate    @relation(fields: [templateId], references: [id])
+
+  @@index([campaignId])
+  @@index([status])
+}

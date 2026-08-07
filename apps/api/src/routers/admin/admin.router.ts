@@ -14,6 +14,7 @@ import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
 import StudentProfileRouter from "@webcampus/api/src/routers/admin/student-profile.router";
 import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
 import UserRouter from "@webcampus/api/src/routers/admin/user.router";
+import WhatsAppRouter from "@webcampus/api/src/routers/admin/whatsapp.router";
 import { Router } from "express";
 import { getSections } from "../../controllers/admin/section.controller";
 import facultyRouter from "./faculty.router";
@@ -51,6 +52,8 @@ router.use("/registration-tracking", RegistrationTrackingRouter);
 router.use("/attendance-windows", AttendanceWindowRouter);
 
 router.use("/hall-ticket", HallTicketRouter);
+
+router.use("/whatsapp", WhatsAppRouter);
 
 router.get("/sections", getSections);
 
