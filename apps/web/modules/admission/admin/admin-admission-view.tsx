@@ -21,6 +21,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@webcampus/ui/components/dialog";
 import {
   FilterActions,
@@ -28,6 +29,7 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import {
+  Form,
   FormControl,
   FormField,
   FormItem,
@@ -35,7 +37,6 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -88,9 +89,12 @@ const EMPTY_FILTERS: AdmissionFilters = {
 export const AdminAdmissionView = ({
   hideAddForm = false,
   showFilters = false,
+  admissionSemestersOnly = false,
 }: {
   hideAddForm?: boolean;
   showFilters?: boolean;
+  /** Only show UG/PG Semesters 1 and 3 in the semester filter */
+  admissionSemestersOnly?: boolean;
 }) => {
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
@@ -118,6 +122,10 @@ export const AdminAdmissionView = ({
     useState<AdmissionFilters>(initialFilters);
   const [isPortPreviewOpen, setIsPortPreviewOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createChoice, setCreateChoice] = useState<null | "profile" | "fill">(
+    null
+  );
 
   useEffect(() => {
     if (!showFilters) return;
@@ -134,9 +142,17 @@ export const AdminAdmissionView = ({
   // Sync filters when data changes (auto-clear if value no longer exists)
   const selectedTerm = terms.find((t) => t.id === draftFilters.academicTerm);
   const nestedSemesters = selectedTerm?.Semester || [];
+  const admissionEligibleSemesters = nestedSemesters.filter(
+    (semester) =>
+      (semester.programType === "UG" || semester.programType === "PG") &&
+      (semester.semesterNumber === 1 || semester.semesterNumber === 3)
+  );
+  const semesterOptions = admissionSemestersOnly
+    ? admissionEligibleSemesters
+    : nestedSemesters;
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: nestedSemesters,
+    semesters: semesterOptions,
     departments,
   });
 
@@ -261,7 +277,7 @@ export const AdminAdmissionView = ({
         ? "All semesters"
         : "Select term first",
       allOptionLabel: "All semesters",
-      options: nestedSemesters.map((semester) => ({
+      options: semesterOptions.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
@@ -349,6 +365,18 @@ export const AdminAdmissionView = ({
     }
   };
 
+  const fillApplicantPath =
+    role === "admission-instructor"
+      ? "/admission-instructor/fill-applicant"
+      : "/admission/fill-applicant";
+
+  const handleCreateDialogOpenChange = (open: boolean) => {
+    setIsCreateDialogOpen(open);
+    if (!open) {
+      setCreateChoice(null);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
@@ -365,70 +393,148 @@ export const AdminAdmissionView = ({
             <FilterActions onApply={applyFilters} onReset={resetFilters} />
 
             {!hideAddForm && canCreate && (
-              <DialogForm
-                trigger={
-                  <Button disabled={!draftFilters.semester}>
-                    Add Admission
-                  </Button>
-                }
-                title="Create Admission Profile"
-                form={form}
-                onSubmit={onSubmit}
+              <Dialog
+                open={isCreateDialogOpen}
+                onOpenChange={handleCreateDialogOpenChange}
               >
-                <FormField
-                  control={form.control}
-                  name="primaryEmail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Primary Email *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="student@bmsce.ac.in"
-                          {...field}
-                          value={field.value ?? ""}
+                <DialogTrigger asChild>
+                  <Button disabled={!draftFilters.semester}>
+                    Create Admission
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                  {createChoice === null ? (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle>Create Admission</DialogTitle>
+                        <DialogDescription>
+                          Choose how you want to create the admission for the
+                          selected semester.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-3">
+                        <button
+                          type="button"
+                          className="bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
+                          onClick={() => setCreateChoice("profile")}
+                        >
+                          <p className="font-medium">
+                            Create Admission Profile / Shell
+                          </p>
+                          <p className="text-muted-foreground mt-1 text-sm">
+                            Create a shell so the applicant can log in and fill
+                            the form themselves.
+                          </p>
+                        </button>
+                        <button
+                          type="button"
+                          className="bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
+                          onClick={() => {
+                            setCreateChoice(null);
+                            setIsCreateDialogOpen(false);
+                            router.push(
+                              `${fillApplicantPath}?semester=${draftFilters.semester}`
+                            );
+                          }}
+                        >
+                          <p className="font-medium">Fill Application Now</p>
+                          <p className="text-muted-foreground mt-1 text-sm">
+                            Fill and submit the application form directly for
+                            the selected semester.
+                          </p>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <Form {...form}>
+                      <form
+                        onSubmit={form.handleSubmit((values) => {
+                          onSubmit(values);
+                          setIsCreateDialogOpen(false);
+                          setCreateChoice(null);
+                        })}
+                        className="space-y-4"
+                      >
+                        <DialogHeader>
+                          <DialogTitle>Create Admission Profile</DialogTitle>
+                          <DialogDescription>
+                            The applicant will use these credentials to log in
+                            and complete the admission form.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <FormField
+                          control={form.control}
+                          name="primaryEmail"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Primary Email *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="email"
+                                  placeholder="student@bmsce.ac.in"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password *</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Input
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Enter initial password"
-                            {...field}
-                            value={field.value ?? ""}
-                            className="pr-10"
-                          />
+                        <FormField
+                          control={form.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password *</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Enter initial password"
+                                    {...field}
+                                    value={field.value ?? ""}
+                                    className="pr-10"
+                                  />
 
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                                    onClick={() => setShowPassword((v) => !v)}
+                                  >
+                                    {showPassword ? (
+                                      <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                      <Eye className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <DialogFooter>
                           <Button
                             type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                            onClick={() => setShowPassword((v) => !v)}
+                            variant="outline"
+                            onClick={() => setCreateChoice(null)}
                           >
-                            {showPassword ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
+                            Back
                           </Button>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                          <Button
+                            type="submit"
+                            disabled={form.formState.isSubmitting}
+                          >
+                            Create Profile
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
                   )}
-                />
-              </DialogForm>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </div>

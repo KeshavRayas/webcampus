@@ -221,7 +221,6 @@ export function AdmissionDocument({ data }: { data: DocData }) {
             keyName="counselling_round"
           />
           <Row label="ABC / APAAR ID" data={data} keyName="abc_apar_id" />
-          <Row label="Hostel" data={data} keyName="hostel" />
         </Panel>
       </section>
 
@@ -288,7 +287,6 @@ export function AdmissionDocument({ data }: { data: DocData }) {
                 <th>Subject</th>
                 <th>Marks Obtained</th>
                 <th>Max Marks</th>
-                <th>Min / Pass</th>
                 <th>Percentage</th>
               </tr>
             </thead>
@@ -297,21 +295,18 @@ export function AdmissionDocument({ data }: { data: DocData }) {
                 <td>Physics</td>
                 <td>{value(data, "physics_marks")}</td>
                 <td>{value(data, "physics_max")}</td>
-                <td>{value(data, "physics_min")}</td>
                 <td>{pct(data, "physics_marks", "physics_max")}</td>
               </tr>
               <tr>
                 <td>Chemistry</td>
                 <td>{value(data, "chemistry_marks")}</td>
                 <td>{value(data, "chemistry_max")}</td>
-                <td>{value(data, "chemistry_min")}</td>
                 <td>{pct(data, "chemistry_marks", "chemistry_max")}</td>
               </tr>
               <tr>
                 <td>Mathematics</td>
                 <td>{value(data, "maths_marks")}</td>
                 <td>{value(data, "maths_max")}</td>
-                <td>{value(data, "maths_min")}</td>
                 <td>{pct(data, "maths_marks", "maths_max")}</td>
               </tr>
             </tbody>

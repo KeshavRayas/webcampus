@@ -49,7 +49,6 @@ export type AdmissionResponse = {
   feePaid?: number | null;
   feeReceiptNumber?: string | null;
   hostel?: boolean | null;
-  hostelRoomNumber?: string | null;
 
   nameAsPer10th?: string | null;
   dob?: Date | null;

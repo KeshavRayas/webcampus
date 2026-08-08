@@ -140,7 +140,6 @@ type AdminStudentDetailResponse = {
     diplomaAggregateScore?: number | null;
     diplomaAggregateTotal?: number | null;
     hostel?: boolean | null;
-    hostelRoomNumber?: string | null;
     visaValidityDetails?: string | null;
     currentAddress?: string | null;
     currentArea?: string | null;
@@ -527,10 +526,6 @@ export const AdminStudentActions = ({
                       <DataField
                         label="Hostel Required"
                         value={details.admission?.hostel}
-                      />
-                      <DataField
-                        label="Hostel Room No."
-                        value={details.admission?.hostelRoomNumber}
                       />
                     </div>
                   </section>

@@ -402,14 +402,9 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     navMain: {
       items: [
         {
-          name: "Add Admissions",
+          name: "Create Admission",
           url: "/admission",
           icon: LayoutDashboard,
-        },
-        {
-          name: "Fill Applicant Form",
-          url: "/admission/fill-applicant",
-          icon: BookOpenText,
         },
         {
           name: "View Admissions",
@@ -440,14 +435,9 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     navMain: {
       items: [
         {
-          name: "Add Admission",
+          name: "Create Admission",
           url: "/admission-instructor",
           icon: LayoutDashboard,
-        },
-        {
-          name: "Fill Applicant Form",
-          url: "/admission-instructor/fill-applicant",
-          icon: BookOpenText,
         },
         {
           name: "View Admissions",

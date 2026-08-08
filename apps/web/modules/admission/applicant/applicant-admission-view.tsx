@@ -432,15 +432,16 @@ function ParentMemberCard({
 export const ApplicantAdmissionView = ({
   staffMode = false,
   initialStep = "personal",
+  initialSemesterId = "",
 }: {
   staffMode?: boolean;
   initialStep?: StepKey;
+  initialSemesterId?: string;
 }) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSameAddress, setIsSameAddress] = useState(false);
   const [activeStep, setActiveStep] = useState<StepKey>(initialStep);
-  const [hostelEnabled, setHostelEnabled] = useState(false);
   const [nriEnabled, setNriEnabled] = useState(false);
   const [disabilityEnabled, setDisabilityEnabled] = useState(false);
   const [currentCountry, setCurrentCountry] = useState("IN");
@@ -531,7 +532,9 @@ export const ApplicantAdmissionView = ({
   const [selectedDiplomaInstituteType, setSelectedDiplomaInstituteType] =
     useState("");
   const [staffPrimaryEmail, setStaffPrimaryEmail] = useState("");
-  const [staffSemesterId, setStaffSemesterId] = useState("");
+  const [staffSemesterId, setStaffSemesterId] = useState(
+    initialSemesterId ?? ""
+  );
   const [acknowledged] = useState(true);
   const [signature] = useState("");
   const { data: departments } = useAdmissionDepartments();
@@ -539,12 +542,18 @@ export const ApplicantAdmissionView = ({
     enabled: staffMode,
   });
   const academicTerms = academicTermsData ?? [];
-  const staffSemesterOptions = academicTerms.flatMap((term) =>
-    (term.Semester ?? []).map((semester) => ({
-      ...semester,
-      termLabel: `${term.type} ${term.year}`,
-    }))
-  );
+  const staffSemesterOptions = academicTerms
+    .flatMap((term) =>
+      (term.Semester ?? []).map((semester) => ({
+        ...semester,
+        termLabel: `${term.type} ${term.year}`,
+      }))
+    )
+    .filter(
+      (semester) =>
+        (semester.programType === "UG" || semester.programType === "PG") &&
+        (semester.semesterNumber === 1 || semester.semesterNumber === 3)
+    );
   const selectedStaffSemester = staffSemesterOptions.find(
     (semester) => semester.id === staffSemesterId
   );
@@ -614,17 +623,6 @@ export const ApplicantAdmissionView = ({
     e.preventDefault();
 
     const formData = new FormData(e.currentTarget);
-    const applicationId = (
-      formData.get("applicationId")?.toString() ?? ""
-    ).trim();
-
-    if (!/^[A-Za-z0-9-]{3,20}$/.test(applicationId)) {
-      toast.error(
-        "Please enter a valid application ID (3-20 letters, numbers, or hyphens)."
-      );
-      setActiveStep("admission");
-      return;
-    }
 
     if (!class12Enabled && !diplomaEnabled) {
       toast.error("Please fill either Class 12 / PUC or Diploma details.");
@@ -652,7 +650,6 @@ export const ApplicantAdmissionView = ({
 
     setIsSubmitting(true);
 
-    formData.set("hostel", hostelEnabled ? "true" : "false");
     formData.set("nri", nriEnabled ? "true" : "false");
     formData.set("disability", disabilityEnabled ? "true" : "false");
     formData.set(
@@ -661,7 +658,6 @@ export const ApplicantAdmissionView = ({
     );
     formData.set("hasClass12", class12Enabled ? "true" : "false");
     formData.set("hasDiploma", diplomaEnabled ? "true" : "false");
-    formData.set("applicationId", applicationId);
     formData.set("modeOfAdmission", selectedMode);
     formData.set("departmentId", selectedDepartment);
     formData.set("admissionType", selectedAdmissionType || "REGULAR");
@@ -829,7 +825,6 @@ export const ApplicantAdmissionView = ({
       admission_order_date: g("originalAdmissionOrderDate"),
       counselling_round: g("counsellingRound"),
       abc_apar_id: g("abcAparId"),
-      hostel: isYes(hostelEnabled),
       class10_school_name: g("class10thSchoolName"),
       class10_reg_number: g("class10thRollRegNumber"),
       class10_school_type: selectedClass10SchoolType,
@@ -858,9 +853,6 @@ export const ApplicantAdmissionView = ({
       chemistry_max: pcmMarks.chemistryMaxMarks,
       maths_marks: pcmMarks.mathematicsMarks,
       maths_max: pcmMarks.mathematicsMaxMarks,
-      physics_min: g("physicsMinMarks"),
-      chemistry_min: g("chemistryMinMarks"),
-      maths_min: g("mathematicsMinMarks"),
       pcm_percentage: pcmPercentage,
       diploma_institute_name: g("diplomaInstituteName"),
       diploma_institute_type: selectedDiplomaInstituteType,
@@ -1327,8 +1319,7 @@ export const ApplicantAdmissionView = ({
           Application Submitted!
         </h2>
         <p className="text-muted-foreground mt-2">
-          Your application (ID: {admission.applicationId}) is currently under
-          review by the administration.
+          Your application is currently under review by the administration.
         </p>
         {admission.dateOfAdmission && (
           <p className="text-muted-foreground mt-2 text-sm">
@@ -1399,11 +1390,6 @@ export const ApplicantAdmissionView = ({
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="applicationId">Application ID *</Label>
-
-                <Input id="applicationId" name="applicationId" required />
-              </div>
               <div className="space-y-2 md:col-span-1">
                 <Label htmlFor="modeOfAdmission">Mode of Admission *</Label>
                 <Select
@@ -1677,27 +1663,13 @@ export const ApplicantAdmissionView = ({
                 />
               </div>
               <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="hostel-toggle">Hostel Required *</Label>
-                <input
-                  type="hidden"
-                  name="hostel"
-                  value={hostelEnabled ? "true" : "false"}
+                <Label htmlFor="sspId">SSP ID</Label>
+                <Input
+                  id="sspId"
+                  name="sspId"
+                  defaultValue={admission.sspId ?? ""}
+                  placeholder="Scholarship SSP ID"
                 />
-                <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                  <Checkbox
-                    id="hostel-toggle"
-                    checked={hostelEnabled}
-                    onCheckedChange={(checked) =>
-                      setHostelEnabled(Boolean(checked))
-                    }
-                  />
-                  <Label
-                    htmlFor="hostel-toggle"
-                    className="cursor-pointer text-sm font-medium"
-                  >
-                    Staying in hostel
-                  </Label>
-                </div>
               </div>
             </div>
             <div className="mt-6 flex justify-end">
@@ -2428,6 +2400,52 @@ export const ApplicantAdmissionView = ({
                         admission.visaExpiryDate?.slice(0, 10) ?? ""
                       }
                     />
+                  </div>
+
+                  <div className="border-t pt-4 md:col-span-2">
+                    <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">
+                      Parent Passport / Visa (Optional)
+                    </p>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="parentPassportNumber">
+                          Parent Passport Number
+                        </Label>
+                        <Input
+                          id="parentPassportNumber"
+                          name="parentPassportNumber"
+                          defaultValue={admission.parentPassportNumber ?? ""}
+                          pattern={INDIAN_PASSPORT_PATTERN}
+                          minLength={8}
+                          maxLength={8}
+                          placeholder="A1234567"
+                          title={INDIAN_PASSPORT_HINT}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="parentVisaNumber">
+                          Parent Visa Number
+                        </Label>
+                        <Input
+                          id="parentVisaNumber"
+                          name="parentVisaNumber"
+                          defaultValue={admission.parentVisaNumber ?? ""}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="parentVisaExpiryDate">
+                          Parent Visa Expiry Date
+                        </Label>
+                        <Input
+                          id="parentVisaExpiryDate"
+                          name="parentVisaExpiryDate"
+                          type="date"
+                          defaultValue={
+                            admission.parentVisaExpiryDate?.slice(0, 10) ?? ""
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3286,51 +3304,7 @@ export const ApplicantAdmissionView = ({
               onPhoneChange={(value) => setFatherPhone(value ?? "")}
               autoCurrent={getAddress("current")}
               autoPermanent={getAddress("permanent")}
-            >
-              <div className="border-t pt-4">
-                <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">
-                  Parent Passport / Visa (Optional)
-                </p>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="parentPassportNumber">
-                      Passport Number
-                    </Label>
-                    <Input
-                      id="parentPassportNumber"
-                      name="parentPassportNumber"
-                      defaultValue={admission.parentPassportNumber ?? ""}
-                      pattern={INDIAN_PASSPORT_PATTERN}
-                      minLength={8}
-                      maxLength={8}
-                      placeholder="A1234567"
-                      title={INDIAN_PASSPORT_HINT}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="parentVisaNumber">Visa Number</Label>
-                    <Input
-                      id="parentVisaNumber"
-                      name="parentVisaNumber"
-                      defaultValue={admission.parentVisaNumber ?? ""}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="parentVisaExpiryDate">
-                      Visa Expiry Date
-                    </Label>
-                    <Input
-                      id="parentVisaExpiryDate"
-                      name="parentVisaExpiryDate"
-                      type="date"
-                      defaultValue={
-                        admission.parentVisaExpiryDate?.slice(0, 10) ?? ""
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            </ParentMemberCard>
+            />
 
             <ParentMemberCard
               title="Mother's Details"
@@ -3505,11 +3479,6 @@ export const ApplicantAdmissionView = ({
             type="hidden"
             name="scholarship"
             value={scholarshipEnabled ? "true" : "false"}
-          />
-          <input
-            type="hidden"
-            name="sspId"
-            defaultValue={admission.sspId ?? ""}
           />
           <input
             type="hidden"

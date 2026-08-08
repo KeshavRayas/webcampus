@@ -595,8 +595,8 @@ model Admission {
   aadharCard                      String?
   aadharNumber                    String?         @unique
   abcAparId                       String?
-  scholarship                     Boolean?
   sspId                           String?
+  scholarship                     Boolean?
   counsellingRound                String?
   feeReceiptNumber                String?
   dateOfAdmission                 DateTime?
@@ -636,15 +636,12 @@ model Admission {
   class12thYearOfPassing          String?
   physicsMarks                    Float?
   physicsMaxMarks                 Float?
-  physicsMinMarks                 Float?
   physicsPercentage               Float?
   chemistryMarks                  Float?
   chemistryMaxMarks               Float?
-  chemistryMinMarks               Float?
   chemistryPercentage             Float?
   mathematicsMarks                Float?
   mathematicsMaxMarks             Float?
-  mathematicsMinMarks             Float?
   mathematicsPercentage           Float?
   pcmPercentage                   Float?
   currentAddress                  String?
@@ -672,7 +669,6 @@ model Admission {
   guardianOccupation              String?
   guardianPermanentAddress        String?
   hostel                          Boolean?
-  hostelRoomNumber                String?
   motherQualification             String?
   motherOccupation                String?
   motherPermanentAddress          String?

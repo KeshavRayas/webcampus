@@ -162,7 +162,7 @@ export const CancelAdmissionSchema = z
 
 export const SubmitApplicationSchema = z
   .object({
-    applicationId: z.string().min(1, "Application ID is required"),
+    applicationId: z.string().trim().optional(),
 
     nameAsPer10th: z.string().min(1, "Name as per 10th grade is required"),
 
@@ -182,13 +182,10 @@ export const SubmitApplicationSchema = z
     class12thRollRegNumber: optionalText,
     physicsMarks: optionalText,
     physicsMaxMarks: optionalText,
-    physicsMinMarks: optionalText,
     chemistryMarks: optionalText,
     chemistryMaxMarks: optionalText,
-    chemistryMinMarks: optionalText,
     mathematicsMarks: optionalText,
     mathematicsMaxMarks: optionalText,
-    mathematicsMinMarks: optionalText,
     passportNumber: z.string().trim().optional(),
     passportExpiryDate: z.string().optional(),
     visaNumber: z.string().trim().optional(),

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { IncomingHttpHeaders } from "http";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { auth, fromNodeHeaders } from "@webcampus/auth";
@@ -318,7 +319,7 @@ export class AdmissionService {
 
       await db.admission.create({
         data: {
-          // applicationId: crypto.randomUUID(), // or primaryEmail for now
+          applicationId: randomUUID(),
           primaryEmail: data.primaryEmail,
 
           semesterId: data.semesterId,
@@ -659,38 +660,23 @@ export class AdmissionService {
       const chemistryMaxMarks = parseOptionalNumber(data.chemistryMaxMarks);
       const mathematicsMarks = parseOptionalNumber(data.mathematicsMarks);
       const mathematicsMaxMarks = parseOptionalNumber(data.mathematicsMaxMarks);
-      const physicsMinMarks = parseOptionalNumber(data.physicsMinMarks);
-      const chemistryMinMarks = parseOptionalNumber(data.chemistryMinMarks);
-      const mathematicsMinMarks = parseOptionalNumber(data.mathematicsMinMarks);
       const pcmMaxMarks = [
         physicsMaxMarks,
         chemistryMaxMarks,
         mathematicsMaxMarks,
       ];
       const pcmMarks = [physicsMarks, chemistryMarks, mathematicsMarks];
-      const pcmMinMarks = [
-        physicsMinMarks,
-        chemistryMinMarks,
-        mathematicsMinMarks,
-      ];
       if (
-        [...pcmMarks, ...pcmMaxMarks, ...pcmMinMarks].some(
-          (value) => value !== null
-        ) &&
-        [...pcmMarks, ...pcmMaxMarks, ...pcmMinMarks].some(
-          (value) => value === null
-        )
+        [...pcmMarks, ...pcmMaxMarks].some((value) => value !== null) &&
+        [...pcmMarks, ...pcmMaxMarks].some((value) => value === null)
       ) {
         throw new Error(
-          "Physics, Chemistry, and Mathematics marks, maximum marks, and minimum marks are all required."
+          "Physics, Chemistry, and Mathematics marks and maximum marks are all required."
         );
       }
       for (let index = 0; index < pcmMarks.length; index++) {
         if (pcmMarks[index]! > pcmMaxMarks[index]!) {
           throw new Error("Obtained marks cannot exceed maximum marks.");
-        }
-        if (pcmMinMarks[index]! > pcmMaxMarks[index]!) {
-          throw new Error("Minimum marks cannot exceed maximum marks.");
         }
       }
       const pcmPercentage =
@@ -731,7 +717,8 @@ export class AdmissionService {
           status: "SUBMITTED",
 
           // Admission Details
-          applicationId: data.applicationId,
+          applicationId:
+            admission.applicationId || data.applicationId || randomUUID(),
           admissionType: data.admissionType,
           modeOfAdmission: data.modeOfAdmission,
           semesterId: admission.semesterId,
@@ -753,7 +740,6 @@ export class AdmissionService {
           counsellingRound: data.counsellingRound ?? null,
           dateOfAdmission: admission.dateOfAdmission ?? new Date(),
           hostel: data.hostel === "true",
-          hostelRoomNumber: data.hostelRoomNumber ?? null,
 
           // Personal Information
           nameAsPer10th: data.nameAsPer10th,
@@ -845,18 +831,15 @@ export class AdmissionService {
           class12thMediumOfTeaching: data.class12thMediumOfTeaching,
           physicsMarks,
           physicsMaxMarks,
-          physicsMinMarks,
           physicsPercentage: calculatePercentage(physicsMarks, physicsMaxMarks),
           chemistryMarks,
           chemistryMaxMarks,
-          chemistryMinMarks,
           chemistryPercentage: calculatePercentage(
             chemistryMarks,
             chemistryMaxMarks
           ),
           mathematicsMarks,
           mathematicsMaxMarks,
-          mathematicsMinMarks,
           mathematicsPercentage: calculatePercentage(
             mathematicsMarks,
             mathematicsMaxMarks
@@ -935,6 +918,7 @@ export class AdmissionService {
 
     await db.admission.create({
       data: {
+        applicationId: randomUUID(),
         primaryEmail,
         semesterId: data.semesterId,
         departmentId: data.departmentId,

@@ -301,10 +301,6 @@ export const AdminAdmissionActions = ({
                           label="Hostel Required"
                           value={admission.hostel}
                         />
-                        <DataField
-                          label="Hostel Room No."
-                          value={admission.hostelRoomNumber}
-                        />
                       </div>
                     </section>
 

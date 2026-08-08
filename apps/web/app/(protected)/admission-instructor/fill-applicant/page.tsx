@@ -1,6 +1,11 @@
 import { ApplicantAdmissionView } from "@/modules/admission/applicant/applicant-admission-view";
 
-export default function FillApplicantFormPage() {
+export default async function FillApplicantFormPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ semester?: string }>;
+}) {
+  const { semester } = (await searchParams) ?? {};
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
@@ -11,7 +16,7 @@ export default function FillApplicantFormPage() {
           Fill and submit the admission application for an applicant.
         </p>
       </div>
-      <ApplicantAdmissionView staffMode />
+      <ApplicantAdmissionView staffMode initialSemesterId={semester} />
     </div>
   );
 }

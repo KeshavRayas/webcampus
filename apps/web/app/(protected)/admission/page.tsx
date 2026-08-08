@@ -30,7 +30,11 @@ export default function AdmissionPage() {
         <p className="text-muted-foreground text-sm">{description}</p>
       </div>
       <Suspense>
-        {isApplicant ? <ApplicantAdmissionView /> : <AdminAdmissionView />}
+        {isApplicant ? (
+          <ApplicantAdmissionView />
+        ) : (
+          <AdminAdmissionView admissionSemestersOnly />
+        )}
       </Suspense>
     </div>
   );
