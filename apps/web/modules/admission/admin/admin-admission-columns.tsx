@@ -43,7 +43,11 @@ export type AdmissionResponse = {
   entranceExamRank?: string | null;
   originalAdmissionOrderNumber?: string | null;
   originalAdmissionOrderDate?: Date | null;
+  firstName?: string | null;
+  middleName?: string | null;
+  lastName?: string | null;
   feePaid?: number | null;
+  feeReceiptNumber?: string | null;
   hostel?: boolean | null;
   hostelRoomNumber?: string | null;
 
