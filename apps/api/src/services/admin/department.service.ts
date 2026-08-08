@@ -56,12 +56,12 @@ export class DepartmentService {
         throw new Error("Failed to create department user");
       }
 
-      const { generateFileName, uploadToS3 } = await import(
+      const { generateFileName, uploadToS3, sanitizeForS3 } = await import(
         "@webcampus/api/src/utils/s3"
       );
       const logoFileName = generateFileName(
         request.logoFile.originalname,
-        "department_logo_"
+        `department_${sanitizeForS3(request.name)}_`
       );
       const uploadResult = await uploadToS3(
         request.logoFile.buffer,
@@ -289,12 +289,11 @@ export class DepartmentService {
       }
 
       if (logoFile) {
-        const { deleteFromS3, generateFileName, uploadToS3 } = await import(
-          "@webcampus/api/src/utils/s3"
-        );
+        const { deleteFromS3, generateFileName, uploadToS3, sanitizeForS3 } =
+          await import("@webcampus/api/src/utils/s3");
         const nextLogoName = generateFileName(
           logoFile.originalname,
-          "department_logo_"
+          `department_${sanitizeForS3(data.name ?? existingDepartment.name)}_`
         );
         const uploadResult = await uploadToS3(
           logoFile.buffer,

@@ -10,6 +10,7 @@ import coeRouter from "./routers/coe/coe.router";
 import facultyRouter from "./routers/faculty/faculty-domain.router";
 import financeRouter from "./routers/finance/finance.router";
 import hodRouter from "./routers/hod/hod.router";
+import fileRouter from "./routers/shared/file.router";
 import studentRouter from "./routers/student/student-domain.router";
 import supportRouter from "./routers/support/support.router";
 
@@ -46,6 +47,8 @@ app.use("/support", supportRouter);
 app.use("/admission", admissionRouter);
 
 app.use("/student", studentRouter);
+
+app.use("/files", fileRouter);
 
 app.get("/", (req, res) => {
   res.send({

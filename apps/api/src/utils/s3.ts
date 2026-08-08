@@ -4,14 +4,13 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
-  PutBucketPolicyCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from "uuid";
 
-// ── MinIO / S3-compatible configuration ─────────────────────────────────
+// MinIO / S3-compatible configuration
 const ENDPOINT = process.env.MINIO_ENDPOINT;
 const BUCKET = process.env.MINIO_BUCKET_NAME;
 const REGION = process.env.MINIO_REGION;
@@ -19,23 +18,14 @@ const REGION = process.env.MINIO_REGION;
 const s3Client = new S3Client({
   region: REGION,
   endpoint: ENDPOINT,
-  forcePathStyle: true, // Required for MinIO (path-style: endpoint/bucket/key)
+  forcePathStyle: true, // Required for MinIO
   credentials: {
     accessKeyId: process.env.MINIO_ACCESS_KEY_ID!,
     secretAccessKey: process.env.MINIO_SECRET_ACCESS_KEY!,
   },
 });
 
-// ── Old AWS S3 configuration (commented out for reference) ──────────────
-// const s3Client = new S3Client({
-//   region: process.env.AWS_REGION || "ap-south-1",
-//   credentials: {
-//     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-//     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-//   },
-// });
-
-// ── Bucket auto-creation ────────────────────────────────────────────────
+// Bucket auto-creation
 let bucketReady = false;
 
 async function ensureBucket(): Promise<void> {
@@ -53,25 +43,7 @@ async function ensureBucket(): Promise<void> {
 
     if (code === 404 || code === 403) {
       await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET }));
-      // Set public-read policy so the browser can load images directly
-      const publicReadPolicy = JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [
-          {
-            Effect: "Allow",
-            Principal: "*",
-            Action: ["s3:GetObject"],
-            Resource: [`arn:aws:s3:::${BUCKET}/*`],
-          },
-        ],
-      });
-      await s3Client.send(
-        new PutBucketPolicyCommand({
-          Bucket: BUCKET,
-          Policy: publicReadPolicy,
-        })
-      );
-      console.log(`[MinIO] Created bucket "${BUCKET}" with public-read policy`);
+      console.log(`[MinIO] Created bucket "${BUCKET}"`);
       bucketReady = true;
     } else {
       throw error;
@@ -79,11 +51,44 @@ async function ensureBucket(): Promise<void> {
   }
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────
+// Helpers
+
+export const sanitizeForS3 = (str: string) => {
+  return str.replace(/[^a-z0-9]/gi, "").toLowerCase();
+};
 
 export const generateFileName = (originalName: string, prefix: string) => {
   const extension = path.extname(originalName);
-  return `${prefix}${uuidv4()}${extension}`;
+  const uuid = uuidv4();
+
+  // Support prefixes with pre-existing slashes (e.g., support/ticket/message/)
+  if (prefix.includes("/")) {
+    return `${prefix}${uuid}${extension}`;
+  }
+
+  // Split the prefix to extract entity information
+  // Example: department_computerscience_ -> ["department", "computerscience"]
+  const parts = prefix.split("_").filter(Boolean);
+  const category = parts[0];
+
+  if (category === "department") {
+    const name = parts[1] || "unknown";
+    return `department/${name}_${uuid}${extension}`;
+  } else if (category === "faculty") {
+    const deptName = parts[1] || "unknown";
+    const facultyName = parts[2] || "unknown";
+    return `faculty/${deptName}/${facultyName}_${uuid}${extension}`;
+  } else if (category && ["admission", "finance", "coe"].includes(category)) {
+    const name = parts[1] || "unknown";
+    // Group user types into a parent "users" directory
+    return `users/${category}/${name}_${uuid}${extension}`;
+  }
+
+  // Fallback for any unknown prefixes
+  let folder = "others";
+  if (category === "student") folder = "students";
+
+  return `${folder}/${prefix}${uuid}${extension}`;
 };
 
 /**
@@ -93,8 +98,14 @@ export const generateFileName = (originalName: string, prefix: string) => {
 function extractKeyFromUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
-    // MinIO path-style: http://localhost:9000/bucket/key → pathname = /bucket/key
     const segments = parsed.pathname.split("/").filter(Boolean);
+
+    // Support the internal API proxy format: /files/<key>
+    if (segments[0] === "files" && segments.length >= 2) {
+      return segments.slice(1).join("/");
+    }
+
+    // MinIO path-style: http://localhost:9000/bucket/key → pathname = /bucket/key
     if (segments.length >= 2) {
       // First segment is the bucket name, rest is the key
       return segments.slice(1).join("/");
@@ -127,11 +138,12 @@ export const uploadToS3 = async (
 
     await s3Client.send(command);
 
-    // MinIO path-style URL
-    const url = `${ENDPOINT}/${BUCKET}/${fileName}`;
+    // Return the proxy route URL instead of the direct MinIO URL
+    const backendUrl = process.env.BETTER_AUTH_URL || "http://localhost:8080";
+    const url = `${backendUrl}/files/${fileName}`;
 
-    // Old AWS virtual-hosted-style URL (commented out for reference):
-    // const url = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+    // Old MinIO path-style URL (commented out for reference):
+    // const url = `${ENDPOINT}/${BUCKET}/${fileName}`;
 
     return { success: true, url };
   } catch (error) {
@@ -163,10 +175,24 @@ export const uploadBufferToS3 = async (
   }
 };
 
+export const createSignedViewUrl = async (
+  key: string,
+  expiresInSeconds = 3600
+): Promise<string> => {
+  return getSignedUrl(
+    s3Client as unknown as Parameters<typeof getSignedUrl>[0],
+    new GetObjectCommand({
+      Bucket: BUCKET, // was: process.env.AWS_S3_BUCKET_NAME
+      Key: key,
+    }),
+    { expiresIn: expiresInSeconds }
+  );
+};
+
 export const createSignedDownloadUrl = async (
   key: string,
   fileName: string,
-  expiresInSeconds = 300
+  expiresInSeconds = 3600
 ): Promise<string> => {
   return getSignedUrl(
     // The presigner and client packages can resolve separate Smithy type copies

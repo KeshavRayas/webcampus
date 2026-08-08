@@ -29,12 +29,13 @@ export class AdminAdmissionUserService {
 
   private static async uploadPhoto(
     photoFile: Express.Multer.File,
-    prefix: string
+    name: string
   ): Promise<string> {
-    const { generateFileName, uploadToS3 } = await import(
+    const { generateFileName, uploadToS3, sanitizeForS3 } = await import(
       "@webcampus/api/src/utils/s3"
     );
 
+    const prefix = `admission_${sanitizeForS3(name)}_`;
     const photoFileName = generateFileName(photoFile.originalname, prefix);
     const uploadResult = await uploadToS3(
       photoFile.buffer,
@@ -108,10 +109,7 @@ export class AdminAdmissionUserService {
       createdUserId = user.data.id;
 
       if (photoFile) {
-        uploadedImageUrl = await this.uploadPhoto(
-          photoFile,
-          "admission_user_photo_"
-        );
+        uploadedImageUrl = await this.uploadPhoto(photoFile, data.name);
 
         await db.user.update({
           where: { id: createdUserId },
@@ -177,6 +175,7 @@ export class AdminAdmissionUserService {
           id: true,
           role: true,
           image: true,
+          name: true,
         },
       });
 
@@ -188,7 +187,7 @@ export class AdminAdmissionUserService {
       if (photoFile) {
         uploadedImageUrl = await this.uploadPhoto(
           photoFile,
-          "admission_user_photo_"
+          data.name ?? existingUser.name
         );
       }
 

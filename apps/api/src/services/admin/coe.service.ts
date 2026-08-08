@@ -25,12 +25,13 @@ export class CoeService {
 
   private static async uploadPhoto(
     photoFile: Express.Multer.File,
-    prefix: string
+    name: string
   ): Promise<string> {
-    const { generateFileName, uploadToS3 } = await import(
+    const { generateFileName, uploadToS3, sanitizeForS3 } = await import(
       "@webcampus/api/src/utils/s3"
     );
 
+    const prefix = `coe_${sanitizeForS3(name)}_`;
     const photoFileName = generateFileName(photoFile.originalname, prefix);
     const uploadResult = await uploadToS3(
       photoFile.buffer,
@@ -93,7 +94,7 @@ export class CoeService {
       if (request.photoFile) {
         uploadedImageUrl = await this.uploadPhoto(
           request.photoFile,
-          "coe_user_photo_"
+          request.name
         );
 
         await db.user.update({
@@ -246,6 +247,7 @@ export class CoeService {
               image: true,
               emailVerified: true,
               role: true,
+              name: true,
             },
           },
         },
@@ -257,7 +259,10 @@ export class CoeService {
 
       // Automatically handles S3 upload if a new file is attached
       if (photoFile) {
-        uploadedImageUrl = await this.uploadPhoto(photoFile, "coe_user_photo_");
+        uploadedImageUrl = await this.uploadPhoto(
+          photoFile,
+          data.name ?? existingCoe.user.name
+        );
       }
 
       const updatedUser = await db.user.update({
