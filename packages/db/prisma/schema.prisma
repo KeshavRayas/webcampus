@@ -147,6 +147,7 @@ model Department {
   sections            Section[]
   students            Student[]
   registrationWindows RegistrationWindow[]
+  proctorGroups       ProctorGroup[]
 
   @@index([name])
 }
@@ -270,6 +271,10 @@ model Student {
   hallTickets       HallTicket[]
   finances          Finance[]
   feedbackResponses FeedbackResponse[]
+
+  proctorGroupId    String?
+  proctorGroup      ProctorGroup?        @relation(fields: [proctorGroupId], references: [id], onDelete: SetNull)
+
   @@index([departmentName])
   @@index([departmentName, currentSemester])
   @@index([semesterId])
@@ -323,6 +328,7 @@ model Faculty {
   qualifications         FacultyQualification[]
   hod                    Hod?
   feedbackAssignments    FeedbackResponse[]
+  proctorGroups          ProctorGroup[]
 
   @@unique([id, departmentId])
   @@index([departmentId])
@@ -1462,4 +1468,21 @@ model MessageCampaignReceipt {
 
   @@index([campaignId])
   @@index([status])
+}
+
+model ProctorGroup {
+  id           String     @id @default(uuid())
+  groupNumber  String
+  departmentId String
+  facultyId    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  faculty      Faculty?   @relation(fields: [facultyId], references: [id], onDelete: SetNull)
+  students     Student[]
+
+  @@unique([departmentId, groupNumber])
+  @@index([departmentId])
+  @@index([facultyId])
 }

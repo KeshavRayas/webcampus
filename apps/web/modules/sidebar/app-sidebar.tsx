@@ -1,6 +1,8 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
+import { useQuery } from "@tanstack/react-query";
+import { frontendEnv } from "@webcampus/common/env";
 import { Role } from "@webcampus/types/rbac";
 import {
   Sidebar,
@@ -11,6 +13,7 @@ import {
   SidebarMenuItem,
 } from "@webcampus/ui/components/sidebar";
 import { capitalize } from "@webcampus/ui/lib/utils";
+import axios from "axios";
 import Image from "next/image";
 import Link from "next/link";
 import * as React from "react";
@@ -26,6 +29,36 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   console.log("Role:", session?.user.role);
   console.log("Sidebar config:", sidebarConfig);
   const { navMain, navSecondary } = sidebarConfig[session?.user.role as Role];
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+
+  const { data: deptInfo } = useQuery({
+    queryKey: ["department-info"],
+    queryFn: async () => {
+      const res = await axios.get(
+        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
+        { withCredentials: true }
+      );
+      if (res.data.status === "success") return res.data.data;
+      return null;
+    },
+    enabled: session?.user.role === "department",
+  });
+
+  const filteredNavMainItems = navMain.items.map((item) => {
+    if (
+      session?.user.role === "department" &&
+      item.name === "Academics" &&
+      deptInfo?.type !== "DEGREE_GRANTING"
+    ) {
+      return {
+        ...item,
+        children: item.children?.filter(
+          (child) => child.name !== "Proctor Mapping"
+        ),
+      };
+    }
+    return item;
+  });
 
   return (
     <Sidebar variant="inset" {...props}>
@@ -54,7 +87,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain.items} />
+        <NavMain items={filteredNavMainItems} />
         <NavSecondary items={navSecondary.items} className="mt-auto" />
       </SidebarContent>
     </Sidebar>
