@@ -25,13 +25,17 @@ export const QPSetupDialog = ({
         <DialogHeader className="mb-4">
           <div className="flex items-center justify-between pr-8">
             <div>
-              <DialogTitle>Setup {setupContext.assessmentTitle} for {setupContext.course.name}</DialogTitle>
+              <DialogTitle>
+                Setup {setupContext.assessmentTitle} for{" "}
+                {setupContext.course.name}
+              </DialogTitle>
               <DialogDescription>
-                Configure the question paper template for {setupContext.course.code}. 
-                The maximum marks are locked to the department configuration.
+                Configure the question paper template for{" "}
+                {setupContext.course.code}. The maximum marks are locked to the
+                department configuration.
               </DialogDescription>
             </div>
-            <div className="bg-primary/10 text-primary rounded-lg px-4 py-2 text-lg font-semibold border border-primary/20">
+            <div className="bg-primary/10 text-primary border-primary/20 rounded-lg border px-4 py-2 text-lg font-semibold">
               Required Marks: {setupContext.maxMarks}
             </div>
           </div>

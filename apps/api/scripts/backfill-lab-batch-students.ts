@@ -29,7 +29,9 @@ const allocateRoundRobin = async (sectionId: string): Promise<number> => {
     return 0;
   }
 
-  const studentIds = Array.from(new Set(sectionStudents.map((entry) => entry.studentId)));
+  const studentIds = Array.from(
+    new Set(sectionStudents.map((entry) => entry.studentId))
+  );
 
   await db.$transaction(async (tx) => {
     for (const batch of batches) {

@@ -1,5 +1,5 @@
-import DepartmentCourseRouter from "@webcampus/api/src/routers/department/course.router";
 import DepartmentCourseAssignmentRouter from "@webcampus/api/src/routers/department/course-assignment.router";
+import DepartmentCourseRouter from "@webcampus/api/src/routers/department/course.router";
 import DepartmentFacultyRouter from "@webcampus/api/src/routers/department/faculty.router";
 import DepartmentHODRouter from "@webcampus/api/src/routers/department/hod.router";
 import DepartmentSectionAssignmentRouter from "@webcampus/api/src/routers/department/section-assignment.router";

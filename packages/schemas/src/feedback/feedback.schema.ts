@@ -97,7 +97,7 @@ export const FeedbackReportQuerySchema = z.object({
   batchId: z.string().uuid().optional(),
   feedbackRoundId: z.string().uuid().optional(),
   assignmentType: z.enum(["THEORY", "LAB"]).optional(),
-  minScore: z.coerce.number().min(1).max(5).optional(),
+  maxPercentage: z.coerce.number().min(0).max(100).optional(),
   includeOpen: z.coerce.boolean().optional(),
 });
 
@@ -106,6 +106,16 @@ export const FeedbackReportFiltersSchema = z.object({
   semesterId: z.string().uuid(),
   departmentId: z.string().uuid().optional(),
 });
+
+export const CourseDistributionQuerySchema = z.object({
+  facultyId: z.string().uuid(),
+  courseId: z.string().uuid(),
+  sectionId: z.string().uuid().optional(),
+});
+
+export type CourseDistributionQuery = z.infer<
+  typeof CourseDistributionQuerySchema
+>;
 
 export const FeedbackRoleSchema = z.enum([
   "faculty",

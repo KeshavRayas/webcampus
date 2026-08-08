@@ -35,12 +35,66 @@ export async function getFeedbackFilterOptions(
   };
 }
 
-export async function getRoundFaculties(roundId: string) {
+export async function getRoundFaculties(
+  roundId: string,
+  departmentId?: string
+) {
   const response = await axios.get(
     `${baseUrl()}/admin/feedback/rounds/${roundId}/faculties`,
-    { withCredentials: true }
+    {
+      params: departmentId ? { departmentId } : undefined,
+      withCredentials: true,
+    }
   );
   return response.data.data;
+}
+
+export type CourseDistributionResult = {
+  metadata: {
+    academicYear: string;
+    semester: string;
+    program: string;
+    branch: string;
+    courseCode: string;
+    courseName: string;
+    section: string;
+    facultyName: string;
+    totalStudents: number;
+  };
+  questions: Array<{
+    questionNumber: number;
+    questionText: string;
+    excellent: number;
+    veryGood: number;
+    good: number;
+    fair: number;
+    poor: number;
+    rowTotal: number;
+  }>;
+  totals: {
+    excellent: number;
+    veryGood: number;
+    good: number;
+    fair: number;
+    poor: number;
+    overallAverage: number;
+  };
+};
+
+export async function getCourseDistribution(
+  roundId: string,
+  facultyId: string,
+  courseId: string,
+  sectionId?: string
+) {
+  const response = await axios.get(
+    `${baseUrl()}/admin/feedback/rounds/${roundId}/course-distribution`,
+    {
+      params: { facultyId, courseId, ...(sectionId ? { sectionId } : {}) },
+      withCredentials: true,
+    }
+  );
+  return response.data.data as CourseDistributionResult;
 }
 
 export async function getRoundFacultyCourses(

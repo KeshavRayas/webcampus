@@ -1,5 +1,6 @@
 import { db } from "@webcampus/db";
 import type {
+  CourseDistributionQuery,
   FeedbackPresetInput,
   FeedbackReportQuery,
   FeedbackRoundInput,
@@ -16,6 +17,31 @@ const FEEDBACK_SCORE_LABELS = {
   2: "Fair",
   1: "Poor",
 } as const;
+
+const toRoman = (num: number) => {
+  const roman: Record<string, number> = {
+    M: 1000,
+    CM: 900,
+    D: 500,
+    CD: 400,
+    C: 100,
+    XC: 90,
+    L: 50,
+    XL: 40,
+    X: 10,
+    IX: 9,
+    V: 5,
+    IV: 4,
+    I: 1,
+  };
+  let str = "";
+  for (const [key, value] of Object.entries(roman)) {
+    const q = Math.floor(num / value);
+    num -= q * value;
+    str += key.repeat(q);
+  }
+  return str;
+};
 
 const roundIsVisible = (round: { isEnabled: boolean; endsAt: Date }) =>
   !round.isEnabled || new Date() > round.endsAt;
@@ -506,6 +532,7 @@ export class FeedbackService {
             assignmentType: true,
             section: { select: { name: true } },
             batch: { select: { name: true } },
+            department: { select: { name: true } },
           },
         },
         feedbackRound: { select: { id: true, roundNumber: true, name: true } },
@@ -523,6 +550,7 @@ export class FeedbackService {
         assignmentType: string;
         section: string;
         batch: string | null;
+        departmentName: string;
         responseCount: number;
         questionTotals: number[];
       }
@@ -538,6 +566,7 @@ export class FeedbackService {
         assignmentType: response.courseAssignment.assignmentType,
         section: response.courseAssignment.section.name,
         batch: response.courseAssignment.batch?.name ?? null,
+        departmentName: response.courseAssignment.department.name,
         responseCount: 0,
         questionTotals: Array(10).fill(0),
       };
@@ -565,7 +594,9 @@ export class FeedbackService {
         };
       })
       .filter((group) =>
-        query.minScore != null ? group.average >= query.minScore : true
+        query.maxPercentage != null
+          ? group.percentage <= query.maxPercentage
+          : true
       );
   }
 
@@ -593,7 +624,7 @@ export class FeedbackService {
     }));
   }
 
-  static async getRoundFaculties(roundId: string) {
+  static async getRoundFaculties(roundId: string, departmentId?: string) {
     const round = await db.feedbackRound.findUnique({
       where: { id: roundId },
       include: {
@@ -606,6 +637,7 @@ export class FeedbackService {
       where: {
         section: { semesterId: round.semesterId },
         course: { allowFeedback: true },
+        ...(departmentId ? { departmentId } : {}),
       },
       select: {
         faculty: {
@@ -631,6 +663,14 @@ export class FeedbackService {
         semesterId: round.semesterId,
         academicTerm: round.academicTerm,
         semester: round.semester,
+        formattedAcademicYear: round.academicTerm.year,
+        formattedSemester: toRoman(round.semester.semesterNumber),
+        formattedProgram:
+          round.semester.programType === "UG"
+            ? "B.E"
+            : round.semester.programType === "PG"
+              ? "M.Tech"
+              : round.semester.programType,
       },
       faculties: assignments.map((assignment) => ({
         id: assignment.faculty.id,
@@ -654,11 +694,15 @@ export class FeedbackService {
       },
       select: {
         course: { select: { id: true, code: true, name: true } },
+        department: { select: { name: true } },
       },
       distinct: ["courseId"],
       orderBy: { course: { code: "asc" } },
     });
-    const courses = assignments.map((assignment) => assignment.course);
+    const courses = assignments.map((assignment) => ({
+      ...assignment.course,
+      departmentName: assignment.department.name,
+    }));
     const sectionCounts = await db.courseAssignment.groupBy({
       by: ["courseId"],
       where: {
@@ -675,6 +719,166 @@ export class FeedbackService {
       ...course,
       sectionCount: countById.get(course.id) ?? 0,
     }));
+  }
+
+  static async getCourseDistribution(
+    roundId: string,
+    query: CourseDistributionQuery
+  ) {
+    const round = await db.feedbackRound.findUnique({
+      where: { id: roundId },
+      include: {
+        academicTerm: { select: { type: true, year: true, isCurrent: true } },
+        semester: { select: { programType: true, semesterNumber: true } },
+        questionSet: {
+          include: { questions: { orderBy: { questionNumber: "asc" } } },
+        },
+      },
+    });
+    if (!round) throw new Error("Feedback round not found");
+
+    const assignmentWhere: NonNullable<
+      Parameters<typeof db.courseAssignment.findMany>[0]
+    >["where"] = {
+      facultyId: query.facultyId,
+      courseId: query.courseId,
+      section: { semesterId: round.semesterId },
+      ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+    };
+    const assignments = await db.courseAssignment.findMany({
+      where: assignmentWhere,
+      select: { id: true },
+    });
+    if (!assignments.length) {
+      throw new Error(
+        "No course assignment found for the selected faculty and course"
+      );
+    }
+    const assignmentIds = assignments.map((a) => a.id);
+
+    const sections = await db.courseAssignment.findMany({
+      where: assignmentWhere,
+      include: { section: { select: { name: true } } },
+      orderBy: { section: { name: "asc" } },
+    });
+    const sectionNames = [...new Set(sections.map((s) => s.section.name))];
+
+    const firstAssignment = await db.courseAssignment.findFirst({
+      where: assignmentWhere,
+      select: {
+        course: { select: { id: true, code: true, name: true } },
+        department: { select: { name: true } },
+        faculty: {
+          select: { shortName: true, user: { select: { name: true } } },
+        },
+      },
+    });
+    if (!firstAssignment) {
+      throw new Error(
+        "No course assignment found for the selected faculty and course"
+      );
+    }
+
+    const responses = await db.feedbackResponse.findMany({
+      where: {
+        feedbackRoundId: round.id,
+        courseAssignmentId: { in: assignmentIds },
+      },
+      include: {
+        answers: {
+          include: { question: { select: { questionNumber: true } } },
+        },
+      },
+    });
+
+    const countByQuestion = new Map<
+      number,
+      { 1: number; 2: number; 3: number; 4: number; 5: number }
+    >();
+    for (const response of responses) {
+      for (const answer of response.answers) {
+        const qNo = answer.question.questionNumber;
+        const bucket = countByQuestion.get(qNo) ?? {
+          1: 0,
+          2: 0,
+          3: 0,
+          4: 0,
+          5: 0,
+        };
+        const score = Math.min(5, Math.max(1, answer.score)) as
+          | 1
+          | 2
+          | 3
+          | 4
+          | 5;
+        bucket[score] += 1;
+        countByQuestion.set(qNo, bucket);
+      }
+    }
+    const responseCount = responses.length;
+
+    const questions = round.questionSet.questions.map((question) => {
+      const bucket = countByQuestion.get(question.questionNumber) ?? {
+        1: 0,
+        2: 0,
+        3: 0,
+        4: 0,
+        5: 0,
+      };
+      const rowTotal =
+        bucket[1] + bucket[2] + bucket[3] + bucket[4] + bucket[5];
+      return {
+        questionNumber: question.questionNumber,
+        questionText: question.questionText,
+        excellent: bucket[5],
+        veryGood: bucket[4],
+        good: bucket[3],
+        fair: bucket[2],
+        poor: bucket[1],
+        rowTotal: rowTotal,
+      };
+    });
+
+    const totalScore = questions.reduce(
+      (sum, q) =>
+        sum +
+        q.excellent * 5 +
+        q.veryGood * 4 +
+        q.good * 3 +
+        q.fair * 2 +
+        q.poor,
+      0
+    );
+    const totalAnswers = questions.reduce((sum, q) => sum + q.rowTotal, 0);
+    const overallAverage = totalAnswers > 0 ? totalScore / totalAnswers : 0;
+
+    return {
+      metadata: {
+        academicYear: round.academicTerm.year,
+        semester: toRoman(round.semester.semesterNumber),
+        program:
+          round.semester.programType === "UG"
+            ? "B.E"
+            : round.semester.programType === "PG"
+              ? "M.Tech"
+              : round.semester.programType,
+        branch: firstAssignment.department.name,
+        courseCode: firstAssignment.course.code,
+        courseName: firstAssignment.course.name,
+        section: query.sectionId ? sectionNames.join(", ") : "All",
+        facultyName: firstAssignment.faculty.user.name,
+        totalStudents: responseCount,
+      },
+      questions,
+      totals: {
+        excellent: questions.reduce((sum, q) => sum + q.excellent, 0),
+        veryGood: questions.reduce((sum, q) => sum + q.veryGood, 0),
+        good: questions.reduce((sum, q) => sum + q.good, 0),
+        fair: questions.reduce((sum, q) => sum + q.fair, 0),
+        poor: questions.reduce((sum, q) => sum + q.poor, 0),
+        overallAverage,
+      },
+    };
   }
 
   static async getRoundCourseSections(

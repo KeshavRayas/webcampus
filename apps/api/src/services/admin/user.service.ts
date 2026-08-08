@@ -84,7 +84,9 @@ export class UserService {
         user.displayUsername || UserService.getDisplayUsername(user.name);
 
       const shouldUpdate =
-        force || !user.username || !user.displayUsername ||
+        force ||
+        !user.username ||
+        !user.displayUsername ||
         user.username !== nextUsername ||
         user.displayUsername !== nextDisplayUsername;
 

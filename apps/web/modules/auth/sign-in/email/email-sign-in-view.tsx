@@ -31,7 +31,7 @@ export const EmailSignIn = () => {
       >
         <div className="flex flex-col items-center gap-2 text-center">
           <h1 className="text-2xl font-bold">{capitalize(role)} sign in</h1>
-          <p className="text-muted-foreground text-sm text-balance">
+          <p className="text-muted-foreground text-balance text-sm">
             Welcome back! Please sign in to continue.
           </p>
         </div>
@@ -46,7 +46,9 @@ export const EmailSignIn = () => {
                   <Input
                     {...field}
                     placeholder={
-                      isStudent ? "Enter your student email" : "Enter your email"
+                      isStudent
+                        ? "Enter your student email"
+                        : "Enter your email"
                     }
                   />
                 </FormControl>
