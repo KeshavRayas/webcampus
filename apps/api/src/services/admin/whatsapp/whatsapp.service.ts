@@ -96,7 +96,7 @@ export const whatsappService = {
       });
     }
 
-    return persistCampaign({
+    const { campaignId, counts } = await persistCampaign({
       config,
       category: resolved.category,
       scope: resolved.scope,
@@ -106,6 +106,14 @@ export const whatsappService = {
       targets: campaignTargets,
       providerResponse: allProviderResponses,
     });
+
+    return {
+      campaignId,
+      total: counts.total,
+      success: counts.success,
+      failure: counts.failure,
+      skipped: counts.skipped,
+    };
   },
 };
 

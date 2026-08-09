@@ -1437,8 +1437,8 @@ model MessageCampaign {
   skippedCount      Int
   providerResponse  Json?
   createdAt         DateTime           @default(now())
-  studentTemplate   MessageTemplate?   @relation("StudentTemplate", fields: [studentTemplateId], references: [id])
-  parentTemplate    MessageTemplate?   @relation("ParentTemplate", fields: [parentTemplateId], references: [id])
+  studentTemplate   MessageTemplate?   @relation("StudentTemplate", fields: [studentTemplateId], references: [id], onDelete: SetNull)
+  parentTemplate    MessageTemplate?   @relation("ParentTemplate", fields: [parentTemplateId], references: [id], onDelete: SetNull)
   receipts          MessageCampaignReceipt[]
 
   @@index([category])
@@ -1452,13 +1452,13 @@ model MessageCampaignReceipt {
   courseId      String?
   recipientType MessageRecipientType
   to            String
-  templateId    String
+  templateId    String?
   bodyvar       Json
   status        ReceiptStatus
   errorMessage  String?
   createdAt     DateTime           @default(now())
   campaign      MessageCampaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  template      MessageTemplate    @relation(fields: [templateId], references: [id])
+  template      MessageTemplate?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
   @@index([campaignId])
   @@index([status])

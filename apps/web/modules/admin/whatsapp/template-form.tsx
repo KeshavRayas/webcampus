@@ -109,6 +109,33 @@ export const TemplateForm = ({
 
   const { data: fieldSources = [] } = useTemplateFieldSources(category);
 
+  useEffect(() => {
+    const positions = Array.from(
+      form.messageBody.matchAll(/\{\{(\d+)\}\}/g),
+      (match) => Number(match[1])
+    );
+    if (positions.length === 0) return;
+    const positionSet = new Set(positions);
+    const defaultSource = fieldSources[0]?.value ?? "STUDENT_NAME";
+    setForm((prev) => {
+      const existing = new Map(prev.variables.map((v) => [v.position, v]));
+      const next = prev.variables.filter((v) => positionSet.has(v.position));
+      for (const position of positionSet) {
+        if (!existing.has(position)) {
+          next.push({
+            position,
+            label: "",
+            fieldSource: defaultSource,
+          });
+        }
+      }
+      return {
+        ...prev,
+        variables: next.sort((a, b) => a.position - b.position),
+      };
+    });
+  }, [form.messageBody, fieldSources]);
+
   const set = <K extends keyof TemplateFormValues>(
     key: K,
     value: TemplateFormValues[K]

@@ -170,7 +170,7 @@ export type Receipt = {
   courseId: string | null;
   recipientType: MessageRecipientType;
   to: string;
-  templateId: string;
+  templateId: string | null;
   bodyvar: string[];
   status: ReceiptStatus;
   errorMessage: string | null;

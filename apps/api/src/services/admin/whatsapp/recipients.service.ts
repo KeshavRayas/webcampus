@@ -147,7 +147,7 @@ function buildTarget(
     templateName: template.name,
     templateMessageBody: template.messageBody,
     bodyvar,
-    messageText: renderMessageBody(template.messageBody, values),
+    messageText: renderMessageBody(template.messageBody, values, bodyvar),
   };
 }
 
