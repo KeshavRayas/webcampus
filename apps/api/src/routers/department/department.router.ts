@@ -1,5 +1,6 @@
 import DepartmentCourseAssignmentRouter from "@webcampus/api/src/routers/department/course-assignment.router";
 import DepartmentCourseRouter from "@webcampus/api/src/routers/department/course.router";
+import ElectiveMappingRouter from "@webcampus/api/src/routers/department/elective-mapping.router";
 import DepartmentFacultyRouter from "@webcampus/api/src/routers/department/faculty.router";
 import DepartmentHODRouter from "@webcampus/api/src/routers/department/hod.router";
 import DepartmentSectionAssignmentRouter from "@webcampus/api/src/routers/department/section-assignment.router";
@@ -12,6 +13,8 @@ const router: Router = Router();
 router.use("/course", DepartmentCourseRouter);
 
 router.use("/course-assignment", DepartmentCourseAssignmentRouter);
+
+router.use("/elective-mapping", ElectiveMappingRouter);
 
 router.use("/faculty", DepartmentFacultyRouter);
 

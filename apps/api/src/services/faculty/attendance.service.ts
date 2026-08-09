@@ -39,6 +39,11 @@ export class Attendance {
         };
       }
 
+      const { PeCapacityService } = await import(
+        "@webcampus/api/src/services/shared/pe-capacity.service"
+      );
+      await PeCapacityService.assertPeDownstreamReady(data.courseId);
+
       const freezeCourse = await db.course.findUnique({
         where: { id: data.courseId },
         select: {
@@ -70,6 +75,7 @@ export class Attendance {
       };
     } catch (error) {
       logger.error("Error creating attendance:", { error });
+      if (error instanceof Error) throw error;
       throw new Error("Failed to create attendance");
     }
   }
@@ -158,6 +164,7 @@ export class Attendance {
       const existingAttendance = await db.attendance.findUnique({
         where: { id },
         select: {
+          courseId: true,
           course: {
             select: {
               assignments: {
@@ -177,6 +184,13 @@ export class Attendance {
           error: "Attendance not found",
         };
       }
+
+      const { PeCapacityService } = await import(
+        "@webcampus/api/src/services/shared/pe-capacity.service"
+      );
+      await PeCapacityService.assertPeDownstreamReady(
+        existingAttendance.courseId
+      );
 
       const courseAssignment = existingAttendance.course.assignments[0];
       if (courseAssignment?.freezes) {
@@ -203,6 +217,7 @@ export class Attendance {
       };
     } catch (error) {
       logger.error("Error updating attendance:", { error });
+      if (error instanceof Error) throw error;
       throw new Error("Failed to update attendance");
     }
   }
@@ -212,6 +227,7 @@ export class Attendance {
       const existingAttendance = await db.attendance.findUnique({
         where: { id },
         select: {
+          courseId: true,
           course: {
             select: {
               assignments: {
@@ -230,6 +246,13 @@ export class Attendance {
           error: "Attendance not found",
         };
       }
+      const { PeCapacityService } = await import(
+        "@webcampus/api/src/services/shared/pe-capacity.service"
+      );
+      await PeCapacityService.assertPeDownstreamReady(
+        existingAttendance.courseId
+      );
+
       const courseAssignment = existingAttendance.course.assignments[0];
       if (courseAssignment?.freezes) {
         try {
@@ -253,6 +276,7 @@ export class Attendance {
       };
     } catch (error) {
       logger.error("Error deleting attendance:", { error });
+      if (error instanceof Error) throw error;
       throw new Error("Failed to delete attendance");
     }
   }

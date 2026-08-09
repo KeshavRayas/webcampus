@@ -195,6 +195,43 @@ export const FacultyAttendanceView = () => {
       .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
   }, [filterOptionsQuery.data?.courses, filterOptionsQuery.data?.sections]);
 
+  const electiveBatchOptions = useMemo(() => {
+    const courses = filterOptionsQuery.data?.courses ?? [];
+    const electiveBatches = filterOptionsQuery.data?.electiveBatches ?? [];
+    const courseById = new Map(courses.map((course) => [course.id, course]));
+
+    return electiveBatches.map((batch) => {
+      const course = courseById.get(batch.courseId);
+      return {
+        id: batch.id,
+        name: batch.name,
+        courseId: batch.courseId,
+        courseCode: course?.code ?? "",
+        courseName: course?.name ?? "",
+        label: `${course?.code ?? ""} - ${course?.name ?? ""} (${batch.name})`,
+      };
+    });
+  }, [
+    filterOptionsQuery.data?.courses,
+    filterOptionsQuery.data?.electiveBatches,
+  ]);
+
+  const isElectiveCourse = useMemo(() => {
+    const selectedCourse = parseCourseSelectionKey(courseSelectionKey);
+    if (!selectedCourse.courseId) {
+      return false;
+    }
+    const hasSections = assignmentOptions.some(
+      (assignment) => assignment.courseId === selectedCourse.courseId
+    );
+    const hasElectiveBatches = electiveBatchOptions.some(
+      (option) => option.courseId === selectedCourse.courseId
+    );
+    // A course is treated as elective (PE) when it has elective batches and
+    // no section-based assignments.
+    return !hasSections && hasElectiveBatches;
+  }, [assignmentOptions, courseSelectionKey, electiveBatchOptions]);
+
   const courseOptions = useMemo(() => {
     const optionsByKey = new Map<
       string,
@@ -210,8 +247,24 @@ export const FacultyAttendanceView = () => {
       });
     }
 
+    for (const batch of electiveBatchOptions) {
+      optionsByKey.set(`${batch.courseId}${COURSE_SELECTION_DELIMITER}pe`, {
+        id: `${batch.courseId}${COURSE_SELECTION_DELIMITER}pe`,
+        code: batch.courseCode,
+        name: batch.courseName,
+        label: batch.label,
+      });
+    }
+
     return Array.from(optionsByKey.values());
-  }, [assignmentOptions]);
+  }, [assignmentOptions, electiveBatchOptions]);
+
+  const electiveBatchesForSelectedCourse = useMemo(() => {
+    const selectedCourse = parseCourseSelectionKey(courseSelectionKey);
+    return electiveBatchOptions.filter(
+      (option) => option.courseId === selectedCourse.courseId
+    );
+  }, [courseSelectionKey, electiveBatchOptions]);
 
   const sectionsForSelectedCourse = useMemo(() => {
     const selectedCourse = parseCourseSelectionKey(courseSelectionKey);
@@ -302,13 +355,14 @@ export const FacultyAttendanceView = () => {
       courseId: form.courseId || undefined,
       sectionId: form.sectionId || undefined,
       batchId: form.batchId,
+      electiveBatchId: form.electiveBatchId,
       page: 1,
       limit: 100,
     },
     Boolean(
       form.sessionDate &&
         form.courseId &&
-        form.sectionId &&
+        (isElectiveCourse ? form.electiveBatchId : form.sectionId) &&
         selectedTimingWindow
     )
   );
@@ -416,7 +470,11 @@ export const FacultyAttendanceView = () => {
   };
 
   const canOpenSession = useMemo(() => {
-    if (!form.sessionDate || !form.courseId || !form.sectionId) {
+    if (!form.sessionDate || !form.courseId) {
+      return false;
+    }
+
+    if (isElectiveCourse ? !form.electiveBatchId : !form.sectionId) {
       return false;
     }
 
@@ -435,9 +493,11 @@ export const FacultyAttendanceView = () => {
     return true;
   }, [
     form.courseId,
-    form.sectionId,
+    form.electiveBatchId,
     form.sessionDate,
+    form.sectionId,
     hasValidTiming,
+    isElectiveCourse,
     overlapError,
     overlapCheckQuery.isFetching,
     overlapCheckQuery.isLoading,
@@ -473,6 +533,18 @@ export const FacultyAttendanceView = () => {
         courseId: parsed.courseId,
         batchId: parsed.batchId,
         sectionId: "",
+        electiveBatchId: undefined,
+      };
+    });
+  };
+
+  const updateElectiveBatch = (electiveBatchId: string) => {
+    setForm((current) => {
+      return {
+        ...current,
+        electiveBatchId,
+        sectionId: "",
+        batchId: undefined,
       };
     });
   };
@@ -497,14 +569,17 @@ export const FacultyAttendanceView = () => {
 
   const selectedSession = exactSession;
   const isSessionStudentsQueryEnabled = Boolean(
-    form.courseId && form.sectionId && !activeSessionId
+    form.courseId &&
+      (isElectiveCourse ? form.electiveBatchId : form.sectionId) &&
+      !activeSessionId
   );
 
   const sessionStudentsQuery = useFacultyAttendanceSessionStudents(
     {
       courseId: form.courseId,
-      sectionId: form.sectionId,
+      sectionId: isElectiveCourse ? undefined : form.sectionId,
       batchId: form.batchId,
+      electiveBatchId: isElectiveCourse ? form.electiveBatchId : undefined,
     },
     isSessionStudentsQueryEnabled
   );
@@ -580,8 +655,9 @@ export const FacultyAttendanceView = () => {
     try {
       const response = await createOrOpenMutation.mutateAsync({
         courseId: form.courseId,
-        sectionId: form.sectionId,
-        batchId: form.batchId,
+        sectionId: isElectiveCourse ? undefined : form.sectionId,
+        batchId: isElectiveCourse ? undefined : form.batchId,
+        electiveBatchId: isElectiveCourse ? form.electiveBatchId : undefined,
         sessionDate: dayjs(form.sessionDate).format("YYYY-MM-DD"),
         timingMode: form.timingMode,
         timingCode:
@@ -638,15 +714,35 @@ export const FacultyAttendanceView = () => {
   };
 
   const selectedCourseLabel = useMemo(() => {
+    if (isElectiveCourse) {
+      const option = electiveBatchOptions.find(
+        (entry) => entry.courseId === form.courseId
+      );
+      return option
+        ? `${option.courseCode} - ${option.courseName}`
+        : "Not selected";
+    }
     const course = assignmentOptions.find(
       (entry) =>
         entry.courseId === form.courseId &&
         (entry.batchId ?? undefined) === (form.batchId ?? undefined)
     );
     return course ? course.courseLabel : "Not selected";
-  }, [assignmentOptions, form.batchId, form.courseId]);
+  }, [
+    assignmentOptions,
+    electiveBatchOptions,
+    form.batchId,
+    form.courseId,
+    isElectiveCourse,
+  ]);
 
   const selectedSectionLabel = useMemo(() => {
+    if (isElectiveCourse) {
+      const batch = electiveBatchOptions.find(
+        (entry) => entry.id === form.electiveBatchId
+      );
+      return batch ? batch.name : "Not selected";
+    }
     const section = assignmentOptions.find(
       (entry) =>
         entry.sectionId === form.sectionId &&
@@ -654,7 +750,15 @@ export const FacultyAttendanceView = () => {
         (entry.batchId ?? undefined) === (form.batchId ?? undefined)
     );
     return section ? section.sectionName : "Not selected";
-  }, [assignmentOptions, form.batchId, form.courseId, form.sectionId]);
+  }, [
+    assignmentOptions,
+    electiveBatchOptions,
+    form.batchId,
+    form.courseId,
+    form.electiveBatchId,
+    form.sectionId,
+    isElectiveCourse,
+  ]);
 
   return (
     <AttendancePageShell
@@ -666,9 +770,12 @@ export const FacultyAttendanceView = () => {
         form={form}
         courses={courseOptions}
         sections={sectionsForSelectedCourse}
+        electiveBatches={electiveBatchesForSelectedCourse}
         selectedCourseValue={courseSelectionKey}
         selectedSectionValue={sectionSelectionKey}
+        selectedElectiveBatchId={form.electiveBatchId}
         isLabBatch={Boolean(form.batchId)} // Added property to detect lab batch
+        isElective={isElectiveCourse}
         onDateChange={(date) => {
           setForm((current) => ({
             ...current,
@@ -683,8 +790,10 @@ export const FacultyAttendanceView = () => {
             ...current,
             sectionId: parsed.sectionId,
             batchId: parsed.batchId,
+            electiveBatchId: undefined,
           }));
         }}
+        onElectiveBatchChange={updateElectiveBatch}
         onTimingModeChange={updateTimingMode}
         onFixedSlotChange={(fixedTimingCode) => {
           setForm((current) => ({
@@ -729,7 +838,9 @@ export const FacultyAttendanceView = () => {
               {selectedCourseLabel}
             </p>
             <p>
-              <span className="text-muted-foreground">Section:</span>{" "}
+              <span className="text-muted-foreground">
+                {isElectiveCourse ? "Elective Batch:" : "Section:"}
+              </span>{" "}
               {selectedSectionLabel}
             </p>
             <p>

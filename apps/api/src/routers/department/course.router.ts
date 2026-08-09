@@ -5,6 +5,7 @@ import {
   CourseBranchQuerySchema,
   CreateCourseSchema,
   DeleteCourseSchema,
+  PeCapacitySummaryQuerySchema,
   RequestRevisionForSemesterSchema,
   UpdateCoordinatorsBodySchema,
   UpdateCourseSchema,
@@ -59,6 +60,27 @@ router.get(
     },
   }),
   CourseController.getByBranch
+);
+
+router.get(
+  "/pe-capacity-summary",
+  validateRequest(PeCapacitySummaryQuerySchema, "query"),
+  protect({
+    role: "department",
+    permissions: {
+      courses: ["read"],
+    },
+  }),
+  CourseController.getPeCapacitySummary
+);
+
+router.get(
+  "/departments",
+  protect({
+    role: "department",
+    permissions: {},
+  }),
+  CourseController.getDepartments
 );
 
 router.post(

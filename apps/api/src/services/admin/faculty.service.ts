@@ -208,6 +208,8 @@ export class AdminFacultyService {
             select: {
               id: true,
               image: true,
+              email: true,
+              username: true,
             },
           },
         },
@@ -215,36 +217,6 @@ export class AdminFacultyService {
 
       if (!existingFaculty) {
         throw new Error("Faculty not found");
-      }
-
-      if (imageFile) {
-        const { deleteFromS3, generateFileName, uploadToS3 } = await import(
-          "@webcampus/api/src/utils/s3"
-        );
-        const nextImageFileName = generateFileName(
-          imageFile.originalname,
-          "faculty_image_"
-        );
-        const uploadResult = await uploadToS3(
-          imageFile.buffer,
-          nextImageFileName,
-          imageFile.mimetype
-        );
-
-        if (!uploadResult.success || !uploadResult.url) {
-          throw new Error("Failed to upload faculty image");
-        }
-
-        if (existingFaculty.user.image) {
-          await deleteFromS3(existingFaculty.user.image);
-        }
-
-        await db.user.update({
-          where: { id: existingFaculty.user.id },
-          data: {
-            image: uploadResult.url,
-          },
-        });
       }
 
       const nextUserData: {
@@ -266,11 +238,33 @@ export class AdminFacultyService {
         nextUserData.displayUsername = data.displayUsername;
       }
 
-      if (Object.keys(nextUserData).length > 0) {
-        await db.user.update({
-          where: { id: existingFaculty.user.id },
-          data: nextUserData,
+      if (
+        data.email !== undefined &&
+        data.email !== existingFaculty.user.email
+      ) {
+        const existingEmailUser = await db.user.findFirst({
+          where: { email: data.email, NOT: { id: existingFaculty.user.id } },
+          select: { id: true },
         });
+        if (existingEmailUser) {
+          throw new Error("A user with this email already exists");
+        }
+      }
+
+      if (
+        data.username !== undefined &&
+        data.username !== existingFaculty.user.username
+      ) {
+        const existingUsernameUser = await db.user.findFirst({
+          where: {
+            username: data.username,
+            NOT: { id: existingFaculty.user.id },
+          },
+          select: { id: true },
+        });
+        if (existingUsernameUser) {
+          throw new Error("A user with this username already exists");
+        }
       }
 
       const facultyData = { ...data } as Record<string, unknown>;
@@ -279,12 +273,87 @@ export class AdminFacultyService {
       delete facultyData.username;
       delete facultyData.displayUsername;
 
-      const faculty = await db.faculty.update({
-        where: { id },
-        data: facultyData,
+      if (
+        data.employeeId !== undefined &&
+        data.employeeId !== existingFaculty.employeeId
+      ) {
+        const existingEmployeeIdFaculty = await db.faculty.findFirst({
+          where: { employeeId: data.employeeId, NOT: { id } },
+          select: { id: true },
+        });
+        if (existingEmployeeIdFaculty) {
+          throw new Error("A faculty with this employee ID already exists");
+        }
+      }
+
+      let nextImageUrl: string | null = null;
+      if (imageFile) {
+        const { deleteFromS3, generateFileName, uploadToS3 } = await import(
+          "@webcampus/api/src/utils/s3"
+        );
+        const nextImageFileName = generateFileName(
+          imageFile.originalname,
+          "faculty_image_"
+        );
+        const uploadResult = await uploadToS3(
+          imageFile.buffer,
+          nextImageFileName,
+          imageFile.mimetype
+        );
+
+        if (!uploadResult.success || !uploadResult.url) {
+          throw new Error("Failed to upload faculty image");
+        }
+
+        nextImageUrl = uploadResult.url;
+
+        if (existingFaculty.user.image) {
+          await deleteFromS3(existingFaculty.user.image);
+        }
+      }
+
+      let updatedFaculty: unknown;
+      await db.$transaction(async (tx) => {
+        if (nextImageUrl) {
+          await tx.user.update({
+            where: { id: existingFaculty.user.id },
+            data: {
+              image: nextImageUrl,
+            },
+          });
+        }
+
+        if (Object.keys(nextUserData).length > 0) {
+          await tx.user.update({
+            where: { id: existingFaculty.user.id },
+            data: nextUserData,
+          });
+        }
+
+        updatedFaculty = await tx.faculty.update({
+          where: { id },
+          data: facultyData,
+        });
       });
-      return { status: "success", message: "Faculty updated", data: faculty };
+
+      return {
+        status: "success",
+        message: "Faculty updated",
+        data: updatedFaculty,
+      };
     } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2002") {
+          throw new Error("Email, username, or employee ID is already in use");
+        }
+        if (error.code === "P2025") {
+          throw new Error("Faculty not found");
+        }
+      }
+      if (error instanceof Error) {
+        logger.error("Failed to update faculty", error);
+        throw new Error(error.message);
+      }
       logger.error("Failed to update faculty", error);
       throw new Error("Failed to update faculty");
     }

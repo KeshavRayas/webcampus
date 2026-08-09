@@ -25,6 +25,9 @@ export type ArchiveSummaryType = {
     departments: number;
     faculty: number;
     admins: number;
+    electiveBatches: number;
+    electiveBatchFaculties: number;
+    electiveAssignments: number;
   };
 };
 
@@ -39,6 +42,9 @@ export type ArchiveResultType = {
     departments: number;
     faculty: number;
     admins: number;
+    electiveBatches: number;
+    electiveBatchFaculties: number;
+    electiveAssignments: number;
   };
   archivedAt: Date;
 };

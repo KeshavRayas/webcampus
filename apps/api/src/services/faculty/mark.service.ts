@@ -1,3 +1,4 @@
+import { isBatchManagedCourse } from "@webcampus/api/src/services/shared/course-kind";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
@@ -62,6 +63,110 @@ export function resolveExcelStatus(
 }
 
 export class Mark {
+  private static async assertFacultyCanManageMark(
+    facultyId: string,
+    courseId: string,
+    prisma: DbLike = db
+  ): Promise<void> {
+    const { PeCapacityService } = await import(
+      "@webcampus/api/src/services/shared/pe-capacity.service"
+    );
+    await PeCapacityService.assertPeDownstreamReady(courseId);
+    const isAssigned =
+      (await prisma.courseAssignment.findFirst({
+        where: { courseId, facultyId },
+      })) ||
+      (await prisma.electiveBatchFaculty.findFirst({
+        where: { courseId, facultyId },
+      }));
+    if (!isAssigned) {
+      throw new Error("Unauthorized to manage marks for this course");
+    }
+  }
+
+  private static async assertFacultyCourseAccess(
+    facultyId: string,
+    course: { id: string; courseType: string | null },
+    prisma: DbLike = db,
+    unauthorizedMessage = "Unauthorized to view this assessment"
+  ): Promise<"PE" | "PC"> {
+    if (isBatchManagedCourse(course.courseType)) {
+      const batchFaculty = await prisma.electiveBatchFaculty.findFirst({
+        where: { courseId: course.id, facultyId },
+      });
+      if (!batchFaculty) throw new Error(unauthorizedMessage);
+      return "PE";
+    }
+    const isAssigned = await prisma.courseAssignment.findFirst({
+      where: { courseId: course.id, facultyId },
+    });
+    if (!isAssigned) throw new Error(unauthorizedMessage);
+    return "PC";
+  }
+
+  private static async getFacultyCourseStudents(
+    facultyId: string,
+    courseId: string,
+    courseType: string | null,
+    semesterId: string,
+    sectionId: string | undefined,
+    prisma: DbLike = db,
+    withEmail = false
+  ): Promise<
+    Array<{
+      student: {
+        id: string;
+        usn: string;
+        user: { name: string; email?: string };
+      };
+    }>
+  > {
+    if (isBatchManagedCourse(courseType)) {
+      const { PeCapacityService } = await import(
+        "@webcampus/api/src/services/shared/pe-capacity.service"
+      );
+      const roster = await PeCapacityService.getFacultyPeRoster(
+        facultyId,
+        courseId,
+        prisma
+      );
+      const studentIds = roster.map((r) => r.studentId);
+      if (studentIds.length === 0) return [];
+      const students = await prisma.student.findMany({
+        where: { id: { in: studentIds } },
+        select: {
+          id: true,
+          usn: true,
+          user: {
+            select: withEmail ? { name: true, email: true } : { name: true },
+          },
+        },
+      });
+      return students.map((s) => ({ student: s }));
+    }
+    return prisma.courseRegistration.findMany({
+      where: {
+        courseId,
+        semesterId,
+        ...(sectionId
+          ? { student: { studentSections: { some: { sectionId } } } }
+          : {}),
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            usn: true,
+            user: {
+              select: withEmail ? { name: true, email: true } : { name: true },
+            },
+          },
+        },
+      },
+      orderBy: { student: { usn: "asc" } },
+    });
+  }
+
   /**
    * Direct Mark creation — bypasses the assessment aggregate pipeline.
    * Does NOT call recomputeStudentMark, so cieTotal/status here will be
@@ -70,9 +175,18 @@ export class Mark {
    * Prefer saveAssessmentMarks + recomputeStudentMark for normal usage.
    */
   static async create(
-    data: CreateMarkType
+    data: CreateMarkType,
+    userId: string
   ): Promise<BaseResponse<MarkResponseType>> {
     try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
       const existingMark = await db.mark.findUnique({
         where: {
           studentId_courseId: {
@@ -90,6 +204,8 @@ export class Mark {
         };
       }
 
+      await this.assertFacultyCanManageMark(faculty.id, data.courseId);
+
       const mark = await db.mark.create({
         data,
       });
@@ -103,6 +219,7 @@ export class Mark {
       };
     } catch (error) {
       logger.error("Error creating mark:", { error });
+      if (error instanceof Error) throw error;
       throw new Error("Failed to create mark");
     }
   }
@@ -190,16 +307,28 @@ export class Mark {
    */
   static async update(
     id: string,
-    data: UpdateMarkType
+    data: UpdateMarkType,
+    userId: string
   ): Promise<BaseResponse<MarkResponseType>> {
     try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
       const existingMark = await db.mark.findUnique({
         where: { id },
-        include: {
+        select: {
+          id: true,
+          courseId: true,
           course: {
-            include: {
+            select: {
+              approvalStatus: true,
               assignments: {
-                include: {
+                select: {
                   freezes: true,
                 },
               },
@@ -229,6 +358,8 @@ export class Mark {
         };
       }
 
+      await this.assertFacultyCanManageMark(faculty.id, existingMark.courseId);
+
       const mark = await db.mark.update({
         where: { id },
         data,
@@ -248,15 +379,26 @@ export class Mark {
     }
   }
 
-  static async delete(id: string): Promise<BaseResponse<void>> {
+  static async delete(id: string, userId: string): Promise<BaseResponse<void>> {
     try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
       const existingMark = await db.mark.findUnique({
         where: { id },
-        include: {
+        select: {
+          id: true,
+          courseId: true,
           course: {
-            include: {
+            select: {
+              approvalStatus: true,
               assignments: {
-                include: {
+                select: {
                   freezes: true,
                 },
               },
@@ -285,6 +427,8 @@ export class Mark {
           error: "Cannot delete mark as it has been frozen by HOD or admin",
         };
       }
+
+      await this.assertFacultyCanManageMark(faculty.id, existingMark.courseId);
 
       await db.mark.delete({
         where: { id },
@@ -381,10 +525,65 @@ export class Mark {
         },
       }));
 
+      const peAssignments = await db.electiveBatchFaculty.findMany({
+        where: {
+          facultyId: faculty.id,
+          course: { approvalStatus: FACULTY_COURSE_STATUS },
+        },
+        select: {
+          course: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              semester: {
+                select: {
+                  id: true,
+                  semesterNumber: true,
+                  academicTerm: {
+                    select: {
+                      id: true,
+                      type: true,
+                      year: true,
+                    },
+                  },
+                },
+              },
+              assessments: {
+                select: {
+                  id: true,
+                  title: true,
+                  totalMarks: true,
+                  studentRecords: {
+                    select: { id: true },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const formattedPeAssignments = peAssignments.map((assignment) => ({
+        section: null,
+        course: {
+          ...assignment.course,
+          assessments: assignment.course.assessments.map((assessment) => ({
+            id: assessment.id,
+            title: assessment.title,
+            totalMarks: assessment.totalMarks,
+            hasMarks: assessment.studentRecords.length > 0,
+          })),
+        },
+      }));
+
       return {
         status: "success",
         message: "Marks dashboard data retrieved successfully",
-        data: formattedAssignments,
+        data: [...formattedAssignments, ...formattedPeAssignments].sort(
+          (a, b) => a.course.code.localeCompare(b.course.code)
+        ),
       };
     } catch (error) {
       logger.error("Error fetching marks dashboard", error);
@@ -422,6 +621,7 @@ export class Mark {
               id: true,
               name: true,
               code: true,
+              courseType: true,
               approvalStatus: true,
             },
           },
@@ -434,47 +634,19 @@ export class Mark {
 
       assertFacultyCourseApproved(assessment.course.approvalStatus);
 
-      // Verify faculty is assigned to this course
-      const isAssigned = await db.courseAssignment.findFirst({
-        where: {
-          courseId: assessment.courseId,
-          facultyId: faculty.id,
-        },
-      });
+      // Verify faculty is assigned to this course (PC section mapping or PE elective batch)
+      await this.assertFacultyCourseAccess(faculty.id, assessment.course, db);
 
-      if (!isAssigned) {
-        throw new Error("Unauthorized to view this assessment");
-      }
-
-      // Get students registered for this course, optionally filtered by section
-      const courseRegistrations = await db.courseRegistration.findMany({
-        where: {
-          courseId: assessment.courseId,
-          semesterId: assessment.semesterId,
-          ...(sectionId
-            ? {
-                student: {
-                  studentSections: {
-                    some: { sectionId },
-                  },
-                },
-              }
-            : {}),
-        },
-        include: {
-          student: {
-            select: {
-              id: true,
-              usn: true,
-              user: {
-                select: {
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      // Get students for this course, scoped to the faculty (PC section or PE batch roster)
+      const courseStudents = await this.getFacultyCourseStudents(
+        faculty.id,
+        assessment.courseId,
+        assessment.course.courseType,
+        assessment.semesterId,
+        sectionId,
+        db,
+        false
+      );
 
       // Get existing student assessments and marks
       const existingAssessments = await db.studentAssessment.findMany({
@@ -495,7 +667,7 @@ export class Mark {
         existingAssessments.map((a) => [a.studentId, a])
       );
 
-      const students = courseRegistrations.map((reg) => {
+      const students = courseStudents.map((reg) => {
         const studentAssess = assessmentMap.get(reg.student.id);
         const questionMarks: Record<string, number> = {};
         if (studentAssess?.questionMarks) {
@@ -565,7 +737,7 @@ export class Mark {
         where: { id: data.assessmentId },
         include: {
           questions: true,
-          course: { select: { approvalStatus: true } },
+          course: { select: { approvalStatus: true, courseType: true } },
         },
       });
 
@@ -575,17 +747,32 @@ export class Mark {
 
       assertFacultyCourseApproved(assessment.course.approvalStatus, true);
 
-      // Verify faculty is assigned to this course
-      const isAssigned = await prisma.courseAssignment.findFirst({
-        where: {
-          courseId: assessment.courseId,
-          facultyId: faculty.id,
-        },
-      });
+      const { PeCapacityService } = await import(
+        "@webcampus/api/src/services/shared/pe-capacity.service"
+      );
+      await PeCapacityService.assertPeDownstreamReady(assessment.courseId);
 
-      if (!isAssigned) {
-        throw new Error("Unauthorized to save marks for this assessment");
-      }
+      // Verify faculty is assigned to this course (PC section mapping or PE elective batch)
+      await this.assertFacultyCourseAccess(
+        faculty.id,
+        { id: assessment.courseId, courseType: assessment.course.courseType },
+        prisma,
+        "Unauthorized to save marks for this assessment"
+      );
+
+      // PE/OE faculty may only save marks for students in their own elective batches
+      const isBatchManaged = isBatchManagedCourse(assessment.course.courseType);
+      const allowedPeStudentIds = isBatchManaged
+        ? new Set(
+            (
+              await PeCapacityService.getFacultyPeRoster(
+                faculty.id,
+                assessment.courseId,
+                prisma
+              )
+            ).map((r) => r.studentId)
+          )
+        : null;
 
       // Check freeze state before allowing marks to be saved
       const freezeRecord = await prisma.courseAssignment.findFirst({
@@ -629,20 +816,29 @@ export class Mark {
 
       // Process each student's totals
       for (const [studentId, totalEntry] of totalsByStudent.entries()) {
-        // Verify student is registered for this course
-        const registration = await prisma.courseRegistration.findFirst({
-          where: {
-            studentId,
-            courseId: assessment.courseId,
-            semesterId: assessment.semesterId,
-          },
-        });
-
-        if (!registration) {
-          logger.warn(`Student ${studentId} not registered for course`, {
-            courseId: assessment.courseId,
+        // PE/OE faculty may only mark students within their elective batches
+        if (isBatchManaged) {
+          if (!allowedPeStudentIds?.has(studentId)) {
+            throw new Error(
+              `Student ${studentId} is not in any of your elective batches for this course`
+            );
+          }
+        } else {
+          // Verify student is registered for this course
+          const registration = await prisma.courseRegistration.findFirst({
+            where: {
+              studentId,
+              courseId: assessment.courseId,
+              semesterId: assessment.semesterId,
+            },
           });
-          continue;
+
+          if (!registration) {
+            logger.warn(`Student ${studentId} not registered for course`, {
+              courseId: assessment.courseId,
+            });
+            continue;
+          }
         }
 
         // Create or update StudentAssessment record
@@ -730,6 +926,7 @@ export class Mark {
             id: true,
             code: true,
             name: true,
+            courseType: true,
             approvalStatus: true,
             semester: {
               select: {
@@ -746,30 +943,17 @@ export class Mark {
 
     assertFacultyCourseApproved(assessment.course.approvalStatus);
 
-    const isAssigned = await db.courseAssignment.findFirst({
-      where: { courseId: assessment.courseId, facultyId: faculty.id },
-    });
-    if (!isAssigned) throw new Error("Unauthorized to view this assessment");
+    await this.assertFacultyCourseAccess(faculty.id, assessment.course, db);
 
-    const registrations = await db.courseRegistration.findMany({
-      where: {
-        courseId: assessment.courseId,
-        semesterId: assessment.semesterId,
-        ...(sectionId
-          ? { student: { studentSections: { some: { sectionId } } } }
-          : {}),
-      },
-      include: {
-        student: {
-          select: {
-            id: true,
-            usn: true,
-            user: { select: { name: true, email: true } },
-          },
-        },
-      },
-      orderBy: { student: { usn: "asc" } },
-    });
+    const roster = await this.getFacultyCourseStudents(
+      faculty.id,
+      assessment.courseId,
+      assessment.course.courseType,
+      assessment.semesterId,
+      sectionId,
+      db,
+      true
+    );
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Marks Entry");
@@ -794,7 +978,7 @@ export class Mark {
     ]);
     headerRow.font = { bold: true };
 
-    registrations.forEach((reg) => {
+    roster.forEach((reg) => {
       const rosterRow = worksheet.addRow([
         reg.student.usn,
         reg.student.user.name,
@@ -879,30 +1063,30 @@ export class Mark {
       where: { id: assessmentId },
       include: {
         questions: { orderBy: [{ part: "asc" }, { qNumber: "asc" }] },
-        course: { select: { id: true } },
+        course: { select: { id: true, courseType: true } },
       },
     });
     if (!assessment) throw new Error("Assessment not found");
 
-    const isAssigned = await db.courseAssignment.findFirst({
-      where: { courseId: assessment.courseId, facultyId: faculty.id },
-    });
-    if (!isAssigned) {
-      throw new Error("Unauthorized to upload marks for this assessment");
-    }
+    await this.assertFacultyCourseAccess(
+      faculty.id,
+      assessment.course,
+      db,
+      "Unauthorized to upload marks for this assessment"
+    );
 
-    const registrations = await db.courseRegistration.findMany({
-      where: {
-        courseId: assessment.courseId,
-        semesterId: assessment.semesterId,
-        ...(sectionId
-          ? { student: { studentSections: { some: { sectionId } } } }
-          : {}),
-      },
-      include: { student: { select: { id: true, usn: true } } },
-    });
+    const isBatchManaged = isBatchManagedCourse(assessment.course.courseType);
+    const roster = await this.getFacultyCourseStudents(
+      faculty.id,
+      assessment.courseId,
+      assessment.course.courseType,
+      assessment.semesterId,
+      sectionId,
+      db,
+      false
+    );
     const studentIdByUsn = new Map(
-      registrations.map((r) => [r.student.usn, r.student.id])
+      roster.map((r) => [r.student.usn, r.student.id])
     );
 
     const workbook = new ExcelJS.Workbook();
@@ -980,7 +1164,9 @@ export class Mark {
           row: rowNumber,
           usn,
           question: "-",
-          message: "Student not found in the selected section",
+          message: isBatchManaged
+            ? "Student not found in your elective batches"
+            : "Student not found in the selected section",
         });
         return;
       }
@@ -1120,31 +1306,49 @@ export class Mark {
         throw new Error("Faculty profile not found");
       }
 
-      const assignment = await db.courseAssignment.findFirst({
-        where: {
-          courseId,
-          facultyId: faculty.id,
-          course: { approvalStatus: FACULTY_COURSE_STATUS },
-        },
-        include: {
-          course: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              semesterId: true,
-              cieEligibility: true,
-              cieMaxMarks: true,
-              approvalStatus: true,
-              semester: {
-                include: {
-                  academicTerm: true,
-                },
+      const courseTypeRow = await db.course.findUnique({
+        where: { id: courseId },
+        select: { courseType: true },
+      });
+
+      const isBatchManaged = isBatchManagedCourse(courseTypeRow?.courseType);
+
+      const courseInclude = {
+        course: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            semesterId: true,
+            cieEligibility: true,
+            cieMaxMarks: true,
+            approvalStatus: true,
+            semester: {
+              include: {
+                academicTerm: true,
               },
             },
           },
         },
-      });
+      } as const;
+
+      const assignment = isBatchManaged
+        ? await db.electiveBatchFaculty.findFirst({
+            where: {
+              courseId,
+              facultyId: faculty.id,
+              course: { approvalStatus: FACULTY_COURSE_STATUS },
+            },
+            include: courseInclude,
+          })
+        : await db.courseAssignment.findFirst({
+            where: {
+              courseId,
+              facultyId: faculty.id,
+              course: { approvalStatus: FACULTY_COURSE_STATUS },
+            },
+            include: courseInclude,
+          });
 
       if (!assignment) {
         throw new Error("Unauthorized to view this course");
@@ -1169,32 +1373,15 @@ export class Mark {
         orderBy: { title: "asc" },
       });
 
-      const registrations = await db.courseRegistration.findMany({
-        where: {
-          courseId,
-          semesterId: course.semesterId,
-          ...(sectionId
-            ? {
-                student: {
-                  studentSections: {
-                    some: { sectionId },
-                  },
-                },
-              }
-            : {}),
-        },
-        include: {
-          student: {
-            select: {
-              id: true,
-              usn: true,
-              user: {
-                select: { name: true },
-              },
-            },
-          },
-        },
-      });
+      const registrations = await this.getFacultyCourseStudents(
+        faculty.id,
+        courseId,
+        isBatchManaged ? "PE" : null,
+        course.semesterId,
+        sectionId,
+        db,
+        false
+      );
 
       const studentIds = registrations.map((r) => r.student.id);
 
@@ -1377,7 +1564,34 @@ export class Mark {
         semesterId: a.course.semesterId,
       }));
 
-      const courseIds = [...new Set(courses.map((c) => c.id))];
+      const peAssignments = await db.electiveBatchFaculty.findMany({
+        where: {
+          facultyId: faculty.id,
+          course: { approvalStatus: FACULTY_COURSE_STATUS },
+        },
+        select: {
+          course: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              semesterId: true,
+            },
+          },
+        },
+      });
+
+      const peCourses = peAssignments.map((a) => ({
+        id: a.course.id,
+        code: a.course.code,
+        name: a.course.name,
+        sectionId: "",
+        sectionName: "",
+        semesterId: a.course.semesterId,
+      }));
+
+      const allCourses = [...courses, ...peCourses];
+      const courseIds = [...new Set(allCourses.map((c) => c.id))];
       const assessmentsRaw = await db.assessmentTemplate.findMany({
         where: { courseId: { in: courseIds } },
         select: { id: true, title: true, courseId: true },
@@ -1387,7 +1601,7 @@ export class Mark {
       return {
         status: "success",
         message: "Filter options retrieved successfully",
-        data: { courses, assessments: assessmentsRaw },
+        data: { courses: allCourses, assessments: assessmentsRaw },
       };
     } catch (error) {
       logger.error("Error fetching marks report filter options", error);

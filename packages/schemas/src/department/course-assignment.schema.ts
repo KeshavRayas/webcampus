@@ -82,16 +82,37 @@ export const CourseMappingSectionSchema = z.object({
     .default([]),
 });
 
-export const UpsertCourseMappingSchema = z.object({
-  courseId: z.uuid("Invalid course ID"),
-  semesterId: z.uuid("Invalid semester ID"),
-  academicYear: z.string().min(1, "Academic year is required"),
-  studentsPerLabBatch: z.number().int().min(1).optional(),
-  sectionMappings: z
-    .array(CourseMappingSectionSchema)
-    .min(1, "At least one section mapping is required"),
-  isSuperEdit: z.boolean().optional(),
-});
+export const UpsertCourseMappingSchema = z
+  .object({
+    courseId: z.uuid("Invalid course ID"),
+    semesterId: z.uuid("Invalid semester ID"),
+    academicYear: z.string().min(1, "Academic year is required"),
+    studentsPerLabBatch: z.number().int().min(1).optional(),
+    sectionMappings: z
+      .array(CourseMappingSectionSchema)
+      .min(1, "At least one section mapping is required")
+      .optional(),
+    electiveBatchMappings: z
+      .array(
+        z.object({
+          electiveBatchId: z.uuid("Invalid elective batch ID"),
+          facultyId: z.uuid("Invalid faculty ID").nullable(),
+        })
+      )
+      .optional(),
+    isSuperEdit: z.boolean().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const hasSections = (value.sectionMappings?.length ?? 0) > 0;
+    const hasElective = (value.electiveBatchMappings?.length ?? 0) > 0;
+    if (!hasSections && !hasElective) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sectionMappings"],
+        message: "At least one section or elective batch mapping is required",
+      });
+    }
+  });
 
 export const CourseMappingStatusItemSchema = z.object({
   courseId: z.uuid(),
@@ -119,13 +140,15 @@ export const CourseMappingStatusResponseSchema = z.object({
 
 export const CourseMappingByCourseItemSchema = z.object({
   id: z.uuid(),
-  sectionId: z.uuid(),
+  sectionId: z.uuid().nullable().optional(),
   facultyId: z.uuid(),
   assignmentType: assignmentTypeEnum,
   batchId: z.uuid().nullable(),
   batchName: z.string().nullable(),
   facultyName: z.string().nullable(),
   sectionName: z.string().nullable(),
+  electiveBatchId: z.uuid().nullable().optional(),
+  electiveBatchName: z.string().nullable().optional(),
 });
 
 export const DownloadMappingTemplateQuerySchema = z.object({

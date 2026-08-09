@@ -66,8 +66,14 @@ mock.module("@webcampus/db", () => ({
     },
   },
   PrismaClient: class PrismaClient {},
-  CourseApprovalStatus: {},
+  CourseApprovalStatus: {
+    APPROVED: "APPROVED",
+    PENDING: "PENDING",
+    DRAFT: "DRAFT",
+    NEEDS_REVISION: "NEEDS_REVISION",
+  },
   Cycle: {},
+  Designation: {},
 }));
 
 mock.module("@webcampus/common/logger", () => ({

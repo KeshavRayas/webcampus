@@ -35,6 +35,10 @@ export class RegistrationWindowController {
       return 400;
     }
 
+    if (error.message.includes("Cannot reopen registration")) {
+      return 409;
+    }
+
     return 500;
   }
 

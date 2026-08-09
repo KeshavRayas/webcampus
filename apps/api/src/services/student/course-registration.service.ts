@@ -1,3 +1,14 @@
+import { isBatchManagedCourse } from "@webcampus/api/src/services/shared/course-kind";
+import {
+  isPeFull,
+  peCourseCapacity,
+  seatsLeft,
+} from "@webcampus/api/src/services/shared/pe-capacity.service";
+import {
+  registrationStrategies,
+  strategyFor,
+  StudentRegistrationContext,
+} from "@webcampus/api/src/services/student/registration-strategies";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
@@ -161,7 +172,14 @@ export class CourseRegistration {
       where: {
         semesterId: student.semesterId,
         approvalStatus: "APPROVED",
-        ...(scope.departmentId ? { departmentId: scope.departmentId } : {}),
+        // A department-scoped student may register for courses owned by their own
+        // department (PC/PE) AND Open Electives owned by ANY department (visibility
+        // is governed by the OE eligibility contract, applied in JS after fetch).
+        ...(scope.departmentId
+          ? {
+              OR: [{ departmentId: scope.departmentId }, { courseType: "OE" }],
+            }
+          : {}),
         ...(scope.cycle ? { cycle: scope.cycle } : {}),
       },
       select: {
@@ -174,18 +192,90 @@ export class CourseRegistration {
         practicalCredits: true,
         skillCredits: true,
         totalCredits: true,
+        numberOfBatches: true,
+        studentsPerBatch: true,
+        departmentName: true,
+        openElectiveEligibility: true,
+        openElectiveDepartments: {
+          select: { department: { select: { name: true } } },
+        },
+        electiveBatches: {
+          orderBy: { sortOrder: "asc" },
+          select: {
+            id: true,
+            name: true,
+            facultyAssignment: {
+              select: {
+                faculty: {
+                  select: { shortName: true, user: { select: { name: true } } },
+                },
+              },
+            },
+            _count: { select: { studentAssignments: true } },
+          },
+        },
+        _count: {
+          select: { registrations: true },
+        },
       },
       orderBy: { code: "asc" },
     });
 
-    return courses.map((course) => ({
-      id: course.id,
-      code: course.code,
-      name: course.name,
-      courseType: course.courseType,
-      ltp: `${course.lectureCredits}-${course.tutorialCredits}-${course.practicalCredits}-${course.skillCredits}`,
-      totalCredits: course.totalCredits,
-    }));
+    const visibleCourses = courses.filter(
+      (course) =>
+        strategyFor(course.courseType).visibleCourses(
+          [course],
+          student.departmentName
+        ).length === 1
+    );
+
+    return visibleCourses.map((course) => {
+      const base = {
+        id: course.id,
+        code: course.code,
+        name: course.name,
+        courseType: course.courseType,
+        ltp: `${course.lectureCredits}-${course.tutorialCredits}-${course.practicalCredits}-${course.skillCredits}`,
+        totalCredits: course.totalCredits,
+      };
+      if (course.courseType === "PE") {
+        const capacity = peCourseCapacity(
+          course.numberOfBatches,
+          course.studentsPerBatch
+        );
+        const registeredCount = course._count.registrations;
+        return {
+          ...base,
+          capacity,
+          registeredCount,
+          seatsLeft: seatsLeft(capacity, registeredCount),
+          isFull: isPeFull(capacity, registeredCount),
+        };
+      }
+      if (course.courseType === "OE") {
+        const perBatch = course.studentsPerBatch ?? 0;
+        return {
+          ...base,
+          batches: course.electiveBatches.map((batch) => {
+            const registeredCount = batch._count.studentAssignments;
+            const capacity = perBatch;
+            return {
+              batchId: batch.id,
+              name: batch.name,
+              facultyName:
+                batch.facultyAssignment?.faculty.user?.name ??
+                batch.facultyAssignment?.faculty.shortName ??
+                null,
+              capacity,
+              registeredCount,
+              seatsLeft: Math.max(0, capacity - registeredCount),
+              isFull: registeredCount >= capacity,
+            };
+          }),
+        };
+      }
+      return base;
+    });
   }
 
   static async getRegistrationDashboard(
@@ -374,39 +464,31 @@ export class CourseRegistration {
         }
       }
 
-      const requiredCoreIds = availableCourses
-        .filter(
-          (course) => course.courseType === "PC" || course.courseType === "NCMC"
-        )
-        .map((course) => course.id);
-      const selectedPeCount = uniqueCourseIds.filter(
-        (courseId) => availableById.get(courseId)?.courseType === "PE"
-      ).length;
-      const selectedOeCount = uniqueCourseIds.filter(
-        (courseId) => availableById.get(courseId)?.courseType === "OE"
-      ).length;
-
-      if (
-        requiredCoreIds.some((courseId) => !uniqueCourseIds.includes(courseId))
-      ) {
-        throw new Error("All mandatory core courses must be included");
+      for (const strategy of registrationStrategies) {
+        strategy.validateSelection(availableCourses, uniqueCourseIds, request);
       }
 
-      if (
-        availableCourses.some((course) => course.courseType === "PE") &&
-        selectedPeCount !== 1
-      ) {
-        throw new Error("Please select exactly one Professional Elective (PE)");
-      }
-
-      if (
-        availableCourses.some((course) => course.courseType === "OE") &&
-        selectedOeCount !== 1
-      ) {
-        throw new Error("Please select exactly one Open Elective (OE)");
-      }
+      const registrationContext: StudentRegistrationContext = {
+        studentId: student.id,
+        departmentName: student.departmentName,
+        semesterId: student.semesterId,
+        academicTermId: student.academicTermId,
+      };
 
       await db.$transaction(async (tx) => {
+        for (const strategy of registrationStrategies) {
+          const strategyCourseIds = uniqueCourseIds.filter((courseId) =>
+            strategy.matches(availableById.get(courseId)?.courseType)
+          );
+          if (strategyCourseIds.length === 0) continue;
+          await strategy.registerInTx(
+            registrationContext,
+            tx,
+            strategyCourseIds.map((courseId) => availableById.get(courseId)!),
+            request
+          );
+        }
+
         await tx.courseRegistration.createMany({
           data: uniqueCourseIds.map((courseId) => ({
             studentId: student.id,
@@ -415,6 +497,19 @@ export class CourseRegistration {
             academicTermId: student.academicTermId,
           })),
         });
+
+        // A new batch-managed (PE/OE) registrant is unassigned until mapping is
+        // saved, which flips elective-mapping completeness. Bump
+        // electiveMappingVersion so mapping clients holding a stale version
+        // notice the change.
+        for (const courseId of uniqueCourseIds) {
+          const course = availableById.get(courseId);
+          if (!course || !isBatchManagedCourse(course.courseType)) continue;
+          await tx.course.update({
+            where: { id: courseId },
+            data: { electiveMappingVersion: { increment: 1 } },
+          });
+        }
       });
 
       return {

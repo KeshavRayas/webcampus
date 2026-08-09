@@ -42,7 +42,8 @@ const getStatusCodeForError = (message: string): number => {
 export class MarkController {
   static async create(req: Request, res: Response): Promise<void> {
     try {
-      const response = await Mark.create(req.body);
+      const user = await resolveSessionUser(req);
+      const response = await Mark.create(req.body, user.id);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -150,7 +151,8 @@ export class MarkController {
     res: Response
   ): Promise<void> {
     try {
-      const response = await Mark.update(req.params.id, req.body);
+      const user = await resolveSessionUser(req);
+      const response = await Mark.update(req.params.id, req.body, user.id);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -193,7 +195,8 @@ export class MarkController {
     res: Response
   ): Promise<void> {
     try {
-      const response = await Mark.delete(req.params.id);
+      const user = await resolveSessionUser(req);
+      const response = await Mark.delete(req.params.id, user.id);
       if (response.status === "success") {
         sendResponse({
           res,

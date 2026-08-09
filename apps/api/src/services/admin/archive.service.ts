@@ -16,7 +16,6 @@ export class ArchiveService {
   private static isSemesterArchived(startDate: Date, endDate: Date): boolean {
     const end = dayjs(endDate).endOf("day");
     const today = dayjs();
-    console.log(startDate);
     return today.isAfter(end);
   }
 
@@ -113,6 +112,43 @@ export class ArchiveService {
         },
       });
 
+      // Program Elective (PE) data: elective batches, batch faculty, and
+      // student assignments for every course in this semester. Denormalized
+      // names are captured so the snapshots survive later user/faculty deletion.
+      const electiveBatches = await db.electiveBatch.findMany({
+        where: { course: { semesterId } },
+        include: {
+          course: {
+            select: { id: true, code: true, name: true, departmentId: true },
+          },
+        },
+      });
+
+      const electiveBatchFaculties = await db.electiveBatchFaculty.findMany({
+        where: { course: { semesterId } },
+        include: {
+          course: {
+            select: { id: true, code: true, name: true, departmentId: true },
+          },
+          faculty: { select: { id: true, shortName: true } },
+          electiveBatch: { select: { id: true, name: true } },
+        },
+      });
+
+      const electiveStudentAssignments =
+        await db.electiveStudentAssignment.findMany({
+          where: { course: { semesterId } },
+          include: {
+            course: {
+              select: { id: true, code: true, name: true, departmentId: true },
+            },
+            student: {
+              select: { id: true, usn: true, user: { select: { name: true } } },
+            },
+            electiveBatch: { select: { id: true, name: true } },
+          },
+        });
+
       // 5. Execute archival within a single transaction
       const result = await db.$transaction(async (tx) => {
         // Archive the semester
@@ -143,6 +179,93 @@ export class ArchiveService {
                 type: dept.type,
                 semesterId: semester.id,
                 snapshot: JSON.parse(JSON.stringify(dept)),
+                archivedBy: archivedByUserId,
+              },
+            })
+          )
+        );
+
+        // Map live department id -> archived department id (elective rows link
+        // to the archived department that owned the course)
+        const archivedDepartmentIdByOriginalId = new Map<string, string>();
+        for (let index = 0; index < departments.length; index++) {
+          const archived = archivedDepartments[index];
+          const dept = departments[index];
+          if (archived && dept) {
+            archivedDepartmentIdByOriginalId.set(dept.id, archived.id);
+          }
+        }
+
+        // Archive elective batches
+        const archivedElectiveBatches = await Promise.all(
+          electiveBatches.map((batch) =>
+            tx.archivedElectiveBatch.create({
+              data: {
+                originalId: batch.id,
+                courseId: batch.courseId,
+                courseCode: batch.course.code,
+                courseName: batch.course.name,
+                name: batch.name,
+                sortOrder: batch.sortOrder,
+                semesterId: semester.id,
+                archivedDepartmentId:
+                  archivedDepartmentIdByOriginalId.get(
+                    batch.course.departmentId
+                  ) ?? null,
+                createdAt: batch.createdAt,
+                updatedAt: batch.updatedAt,
+                snapshot: JSON.parse(JSON.stringify(batch)),
+                archivedBy: archivedByUserId,
+              },
+            })
+          )
+        );
+
+        // Archive elective batch faculty
+        const archivedElectiveBatchFaculties = await Promise.all(
+          electiveBatchFaculties.map((fac) =>
+            tx.archivedElectiveBatchFaculty.create({
+              data: {
+                originalId: fac.id,
+                courseId: fac.courseId,
+                courseCode: fac.course.code,
+                courseName: fac.course.name,
+                batchName: fac.electiveBatch.name,
+                facultyId: fac.facultyId,
+                facultyName: fac.faculty.shortName,
+                semester: fac.semester,
+                academicYear: fac.academicYear,
+                semesterId: semester.id,
+                archivedDepartmentId:
+                  archivedDepartmentIdByOriginalId.get(
+                    fac.course.departmentId
+                  ) ?? null,
+                snapshot: JSON.parse(JSON.stringify(fac)),
+                archivedBy: archivedByUserId,
+              },
+            })
+          )
+        );
+
+        // Archive elective student assignments
+        const archivedElectiveAssignments = await Promise.all(
+          electiveStudentAssignments.map((assignment) =>
+            tx.archivedElectiveAssignment.create({
+              data: {
+                originalId: assignment.id,
+                courseId: assignment.courseId,
+                courseCode: assignment.course.code,
+                courseName: assignment.course.name,
+                batchName: assignment.electiveBatch.name,
+                studentId: assignment.studentId,
+                usn: assignment.student.usn,
+                studentName: assignment.student.user.name,
+                semesterId: semester.id,
+                archivedDepartmentId:
+                  archivedDepartmentIdByOriginalId.get(
+                    assignment.course.departmentId
+                  ) ?? null,
+                snapshot: JSON.parse(JSON.stringify(assignment)),
                 archivedBy: archivedByUserId,
               },
             })
@@ -188,12 +311,15 @@ export class ArchiveService {
           departmentCount: archivedDepartments.length,
           facultyCount: archivedFaculty.length,
           adminCount: archivedAdmins.length,
+          electiveBatchCount: archivedElectiveBatches.length,
+          electiveBatchFacultyCount: archivedElectiveBatchFaculties.length,
+          electiveAssignmentCount: archivedElectiveAssignments.length,
         };
       });
 
       const response: BaseResponse<ArchiveResultType> = {
         status: "success",
-        message: `Semester archived successfully. Archived ${result.departmentCount} departments, ${result.facultyCount} faculty, ${result.adminCount} admins.`,
+        message: `Semester archived successfully. Archived ${result.departmentCount} departments, ${result.facultyCount} faculty, ${result.adminCount} admins, ${result.electiveBatchCount} elective batches, ${result.electiveBatchFacultyCount} elective batch faculties, ${result.electiveAssignmentCount} elective student assignments.`,
         data: {
           semester: {
             id: result.archivedSemester.id,
@@ -205,6 +331,9 @@ export class ArchiveService {
             departments: result.departmentCount,
             faculty: result.facultyCount,
             admins: result.adminCount,
+            electiveBatches: result.electiveBatchCount,
+            electiveBatchFaculties: result.electiveBatchFacultyCount,
+            electiveAssignments: result.electiveAssignmentCount,
           },
           archivedAt: result.archivedSemester.archivedAt,
         },
@@ -267,7 +396,14 @@ export class ArchiveService {
         return response;
       }
 
-      const [departmentCount, facultyCount, adminCount] = await Promise.all([
+      const [
+        departmentCount,
+        facultyCount,
+        adminCount,
+        electiveBatchCount,
+        electiveBatchFacultyCount,
+        electiveAssignmentCount,
+      ] = await Promise.all([
         db.archivedDepartment.count({
           where: { semesterId },
         }),
@@ -275,6 +411,15 @@ export class ArchiveService {
           where: { semesterId },
         }),
         db.archivedAdmin.count({
+          where: { semesterId },
+        }),
+        db.archivedElectiveBatch.count({
+          where: { semesterId },
+        }),
+        db.archivedElectiveBatchFaculty.count({
+          where: { semesterId },
+        }),
+        db.archivedElectiveAssignment.count({
           where: { semesterId },
         }),
       ]);
@@ -294,6 +439,9 @@ export class ArchiveService {
             departments: departmentCount,
             faculty: facultyCount,
             admins: adminCount,
+            electiveBatches: electiveBatchCount,
+            electiveBatchFaculties: electiveBatchFacultyCount,
+            electiveAssignments: electiveAssignmentCount,
           },
         },
       };
@@ -323,19 +471,33 @@ export class ArchiveService {
 
       const summaries: ArchiveSummaryType[] = await Promise.all(
         archivedSemesters.map(async (archived) => {
-          const [departmentCount, facultyCount, adminCount] = await Promise.all(
-            [
-              db.archivedDepartment.count({
-                where: { semesterId: archived.originalId },
-              }),
-              db.archivedFaculty.count({
-                where: { semesterId: archived.originalId },
-              }),
-              db.archivedAdmin.count({
-                where: { semesterId: archived.originalId },
-              }),
-            ]
-          );
+          const [
+            departmentCount,
+            facultyCount,
+            adminCount,
+            electiveBatchCount,
+            electiveBatchFacultyCount,
+            electiveAssignmentCount,
+          ] = await Promise.all([
+            db.archivedDepartment.count({
+              where: { semesterId: archived.originalId },
+            }),
+            db.archivedFaculty.count({
+              where: { semesterId: archived.originalId },
+            }),
+            db.archivedAdmin.count({
+              where: { semesterId: archived.originalId },
+            }),
+            db.archivedElectiveBatch.count({
+              where: { semesterId: archived.originalId },
+            }),
+            db.archivedElectiveBatchFaculty.count({
+              where: { semesterId: archived.originalId },
+            }),
+            db.archivedElectiveAssignment.count({
+              where: { semesterId: archived.originalId },
+            }),
+          ]);
 
           return {
             semesterId: archived.originalId,
@@ -349,6 +511,9 @@ export class ArchiveService {
               departments: departmentCount,
               faculty: facultyCount,
               admins: adminCount,
+              electiveBatches: electiveBatchCount,
+              electiveBatchFaculties: electiveBatchFacultyCount,
+              electiveAssignments: electiveAssignmentCount,
             },
           };
         })

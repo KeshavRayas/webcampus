@@ -147,6 +147,7 @@ model Department {
   sections            Section[]
   students            Student[]
   registrationWindows RegistrationWindow[]
+  openElectiveCourses OpenElectiveDepartment[]
 
   @@index([name])
 }
@@ -210,6 +211,7 @@ model Section {
   @@index([departmentId, semesterId, cycle])
 }
 
+
 /// *
 ///  * TODO Change the Name of this model to support L-T-P
 model Batch {
@@ -265,11 +267,13 @@ model Student {
   marks             Mark[]
   department        Department           @relation(fields: [departmentName], references: [name])
   user              User                 @relation(fields: [userId], references: [id])
-  studentSections   StudentSection[]
-  batches           Batch[]              @relation("BatchStudents")
-  hallTickets       HallTicket[]
-  finances          Finance[]
   feedbackResponses FeedbackResponse[]
+  studentSections            StudentSection[]
+  batches                    Batch[]                     @relation("BatchStudents")
+  hallTickets                HallTicket[]
+  finances                   Finance[]
+  electiveStudentAssignments ElectiveStudentAssignment[]
+
   @@index([departmentName])
   @@index([departmentName, currentSemester])
   @@index([semesterId])
@@ -316,6 +320,7 @@ model Faculty {
   ClassSession           ClassSession[]
   teaches                CourseAssignment[]
   coordinatedCourses     CourseCoordinator[]
+  electiveBatchFaculties ElectiveBatchFaculty[]
   department             Department             @relation(fields: [departmentId], references: [id])
   user                   User                   @relation(fields: [userId], references: [id])
   experiences            FacultyExperience[]
@@ -431,6 +436,14 @@ model Course {
   allowFeedback      Boolean @default(false)
   attendanceRequired Boolean @default(true)
 
+  // ─── PROGRAM ELECTIVE (PE) CONFIG ───
+  numberOfBatches         Int?
+  studentsPerBatch        Int?
+  electiveMappingVersion  Int  @default(1)
+
+  // ─── OPEN ELECTIVE (OE) CONFIG ───
+  openElectiveEligibility OpenElectiveEligibility @default(ALL)
+
   // ─── APPROVAL & TRACKING FIELDS ───
   approvalStatus          CourseApprovalStatus @default(DRAFT)
   approvedByRole          String?
@@ -447,17 +460,21 @@ model Course {
   hasPostApprovalEdits    Boolean              @default(false)
 
   // ─── RELATIONS ───
-  department         Department              @relation(fields: [departmentId], references: [id])
-  semester           Semester                @relation(fields: [semesterId], references: [id])
-  attendances        Attendance[]
-  ClassSession       ClassSession[]
-  coordinators       CourseCoordinator[]
-  assessments        AssessmentTemplate[]
-  assignments        CourseAssignment[]
-  registrations      CourseRegistration[]
-  marks              Mark[]
-  studentAssessments StudentAssessment[]
-  mappingAuditLogs   CourseMappingAuditLog[]
+  department               Department                   @relation(fields: [departmentId], references: [id])
+  semester                 Semester                     @relation(fields: [semesterId], references: [id])
+  attendances              Attendance[]
+  ClassSession             ClassSession[]
+  coordinators             CourseCoordinator[]
+  assessments              AssessmentTemplate[]
+  assignments              CourseAssignment[]
+  registrations            CourseRegistration[]
+  marks                    Mark[]
+  studentAssessments       StudentAssessment[]
+  mappingAuditLogs         CourseMappingAuditLog[]
+  electiveBatches          ElectiveBatch[]
+  electiveBatchFaculties   ElectiveBatchFaculty[]
+  electiveStudentAssignments ElectiveStudentAssignment[]
+  openElectiveDepartments  OpenElectiveDepartment[]
   feedbackResponses  FeedbackResponse[]
 
   // ─── INDEXES ───
@@ -641,7 +658,8 @@ model Attendance {
   id                String            @id @default(uuid())
   studentId         String
   courseId          String
-  batchId           String? // <-- NEW: Added to track lab vs theory
+  batchId           String? // lab batch (section-scoped)
+  electiveBatchId   String? // PE elective batch
   total             Int
   present           Int
   absent            Int
@@ -649,12 +667,13 @@ model Attendance {
   percentage        Float
   course            Course            @relation(fields: [courseId], references: [id])
   student           Student           @relation(fields: [studentId], references: [id])
-  batch             Batch?            @relation(fields: [batchId], references: [id]) // <-- NEW: Relation to Batch
+  batch             Batch?            @relation(fields: [batchId], references: [id])
+  electiveBatch     ElectiveBatch?    @relation(fields: [electiveBatchId], references: [id])
 
-  // Updated unique constraint to allow separate aggregates for theory and lab
-  @@unique([studentId, courseId, batchId])
+  @@unique([studentId, courseId, batchId, electiveBatchId])
   @@index([courseId])
   @@index([batchId])
+  @@index([electiveBatchId])
 }
 
 model Mark {
@@ -852,27 +871,31 @@ model Admission {
 }
 
 model AttendanceRecord {
-  id           String           @id
-  sessionId    String
-  studentId    String
-  batchId      String? // <-- NEW: Added to link individual records to a batch
-  status       AttendanceStatus
-  markedAt     DateTime         @default(now())
-  ClassSession ClassSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  Student      Student          @relation(fields: [studentId], references: [id])
-  Batch        Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull) // <-- NEW: Relation
+  id              String           @id
+  sessionId       String
+  studentId       String
+  batchId         String? // lab batch (section-scoped)
+  electiveBatchId String? // PE elective batch
+  status          AttendanceStatus
+  markedAt        DateTime         @default(now())
+  ClassSession    ClassSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  Student         Student          @relation(fields: [studentId], references: [id])
+  Batch           Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  electiveBatch   ElectiveBatch?   @relation(fields: [electiveBatchId], references: [id], onDelete: SetNull)
 
   @@unique([sessionId, studentId])
   @@index([studentId])
   @@index([batchId])
+  @@index([electiveBatchId])
 }
 
 model ClassSession {
   id               String             @id
   courseId         String
-  sectionId        String
+  sectionId        String? // null for PE (section-less)
   facultyId        String
-  batchId          String?
+  batchId          String? // lab batch
+  electiveBatchId  String? // PE elective batch
   sessionDate      DateTime
   createdAt        DateTime           @default(now())
   timingCode       String
@@ -881,14 +904,71 @@ model ClassSession {
   timingEndTime    String
   AttendanceRecord AttendanceRecord[]
   Batch            Batch?             @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  electiveBatch    ElectiveBatch?     @relation(fields: [electiveBatchId], references: [id], onDelete: SetNull)
   Course           Course             @relation(fields: [courseId], references: [id])
   Faculty          Faculty            @relation(fields: [facultyId], references: [id])
-  Section          Section            @relation(fields: [sectionId], references: [id])
+  Section          Section?           @relation(fields: [sectionId], references: [id])
 
-  @@unique([courseId, sectionId, sessionDate, timingCode, batchId])
+  @@unique([courseId, sectionId, sessionDate, timingCode, batchId, electiveBatchId])
   @@index([courseId])
   @@index([sectionId])
   @@index([batchId])
+  @@index([electiveBatchId])
+}
+
+// ─── PROGRAM ELECTIVE BATCHES (course-scoped, not section-scoped) ───
+
+model ElectiveBatch {
+  id                 String                      @id @default(uuid())
+  courseId           String
+  name               String
+  sortOrder          Int
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  course             Course                      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  facultyAssignment  ElectiveBatchFaculty?
+  studentAssignments ElectiveStudentAssignment[]
+  attendances        Attendance[]
+  attendanceRecords  AttendanceRecord[]
+  classSessions      ClassSession[]
+
+  @@unique([courseId, name])
+  @@unique([courseId, sortOrder])
+  @@index([courseId])
+}
+
+model ElectiveBatchFaculty {
+  id              String        @id @default(uuid())
+  courseId        String
+  electiveBatchId String        @unique
+  facultyId       String
+  semester        Int
+  academicYear    String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  course          Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  electiveBatch   ElectiveBatch @relation(fields: [electiveBatchId], references: [id], onDelete: Cascade)
+  faculty         Faculty       @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, electiveBatchId])
+  @@index([facultyId])
+  @@index([courseId, semester, academicYear])
+}
+
+model ElectiveStudentAssignment {
+  id              String        @id @default(uuid())
+  courseId        String
+  studentId       String
+  electiveBatchId String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  course          Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student         Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  electiveBatch   ElectiveBatch @relation(fields: [electiveBatchId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@index([electiveBatchId])
+  @@index([courseId])
 }
 
 model CourseCoordinator {
@@ -900,6 +980,23 @@ model CourseCoordinator {
   faculty Faculty @relation(fields: [facultyId], references: [id], onDelete: Cascade)
 
   @@unique([courseId, facultyId])
+  @@index([courseId])
+}
+
+// ─── OPEN ELECTIVE VISIBILITY (normalized; CUSTOM mode only) ───
+
+model OpenElectiveDepartment {
+  id           String     @id @default(uuid())
+  courseId     String
+  departmentId String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, departmentId])
+  @@index([departmentId])
   @@index([courseId])
 }
 
@@ -1090,6 +1187,12 @@ enum CourseApprovalStatus {
   NEEDS_REVISION
 }
 
+enum OpenElectiveEligibility {
+  ALL
+  ALL_EXCEPT_OWNER
+  CUSTOM
+}
+
 enum FreezeActorRole {
   FACULTY
   HOD
@@ -1260,6 +1363,81 @@ model ArchivedAdmin {
   @@unique([originalId, semesterId, archivedAt])
   @@index([originalId])
   @@index([semesterId])
+  @@index([archivedAt])
+}
+
+model ArchivedElectiveBatch {
+  id                   String   @id @default(uuid())
+  originalId           String
+  courseId             String
+  courseCode           String
+  courseName           String
+  name                 String
+  sortOrder            Int
+  semesterId           String
+  archivedDepartmentId String?
+  createdAt            DateTime
+  updatedAt            DateTime
+  snapshot             Json
+  archivedAt           DateTime @default(now())
+  archivedBy           String
+
+  @@unique([originalId, semesterId, archivedAt])
+  @@index([originalId])
+  @@index([semesterId])
+  @@index([courseId])
+  @@index([archivedDepartmentId])
+  @@index([archivedAt])
+}
+
+model ArchivedElectiveBatchFaculty {
+  id                   String   @id @default(uuid())
+  originalId           String
+  courseId             String
+  courseCode           String
+  courseName           String
+  batchName            String
+  facultyId            String
+  facultyName          String
+  semester             Int
+  academicYear         String
+  semesterId           String
+  archivedDepartmentId String?
+  snapshot             Json
+  archivedAt           DateTime @default(now())
+  archivedBy           String
+
+  @@unique([originalId, semesterId, archivedAt])
+  @@index([originalId])
+  @@index([semesterId])
+  @@index([courseId])
+  @@index([facultyId])
+  @@index([archivedDepartmentId])
+  @@index([archivedAt])
+}
+
+model ArchivedElectiveAssignment {
+  id                   String   @id @default(uuid())
+  originalId           String
+  courseId             String
+  courseCode           String
+  courseName           String
+  batchName            String
+  studentId            String
+  usn                  String
+  studentName          String
+  semesterId           String
+  archivedDepartmentId String?
+  snapshot             Json
+  archivedAt           DateTime @default(now())
+  archivedBy           String
+
+  @@unique([originalId, semesterId, archivedAt])
+  @@index([originalId])
+  @@index([semesterId])
+  @@index([courseId])
+  @@index([studentId])
+  @@index([archivedDepartmentId])
   @@index([archivedAt])
 }
 

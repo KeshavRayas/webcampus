@@ -79,6 +79,45 @@ type HallTicketWithAcademics = StudentEligibility & {
 };
 
 export const hallTicketService = {
+  async getStudentPeCourseIds(
+    studentId: string,
+    academicTermId: string
+  ): Promise<string[]> {
+    const regs = await db.courseRegistration.findMany({
+      where: { studentId, academicTermId, course: { courseType: "PE" } },
+      select: { courseId: true },
+    });
+    return regs.map((r) => r.courseId);
+  },
+
+  async assertStudentPeReady(
+    studentId: string,
+    academicTermId: string
+  ): Promise<void> {
+    const { PeCapacityService } = await import(
+      "@webcampus/api/src/services/shared/pe-capacity.service"
+    );
+    const peCourseIds = await this.getStudentPeCourseIds(
+      studentId,
+      academicTermId
+    );
+    for (const courseId of peCourseIds) {
+      await PeCapacityService.assertPeDownstreamReady(courseId);
+    }
+  },
+
+  async isStudentPeReady(
+    studentId: string,
+    academicTermId: string
+  ): Promise<boolean> {
+    try {
+      await this.assertStudentPeReady(studentId, academicTermId);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   async list(
     filters: {
       departmentId?: string;
@@ -103,6 +142,16 @@ export const hallTicketService = {
     const frozenStudents = eligibleStudents.filter((s) => s.allCoursesFrozen);
     if (frozenStudents.length === 0) return [];
 
+    const peReady = await Promise.all(
+      frozenStudents.map(async (s) =>
+        (await this.isStudentPeReady(s.studentId, academicTermId)) ? s : null
+      )
+    );
+    const readyFrozenStudents = peReady.filter(
+      (s): s is (typeof frozenStudents)[number] => s !== null
+    );
+    if (readyFrozenStudents.length === 0) return [];
+
     const term = await db.academicTerm.findUnique({
       where: { id: academicTermId },
       select: { year: true, type: true },
@@ -111,7 +160,7 @@ export const hallTicketService = {
       ? `${term.type.toUpperCase()} ${term.year}`
       : "N/A";
 
-    const studentIds = frozenStudents.map((s) => s.studentId);
+    const studentIds = readyFrozenStudents.map((s) => s.studentId);
     const sendRecords = await db.hallTicket.findMany({
       where: {
         studentId: { in: studentIds },
@@ -128,7 +177,7 @@ export const hallTicketService = {
 
     const sendMap = new Map(sendRecords.map((r) => [r.studentId, r]));
 
-    return frozenStudents.map((student) => ({
+    return readyFrozenStudents.map((student) => ({
       ...student,
       academicTermLabel,
       isSent: sendMap.get(student.studentId)?.isSent ?? false,
@@ -186,6 +235,13 @@ export const hallTicketService = {
 
     for (const studentId of studentIds) {
       try {
+        if (!(await this.isStudentPeReady(studentId, academicTermId))) {
+          errors.push({
+            studentId,
+            error: "PE course mapping is not complete",
+          });
+          continue;
+        }
         const eligibility = await academicEligibility.getCourseEligibility(
           studentId,
           academicTermId
@@ -258,6 +314,13 @@ export const hallTicketService = {
       return null;
     }
 
+    if (!(await this.isStudentPeReady(studentId, academicTermId))) {
+      logger.warn(
+        `[HallTicket] getData: PE mapping not complete for student=${studentId} term=${academicTermId}`
+      );
+      return null;
+    }
+
     const sendRecord = semesterId
       ? await db.hallTicket.findUnique({
           where: {
@@ -324,6 +387,21 @@ export const hallTicketService = {
     studentId: string,
     academicTermId: string
   ): Promise<string> {
+    const peRegs = await db.courseRegistration.findMany({
+      where: {
+        studentId,
+        academicTermId,
+        course: { courseType: "PE" },
+      },
+      select: { courseId: true },
+    });
+    const { PeCapacityService } = await import(
+      "@webcampus/api/src/services/shared/pe-capacity.service"
+    );
+    for (const reg of peRegs) {
+      await PeCapacityService.assertPeDownstreamReady(reg.courseId);
+    }
+
     const data = await this.getData(studentId, academicTermId);
     if (!data) {
       logger.error(

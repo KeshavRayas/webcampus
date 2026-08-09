@@ -60,7 +60,9 @@ export const useCreateAdminFacultyForm = (departmentId: string) => {
     mutationFn: async (values: FormType) => {
       const formData = new FormData();
       Object.entries(values).forEach(([key, value]) => {
-        formData.append(key, String(value));
+        if (value !== undefined && value !== null) {
+          formData.append(key, String(value));
+        }
       });
 
       if (imageFile) {

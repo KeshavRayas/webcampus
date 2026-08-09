@@ -63,7 +63,7 @@ export const AdminSemesterCourseBlock = ({
           onSubmit={onSubmit}
           contentClassName="sm:max-w-4xl max-h-[90vh] overflow-y-auto"
         >
-          <CourseFormFields form={form} />
+          <CourseFormFields form={form} apiPath="admin" />
         </DialogForm>
       </div>
       <DataTable

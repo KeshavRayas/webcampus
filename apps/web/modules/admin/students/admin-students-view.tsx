@@ -64,14 +64,18 @@ export const AdminStudentsView = () => {
     getFiltersFromSearchParams(searchParams, EMPTY_FILTERS)
   );
 
-  const debouncedSearch = useDebounce(
-    {
+  const searchInput = useMemo(
+    () => ({
       usn: draftFilters.usn,
       name: draftFilters.name,
       email: draftFilters.email,
-    },
-    300
+    }),
+    [draftFilters.usn, draftFilters.name, draftFilters.email]
   );
+
+  const debouncedSearch = useDebounce(searchInput, 300);
+
+  const columns = useMemo(() => getAdminStudentColumns(true), []);
 
   useEffect(() => {
     setAppliedFilters((current) => {
@@ -373,7 +377,7 @@ export const AdminStudentsView = () => {
           <p className="text-muted-foreground text-sm">
             Showing {students.length} students
           </p>
-          <DataTable columns={getAdminStudentColumns(true)} data={students} />
+          <DataTable columns={columns} data={students} />
         </div>
       ) : null}
     </div>

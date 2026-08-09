@@ -7,6 +7,7 @@ import CoeRouter from "@webcampus/api/src/routers/admin/coe.router";
 import AdminCourseAssignmentRouter from "@webcampus/api/src/routers/admin/course-assignment.router";
 import AdminCourseRouter from "@webcampus/api/src/routers/admin/course.router";
 import DepartmentRouter from "@webcampus/api/src/routers/admin/department.router";
+import ElectiveMappingRouter from "@webcampus/api/src/routers/admin/elective-mapping.router";
 import FinanceRouter from "@webcampus/api/src/routers/admin/finance.router";
 import RegistrationTrackingRouter from "@webcampus/api/src/routers/admin/registration-tracking.router";
 import RegistrationWindowRouter from "@webcampus/api/src/routers/admin/registration-window.router";
@@ -42,6 +43,8 @@ router.use("/students", StudentProfileRouter);
 router.use("/course", AdminCourseRouter);
 
 router.use("/course-assignment", AdminCourseAssignmentRouter);
+
+router.use("/elective-mapping", ElectiveMappingRouter);
 
 router.use("/audit", AuditRouter);
 

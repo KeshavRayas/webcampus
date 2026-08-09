@@ -1,10 +1,22 @@
-import {
+﻿import {
   checkAndIncrementOptimisticVersion,
   diffFields,
   diffLists,
   logChanges,
 } from "@webcampus/api/src/services/shared/audit.service";
-import { CourseApprovalStatus, Cycle, PrismaClient } from "@webcampus/db";
+import { isBatchManagedCourse } from "@webcampus/api/src/services/shared/course-kind";
+import {
+  PeCapacityScope,
+  PeCapacityService,
+  peCourseCapacity,
+  syncBatchManagedCourseBatches,
+} from "@webcampus/api/src/services/shared/pe-capacity.service";
+import {
+  CourseApprovalStatus,
+  CourseType,
+  Cycle,
+  PrismaClient,
+} from "@webcampus/db";
 import {
   CreateCourseDTO,
   UpdateCourseDTO,
@@ -52,6 +64,9 @@ const TRACKABLE_COURSE_FIELDS = [
   "aatEligibility",
   "allowFeedback",
   "attendanceRequired",
+  "numberOfBatches",
+  "studentsPerBatch",
+  "openElectiveEligibility",
 ] as const;
 
 const prisma = new PrismaClient();
@@ -76,9 +91,9 @@ interface GroupShape {
 }
 
 export class CourseService {
-  // ────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // CORE BUSINESS LOGIC (Wrapped in standard API responses)
-  // ────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   static async createCourse(data: CreateCourseDTO, userId: string) {
     void userId;
@@ -114,57 +129,131 @@ export class CourseService {
     const hasLaboratoryComponent =
       (data.practicalCredits || 0) > 0 || (data.labMaxMarks || 0) > 0;
 
-    const course = await prisma.course.create({
-      data: {
-        code: data.code,
-        name: data.name,
-        courseMode: data.courseMode,
-        courseType: data.courseType,
-        cycle: data.cycle,
-        departmentId: targetDepartmentId,
-        departmentName: data.departmentName,
-        semesterId: data.semesterId,
-        semesterNumber: data.semesterNumber,
+    if (
+      isBatchManagedCourse(data.courseType) &&
+      data.courseMode !== "NON_INTEGRATED"
+    ) {
+      throw new Error(
+        `${data.courseType === "PE" ? "Program Elective (PE)" : "Open Elective (OE)"} courses must use NON_INTEGRATED mode`
+      );
+    }
 
-        lectureCredits: data.lectureCredits,
-        tutorialCredits: data.tutorialCredits,
-        practicalCredits: data.practicalCredits,
-        skillCredits: data.skillCredits,
-        totalCredits,
-        hasLaboratoryComponent,
+    if (isBatchManagedCourse(data.courseType)) {
+      if (!data.numberOfBatches || !data.studentsPerBatch) {
+        throw new Error(
+          `Number of batches and students per batch are required for ${
+            data.courseType === "PE" ? "PE" : "OE"
+          } courses`
+        );
+      }
+      if (peCourseCapacity(data.numberOfBatches, data.studentsPerBatch) <= 0) {
+        throw new Error(
+          `${data.courseType === "PE" ? "PE" : "OE"} course capacity must be at least 1 batch Ã— 1 student per batch`
+        );
+      }
+    }
 
-        seeMaxMarks: data.seeMaxMarks,
-        seeEligibility: data.seeEligibility,
+    const course = await prisma.$transaction(async (tx) => {
+      const created = await tx.course
+        .create({
+          data: {
+            code: data.code,
+            name: data.name,
+            courseMode: data.courseMode,
+            courseType: data.courseType,
+            cycle: data.cycle,
+            departmentId: targetDepartmentId,
+            departmentName: data.departmentName,
+            semesterId: data.semesterId,
+            semesterNumber: data.semesterNumber,
 
-        cieMaxMarks: data.cieMaxMarks,
-        cieEligibility: data.cieEligibility,
+            lectureCredits: data.lectureCredits,
+            tutorialCredits: data.tutorialCredits,
+            practicalCredits: data.practicalCredits,
+            skillCredits: data.skillCredits,
+            totalCredits,
+            hasLaboratoryComponent,
 
-        theoryMaxExams: data.theoryMaxExams,
-        theoryExamMaxMarks: data.theoryExamMaxMarks,
-        theoryMinExams: data.theoryMinExams,
-        theoryCieContribution: data.theoryCieContribution,
-        theoryEligibility: data.theoryEligibility,
+            seeMaxMarks: data.seeMaxMarks,
+            seeEligibility: data.seeEligibility,
 
-        labMaxMarks: data.labMaxMarks,
-        labEligibility: data.labEligibility,
+            cieMaxMarks: data.cieMaxMarks,
+            cieEligibility: data.cieEligibility,
 
-        aatMaxMarks: data.aatMaxMarks,
-        aatEligibility: data.aatEligibility,
+            theoryMaxExams: data.theoryMaxExams,
+            theoryExamMaxMarks: data.theoryExamMaxMarks,
+            theoryMinExams: data.theoryMinExams,
+            theoryCieContribution: data.theoryCieContribution,
+            theoryEligibility: data.theoryEligibility,
 
-        allowFeedback: data.allowFeedback,
-        attendanceRequired: data.attendanceRequired,
+            labMaxMarks: data.labMaxMarks,
+            labEligibility: data.labEligibility,
 
-        approvalStatus: CourseApprovalStatus.DRAFT,
-        version: 1,
-      },
-      include: {
-        department: true,
-        semester: {
-          include: {
-            academicTerm: true,
+            aatMaxMarks: data.aatMaxMarks,
+            aatEligibility: data.aatEligibility,
+
+            allowFeedback: data.allowFeedback,
+            attendanceRequired: data.attendanceRequired,
+
+            numberOfBatches: isBatchManagedCourse(data.courseType)
+              ? data.numberOfBatches
+              : null,
+            studentsPerBatch: isBatchManagedCourse(data.courseType)
+              ? data.studentsPerBatch
+              : null,
+            openElectiveEligibility:
+              data.courseType === "OE"
+                ? (data.openElectiveEligibility ?? "ALL")
+                : "ALL",
+
+            approvalStatus: CourseApprovalStatus.DRAFT,
+            version: 1,
           },
-        },
-      },
+          include: {
+            department: true,
+            semester: {
+              include: {
+                academicTerm: true,
+              },
+            },
+          },
+        })
+        .catch((error: unknown) => {
+          if (
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            (error as { code?: string }).code === "P2002"
+          ) {
+            throw new Error("Course code already exists");
+          }
+          throw error;
+        });
+
+      if (
+        data.courseType === "OE" &&
+        data.openElectiveEligibility === "CUSTOM" &&
+        data.eligibleDepartmentIds?.length
+      ) {
+        await tx.openElectiveDepartment.createMany({
+          data: data.eligibleDepartmentIds.map((departmentId) => ({
+            courseId: created.id,
+            departmentId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      if (isBatchManagedCourse(data.courseType) && data.numberOfBatches) {
+        await syncBatchManagedCourseBatches({
+          tx,
+          courseId: created.id,
+          courseCode: created.code,
+          targetCount: data.numberOfBatches,
+        });
+      }
+
+      return created;
     });
 
     return {
@@ -220,62 +309,259 @@ export class CourseService {
     const labMaxMarks = data.labMaxMarks ?? existingCourse.labMaxMarks;
     const hasLaboratoryComponent = practicalCredits > 0 || labMaxMarks > 0;
 
-    const course = await prisma.course.update({
-      where: { id },
-      data: {
-        code: data.code,
-        name: data.name,
-        courseMode: data.courseMode,
-        courseType: data.courseType,
-        cycle: data.cycle,
-        departmentId: targetDepartmentId,
-        departmentName: data.departmentName ?? existingCourse.departmentName,
-        semesterId: data.semesterId,
-        semesterNumber: data.semesterNumber,
+    const nextCourseType = data.courseType ?? existingCourse.courseType;
+    const nextCourseMode = data.courseMode ?? existingCourse.courseMode;
+    const nextNumberOfBatches =
+      data.numberOfBatches ?? existingCourse.numberOfBatches;
+    const nextStudentsPerBatch =
+      data.studentsPerBatch ?? existingCourse.studentsPerBatch;
 
-        lectureCredits,
-        tutorialCredits,
-        practicalCredits,
-        skillCredits,
-        totalCredits,
-        hasLaboratoryComponent,
+    const registrationCount = await prisma.courseRegistration.count({
+      where: { courseId: id },
+    });
 
-        seeMaxMarks: data.seeMaxMarks,
-        seeEligibility: data.seeEligibility,
+    // Course type immutable once any registration exists
+    if (
+      data.courseType &&
+      data.courseType !== existingCourse.courseType &&
+      registrationCount > 0
+    ) {
+      throw new Error(
+        "Course type cannot be changed after registrations exist"
+      );
+    }
 
-        cieMaxMarks: data.cieMaxMarks,
-        cieEligibility: data.cieEligibility,
+    // Type change only while Draft + not approved + zero registrations
+    if (
+      data.courseType &&
+      data.courseType !== existingCourse.courseType &&
+      (existingCourse.approvalStatus !== CourseApprovalStatus.DRAFT ||
+        registrationCount > 0)
+    ) {
+      throw new Error(
+        "Course type can only be changed while the course is Draft with zero registrations"
+      );
+    }
 
-        theoryMaxExams: data.theoryMaxExams,
-        theoryExamMaxMarks: data.theoryExamMaxMarks,
-        theoryMinExams: data.theoryMinExams,
-        theoryCieContribution: data.theoryCieContribution,
-        theoryEligibility: data.theoryEligibility,
+    // Cannot convert to a batch-managed course if section-based faculty mappings exist
+    if (
+      isBatchManagedCourse(data.courseType) &&
+      !isBatchManagedCourse(existingCourse.courseType)
+    ) {
+      const sectionAssignments = await prisma.courseAssignment.count({
+        where: { courseId: id },
+      });
+      if (sectionAssignments > 0) {
+        throw new Error(
+          "Cannot convert to a batch-managed course (PE/OE) while section-based faculty mappings exist"
+        );
+      }
+    }
 
-        labMaxMarks,
-        labEligibility: data.labEligibility,
+    if (
+      isBatchManagedCourse(nextCourseType) &&
+      nextCourseMode !== "NON_INTEGRATED"
+    ) {
+      throw new Error(
+        `${nextCourseType === "PE" ? "Program Elective (PE)" : "Open Elective (OE)"} courses must use NON_INTEGRATED mode`
+      );
+    }
 
-        aatMaxMarks: data.aatMaxMarks,
-        aatEligibility: data.aatEligibility,
+    const batchConfigChanging =
+      isBatchManagedCourse(nextCourseType) &&
+      (data.numberOfBatches !== undefined ||
+        data.studentsPerBatch !== undefined ||
+        data.electiveBatchesToRemove !== undefined ||
+        (data.courseType === "OE" &&
+          (data.openElectiveEligibility !== undefined ||
+            data.eligibleDepartmentIds !== undefined)));
 
-        allowFeedback: data.allowFeedback,
-        attendanceRequired: data.attendanceRequired,
+    if (isBatchManagedCourse(nextCourseType) && batchConfigChanging) {
+      if (await PeCapacityService.hasAttendanceOrMarksForCourse(id)) {
+        throw new Error(
+          `Cannot change ${nextCourseType === "PE" ? "PE" : "OE"} batch configuration after attendance or marks exist`
+        );
+      }
 
-        ...(isAdmin
-          ? {}
-          : {
-              approvalStatus: CourseApprovalStatus.DRAFT,
-              version: { increment: 1 },
-            }),
-      },
-      include: {
-        department: true,
-        semester: {
-          include: {
-            academicTerm: true,
-          },
+      const hasRegs = registrationCount > 0;
+      const scopeCycle =
+        (data.cycle ?? existingCourse.cycle) === "PHYSICS" ||
+        (data.cycle ?? existingCourse.cycle) === "CHEMISTRY"
+          ? ((data.cycle ?? existingCourse.cycle) as "PHYSICS" | "CHEMISTRY")
+          : null;
+
+      const windowOpen = await prisma.registrationWindow.findFirst({
+        where: {
+          semesterId: data.semesterId ?? existingCourse.semesterId,
+          isOpen: true,
+          departmentId: scopeCycle ? null : targetDepartmentId,
+          cycle: scopeCycle,
         },
-      },
+        select: { id: true },
+      });
+
+      if (hasRegs && windowOpen) {
+        throw new Error(
+          `Cannot change ${nextCourseType === "PE" ? "PE" : "OE"} batch configuration while registration is open and students have registered`
+        );
+      }
+
+      if (!nextNumberOfBatches || !nextStudentsPerBatch) {
+        throw new Error(
+          `Number of batches and students per batch are required for ${
+            nextCourseType === "PE" ? "PE" : "OE"
+          } courses`
+        );
+      }
+      if (peCourseCapacity(nextNumberOfBatches, nextStudentsPerBatch) <= 0) {
+        throw new Error(
+          `${nextCourseType === "PE" ? "PE" : "OE"} course capacity must be at least 1 batch Ã— 1 student per batch`
+        );
+      }
+
+      await PeCapacityService.assertCourseCapacityAboveRegistrations({
+        courseId: id,
+        numberOfBatches: nextNumberOfBatches,
+        studentsPerBatch: nextStudentsPerBatch,
+      });
+    }
+
+    const course = await prisma.$transaction(async (tx) => {
+      // Leaving a batch-managed course: wipe elective batch data
+      if (
+        isBatchManagedCourse(existingCourse.courseType) &&
+        !isBatchManagedCourse(nextCourseType)
+      ) {
+        await tx.electiveStudentAssignment.deleteMany({
+          where: { courseId: id },
+        });
+        await tx.electiveBatchFaculty.deleteMany({ where: { courseId: id } });
+        await tx.electiveBatch.deleteMany({ where: { courseId: id } });
+        await tx.openElectiveDepartment.deleteMany({ where: { courseId: id } });
+      }
+
+      const nextEligibility =
+        data.courseType === "OE"
+          ? (data.openElectiveEligibility ??
+            existingCourse.openElectiveEligibility ??
+            "ALL")
+          : "ALL";
+
+      const updated = await tx.course
+        .update({
+          where: { id },
+          data: {
+            code: data.code,
+            name: data.name,
+            courseMode: data.courseMode,
+            courseType: data.courseType,
+            cycle: data.cycle,
+            departmentId: targetDepartmentId,
+            departmentName:
+              data.departmentName ?? existingCourse.departmentName,
+            semesterId: data.semesterId,
+            semesterNumber: data.semesterNumber,
+
+            lectureCredits,
+            tutorialCredits,
+            practicalCredits,
+            skillCredits,
+            totalCredits,
+            hasLaboratoryComponent,
+
+            seeMaxMarks: data.seeMaxMarks,
+            seeEligibility: data.seeEligibility,
+
+            cieMaxMarks: data.cieMaxMarks,
+            cieEligibility: data.cieEligibility,
+
+            theoryMaxExams: data.theoryMaxExams,
+            theoryExamMaxMarks: data.theoryExamMaxMarks,
+            theoryMinExams: data.theoryMinExams,
+            theoryCieContribution: data.theoryCieContribution,
+            theoryEligibility: data.theoryEligibility,
+
+            labMaxMarks,
+            labEligibility: data.labEligibility,
+
+            aatMaxMarks: data.aatMaxMarks,
+            aatEligibility: data.aatEligibility,
+
+            allowFeedback: data.allowFeedback,
+            attendanceRequired: data.attendanceRequired,
+
+            numberOfBatches: isBatchManagedCourse(nextCourseType)
+              ? nextNumberOfBatches
+              : null,
+            studentsPerBatch: isBatchManagedCourse(nextCourseType)
+              ? nextStudentsPerBatch
+              : null,
+            openElectiveEligibility: nextEligibility,
+
+            ...(isAdmin
+              ? {}
+              : {
+                  approvalStatus: CourseApprovalStatus.DRAFT,
+                  version: { increment: 1 },
+                }),
+          },
+          include: {
+            department: true,
+            semester: {
+              include: {
+                academicTerm: true,
+              },
+            },
+          },
+        })
+        .catch((error: unknown) => {
+          if (
+            typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            (error as { code?: string }).code === "P2002"
+          ) {
+            throw new Error("Course code already exists");
+          }
+          throw error;
+        });
+
+      if (nextCourseType === "OE") {
+        await tx.openElectiveDepartment.deleteMany({ where: { courseId: id } });
+        if (
+          nextEligibility === "CUSTOM" &&
+          data.eligibleDepartmentIds?.length
+        ) {
+          await tx.openElectiveDepartment.createMany({
+            data: data.eligibleDepartmentIds.map((departmentId) => ({
+              courseId: id,
+              departmentId,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+
+      if (isBatchManagedCourse(nextCourseType) && nextNumberOfBatches) {
+        const currentBatches = await tx.electiveBatch.count({
+          where: { courseId: id },
+        });
+        if (
+          batchConfigChanging ||
+          currentBatches !== nextNumberOfBatches ||
+          !isBatchManagedCourse(existingCourse.courseType)
+        ) {
+          await syncBatchManagedCourseBatches({
+            tx,
+            courseId: id,
+            courseCode: updated.code,
+            targetCount: nextNumberOfBatches,
+            batchesToRemoveIds: data.electiveBatchesToRemove,
+          });
+        }
+      }
+
+      return updated;
     });
 
     const isLocked =
@@ -436,6 +722,32 @@ export class CourseService {
         },
         mappingAuditLogs: true,
         coordinators: true,
+        openElectiveDepartments: {
+          select: { department: { select: { id: true, name: true } } },
+        },
+        electiveBatches: {
+          select: {
+            id: true,
+            name: true,
+            sortOrder: true,
+            facultyAssignment: {
+              select: {
+                facultyId: true,
+                semester: true,
+                academicYear: true,
+                faculty: {
+                  select: {
+                    shortName: true,
+                    user: { select: { name: true } },
+                  },
+                },
+              },
+            },
+            _count: {
+              select: { studentAssignments: true },
+            },
+          },
+        },
         _count: {
           select: { assignments: true, coordinators: true },
         },
@@ -463,11 +775,17 @@ export class CourseService {
       course.cycle ?? undefined
     );
     const key = `${course.semesterId}_${course.cycle}`;
-    const status = CourseService.computeMappingStatus(
-      course.courseMode,
-      sectionCounts[key] || { sections: 0, batches: 0 },
-      course._count.assignments
-    );
+    const status = isBatchManagedCourse(course.courseType)
+      ? PeCapacityService.computePeFacultyMapping(
+          course.electiveBatches,
+          course.semester?.semesterNumber ?? null,
+          course.semester?.academicTerm?.year
+        )
+      : CourseService.computeMappingStatus(
+          course.courseMode,
+          sectionCounts[key] || { sections: 0, batches: 0 },
+          course._count.assignments
+        );
 
     return {
       status: "success",
@@ -478,6 +796,24 @@ export class CourseService {
         isPartiallyMapped: status.isPartiallyMapped,
         isUnmapped: status.isUnmapped,
         coordinatorCount: course._count.coordinators,
+        eligibleDepartmentIds: course.openElectiveDepartments.map(
+          (entry) => entry.department.id
+        ),
+        eligibleDepartments: course.openElectiveDepartments.map((entry) => ({
+          id: entry.department.id,
+          name: entry.department.name,
+        })),
+        electiveBatches: course.electiveBatches.map((b) => ({
+          id: b.id,
+          name: b.name,
+          sortOrder: b.sortOrder,
+          facultyId: b.facultyAssignment?.facultyId ?? null,
+          facultyName:
+            b.facultyAssignment?.faculty.user?.name ??
+            b.facultyAssignment?.faculty.shortName ??
+            null,
+          studentCount: b._count.studentAssignments,
+        })),
       },
     };
   }
@@ -524,6 +860,32 @@ export class CourseService {
         },
         mappingAuditLogs: true,
         coordinators: true,
+        openElectiveDepartments: {
+          select: { department: { select: { id: true, name: true } } },
+        },
+        electiveBatches: {
+          select: {
+            id: true,
+            name: true,
+            sortOrder: true,
+            facultyAssignment: {
+              select: {
+                facultyId: true,
+                semester: true,
+                academicYear: true,
+                faculty: {
+                  select: {
+                    shortName: true,
+                    user: { select: { name: true } },
+                  },
+                },
+              },
+            },
+            _count: {
+              select: { studentAssignments: true },
+            },
+          },
+        },
         _count: {
           select: { assignments: true, coordinators: true },
         },
@@ -538,17 +900,41 @@ export class CourseService {
       message: "Courses fetched successfully",
       data: courses.map((course) => {
         const key = `${course.semesterId}_${course.cycle}`;
-        const status = CourseService.computeMappingStatus(
-          course.courseMode,
-          sectionCounts[key] || { sections: 0, batches: 0 },
-          course._count.assignments
-        );
+        const status = isBatchManagedCourse(course.courseType)
+          ? PeCapacityService.computePeFacultyMapping(
+              course.electiveBatches,
+              course.semester?.semesterNumber ?? null,
+              course.semester?.academicTerm?.year
+            )
+          : CourseService.computeMappingStatus(
+              course.courseMode,
+              sectionCounts[key] || { sections: 0, batches: 0 },
+              course._count.assignments
+            );
         return {
           ...course,
           isFullyMapped: status.isFullyMapped,
           isPartiallyMapped: status.isPartiallyMapped,
           isUnmapped: status.isUnmapped,
           coordinatorCount: course._count.coordinators,
+          eligibleDepartmentIds: course.openElectiveDepartments.map(
+            (entry) => entry.department.id
+          ),
+          eligibleDepartments: course.openElectiveDepartments.map((entry) => ({
+            id: entry.department.id,
+            name: entry.department.name,
+          })),
+          electiveBatches: course.electiveBatches.map((b) => ({
+            id: b.id,
+            name: b.name,
+            sortOrder: b.sortOrder,
+            facultyId: b.facultyAssignment?.facultyId ?? null,
+            facultyName:
+              b.facultyAssignment?.faculty.user?.name ??
+              b.facultyAssignment?.faculty.shortName ??
+              null,
+            studentCount: b._count.studentAssignments,
+          })),
         };
       }),
     };
@@ -623,8 +1009,73 @@ export class CourseService {
       whereClause.cycle = cycle;
     }
 
-    const updateResult = await prisma.$transaction((tx) =>
-      tx.course.updateMany({
+    const courses = await prisma.course.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        code: true,
+        courseType: true,
+        semester: {
+          select: {
+            semesterNumber: true,
+            academicTerm: { select: { year: true } },
+          },
+        },
+      },
+    });
+
+    const scopeCycle =
+      cycle && cycle !== "NONE" ? (cycle as "PHYSICS" | "CHEMISTRY") : null;
+    const capacityScope: PeCapacityScope = {
+      departmentId: scopeCycle ? null : resolvedDepartmentId,
+      semesterId,
+      cycle: scopeCycle,
+    };
+
+    if (courses.some((c) => c.courseType === "PE")) {
+      const configuredCapacity = await PeCapacityService.sumPeCapacityInScope(
+        capacityScope,
+        {
+          statuses: [
+            CourseApprovalStatus.PENDING,
+            CourseApprovalStatus.APPROVED,
+          ],
+        }
+      );
+      const eligibleStudents =
+        await PeCapacityService.countEligibleStudents(capacityScope);
+      if (configuredCapacity < eligibleStudents) {
+        throw new Error(
+          `Cannot approve Program Elective courses.\n\nEligible students: ${eligibleStudents}\nConfigured capacity: ${configuredCapacity}\n\nIncrease the number of batches or students per batch across the Program Elective courses before submitting.`
+        );
+      }
+    }
+
+    const updateResult = await prisma.$transaction(async (tx) => {
+      for (const course of courses) {
+        if (isBatchManagedCourse(course.courseType)) {
+          const batchCount = await tx.electiveBatch.count({
+            where: { courseId: course.id },
+          });
+          if (batchCount === 0) {
+            throw new Error(
+              `Cannot approve ${course.code}: ${course.courseType === "PE" ? "PE" : "OE"} has no elective batches configured`
+            );
+          }
+          const facultyOk = await PeCapacityService.isFacultyMappingComplete(
+            course.id,
+            course.semester?.semesterNumber ?? null,
+            course.semester?.academicTerm?.year,
+            tx
+          );
+          if (!facultyOk) {
+            throw new Error(
+              `Cannot approve ${course.code}: ${course.courseType === "PE" ? "PE" : "OE"} faculty mapping incomplete (every elective batch needs one faculty)`
+            );
+          }
+        }
+      }
+      return tx.course.updateMany({
         where: whereClause,
         data: {
           approvalStatus: CourseApprovalStatus.APPROVED,
@@ -634,8 +1085,8 @@ export class CourseService {
           approvedByDisplay,
           approvedAt: new Date(),
         },
-      })
-    );
+      });
+    });
 
     return {
       status: "success" as const,
@@ -686,9 +1137,9 @@ export class CourseService {
     };
   }
 
-  // ────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // STATIC ALIASES & CONTROLLER/ADMIN BRIDGE METHODS
-  // ────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   static async create(data: CreateCourseDTO, departmentContext?: unknown) {
     const ctx = departmentContext as { userId?: string } | undefined;
@@ -773,6 +1224,34 @@ export class CourseService {
     );
   }
 
+  static async getPeCapacitySummary(
+    semesterId: string,
+    departmentId?: string,
+    departmentName?: string,
+    cycle?: string
+  ) {
+    const resolvedDepartmentId = await CourseService.resolveDepartmentId(
+      departmentId,
+      departmentName
+    );
+
+    const scopeCycle =
+      cycle && cycle !== "NONE" ? (cycle as "PHYSICS" | "CHEMISTRY") : null;
+    const capacityScope: PeCapacityScope = {
+      departmentId: scopeCycle ? null : resolvedDepartmentId,
+      semesterId,
+      cycle: scopeCycle,
+    };
+
+    const summary = await PeCapacityService.getPeCapacitySummary(capacityScope);
+
+    return {
+      status: "success" as const,
+      message: "Fetched PE capacity summary",
+      data: summary,
+    };
+  }
+
   static async bulkSubmitForApproval(
     semesterId: string,
     departmentId?: string,
@@ -808,11 +1287,26 @@ export class CourseService {
         _count: {
           select: { assignments: true, coordinators: true },
         },
+        semester: {
+          select: {
+            semesterNumber: true,
+            academicTerm: { select: { year: true } },
+          },
+        },
       },
     });
 
     const errors: string[] = [];
     for (const course of courses) {
+      if (isBatchManagedCourse(course.courseType)) {
+        if (course._count.coordinators === 0) {
+          errors.push(
+            `${course.code} (${course.name}) â€” no coordinator appointed`
+          );
+        }
+        continue;
+      }
+
       const key = `${course.semesterId}_${course.cycle}`;
       const counts = sectionCounts[key] || { sections: 0, batches: 0 };
       const { expectedAssignments, isFullyMapped } =
@@ -824,12 +1318,12 @@ export class CourseService {
 
       if (course._count.coordinators === 0) {
         errors.push(
-          `${course.code} (${course.name}) — no coordinator appointed`
+          `${course.code} (${course.name}) â€” no coordinator appointed`
         );
       }
       if (!isFullyMapped) {
         errors.push(
-          `${course.code} (${course.name}) — not fully mapped (${course._count.assignments}/${expectedAssignments} assignments)`
+          `${course.code} (${course.name}) â€” not fully mapped (${course._count.assignments}/${expectedAssignments} assignments)`
         );
       }
     }
@@ -840,8 +1334,68 @@ export class CourseService {
       );
     }
 
-    const updateResult = await prisma.$transaction((tx) =>
-      tx.course.updateMany({
+    const scopeCycle =
+      cycle && cycle !== "NONE" ? (cycle as "PHYSICS" | "CHEMISTRY") : null;
+    const capacityScope: PeCapacityScope = {
+      departmentId: scopeCycle ? null : resolvedDepartmentId,
+      semesterId,
+      cycle: scopeCycle,
+    };
+
+    if (courses.some((c) => c.courseType === "PE")) {
+      const existingCapacity = await PeCapacityService.sumPeCapacityInScope(
+        capacityScope,
+        {
+          statuses: [
+            CourseApprovalStatus.PENDING,
+            CourseApprovalStatus.APPROVED,
+          ],
+        }
+      );
+      const submittingCapacity = courses
+        .filter((c) => c.courseType === "PE")
+        .reduce(
+          (sum, c) =>
+            sum +
+            peCourseCapacity(c.numberOfBatches ?? 0, c.studentsPerBatch ?? 0),
+          0
+        );
+      const eligibleStudents =
+        await PeCapacityService.countEligibleStudents(capacityScope);
+      if (existingCapacity + submittingCapacity < eligibleStudents) {
+        throw new Error(
+          `Cannot submit Program Elective courses.\n\nEligible students: ${eligibleStudents}\nConfigured capacity: ${
+            existingCapacity + submittingCapacity
+          }\n\nIncrease the number of batches or students per batch across the Program Elective courses before submitting.`
+        );
+      }
+    }
+
+    const updateResult = await prisma.$transaction(async (tx) => {
+      for (const course of courses) {
+        if (isBatchManagedCourse(course.courseType)) {
+          const batchCount = await tx.electiveBatch.count({
+            where: { courseId: course.id },
+          });
+          if (batchCount === 0) {
+            throw new Error(
+              `Cannot submit for approval. ${course.code} (${course.name}) â€” ${course.courseType === "PE" ? "PE" : "OE"} has no elective batches configured`
+            );
+          }
+          const facultyOk = await PeCapacityService.isFacultyMappingComplete(
+            course.id,
+            course.semester?.semesterNumber ?? null,
+            course.semester?.academicTerm?.year,
+            tx
+          );
+          if (!facultyOk) {
+            throw new Error(
+              `Cannot submit for approval. ${course.code} (${course.name}) â€” ${course.courseType === "PE" ? "PE" : "OE"} faculty mapping incomplete (every elective batch needs one faculty)`
+            );
+          }
+        }
+      }
+      return tx.course.updateMany({
         where: whereClause,
         data: {
           approvalStatus: CourseApprovalStatus.PENDING,
@@ -853,8 +1407,8 @@ export class CourseService {
           revisionNotes: null,
           revisionRequestedAt: null,
         },
-      })
-    );
+      });
+    });
 
     return {
       status: "success" as const,
@@ -1054,6 +1608,80 @@ export class CourseService {
     };
   }
 
+  private static async getFacultyMappedToCourse(
+    courseId: string,
+    courseType: CourseType
+  ): Promise<{ id: string; name: string; departmentAbbreviation: string }[]> {
+    const rows: {
+      id: string;
+      name: string;
+      departmentAbbreviation: string;
+    }[] = [];
+
+    if (isBatchManagedCourse(courseType)) {
+      const batches = await prisma.electiveBatch.findMany({
+        where: { courseId },
+        select: {
+          facultyAssignment: {
+            select: {
+              faculty: {
+                select: {
+                  id: true,
+                  user: { select: { name: true } },
+                  department: { select: { abbreviation: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      for (const batch of batches) {
+        if (batch.facultyAssignment) {
+          rows.push({
+            id: batch.facultyAssignment.faculty.id,
+            name: batch.facultyAssignment.faculty.user.name,
+            departmentAbbreviation:
+              batch.facultyAssignment.faculty.department.abbreviation,
+          });
+        }
+      }
+    } else {
+      const assignments = await prisma.courseAssignment.findMany({
+        where: { courseId },
+        select: {
+          facultyId: true,
+          faculty: {
+            select: {
+              id: true,
+              user: { select: { name: true } },
+              department: { select: { abbreviation: true } },
+            },
+          },
+        },
+      });
+
+      for (const assignment of assignments) {
+        rows.push({
+          id: assignment.faculty.id,
+          name: assignment.faculty.user.name,
+          departmentAbbreviation: assignment.faculty.department.abbreviation,
+        });
+      }
+    }
+
+    const seen = new Set<string>();
+    const unique = rows.filter((faculty) => {
+      if (seen.has(faculty.id)) {
+        return false;
+      }
+      seen.add(faculty.id);
+      return true;
+    });
+
+    return unique.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   static async getMappedFacultyForCourse(
     courseId: string,
     departmentContext?: { departmentId: string }
@@ -1071,38 +1699,10 @@ export class CourseService {
       throw new Error("Course not found");
     }
 
-    const assignments = await prisma.courseAssignment.findMany({
-      where: { courseId },
-      select: {
-        facultyId: true,
-        faculty: {
-          select: {
-            id: true,
-            user: { select: { name: true } },
-            department: { select: { abbreviation: true } },
-          },
-        },
-      },
-    });
-
-    const seen = new Set<string>();
-    const uniqueFaculty: {
-      id: string;
-      name: string;
-      departmentAbbreviation: string;
-    }[] = [];
-
-    for (const assignment of assignments) {
-      if (seen.has(assignment.facultyId)) continue;
-      seen.add(assignment.facultyId);
-      uniqueFaculty.push({
-        id: assignment.faculty.id,
-        name: assignment.faculty.user.name,
-        departmentAbbreviation: assignment.faculty.department.abbreviation,
-      });
-    }
-
-    uniqueFaculty.sort((a, b) => a.name.localeCompare(b.name));
+    const uniqueFaculty = await this.getFacultyMappedToCourse(
+      course.id,
+      course.courseType
+    );
 
     return {
       status: "success" as const,
