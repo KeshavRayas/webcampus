@@ -5,6 +5,7 @@ export * from "./course-assignment.schema";
 export * from "./course.schema";
 export * from "./freeze.schema";
 export * from "./registration-tracking.schema";
+export * from "./bonus-attendance.schema";
 export * from "./registration-window.schema";
 export * from "./semester.schema";
 export * from "./student.schema";

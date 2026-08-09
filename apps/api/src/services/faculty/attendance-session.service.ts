@@ -5,7 +5,7 @@ import {
 } from "@webcampus/api/src/services/faculty/freeze.service";
 import { buildRegistrationWhere } from "@webcampus/api/src/services/shared/registration-helper.service";
 import { logger } from "@webcampus/common/logger";
-import { db, type Prisma } from "@webcampus/db";
+import { db, type Cycle, type Prisma } from "@webcampus/db";
 import {
   CreateOrOpenFacultyAttendanceSessionType,
   DeleteFacultyAttendanceSessionParamsType,
@@ -44,6 +44,8 @@ type FacultyCourseSectionAssignmentContext = {
   batchId: string | null;
   semesterId: string;
   academicTermId: string;
+  departmentId: string;
+  cycle: string;
 };
 
 const toLabBatchNumber = (
@@ -354,6 +356,12 @@ export class FacultyAttendanceSessionService {
             },
           },
         },
+        section: {
+          select: {
+            departmentId: true,
+            cycle: true,
+          },
+        },
       },
     });
 
@@ -370,6 +378,8 @@ export class FacultyAttendanceSessionService {
       batchId: assignment.batchId,
       semesterId: assignment.course.semesterId,
       academicTermId: assignment.course.semester.academicTermId,
+      departmentId: assignment.section.departmentId,
+      cycle: assignment.section.cycle,
     };
   }
 
@@ -723,6 +733,36 @@ export class FacultyAttendanceSessionService {
 
       const sessionDate = toSessionDateUtc(payload.sessionDate);
       const timing = getTimingWindow(payload);
+
+      const today = toSessionDateUtc(new Date());
+      if (sessionDate.getTime() > today.getTime()) {
+        const window = await db.bonusAttendanceWindow.findFirst({
+          where: {
+            academicTermId: assignmentContext.academicTermId,
+            semesterId: assignmentContext.semesterId,
+            isOpen: true,
+            OR: [
+              { departmentId: assignmentContext.departmentId },
+              { cycle: assignmentContext.cycle as Cycle },
+              { departmentId: null, cycle: null },
+            ],
+          },
+          orderBy: { days: "desc" },
+        });
+
+        if (!window) {
+          throw new Error("Cannot take attendance for future dates.");
+        }
+
+        const maxAllowedDate = new Date(today);
+        maxAllowedDate.setUTCDate(maxAllowedDate.getUTCDate() + window.days);
+
+        if (sessionDate.getTime() > maxAllowedDate.getTime()) {
+          throw new Error(
+            `Cannot take attendance beyond ${window.days} days in the future.`
+          );
+        }
+      }
 
       // Strict check: existing session → 409 conflict
       const existingSession = await db.classSession.findFirst({

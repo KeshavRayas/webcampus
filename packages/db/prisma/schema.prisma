@@ -57,6 +57,7 @@ model AcademicTerm {
   feedbackQuestionSets FeedbackQuestionSet[]
   feedbackRounds      FeedbackRound[]
   feedbackQuestionPresets FeedbackQuestionPreset[]
+  bonusAttendanceWindows BonusAttendanceWindow[]
 
   @@unique([type, year])
 }
@@ -79,6 +80,7 @@ model Semester {
   hallTickets         HallTicket[]
   feedbackQuestionSet FeedbackQuestionSet?
   feedbackRounds      FeedbackRound[]
+  bonusAttendanceWindows BonusAttendanceWindow[]
   academicTerm        AcademicTerm         @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
   createdBy           User                 @relation(fields: [userId], references: [id])
 
@@ -147,6 +149,7 @@ model Department {
   sections            Section[]
   students            Student[]
   registrationWindows RegistrationWindow[]
+  bonusAttendanceWindows BonusAttendanceWindow[]
   proctorGroups       ProctorGroup[]
 
   @@index([name])
@@ -159,6 +162,25 @@ model RegistrationWindow {
   departmentId   String?
   cycle          Cycle?
   isOpen         Boolean @default(false)
+
+  academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+  semester     Semester     @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  department   Department?  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([academicTermId, semesterId, departmentId, cycle])
+  @@index([academicTermId, semesterId])
+}
+
+model BonusAttendanceWindow {
+  id             String  @id @default(uuid())
+  academicTermId String
+  semesterId     String
+  departmentId   String?
+  cycle          Cycle?
+  days           Int     @default(1)
+  isOpen         Boolean @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
   semester     Semester     @relation(fields: [semesterId], references: [id], onDelete: Cascade)

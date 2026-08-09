@@ -3,6 +3,7 @@ import AdmissionUserRouter from "@webcampus/api/src/routers/admin/admission-user
 import ArchiveRouter from "@webcampus/api/src/routers/admin/archive.router";
 import AttendanceWindowRouter from "@webcampus/api/src/routers/admin/attendance-window.router";
 import AuditRouter from "@webcampus/api/src/routers/admin/audit.router";
+import { bonusAttendanceRouter } from "@webcampus/api/src/routers/admin/bonus-attendance.router";
 import CoeRouter from "@webcampus/api/src/routers/admin/coe.router";
 import AdminCourseAssignmentRouter from "@webcampus/api/src/routers/admin/course-assignment.router";
 import AdminCourseRouter from "@webcampus/api/src/routers/admin/course.router";
@@ -50,6 +51,8 @@ router.use("/registration-windows", RegistrationWindowRouter);
 router.use("/registration-tracking", RegistrationTrackingRouter);
 
 router.use("/attendance-windows", AttendanceWindowRouter);
+
+router.use("/bonus-attendance", bonusAttendanceRouter);
 
 router.use("/hall-ticket", HallTicketRouter);
 

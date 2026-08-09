@@ -105,6 +105,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
                   name: "Attendance Report",
                   url: "/admin/academics/attendance",
                 },
+                {
+                  name: "Bonus Attendance",
+                  url: "/admin/academics/bonus-attendance",
+                },
               ],
             },
             {
