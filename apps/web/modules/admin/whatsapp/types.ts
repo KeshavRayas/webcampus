@@ -6,6 +6,8 @@ export type MessageCategory =
   | "ANNUAL_FEE"
   | "PARENT_TEACHER_MEETING";
 
+export type MessageChannel = "WHATSAPP" | "SMS";
+
 export type MessageRecipientType = "STUDENT" | "PARENT";
 export type MessageScope = "STUDENT" | "PARENT" | "BOTH";
 export type MessageFieldSource =
@@ -41,6 +43,7 @@ export type MessageTemplate = {
   category: MessageCategory;
   recipientType: MessageRecipientType;
   externalTemplateId: string;
+  smsTemplateId?: string;
   messageBody: string;
   isActive: boolean;
   createdAt: string;
@@ -59,6 +62,7 @@ export type TemplateFormValues = {
   category: MessageCategory;
   recipientType: MessageRecipientType;
   externalTemplateId: string;
+  smsTemplateId?: string;
   messageBody: string;
   isActive: boolean;
   variables: TemplateVariableInput[];
@@ -114,6 +118,7 @@ export type PreviewResult = {
 };
 
 export type SendConfig = {
+  channel?: MessageChannel;
   academicTermId?: string;
   departmentId?: string;
   semesterId?: string;
@@ -142,7 +147,7 @@ export type SendResult = {
 
 export type Campaign = {
   id: string;
-  channel: "WHATSAPP";
+  channel: MessageChannel;
   category: MessageCategory;
   scope: MessageScope;
   cieNumber: number | null;

@@ -63,6 +63,7 @@ const emptyForm: TemplateFormValues = {
   category: "CIE",
   recipientType: "STUDENT",
   externalTemplateId: "",
+  smsTemplateId: "",
   messageBody: "",
   isActive: true,
   variables: [],
@@ -86,6 +87,7 @@ export const TemplateForm = ({
           category: editing.category,
           recipientType: editing.recipientType,
           externalTemplateId: editing.externalTemplateId,
+          smsTemplateId: editing.smsTemplateId ?? "",
           messageBody: editing.messageBody,
           isActive: editing.isActive,
           variables: editing.variables
@@ -230,6 +232,17 @@ export const TemplateForm = ({
                 value={form.externalTemplateId}
                 onChange={(e) => set("externalTemplateId", e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>SMS Template ID (optional)</Label>
+              <Input
+                placeholder="SMS / DLT template id"
+                value={form.smsTemplateId}
+                onChange={(e) => set("smsTemplateId", e.target.value)}
+              />
+              <p className="text-muted-foreground text-xs">
+                Used only for SMS sends. Can be left empty.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Category</Label>

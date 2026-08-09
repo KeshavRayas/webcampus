@@ -44,7 +44,8 @@ export const whatsappService = {
 
   async send(config: SendConfigType, sentById: string) {
     const resolved = await resolveTargets(config);
-    const channel: MessageChannel = getMessageChannel("WHATSAPP");
+    const channelName = config.channel;
+    const channel: MessageChannel = getMessageChannel(channelName);
 
     const sendable = resolved.targets.filter(
       (t): t is RecipientTarget & { to: string } => Boolean(t.to)
@@ -62,14 +63,21 @@ export const whatsappService = {
 
     const allProviderResponses: unknown[] = [];
 
-    for (const [templateId, receivers] of byTemplate) {
+    for (const [, receivers] of byTemplate) {
+      const first = receivers[0];
+      if (!first) continue;
       for (let i = 0; i < receivers.length; i += CHUNK_SIZE) {
         const chunk = receivers.slice(i, i + CHUNK_SIZE);
         let result: { ok: boolean; raw: unknown };
         try {
           result = await channel.send({
-            templateId,
-            receivers: chunk.map((r) => ({ to: r.to, bodyvar: r.bodyvar })),
+            templateId: first.externalTemplateId,
+            smsTemplateId: first.smsTemplateId,
+            receivers: chunk.map((r) => ({
+              to: r.to,
+              bodyvar: r.bodyvar,
+              message: r.messageText,
+            })),
           });
         } catch (err) {
           result = {
@@ -98,6 +106,7 @@ export const whatsappService = {
 
     const { campaignId, counts } = await persistCampaign({
       config,
+      channel: channelName,
       category: resolved.category,
       scope: resolved.scope,
       studentTemplateId: resolved.studentTemplate?.id,

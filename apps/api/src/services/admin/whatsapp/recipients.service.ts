@@ -18,6 +18,7 @@ export type TemplateWithVars = {
   category: MessageCategory;
   recipientType: MessageRecipientType;
   externalTemplateId: string;
+  smsTemplateId?: string;
   messageBody: string;
   variables: {
     position: number;
@@ -40,6 +41,8 @@ export type RecipientTarget = {
   skipReason?: string;
   templateId: string;
   templateName: string;
+  externalTemplateId: string;
+  smsTemplateId?: string;
   templateMessageBody: string;
   bodyvar: string[];
   messageText: string;
@@ -83,6 +86,7 @@ async function loadTemplate(
     category: template.category as MessageCategory,
     recipientType: template.recipientType as MessageRecipientType,
     externalTemplateId: template.externalTemplateId,
+    smsTemplateId: template.smsTemplateId ?? undefined,
     messageBody: template.messageBody,
     variables: template.variables.map(
       (v: { position: number; label: string; fieldSource: string }) => ({
@@ -145,6 +149,8 @@ function buildTarget(
     ...(opts.skipReason ? { skipReason: opts.skipReason } : {}),
     templateId: template.id,
     templateName: template.name,
+    externalTemplateId: template.externalTemplateId,
+    smsTemplateId: template.smsTemplateId,
     templateMessageBody: template.messageBody,
     bodyvar,
     messageText: renderMessageBody(template.messageBody, values, bodyvar),

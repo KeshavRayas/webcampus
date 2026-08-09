@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const MESSAGE_CHANNELS = ["WHATSAPP", "SMS"] as const;
+export type MessageChannel = (typeof MESSAGE_CHANNELS)[number];
+
 export const MESSAGE_CATEGORIES = [
   "CIE",
   "BALANCE_FEE",
@@ -40,6 +43,7 @@ export const RECEIPT_STATUSES = ["SUCCESS", "FAILURE", "SKIPPED"] as const;
 export type ReceiptStatus = (typeof RECEIPT_STATUSES)[number];
 
 export const MessageCategorySchema = z.enum(MESSAGE_CATEGORIES);
+export const MessageChannelSchema = z.enum(MESSAGE_CHANNELS);
 export const MessageRecipientTypeSchema = z.enum(MESSAGE_RECIPIENT_TYPES);
 export const MessageScopeSchema = z.enum(MESSAGE_SCOPES);
 export const MessageFieldSourceSchema = z.enum(MESSAGE_FIELD_SOURCES);
@@ -59,6 +63,7 @@ export const CreateMessageTemplateSchema = z.object({
   category: MessageCategorySchema,
   recipientType: MessageRecipientTypeSchema,
   externalTemplateId: z.string().trim().min(1).max(160),
+  smsTemplateId: z.string().trim().max(160).optional().default(""),
   messageBody: z.string().trim().min(1).max(4000),
   isActive: z.boolean().optional().default(true),
   variables: z
@@ -89,6 +94,7 @@ export const MessageTemplateResponseSchema = z.object({
   category: MessageCategorySchema,
   recipientType: MessageRecipientTypeSchema,
   externalTemplateId: z.string(),
+  smsTemplateId: z.string().nullable().optional(),
   messageBody: z.string(),
   isActive: z.boolean(),
   createdAt: z.date(),
@@ -133,6 +139,7 @@ const optionalUuidList = z.preprocess((value) => {
 }, z.array(z.string().uuid()).optional());
 
 export const SendConfigSchema = z.object({
+  channel: MessageChannelSchema.optional().default("WHATSAPP"),
   academicTermId: optionalQueryString(z.string().uuid()),
   departmentId: optionalQueryString(z.string().uuid()),
   semesterId: optionalQueryString(z.string().uuid()),
