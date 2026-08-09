@@ -99,6 +99,11 @@ const deterministicAadhar = (serial: number): string => {
   return `9${tail}`;
 };
 
+const deterministicAbcAparId = (serial: number): string => {
+  const tail = String((serial % 1_000_000_000_000) + 1).padStart(12, "0");
+  return tail;
+};
+
 const cleanupPartialApplicant = async (
   email: string,
   removeApplicantUser: boolean
@@ -260,6 +265,7 @@ const submitAndApprove = async (
     scholarship: "false",
     primaryPhoneNumber: randomPhone(serial),
     aadharNumber: deterministicAadhar(serial),
+    abcAparId: deterministicAbcAparId(serial),
     dob: faker.date
       .birthdate({ min: 17, max: 21, mode: "age" })
       .toISOString()
