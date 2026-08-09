@@ -1,13 +1,13 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@webcampus/ui/components/badge";
 import { AdminAdmissionActions } from "./admin-admission-actions";
 
 export type AdmissionResponse = {
   id: string;
   applicationId: string;
   modeOfAdmission: string;
+  semesterId?: string | null;
   status:
     | "PENDING"
     | "SUBMITTED"
@@ -49,6 +49,11 @@ export type AdmissionResponse = {
   feePaid?: number | null;
   feeReceiptNumber?: string | null;
   hostel?: boolean | null;
+  scholarship?: boolean | null;
+  abcAparId?: string | null;
+  sspId?: string | null;
+  counsellingRound?: string | null;
+  admissionType?: string | null;
 
   nameAsPer10th?: string | null;
   dob?: Date | null;
@@ -97,6 +102,15 @@ export type AdmissionResponse = {
   aadharNumber?: string | null;
   aadharCard?: string | null;
 
+  passportNumber?: string | null;
+  passportExpiryDate?: string | null;
+  visaNumber?: string | null;
+  visaExpiryDate?: string | null;
+  parentPassportNumber?: string | null;
+  parentVisaNumber?: string | null;
+  parentVisaExpiryDate?: string | null;
+  studiedKannadaIn10th?: boolean | null;
+
   class10thSchoolName?: string | null;
   class10thRollRegNumber?: string | null;
   class10thSchoolType?: string | null;
@@ -134,6 +148,16 @@ export type AdmissionResponse = {
   mathematicsPercentage?: number | null;
   pcmPercentage?: number | null;
 
+  diplomaInstituteName?: string | null;
+  diplomaInstituteType?: string | null;
+  diplomaInstituteCity?: string | null;
+  diplomaInstituteState?: string | null;
+  diplomaBranch?: string | null;
+  diplomaYearOfPassing?: string | null;
+  diplomaMediumOfTeaching?: string | null;
+  diplomaAggregateScore?: number | null;
+  diplomaAggregateTotal?: number | null;
+
   studyCertificate?: string | null;
   transferCertificate?: string | null;
 
@@ -168,20 +192,23 @@ const baseColumns: ColumnDef<AdmissionResponse>[] = [
     ),
   },
   {
-    accessorKey: "status",
-    header: "Status",
+    id: "createdAt",
+    header: "Created On",
     cell: ({ row }) => {
-      const status = row.original.status;
-      const variant =
-        status === "APPROVED"
-          ? "default"
-          : status === "SUBMITTED"
-            ? "secondary"
-            : status === "REJECTED"
-              ? "destructive"
-              : "outline";
-
-      return <Badge variant={variant}>{status}</Badge>;
+      const createdAt = row.original.createdAt;
+      if (!createdAt) return <div>-</div>;
+      const date = new Date(createdAt);
+      return (
+        <div suppressHydrationWarning>
+          {Number.isNaN(date.getTime())
+            ? "-"
+            : date.toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+        </div>
+      );
     },
   },
   {
@@ -223,11 +250,4 @@ export const getAdminAdmissionColumns = (
         } satisfies ColumnDef<AdmissionResponse>,
       ]
     : []),
-  {
-    id: "menu",
-    header: "",
-    cell: ({ row }) => (
-      <AdminAdmissionActions admission={row.original} menuOnly />
-    ),
-  },
 ];

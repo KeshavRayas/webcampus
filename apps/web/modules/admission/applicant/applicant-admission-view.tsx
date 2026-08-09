@@ -9,6 +9,8 @@ import {
   admissionTypes,
   categoriesAllotted,
   categoriesClaimed,
+  counsellingRounds,
+  nationalities,
   quotas,
 } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
@@ -17,6 +19,10 @@ import { Checkbox } from "@webcampus/ui/components/checkbox";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
 import { PhoneNumberInput } from "@webcampus/ui/components/phone-input";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@webcampus/ui/components/radio-group";
 import {
   Select,
   SelectContent,
@@ -27,8 +33,9 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@webcampus/ui/components/tabs";
 import axios, { isAxiosError } from "axios";
 import { City, Country, State } from "country-state-city";
-import html2canvas from "html2canvas";
+import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
+import { FileDown } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { AdmissionDocument, COLLEGE, type DocData } from "./admission-document";
@@ -47,6 +54,8 @@ type ApplicantAdmissionData = {
   primaryEmail: string;
   filledBy?: { name: string; email: string; role?: string | null } | null;
   admissionType?: string | null;
+  admissionBasedOn?: string | null;
+  nationality?: string | null;
   scholarship?: boolean | null;
   sspId?: string | null;
   abcAparId?: string | null;
@@ -104,8 +113,8 @@ const STEP_LABELS: Record<StepKey, string> = {
   personal: "Personal Information",
   admission: "Admission Details",
   education: "Education Details",
-  parent: "Parental Details",
-  payment: "Upload Image",
+  parent: "Parent Details",
+  payment: "Payment & Photo",
   receipt: "Verification",
 };
 
@@ -433,10 +442,14 @@ export const ApplicantAdmissionView = ({
   staffMode = false,
   initialStep = "personal",
   initialSemesterId = "",
+  initialEmail = "",
+  initialApplicationId = "",
 }: {
   staffMode?: boolean;
   initialStep?: StepKey;
   initialSemesterId?: string;
+  initialEmail?: string;
+  initialApplicationId?: string;
 }) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -470,6 +483,10 @@ export const ApplicantAdmissionView = ({
   const [selectedAdmissionType, setSelectedAdmissionType] = useState("");
   const [admissionBasedOn, setAdmissionBasedOn] = useState("");
   const [scholarshipEnabled, setScholarshipEnabled] = useState(false);
+  const [selectedCounsellingRound, setSelectedCounsellingRound] = useState("");
+  const [selectedNationality, setSelectedNationality] = useState("Indian");
+  const [feePaid, setFeePaid] = useState("");
+  const [feeReceiptNumber, setFeeReceiptNumber] = useState("");
   const [studiedKannadaEnabled, setStudiedKannadaEnabled] = useState(false);
   const [economicallyBackwardEnabled, setEconomicallyBackwardEnabled] =
     useState(false);
@@ -482,6 +499,8 @@ export const ApplicantAdmissionView = ({
   const [docData, setDocData] = useState<DocData | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isDocUpdated, setIsDocUpdated] = useState(false);
+  const [showAcknowledgement, setShowAcknowledgement] = useState(true);
   const sectionRefs = useRef<Record<StepKey, HTMLDivElement | null>>({
     personal: null,
     admission: null,
@@ -531,7 +550,7 @@ export const ApplicantAdmissionView = ({
     useState("");
   const [selectedDiplomaInstituteType, setSelectedDiplomaInstituteType] =
     useState("");
-  const [staffPrimaryEmail, setStaffPrimaryEmail] = useState("");
+  const [staffPrimaryEmail, setStaffPrimaryEmail] = useState(initialEmail);
   const [staffSemesterId, setStaffSemesterId] = useState(
     initialSemesterId ?? ""
   );
@@ -607,7 +626,29 @@ export const ApplicantAdmissionView = ({
     enabled: !staffMode,
     retry: false,
   });
-  const admission = fetchedAdmission ?? EMPTY_ADMISSION;
+
+  const { data: fetchedStaffAdmission } = useQuery({
+    queryKey: ["admission-by-application", initialApplicationId, staffMode],
+    queryFn: async () => {
+      const res = await axios.get<BaseResponse<ApplicantAdmissionData[]>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/admission?applicationId=${encodeURIComponent(initialApplicationId)}`,
+        { withCredentials: true }
+      );
+      if (res.data.status === "success") {
+        const list = res.data.data;
+        return Array.isArray(list) && list.length > 0
+          ? (list[0] ?? null)
+          : null;
+      }
+      return null;
+    },
+    enabled: staffMode && Boolean(initialApplicationId),
+    retry: false,
+  });
+
+  const admission = staffMode
+    ? (fetchedStaffAdmission ?? EMPTY_ADMISSION)
+    : (fetchedAdmission ?? EMPTY_ADMISSION);
   const countries = Country.getAllCountries();
   console.log("Admission:", admission);
   console.log("Primary Email:", admission?.primaryEmail);
@@ -656,6 +697,11 @@ export const ApplicantAdmissionView = ({
       "economicallyBackward",
       economicallyBackwardEnabled ? "true" : "false"
     );
+    formData.set("scholarship", scholarshipEnabled ? "true" : "false");
+    formData.set("feePaid", feePaid);
+    formData.set("feeReceiptNumber", feeReceiptNumber);
+    formData.set("nationality", selectedNationality);
+    formData.set("counsellingRound", selectedCounsellingRound);
     formData.set("hasClass12", class12Enabled ? "true" : "false");
     formData.set("hasDiploma", diplomaEnabled ? "true" : "false");
     formData.set("modeOfAdmission", selectedMode);
@@ -713,9 +759,6 @@ export const ApplicantAdmissionView = ({
     formData.set("diplomaCountry", diplomaCountry);
     formData.set("diplomaInstituteCity", diplomaCity);
     formData.set("diplomaInstituteState", diplomaState);
-    for (const [key, value] of formData.entries()) {
-      console.log(key, value);
-    }
     try {
       await axios({
         method: staffMode ? "post" : "put",
@@ -885,6 +928,9 @@ export const ApplicantAdmissionView = ({
       guardian_mobile: guardianPhone,
       guardian_email: g("guardianEmail"),
       guardian_address: g("guardianPermanentAddress"),
+      receiving_scholarship: isYes(scholarshipEnabled),
+      fee_paid: feePaid,
+      fee_receipt: feeReceiptNumber,
       signature,
       date: new Date().toLocaleDateString("en-IN", {
         day: "2-digit",
@@ -950,8 +996,10 @@ export const ApplicantAdmissionView = ({
       });
       const pageWidth = 210;
       const pageHeight = 297;
-      const pxPerMm = canvas.width / pageWidth;
-      const contentHeightPx = Math.floor(pageHeight * pxPerMm);
+      const border = 4;
+      const contentWidth = pageWidth - border * 2;
+      const pxPerMm = canvas.width / contentWidth;
+      const contentHeightPx = Math.floor((pageHeight - border * 2) * pxPerMm);
       let remaining = canvas.height;
       let offset = 0;
       let pageIndex = 0;
@@ -977,10 +1025,10 @@ export const ApplicantAdmissionView = ({
         pdf.addImage(
           pageData,
           "JPEG",
-          0,
-          0,
-          pageWidth,
-          (sliceH / canvas.width) * pageWidth,
+          border,
+          border,
+          contentWidth,
+          (sliceH / canvas.width) * contentWidth,
           undefined,
           "FAST"
         );
@@ -1014,6 +1062,22 @@ export const ApplicantAdmissionView = ({
     } finally {
       setIsGeneratingPdf(false);
     }
+  };
+
+  const updateDocument = () => {
+    const invalid = findFirstInvalid(STEP_ORDER.length - 1);
+    if (invalid) {
+      warnAndNavigate(invalid);
+      return;
+    }
+    setDocData(buildDocumentData());
+    setIsDocUpdated(true);
+    toast.success("Admission form updated with the latest details.");
+  };
+
+  const downloadDocument = () => {
+    if (!isDocUpdated) return;
+    void generatePdf({ auto: false });
   };
 
   const checkStepValid = (step: StepKey) => {
@@ -1203,6 +1267,26 @@ export const ApplicantAdmissionView = ({
       setSelectedAdmissionType(admission.admissionType);
     }
 
+    if (admission?.admissionBasedOn) {
+      setAdmissionBasedOn(admission.admissionBasedOn);
+    }
+
+    if (admission?.counsellingRound) {
+      setSelectedCounsellingRound(admission.counsellingRound);
+    }
+
+    if (admission?.nationality) {
+      setSelectedNationality(admission.nationality);
+    }
+
+    if (admission?.feePaid != null) {
+      setFeePaid(String(admission.feePaid));
+    }
+
+    if (admission?.feeReceiptNumber) {
+      setFeeReceiptNumber(admission.feeReceiptNumber);
+    }
+
     if (admission?.scholarship != null) {
       setScholarshipEnabled(admission.scholarship);
     }
@@ -1210,6 +1294,238 @@ export const ApplicantAdmissionView = ({
     if (admission?.studiedKannadaIn10th != null) {
       setStudiedKannadaEnabled(admission.studiedKannadaIn10th);
     }
+  }, [admission]);
+
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    const a = admission as ApplicantAdmissionData & Record<string, unknown>;
+    const hasData = Boolean(
+      a?.applicationId || a?.primaryEmail || a?.firstName
+    );
+    if (!hasData || hydratedRef.current) return;
+
+    const countryCodeOf = (stored?: unknown): string => {
+      if (!stored) return "IN";
+      const text = String(stored).trim();
+      const byCode = Country.getAllCountries().find(
+        (c) => c.isoCode.toLowerCase() === text.toLowerCase()
+      );
+      if (byCode) return byCode.isoCode;
+      const byName = Country.getAllCountries().find(
+        (c) => c.name.toLowerCase() === text.toLowerCase()
+      );
+      return byName ? byName.isoCode : text.toUpperCase().slice(0, 2);
+    };
+
+    const stateCodeOf = (country: string, name?: unknown): string => {
+      if (!name) return "";
+      const text = String(name).trim();
+      const states = State.getStatesOfCountry(country);
+      const byName = states.find(
+        (state) => state.name.toLowerCase() === text.toLowerCase()
+      );
+      if (byName) return byName.isoCode;
+      const byCode = states.find(
+        (state) => state.isoCode.toLowerCase() === text.toLowerCase()
+      );
+      return byCode ? byCode.isoCode : "";
+    };
+
+    const cityNameOf = (
+      country: string,
+      state: string,
+      name?: unknown
+    ): string => {
+      if (!name) return "";
+      const text = String(name).trim();
+      const cities = City.getCitiesOfState(country, state);
+      const match = cities.find((city) => city.name === text);
+      return match ? match.name : text;
+    };
+
+    const currentCountryCode = countryCodeOf(a.currentCountry);
+    setCurrentCountry(currentCountryCode);
+    setCurrentState(stateCodeOf(currentCountryCode, a.currentState));
+    setCurrentDistrict(
+      cityNameOf(
+        currentCountryCode,
+        stateCodeOf(currentCountryCode, a.currentState),
+        a.currentDistrict
+      )
+    );
+    setCurrentAddress(String(a.currentAddress ?? ""));
+    setCurrentArea(String(a.currentArea ?? ""));
+    setCurrentPincode(String(a.currentPincode ?? ""));
+
+    const permanentCountryCode = countryCodeOf(a.permanentCountry);
+    setPermanentCountry(permanentCountryCode);
+    setPermanentState(stateCodeOf(permanentCountryCode, a.permanentState));
+    setPermanentDistrict(
+      cityNameOf(
+        permanentCountryCode,
+        stateCodeOf(permanentCountryCode, a.permanentState),
+        a.permanentDistrict
+      )
+    );
+    setPermanentAddress(String(a.permanentAddress ?? ""));
+    setPermanentArea(String(a.permanentArea ?? ""));
+    setPermanentPincode(String(a.permanentPincode ?? ""));
+
+    setPrimaryPhone(String(a.primaryPhoneNumber ?? ""));
+    setSecondaryPhone(String(a.secondaryPhoneNumber ?? ""));
+    setEmergencyPhone(String(a.emergencyContactNumber ?? ""));
+    setFatherPhone(String(a.fatherNumber ?? ""));
+    setMotherPhone(String(a.motherNumber ?? ""));
+    setGuardianPhone(String(a.guardianNumber ?? ""));
+    setGuardianEnabled(Boolean(a.guardianName));
+
+    setSelectedMode(
+      (a.modeOfAdmission ?? "KCET") as keyof typeof categoriesClaimed
+    );
+    setSelectedDepartment(String(a.departmentId ?? ""));
+    setSelectedAdmissionType(String(a.admissionType ?? ""));
+    setAdmissionBasedOn(String(a.admissionBasedOn ?? ""));
+    setSelectedCounsellingRound(String(a.counsellingRound ?? ""));
+    setSelectedNationality(String(a.nationality ?? "Indian"));
+    setFeePaid(String(a.feePaid ?? ""));
+    setFeeReceiptNumber(String(a.feeReceiptNumber ?? ""));
+    setScholarshipEnabled(Boolean(a.scholarship));
+    setStudiedKannadaEnabled(Boolean(a.studiedKannadaIn10th));
+    setNriEnabled(Boolean(a.nri));
+    setDisabilityEnabled(Boolean(a.disability));
+    setEconomicallyBackwardEnabled(Boolean(a.economicallyBackward));
+    setSelectedCategoryClaimed(String(a.categoryClaimed ?? ""));
+    setSelectedCategoryAllotted(String(a.categoryAllotted ?? ""));
+    setSelectedQuota(String(a.quota ?? ""));
+    setSportName(String(a.sportName ?? ""));
+    setSelectedBloodGroup(String(a.bloodGroup ?? ""));
+    setSelectedGender(String(a.gender ?? ""));
+    setSelectedClass10SchoolType(String(a.class10thSchoolType ?? ""));
+    setSelectedClass12InstituteType(String(a.class12thInstituteType ?? ""));
+    setSelectedDiplomaInstituteType(String(a.diplomaInstituteType ?? ""));
+
+    const hasClass12Value = Boolean(
+      a.class12thInstituteName ||
+        a.class12thRollRegNumber ||
+        a.class12thAggregateScore
+    );
+    const hasDiplomaValue = Boolean(
+      a.diplomaInstituteName ||
+        a.diplomaInstituteCity ||
+        a.diplomaAggregateScore
+    );
+    setClass12Enabled(Boolean(a.hasClass12) || hasClass12Value);
+    setDiplomaEnabled(Boolean(a.hasDiploma) || hasDiplomaValue);
+
+    setPcmMarks({
+      physicsMarks: String(a.physicsMarks ?? ""),
+      physicsMaxMarks: String(a.physicsMaxMarks ?? "100"),
+      chemistryMarks: String(a.chemistryMarks ?? ""),
+      chemistryMaxMarks: String(a.chemistryMaxMarks ?? "100"),
+      mathematicsMarks: String(a.mathematicsMarks ?? ""),
+      mathematicsMaxMarks: String(a.mathematicsMaxMarks ?? "100"),
+    });
+
+    const class10CountryCode = countryCodeOf(a.schoolCountry || "IN");
+    setClass10Country(class10CountryCode);
+    setClass10State(stateCodeOf(class10CountryCode, a.class10thSchoolState));
+    setClass10City(
+      cityNameOf(
+        class10CountryCode,
+        stateCodeOf(class10CountryCode, a.class10thSchoolState),
+        a.class10thSchoolCity
+      )
+    );
+
+    const class12CountryCode = countryCodeOf(a.instituteCountry || "IN");
+    setClass12Country(class12CountryCode);
+    setClass12State(stateCodeOf(class12CountryCode, a.class12thInstituteState));
+    setClass12City(
+      cityNameOf(
+        class12CountryCode,
+        stateCodeOf(class12CountryCode, a.class12thInstituteState),
+        a.class12thInstituteCity
+      )
+    );
+
+    const diplomaCountryCode = countryCodeOf(a.diplomaCountry || "IN");
+    setDiplomaCountry(diplomaCountryCode);
+    setDiplomaState(stateCodeOf(diplomaCountryCode, a.diplomaInstituteState));
+    setDiplomaCity(
+      cityNameOf(
+        diplomaCountryCode,
+        stateCodeOf(diplomaCountryCode, a.diplomaInstituteState),
+        a.diplomaInstituteCity
+      )
+    );
+
+    const birthCountryCode = countryCodeOf(a.countryOfBirth || "IN");
+    setBirthState(
+      stateCodeOf("IN", a.placeOfBirth) ||
+        stateCodeOf(birthCountryCode, a.stateOfBirth) ||
+        stateCodeOf("IN", a.stateOfBirth)
+    );
+    setDomicileState(stateCodeOf("IN", a.stateOfBirth));
+
+    if (staffMode) {
+      if (a.primaryEmail) setStaffPrimaryEmail(String(a.primaryEmail));
+      if (a.semesterId) setStaffSemesterId(String(a.semesterId));
+    }
+
+    const applyNativeValues = () => {
+      const form = formRef.current;
+      if (!form) return;
+      const record = admission as Record<string, unknown>;
+      form
+        .querySelectorAll<
+          HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+        >("input, textarea, select")
+        .forEach((el) => {
+          const name = el.name;
+          if (!name) return;
+          if (
+            el instanceof HTMLInputElement &&
+            (el.type === "file" || el.type === "hidden")
+          )
+            return;
+          const raw = record[name];
+          if (raw === null || raw === undefined || raw === "") return;
+          if (
+            el instanceof HTMLInputElement &&
+            (el.type === "checkbox" || el.type === "radio")
+          ) {
+            const valueText = String(raw).toLowerCase();
+            const selfMatch =
+              el.type === "checkbox" || ["true", "1", "yes"].includes(valueText)
+                ? true
+                : ["false", "0", "no"].includes(valueText)
+                  ? false
+                  : null;
+            if (selfMatch !== null) {
+              el.checked = [
+                "true",
+                el.value.toLowerCase(),
+                "1",
+                "yes",
+              ].includes(valueText);
+            }
+            return;
+          }
+          if (el instanceof HTMLInputElement && el.type === "date") {
+            el.value = String(raw).slice(0, 10);
+            return;
+          }
+          el.value = String(raw);
+        });
+    };
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        applyNativeValues();
+        hydratedRef.current = true;
+      });
+    });
   }, [admission]);
 
   useEffect(() => {
@@ -1272,6 +1588,12 @@ export const ApplicantAdmissionView = ({
       : semesterNumber === 3
         ? admissionTypes.filter((type) => type.value !== "REGULAR")
         : [];
+
+  useEffect(() => {
+    if (semesterNumber === 1 && !selectedAdmissionType) {
+      setSelectedAdmissionType("REGULAR");
+    }
+  }, [semesterNumber, selectedAdmissionType]);
 
   const class10Cities = City.getCitiesOfState("IN", class10State);
   const class12Cities = City.getCitiesOfState("IN", class12State);
@@ -1414,7 +1736,7 @@ export const ApplicantAdmissionView = ({
               </div>
 
               <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="departmentId">Branch *</Label>
+                <Label htmlFor="departmentId">Branch/Dept *</Label>
                 <Select
                   name="departmentId"
                   value={selectedDepartment}
@@ -1450,25 +1772,6 @@ export const ApplicantAdmissionView = ({
                         {type.label}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="admissionBasedOn">Admission Based On *</Label>
-                <Select
-                  name="admissionBasedOn"
-                  value={admissionBasedOn}
-                  onValueChange={setAdmissionBasedOn}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select qualification" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CLASS_12_PUC">
-                      Class 12th / PUC
-                    </SelectItem>
-                    <SelectItem value="DIPLOMA">Diploma</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1621,6 +1924,26 @@ export const ApplicantAdmissionView = ({
                 </div>
               ) : null}
               <div className="space-y-2 md:col-span-1">
+                <Label htmlFor="counsellingRound">Counselling Round *</Label>
+                <Select
+                  name="counsellingRound"
+                  value={selectedCounsellingRound}
+                  onValueChange={setSelectedCounsellingRound}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select round" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {counsellingRounds.map((round) => (
+                      <SelectItem key={round} value={round}>
+                        {round}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-1">
                 <Label htmlFor="originalAdmissionOrderNumber">
                   Original Admission Order No. *
                 </Label>
@@ -1631,25 +1954,7 @@ export const ApplicantAdmissionView = ({
                 />
               </div>
               <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="originalAdmissionOrderDate">
-                  Admission Date
-                </Label>
-                <Input
-                  id="originalAdmissionOrderDate"
-                  name="originalAdmissionOrderDate"
-                  type="date"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="counsellingRound">Counselling Round</Label>
-                <Input
-                  id="counsellingRound"
-                  name="counsellingRound"
-                  defaultValue={admission.counsellingRound ?? ""}
-                />
-              </div>
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="abcAparId">ABC/APAAR ID</Label>
+                <Label htmlFor="abcAparId">ABC/APAAR ID *</Label>
                 <Input
                   id="abcAparId"
                   name="abcAparId"
@@ -1658,6 +1963,7 @@ export const ApplicantAdmissionView = ({
                   pattern="[0-9]{12}"
                   maxLength={12}
                   minLength={12}
+                  required
                   title="ABC/APAAR ID must be 12 digits"
                   placeholder="12-digit ID"
                 />
@@ -2180,7 +2486,7 @@ export const ApplicantAdmissionView = ({
                 </div>
               </div>
               <div className="border-t pt-6 md:col-span-2">
-                <h4 className="mb-4 text-lg font-semibold">Other Details</h4>
+                <h4 className="mb-4 text-lg font-semibold">Miscellaneous</h4>
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div className="space-y-2">
@@ -2210,7 +2516,7 @@ export const ApplicantAdmissionView = ({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="stateOfBirth">Domicile State *</Label>
+                    <Label htmlFor="stateOfBirth">Domicile of State *</Label>
                     <Select
                       value={domicileState}
                       onValueChange={setDomicileState}
@@ -2243,6 +2549,10 @@ export const ApplicantAdmissionView = ({
                     <Input id="religion" name="religion" required />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="motherTongue">Mother Tongue *</Label>
+                    <Input id="motherTongue" name="motherTongue" required />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="caste">Caste *</Label>
                     <Input id="caste" name="caste" required />
                   </div>
@@ -2250,15 +2560,28 @@ export const ApplicantAdmissionView = ({
                     <Label htmlFor="subCaste">Sub caste</Label>
                     <Input id="subCaste" name="subCaste" />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="motherTongue">Mother Tongue *</Label>
-                    <Input id="motherTongue" name="motherTongue" required />
-                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="nationality">Nationality *</Label>
-                    <Input id="nationality" name="nationality" required />
+                    <Select
+                      name="nationality"
+                      value={selectedNationality}
+                      onValueChange={setSelectedNationality}
+                      required
+                    >
+                      <SelectTrigger className="w-full" id="nationality">
+                        <SelectValue placeholder="Select nationality" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {nationalities.map((nationality) => (
+                          <SelectItem key={nationality} value={nationality}>
+                            {nationality}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+                  <div className="space-y-2" />
+
                   <div className="space-y-2">
                     <Label htmlFor="nri">NRI Citizen *</Label>
                     <input
@@ -2266,23 +2589,25 @@ export const ApplicantAdmissionView = ({
                       name="nri"
                       value={nriEnabled ? "true" : "false"}
                     />
-                    <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                      <Checkbox
-                        id="nri-toggle"
-                        checked={nriEnabled}
-                        onCheckedChange={(checked) =>
-                          setNriEnabled(Boolean(checked))
-                        }
-                      />
-                      <Label
-                        htmlFor="nri-toggle"
-                        className="cursor-pointer text-sm font-medium"
-                      >
-                        Has NRI status
-                      </Label>
-                    </div>
+                    <RadioGroup
+                      value={nriEnabled ? "true" : "false"}
+                      onValueChange={(value) => setNriEnabled(value === "true")}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="true" id="nri-yes" />
+                        <Label htmlFor="nri-yes" className="font-normal">
+                          Yes
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="false" id="nri-no" />
+                        <Label htmlFor="nri-no" className="font-normal">
+                          No
+                        </Label>
+                      </div>
+                    </RadioGroup>
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="disability">Disability Status *</Label>
                     <input
@@ -2290,21 +2615,26 @@ export const ApplicantAdmissionView = ({
                       name="disability"
                       value={disabilityEnabled ? "true" : "false"}
                     />
-                    <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                      <Checkbox
-                        id="disability-toggle"
-                        checked={disabilityEnabled}
-                        onCheckedChange={(checked) =>
-                          setDisabilityEnabled(Boolean(checked))
-                        }
-                      />
-                      <Label
-                        htmlFor="disability-toggle"
-                        className="cursor-pointer text-sm font-medium"
-                      >
-                        Has disability
-                      </Label>
-                    </div>
+                    <RadioGroup
+                      value={disabilityEnabled ? "true" : "false"}
+                      onValueChange={(value) =>
+                        setDisabilityEnabled(value === "true")
+                      }
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="true" id="disability-yes" />
+                        <Label htmlFor="disability-yes" className="font-normal">
+                          Yes
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="false" id="disability-no" />
+                        <Label htmlFor="disability-no" className="font-normal">
+                          No
+                        </Label>
+                      </div>
+                    </RadioGroup>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="disabilityType">Disability Details </Label>
@@ -2323,21 +2653,26 @@ export const ApplicantAdmissionView = ({
                       name="economicallyBackward"
                       value={economicallyBackwardEnabled ? "true" : "false"}
                     />
-                    <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                      <Checkbox
-                        id="economicallyBackward-toggle"
-                        checked={economicallyBackwardEnabled}
-                        onCheckedChange={(checked) =>
-                          setEconomicallyBackwardEnabled(Boolean(checked))
-                        }
-                      />
-                      <Label
-                        htmlFor="economicallyBackward-toggle"
-                        className="cursor-pointer text-sm font-medium"
-                      >
-                        Economically backward
-                      </Label>
-                    </div>
+                    <RadioGroup
+                      value={economicallyBackwardEnabled ? "true" : "false"}
+                      onValueChange={(value) =>
+                        setEconomicallyBackwardEnabled(value === "true")
+                      }
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="true" id="eb-yes" />
+                        <Label htmlFor="eb-yes" className="font-normal">
+                          Yes
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="false" id="eb-no" />
+                        <Label htmlFor="eb-no" className="font-normal">
+                          No
+                        </Label>
+                      </div>
+                    </RadioGroup>
                   </div>
 
                   <div className="space-y-2">
@@ -2352,6 +2687,7 @@ export const ApplicantAdmissionView = ({
                       required
                     />
                   </div>
+                  <div className="space-y-2" />
                   <div className="space-y-2">
                     <Label htmlFor="passportNumber">
                       Student Passport Number
@@ -2480,6 +2816,31 @@ export const ApplicantAdmissionView = ({
             </h3>
           </div>
 
+          <div className="bg-muted/10 rounded-xl border p-4 sm:p-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="admissionBasedOn">Admission Based On *</Label>
+                <Select
+                  name="admissionBasedOn"
+                  value={admissionBasedOn}
+                  onValueChange={setAdmissionBasedOn}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select qualification" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CLASS_12_PUC">
+                      Class 12th / PUC
+                    </SelectItem>
+                    <SelectItem value="DIPLOMA">Diploma</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2" />
+            </div>
+          </div>
+
           {/* Class 10 */}
           <div className="bg-muted/10 rounded-xl border p-4 sm:p-6">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -2497,11 +2858,12 @@ export const ApplicantAdmissionView = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="class10thRollRegNumber">
-                  Roll / Registration Number
+                  Roll / Registration Number *
                 </Label>
                 <Input
                   id="class10thRollRegNumber"
                   name="class10thRollRegNumber"
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -2673,21 +3035,26 @@ export const ApplicantAdmissionView = ({
                   name="studiedKannadaIn10th"
                   value={studiedKannadaEnabled ? "true" : "false"}
                 />
-                <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                  <Checkbox
-                    id="studiedKannadaIn10th"
-                    checked={studiedKannadaEnabled}
-                    onCheckedChange={(checked) =>
-                      setStudiedKannadaEnabled(Boolean(checked))
-                    }
-                  />
-                  <Label
-                    htmlFor="studiedKannadaIn10th"
-                    className="cursor-pointer"
-                  >
-                    Yes
-                  </Label>
-                </div>
+                <RadioGroup
+                  value={studiedKannadaEnabled ? "true" : "false"}
+                  onValueChange={(value) =>
+                    setStudiedKannadaEnabled(value === "true")
+                  }
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="true" id="kannada-yes" />
+                    <Label htmlFor="kannada-yes" className="font-normal">
+                      Yes
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="false" id="kannada-no" />
+                    <Label htmlFor="kannada-no" className="font-normal">
+                      No
+                    </Label>
+                  </div>
+                </RadioGroup>
               </div>
 
               <div className="space-y-3 border-t pt-6 md:col-span-2">
@@ -2894,21 +3261,21 @@ export const ApplicantAdmissionView = ({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="class12thBranch">Branch *</Label>
+                    <Label htmlFor="class12thBranch">Branch</Label>
                     <Input
                       id="class12thBranch"
                       name="class12thBranch"
                       placeholder="PCM"
-                      required
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="class12thRollRegNumber">
-                      Roll / Registration Number
+                      Roll / Registration Number *
                     </Label>
                     <Input
                       id="class12thRollRegNumber"
                       name="class12thRollRegNumber"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -2964,9 +3331,6 @@ export const ApplicantAdmissionView = ({
                             <th className="px-2 py-3 text-center font-semibold">
                               Max *
                             </th>
-                            <th className="px-2 py-3 text-center font-semibold">
-                              Min / Pass *
-                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3019,28 +3383,6 @@ export const ApplicantAdmissionView = ({
                                   onChange={(event) =>
                                     updatePcmMark(
                                       `${key}MaxMarks` as keyof typeof pcmMarks,
-                                      event.target.value
-                                    )
-                                  }
-                                  required
-                                  className="mx-auto w-24 text-center"
-                                />
-                              </td>
-                              <td className="px-2 py-3">
-                                <Input
-                                  id={`${key}MinMarks`}
-                                  name={`${key}MinMarks`}
-                                  type="number"
-                                  min="0"
-                                  step="any"
-                                  value={
-                                    pcmMarks[
-                                      `${key}MinMarks` as keyof typeof pcmMarks
-                                    ]
-                                  }
-                                  onChange={(event) =>
-                                    updatePcmMark(
-                                      `${key}MinMarks` as keyof typeof pcmMarks,
                                       event.target.value
                                     )
                                   }
@@ -3287,7 +3629,7 @@ export const ApplicantAdmissionView = ({
         >
           <div className="border-b pb-2">
             <h3 className="text-xl font-semibold tracking-tight">
-              4. Parental Details
+              4. Parent Details
             </h3>
           </div>
 
@@ -3374,21 +3716,25 @@ export const ApplicantAdmissionView = ({
           <div className="border-b pb-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-xl font-semibold tracking-tight">
-                5. Upload Image
+                5. Payment & Photo
               </h3>
             </div>
             <div className="text-muted-foreground mt-2 space-y-2 text-sm">
               <p>
-                Upload a recent passport-size photograph. The image is saved
-                with your application and used on your hall ticket.
+                Provide fee details and upload a recent passport-size
+                photograph. The image is saved with your application and used on
+                your hall ticket.
               </p>
             </div>
           </div>
           <div className="border-muted/50 bg-muted/20 flex flex-col items-center gap-6 rounded-lg border p-6 md:flex-row">
-            <div className="bg-background relative flex h-48 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border">
-              {photoPreviewUrl ? (
+            <label
+              htmlFor="photo"
+              className="bg-background relative flex h-48 w-40 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border"
+            >
+              {photoPreviewUrl || admission.photo ? (
                 <img
-                  src={photoPreviewUrl}
+                  src={photoPreviewUrl ?? admission.photo ?? ""}
                   alt="Applicant photo preview"
                   className="h-full w-full object-cover"
                 />
@@ -3400,7 +3746,7 @@ export const ApplicantAdmissionView = ({
                   <span className="text-xs">Upload Your Image</span>
                 </div>
               )}
-            </div>
+            </label>
             <div className="flex flex-1 flex-col items-center gap-4 sm:items-start">
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <Input
@@ -3416,7 +3762,7 @@ export const ApplicantAdmissionView = ({
                     Change Photo
                   </label>
                 </Button>
-                {photoPreviewUrl ? (
+                {photoPreviewUrl || admission.photo ? (
                   <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
                     <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-xs text-white">
                       ✓
@@ -3441,6 +3787,66 @@ export const ApplicantAdmissionView = ({
               </p>
             </div>
           </div>
+
+          <div className="border-muted/50 bg-muted/20 rounded-lg border p-4 sm:p-6">
+            <h4 className="text-base font-semibold">Fee Details</h4>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Provide details of the fee payment made for this admission.
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="receivingScholarship">
+                  Receiving Scholarship?
+                </Label>
+                <RadioGroup
+                  value={scholarshipEnabled ? "true" : "false"}
+                  onValueChange={(value) =>
+                    setScholarshipEnabled(value === "true")
+                  }
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="true" id="scholarship-yes" />
+                    <Label htmlFor="scholarship-yes" className="font-normal">
+                      Yes
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="false" id="scholarship-no" />
+                    <Label htmlFor="scholarship-no" className="font-normal">
+                      No
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="feePaid">Fee Paid (₹)</Label>
+                <Input
+                  id="feePaid"
+                  name="feePaid"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={feePaid}
+                  onChange={(event) => setFeePaid(event.target.value)}
+                  placeholder="e.g. 50000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="feeReceiptNumber">
+                  Fee Receipt / Transaction No.
+                </Label>
+                <Input
+                  id="feeReceiptNumber"
+                  name="feeReceiptNumber"
+                  value={feeReceiptNumber}
+                  onChange={(event) => setFeeReceiptNumber(event.target.value)}
+                  placeholder="Receipt / transaction number"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-wrap justify-between gap-3">
             <Button
               type="button"
@@ -3475,37 +3881,39 @@ export const ApplicantAdmissionView = ({
             </div>
           </div>
 
-          <input
-            type="hidden"
-            name="scholarship"
-            value={scholarshipEnabled ? "true" : "false"}
-          />
-          <input
-            type="hidden"
-            name="feeReceiptNumber"
-            defaultValue={admission.feeReceiptNumber ?? ""}
-          />
-          <input type="hidden" name="feePaid" value="" />
-
           <div className="bg-background/60 space-y-4 rounded-lg border p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h4 className="text-base font-semibold">
-                  Generate Admission PDF
-                </h4>
+                <h4 className="text-base font-semibold">Admission Form PDF</h4>
                 <p className="text-muted-foreground text-sm">
-                  Render your filled details into a print-ready PDF and preview
-                  it below.
+                  Update the preview with your latest details, then download the
+                  final PDF.
                 </p>
               </div>
-              <Button
-                type="button"
-                size="lg"
-                disabled={isGeneratingPdf}
-                onClick={() => void generatePdf()}
-              >
-                {isGeneratingPdf ? "Generating..." : "Generate PDF"}
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  disabled={isGeneratingPdf}
+                  onClick={updateDocument}
+                >
+                  Update
+                </Button>
+                <Button
+                  type="button"
+                  size="lg"
+                  disabled={isGeneratingPdf || !isDocUpdated}
+                  onClick={downloadDocument}
+                  title={
+                    !isDocUpdated
+                      ? "Click Update first to refresh the document with the latest details"
+                      : undefined
+                  }
+                >
+                  {isGeneratingPdf ? "Generating..." : "Download PDF"}
+                </Button>
+              </div>
             </div>
 
             {pdfUrl && (
@@ -3518,13 +3926,6 @@ export const ApplicantAdmissionView = ({
                   />
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <a
-                    href={pdfUrl}
-                    download="admission-form.pdf"
-                    className="bg-foreground text-background inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition hover:opacity-90"
-                  >
-                    Download PDF
-                  </a>
                   <Button
                     type="button"
                     variant="outline"
@@ -3554,6 +3955,47 @@ export const ApplicantAdmissionView = ({
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="bg-background/60 space-y-4 rounded-lg border p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 className="text-base font-semibold">
+                  Admission Acknowledgement
+                </h4>
+                <p className="text-muted-foreground text-sm">
+                  Sample acknowledgement for your reference.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowAcknowledgement((current) => !current)}
+                >
+                  {showAcknowledgement ? "Hide" : "View"}
+                </Button>
+                <Button type="button" variant="outline" asChild>
+                  <a
+                    href="/sample-acknowledgement.pdf"
+                    download="Sample Acknowledgement.pdf"
+                  >
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Download
+                  </a>
+                </Button>
+              </div>
+            </div>
+
+            {showAcknowledgement ? (
+              <div className="bg-background overflow-hidden rounded-lg border">
+                <iframe
+                  title="Sample Acknowledgement PDF"
+                  src="/sample-acknowledgement.pdf"
+                  className="h-[75vh] w-full"
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap justify-between gap-3 border-t pt-6">

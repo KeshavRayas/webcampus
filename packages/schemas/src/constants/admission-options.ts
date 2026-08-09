@@ -15,6 +15,29 @@ export const admissionTypes = [
   { value: "COLLEGE_CHANGE", label: "College Change" },
 ] as const;
 
+export const counsellingRounds = [
+  "Round 1",
+  "Round 2",
+  "Round 3",
+  "Round 4",
+  "Round 5",
+] as const;
+
+export const nationalities = [
+  "Indian",
+  "NRI",
+  "PIO",
+  "Foreign",
+  "Gulf",
+] as const;
+
+export const feePaymentOptions = [
+  { value: "NOT_PAID", label: "Not Paid" },
+  { value: "PAID_ONLINE", label: "Paid Online" },
+  { value: "PAID_DD", label: "Paid via Demand Draft" },
+  { value: "PAID_CASH", label: "Paid in Cash" },
+] as const;
+
 export const categoriesClaimed = {
   KCET: [
     "GM",

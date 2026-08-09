@@ -3,8 +3,19 @@ import { ApplicantAdmissionView } from "@/modules/admission/applicant/applicant-
 export default async function FillApplicantPage({
   searchParams,
 }: {
-  searchParams: Promise<{ semester?: string }>;
+  searchParams: Promise<{
+    semester?: string;
+    email?: string;
+    applicationId?: string;
+  }>;
 }) {
-  const { semester } = (await searchParams) ?? {};
-  return <ApplicantAdmissionView staffMode initialSemesterId={semester} />;
+  const params = (await searchParams) ?? {};
+  return (
+    <ApplicantAdmissionView
+      staffMode
+      initialSemesterId={params.semester}
+      initialEmail={params.email}
+      initialApplicationId={params.applicationId}
+    />
+  );
 }

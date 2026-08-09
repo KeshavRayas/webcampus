@@ -305,7 +305,7 @@ export function CancelAdmissionView() {
             draftFilters={draftFilters}
             onDraftChange={updateDraftFilter}
             allValue={ALL_FILTERS_VALUE}
-            className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-6"
+            className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
           />
           <div className="flex justify-end">
             <FilterActions onApply={applyFilters} onReset={resetFilters} />
