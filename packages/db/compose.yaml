@@ -16,9 +16,16 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
+    # command: >
+    #   postgres
+    #   -c wal_level=replica
+    #   -c archive_mode=on
+    #   -c archive_command="cp %p /var/lib/postgresql/archive/%f"
+    #   -c archive_timeout=300
     volumes:
       # - pgdata:/var/lib/postgresql/data
       - ./data/postgres:/var/lib/postgresql/data
+      # - ./data/archive:/var/lib/postgresql/archive
 
   # ----------------------------------------
   # MinIO Object Storage
@@ -57,3 +64,14 @@ services:
       - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
     depends_on:
       - db
+
+  # ----------------------------------------
+  # Volume Declarations
+  # ----------------------------------------
+  # volumes:
+  #   postgres_data:
+  #     driver: local
+  #   postgres_archive: # Add the new archive volume
+  #     driver: local
+  #   minio_data:
+  #     driver: local
