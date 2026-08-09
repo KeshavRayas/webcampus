@@ -3,9 +3,13 @@ import { ApplicantAdmissionView } from "@/modules/admission/applicant/applicant-
 export default async function FillApplicantFormPage({
   searchParams,
 }: {
-  searchParams: Promise<{ semester?: string }>;
+  searchParams: Promise<{
+    semester?: string;
+    email?: string;
+    applicationId?: string;
+  }>;
 }) {
-  const { semester } = (await searchParams) ?? {};
+  const { semester, email, applicationId } = (await searchParams) ?? {};
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
@@ -16,7 +20,12 @@ export default async function FillApplicantFormPage({
           Fill and submit the admission application for an applicant.
         </p>
       </div>
-      <ApplicantAdmissionView staffMode initialSemesterId={semester} />
+      <ApplicantAdmissionView
+        staffMode
+        initialSemesterId={semester}
+        initialEmail={email}
+        initialApplicationId={applicationId}
+      />
     </div>
   );
 }

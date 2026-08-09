@@ -221,6 +221,13 @@ export function AdmissionDocument({ data }: { data: DocData }) {
             keyName="counselling_round"
           />
           <Row label="ABC / APAAR ID" data={data} keyName="abc_apar_id" />
+          <Row
+            label="Receiving Scholarship?"
+            data={data}
+            keyName="receiving_scholarship"
+          />
+          <Row label="Fee Paid" data={data} keyName="fee_paid" />
+          <Row label="Fee Receipt No." data={data} keyName="fee_receipt" />
         </Panel>
       </section>
 

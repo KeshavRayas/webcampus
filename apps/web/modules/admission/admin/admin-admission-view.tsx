@@ -10,7 +10,6 @@ import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { admissionModes, admissionTypes } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
@@ -56,19 +55,10 @@ import { usePortStudents } from "./use-port-students";
 //   "Other",
 // ] as const;
 // const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
-const ADMISSION_STATUSES = [
-  "PENDING",
-  "SUBMITTED",
-  "APPROVED",
-  "REJECTED",
-] as const;
 const ALL_FILTERS_VALUE = "__all__";
 
 type AdmissionFilters = {
   applicationId: string;
-  status: string;
-  mode: string;
-  admissionType: string;
   academicTerm: string;
   semester: string;
   createdFrom: string;
@@ -77,9 +67,6 @@ type AdmissionFilters = {
 
 const EMPTY_FILTERS: AdmissionFilters = {
   applicationId: "",
-  status: "",
-  mode: "",
-  admissionType: "",
   academicTerm: "",
   semester: "",
   createdFrom: "",
@@ -126,6 +113,7 @@ export const AdminAdmissionView = ({
   const [createChoice, setCreateChoice] = useState<null | "profile" | "fill">(
     null
   );
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!showFilters) return;
@@ -174,11 +162,6 @@ export const AdminAdmissionView = ({
     },
   });
   const selectedSemesterId = draftFilters.semester;
-  console.log("showFilters =", showFilters);
-  console.log("semester =", draftFilters.semester);
-  console.log("selectedSemesterId =", showFilters ? draftFilters.semester : "");
-  console.log("pathname:", pathname);
-  console.log("showFilters:", showFilters);
   const { form, onSubmit } = useCreateAdmissionShellForm(
     selectedSemesterId,
     departments
@@ -269,6 +252,9 @@ export const AdminAdmissionView = ({
         value: term.id,
       })),
     },
+  ];
+
+  const additionalFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
     {
       key: "semester",
       label: "Semester",
@@ -288,39 +274,6 @@ export const AdminAdmissionView = ({
       type: "text",
       placeholder: "Search application ID",
       inputId: "admission-application-id",
-    },
-    {
-      key: "status",
-      label: "Status",
-      type: "select",
-      placeholder: "All statuses",
-      allOptionLabel: "All statuses",
-      options: ADMISSION_STATUSES.map((status) => ({
-        label: status,
-        value: status,
-      })),
-    },
-    {
-      key: "mode",
-      label: "Mode",
-      type: "select",
-      placeholder: "All modes",
-      allOptionLabel: "All modes",
-      options: admissionModes.map((mode) => ({
-        label: mode,
-        value: mode,
-      })),
-    },
-    {
-      key: "admissionType",
-      label: "Admission Type",
-      type: "select",
-      placeholder: "All admission types",
-      allOptionLabel: "All admission types",
-      options: admissionTypes.map((type) => ({
-        label: type.label,
-        value: type.value,
-      })),
     },
     {
       key: "createdFrom",
@@ -349,6 +302,7 @@ export const AdminAdmissionView = ({
     }
 
     setAppliedFilters(draftFilters);
+    setIsFilterDialogOpen(false);
     if (showFilters) {
       const query = createFilterQueryString(draftFilters);
       router.replace(`${pathname}${query ? `?${query}` : ""}`, {
@@ -360,6 +314,7 @@ export const AdminAdmissionView = ({
   const resetFilters = () => {
     setDraftFilters(EMPTY_FILTERS);
     setAppliedFilters(EMPTY_FILTERS);
+    setIsFilterDialogOpen(false);
     if (showFilters) {
       router.replace(pathname, { scroll: false });
     }
@@ -386,11 +341,51 @@ export const AdminAdmissionView = ({
             draftFilters={draftFilters}
             onDraftChange={updateDraftFilter}
             allValue={ALL_FILTERS_VALUE}
-            className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-6"
+            className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
           />
 
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <FilterActions onApply={applyFilters} onReset={resetFilters} />
+            <div className="flex flex-wrap items-center gap-2">
+              <FilterActions onApply={applyFilters} onReset={resetFilters} />
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsFilterDialogOpen(true)}
+              >
+                Filter
+              </Button>
+            </div>
+
+            <Dialog
+              open={isFilterDialogOpen}
+              onOpenChange={setIsFilterDialogOpen}
+            >
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Advanced Filters</DialogTitle>
+                  <DialogDescription>
+                    Filter admissions by semester, application ID, and created
+                    date range.
+                  </DialogDescription>
+                </DialogHeader>
+                <FilterBuilder
+                  fields={additionalFilterFields}
+                  draftFilters={draftFilters}
+                  onDraftChange={updateDraftFilter}
+                  allValue={ALL_FILTERS_VALUE}
+                  className="grid-cols-1 sm:grid-cols-2"
+                />
+                <DialogFooter>
+                  <Button variant="outline" onClick={resetFilters}>
+                    Reset Filters
+                  </Button>
+                  <Button type="button" onClick={applyFilters}>
+                    Apply Filters
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {!hideAddForm && canCreate && (
               <Dialog
@@ -551,7 +546,7 @@ export const AdminAdmissionView = ({
             <h3 className="text-xl font-semibold tracking-tight">Admissions</h3>
             <p className="text-muted-foreground text-sm">
               {showFilters
-                ? "Filter by application ID, status, mode, created date, and semester."
+                ? "Filter by academic term, semester, application ID, and created date."
                 : "Showing admissions for the selected semester."}
             </p>
             {showFilters && selectedSemesterId && (

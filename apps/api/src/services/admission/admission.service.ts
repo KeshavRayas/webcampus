@@ -621,12 +621,20 @@ export class AdmissionService {
         throw new Error("Unable to identify the user who filled the form.");
       }
 
-      if (admission.status === "SUBMITTED") {
+      if (admission.status === "SUBMITTED" && !filledById) {
         throw new Error("Application has already been submitted.");
       }
 
       if (!data.admissionType) {
         throw new Error("Admission type is required.");
+      }
+
+      if (!data.abcAparId?.trim()) {
+        throw new Error("ABC/APAAR ID is required.");
+      }
+
+      if (!data.nationality?.trim()) {
+        throw new Error("Nationality is required.");
       }
 
       const validAdmissionTypes =
@@ -912,22 +920,28 @@ export class AdmissionService {
       select: { id: true },
     });
 
-    if (existingAdmission) {
-      throw new Error("An admission already exists for this email address.");
-    }
-
-    await db.admission.create({
-      data: {
-        applicationId: randomUUID(),
-        primaryEmail,
-        semesterId: data.semesterId,
-        departmentId: data.departmentId,
-        filledById,
-        status: "PENDING",
-      },
-    });
-
     try {
+      if (existingAdmission) {
+        // Staff editing flow: update the existing admission record in place.
+        return await AdmissionService.submitApplication(
+          primaryEmail,
+          data,
+          fileUrls,
+          filledById
+        );
+      }
+
+      await db.admission.create({
+        data: {
+          applicationId: randomUUID(),
+          primaryEmail,
+          semesterId: data.semesterId,
+          departmentId: data.departmentId,
+          filledById,
+          status: "PENDING",
+        },
+      });
+
       return await AdmissionService.submitApplication(
         primaryEmail,
         data,
@@ -935,7 +949,14 @@ export class AdmissionService {
         filledById
       );
     } catch (error) {
-      await db.admission.delete({ where: { primaryEmail } });
+      const createdAdmission = await db.admission.findUnique({
+        where: { primaryEmail },
+        select: { id: true, status: true },
+      });
+
+      if (createdAdmission && createdAdmission.status === "PENDING") {
+        await db.admission.delete({ where: { id: createdAdmission.id } });
+      }
       throw error;
     }
   }
@@ -1100,10 +1121,6 @@ export class AdmissionService {
 
         if (!admission) {
           throw new Error("Admission not found");
-        }
-
-        if (admission.status !== "SUBMITTED") {
-          throw new Error("Only submitted admissions can be cancelled");
         }
 
         const existingArchive = await tx.admissionArchive.findUnique({

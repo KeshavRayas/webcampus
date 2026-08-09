@@ -56,9 +56,14 @@ export function CancelAdmissionActions({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
-          variant="destructive"
+          variant="default"
           size="sm"
-          disabled={admission.status !== "SUBMITTED"}
+          disabled={admission.status === "CANCELLED"}
+          className={
+            admission.status === "CANCELLED"
+              ? "bg-red-200! text-red-400! hover:bg-red-200! disabled:opacity-100"
+              : "bg-red-600! text-white! hover:bg-red-700! disabled:opacity-100"
+          }
         >
           Cancel Admission
         </Button>
@@ -107,7 +112,7 @@ export function CancelAdmissionActions({
             Cancel
           </Button>
           <Button
-            variant="destructive"
+            className="bg-red-600! text-white! hover:bg-red-700!"
             disabled={
               isPending ||
               !reason ||

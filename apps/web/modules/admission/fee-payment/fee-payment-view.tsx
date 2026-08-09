@@ -12,6 +12,11 @@ import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { admissionModes, admissionTypes } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@webcampus/ui/components/avatar";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
@@ -27,13 +32,18 @@ import {
   FilterBuilder,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { FileDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { ApplicantAdmissionView } from "../applicant/applicant-admission-view";
+import {
+  FeeReceiptDocument,
+  FeeReportDocument,
+  type FeeReceiptData,
+  type FeeReportData,
+} from "./fee-document";
 import { type FeePaymentResponse } from "./fee-payment-columns";
 import { useAdmissionPayment } from "./use-admission-payment";
 
@@ -192,6 +202,10 @@ const FeePaymentStaffView = () => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const { initiatePayment, isProcessing } = useAdmissionPayment();
+  const [reportData, setReportData] = useState<FeeReportData | null>(null);
+  const [receiptData, setReceiptData] = useState<FeeReceiptData | null>(null);
+  const reportRef = useRef<HTMLDivElement | null>(null);
+  const receiptRef = useRef<HTMLDivElement | null>(null);
 
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
@@ -288,14 +302,12 @@ const FeePaymentStaffView = () => {
       label: "Created From",
       type: "date",
       inputId: "fee-payment-created-from",
-      className: "xl:col-start-1",
     },
     {
       key: "createdTo",
       label: "Created To",
       type: "date",
       inputId: "fee-payment-created-to",
-      className: "xl:col-start-2",
     },
   ];
 
@@ -350,54 +362,38 @@ const FeePaymentStaffView = () => {
       return;
     }
 
-    const doc = new jsPDF({ orientation: "l", unit: "pt", format: "a4" });
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("Admission Fee Payment Report", 48, 44);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Generated on ${new Date().toLocaleString()}`, 48, 60);
-    doc.text(
-      `Total records: ${summary.total} | Paid: ${summary.paid} | Unpaid: ${summary.unpaid} | Approved: ${summary.approved} | Pending Review: ${summary.pending}`,
-      48,
-      74
-    );
-
-    autoTable(doc, {
-      startY: 90,
-      head: [
-        [
-          "Application ID",
-          "Name",
-          "Email",
-          "Fee Paid (₹)",
-          "Receipt No.",
-          "Status",
-          "Mode",
-        ],
-      ],
-      body: admissions.map((admission) => [
-        admission.applicationId || "-",
-        getFullName(admission),
-        admission.primaryEmail,
-        admission.feePaid != null ? String(admission.feePaid) : "Not paid",
-        admission.feeReceiptNumber || "-",
-        admission.status,
-        admission.modeOfAdmission || "-",
-      ]),
-      theme: "grid",
-      styles: { fontSize: 8, cellPadding: 4 },
-      headStyles: {
-        fillColor: [55, 65, 81],
-        textColor: 255,
-        fontStyle: "bold",
-      },
-      margin: { left: 48, right: 48 },
+    setReportData({
+      generatedAt: new Date().toLocaleString(),
+      total: summary.total,
+      paid: summary.paid,
+      unpaid: summary.unpaid,
+      approved: summary.approved,
+      pending: summary.pending,
+      rows: admissions.map((admission) => ({
+        applicationId: admission.applicationId || "-",
+        name: getFullName(admission),
+        email: admission.primaryEmail,
+        feePaid:
+          admission.feePaid != null ? String(admission.feePaid) : "Not paid",
+        receiptNo: admission.feeReceiptNumber || "-",
+        status: admission.status,
+        mode: admission.modeOfAdmission || "-",
+      })),
     });
-
-    doc.save(`fee-payment-report-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
+
+  useEffect(() => {
+    if (!reportData) return;
+    const node = reportRef.current;
+    if (!node) return;
+    void renderNodeToPdf(
+      node,
+      `fee-payment-report-${new Date().toISOString().slice(0, 10)}.pdf`
+    )
+      .then(() => toast.success("Fee report PDF downloaded."))
+      .catch(() => toast.error("Failed to generate the fee report PDF."))
+      .finally(() => setReportData(null));
+  }, [reportData]);
 
   const generateReceiptPdf = (admission: FeePaymentResponse) => {
     if (!admission) {
@@ -405,218 +401,50 @@ const FeePaymentStaffView = () => {
       return;
     }
 
-    const doc = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
-    const W = 595;
-    const margin = 42;
-    const rightEdge = W - margin;
-    const contentWidth = rightEdge - margin;
-    const brand: [number, number, number] = [106, 162, 224];
-    const brandDark: [number, number, number] = [41, 74, 138];
-    const ink: [number, number, number] = [17, 24, 39];
-    const muted: [number, number, number] = [100, 116, 139];
-    const line: [number, number, number] = [203, 213, 225];
-    const tint: [number, number, number] = [231, 240, 250];
-
-    const name = getFullName(admission);
-    const usn = admission.student?.usn || "-";
     const contact = admission.primaryPhoneNumber || "-";
     const branch = admission.department?.name || "-";
-    const year = "-";
     const quota = admission.quota || admission.categoryAllotted || "-";
-    const academicYear = "-";
     const totalAmount = admission.feePaid;
     const hasAmount =
       typeof totalAmount === "number" && Number.isFinite(totalAmount);
     const amountText = hasAmount ? totalAmount.toLocaleString("en-IN") : "-";
-    const amountInWords = hasAmount ? RUPEES_TEXT(totalAmount) : "-";
-    const receiptNo = admission.feeReceiptNumber || "-";
-    const receiptDate = new Date().toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+    const amountInWords = hasAmount
+      ? RUPEES_TEXT(totalAmount)
+      : "Rupees Zero Only";
+
+    setReceiptData({
+      receiptNo: admission.feeReceiptNumber || "-",
+      receiptDate: new Date().toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      name: getFullName(admission),
+      applicationId: admission.applicationId || "-",
+      usn: admission.student?.usn || "-",
+      contact,
+      branch,
+      quota,
+      paymentMode: admission.modeOfAdmission || "-",
+      transactionId: "-",
+      transactionDate: "-",
+      totalAmountText: amountText,
+      amountInWords,
     });
-    const transactionId = "-";
-    const transactionDate = "-";
-    const remark = "-";
-
-    let y = 46;
-
-    const headingText = (text: string) => {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9.5);
-      doc.setTextColor(brandDark[0], brandDark[1], brandDark[2]);
-      doc.text(text.toUpperCase(), margin, y);
-      doc.setDrawColor(brand[0], brand[1], brand[2]);
-      doc.setLineWidth(1);
-      doc.line(margin, y + 5, rightEdge, y + 5);
-      y += 20;
-    };
-
-    // ---- Header: college + PAID badge ----
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(15);
-    doc.setTextColor(brandDark[0], brandDark[1], brandDark[2]);
-    doc.text("BMS COLLEGE OF ENGINEERING", margin, 44);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(muted[0], muted[1], muted[2]);
-    doc.text(
-      "Affiliated to VTU  •  Approved by AICTE  •  ESTD. 1946",
-      margin,
-      58
-    );
-    doc.text(
-      "P.O. Box No. 1908, Bull Temple Road, Basavanagudi, Bengaluru - 560019",
-      margin,
-      70
-    );
-    doc.text("www.bmsec.com  •  college@bmsec.com", margin, 82);
-
-    doc.setFillColor(tint[0], tint[1], tint[2]);
-    doc.setDrawColor(brand[0], brand[1], brand[2]);
-    doc.setLineWidth(0.8);
-    doc.roundedRect(rightEdge - 92, 38, 92, 30, 5, 5, "FD");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(17);
-    doc.setTextColor(brand[0], brand[1], brand[2]);
-    doc.text("PAID", rightEdge - 46, 55, { align: "center" });
-
-    // divider
-    doc.setDrawColor(line[0], line[1], line[2]);
-    doc.setLineWidth(0.6);
-    doc.line(margin, 96, rightEdge, 96);
-    y = 116;
-
-    // ---- Receipt info row ----
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(muted[0], muted[1], muted[2]);
-    doc.text("Receipt No", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(ink[0], ink[1], ink[2]);
-    doc.text(receiptNo, margin + 78, y);
-
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(muted[0], muted[1], muted[2]);
-    doc.text("Receipt Date", rightEdge - 200, y);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(ink[0], ink[1], ink[2]);
-    doc.text(receiptDate, rightEdge - 108, y);
-    y += 12;
-
-    // ---- Student Details ----
-    headingText("Student Details");
-    const studentPairs: Array<[string, string]> = [
-      ["Student Name", name],
-      ["Application No.", admission.applicationId || "-"],
-      ["USN / Reg. No.", usn],
-      ["Contact No.", contact],
-      ["Branch & Year", `${branch} - ${year}`],
-      ["Academic Year", academicYear],
-      ["Admission Quota", quota],
-    ];
-    const studentPairsPerRow = 2;
-    const colX2 = margin + Math.floor(contentWidth / 2) + 8;
-    const renderPairs = (pairs: Array<[string, string]>) => {
-      pairs.forEach(([label, value], i) => {
-        const x = i % studentPairsPerRow === 0 ? margin : colX2;
-        if (i % studentPairsPerRow === 0 && i > 0) y += 17;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(muted[0], muted[1], muted[2]);
-        doc.text(label, x, y);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(ink[0], ink[1], ink[2]);
-        doc.text(value === "" ? "-" : value, x + 96, y);
-      });
-    };
-    renderPairs(studentPairs);
-    y += 30;
-
-    // ---- Payment Details ----
-    headingText("Payment Details");
-    const paymentPairs: Array<[string, string]> = [
-      ["Payment Mode", admission.modeOfAdmission || "-"],
-      ["Transaction No.", transactionId],
-      ["Transaction Date", transactionDate],
-      ["Remark", remark],
-    ];
-    renderPairs(paymentPairs);
-    y += 30;
-
-    // ---- Fee breakdown table ----
-    headingText("Fee Breakdown");
-    autoTable(doc, {
-      startY: y,
-      head: [["Particulars", "Amount (Rs)"]],
-      body: [
-        ["Admission & Tuition Fee", amountText],
-        ["Miscellaneous Fees", "-"],
-        ["Exam Fee", "-"],
-        ["VTU / University Fees", "-"],
-        ["Skill Lab Fee", "-"],
-      ],
-      foot: [["TOTAL", amountText]],
-      theme: "grid",
-      margin: { left: margin, right: margin },
-      styles: {
-        fontSize: 9,
-        cellPadding: 5,
-        textColor: ink,
-        lineColor: line,
-        lineWidth: 0.5,
-      },
-      headStyles: {
-        fillColor: brandDark,
-        textColor: 255,
-        fontStyle: "bold",
-        fontSize: 9,
-      },
-      footStyles: {
-        fillColor: tint,
-        textColor: ink,
-        fontStyle: "bold",
-        fontSize: 10,
-      },
-      columnStyles: { 1: { halign: "right" } },
-    });
-    y =
-      (doc as typeof doc & { lastAutoTable: { finalY: number } }).lastAutoTable
-        .finalY + 16;
-
-    // ---- Total + Amount in words ----
-    doc.setFillColor(tint[0], tint[1], tint[2]);
-    doc.setDrawColor(brand[0], brand[1], brand[2]);
-    doc.setLineWidth(0.6);
-    doc.roundedRect(margin, y - 12, contentWidth, 40, 4, 4, "FD");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(brandDark[0], brandDark[1], brandDark[2]);
-    doc.text("Total Amount (Rs)", margin + 12, y + 2);
-    doc.setFontSize(13);
-    doc.text(`₹ ${amountText}`, rightEdge - 14, y + 2, { align: "right" });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(ink[0], ink[1], ink[2]);
-    doc.text(`Amount in words : ${amountInWords}`, margin + 12, y + 15);
-    y += 26;
-
-    // ---- Footer ----
-    y += 60;
-    doc.setDrawColor(line[0], line[1], line[2]);
-    doc.line(rightEdge - 170, y - 6, rightEdge, y - 6);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(muted[0], muted[1], muted[2]);
-    doc.text("Authorised Signature", rightEdge - 112, y + 8);
-
-    doc.setFontSize(8);
-    doc.text("This is a system generated receipt", W / 2, 828, {
-      align: "center",
-    });
-
-    doc.save(`fee-receipt-${admission.applicationId || "application"}.pdf`);
   };
+
+  useEffect(() => {
+    if (!receiptData) return;
+    const node = receiptRef.current;
+    if (!node) return;
+    void renderNodeToPdf(
+      node,
+      `fee-receipt-${receiptData.applicationId || "application"}.pdf`
+    )
+      .then(() => toast.success("Fee receipt PDF downloaded."))
+      .catch(() => toast.error("Failed to generate the fee receipt PDF."))
+      .finally(() => setReceiptData(null));
+  }, [receiptData]);
 
   const handlePay = async (id: string) => {
     setPayingId(id);
@@ -700,7 +528,7 @@ const FeePaymentStaffView = () => {
           const isPaying = isProcessing && payingId === admission.id;
 
           return (
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
                 onClick={() => handlePay(admission.id)}
@@ -757,7 +585,7 @@ const FeePaymentStaffView = () => {
             draftFilters={draftFilters}
             onDraftChange={updateDraftFilter}
             allValue={ALL_FILTERS_VALUE}
-            className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-6"
+            className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4"
           />
 
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -823,14 +651,27 @@ const FeePaymentStaffView = () => {
             {selectedAdmission ? (
               <div className="space-y-4">
                 <div className="bg-muted/20 rounded-lg border p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold">
-                        {getFullName(selectedAdmission)}
-                      </p>
-                      <p className="text-muted-foreground text-sm">
-                        {selectedAdmission.primaryEmail || "-"}
-                      </p>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="size-16 rounded-lg">
+                        <AvatarImage
+                          src={selectedAdmission.photo ?? undefined}
+                          alt={getFullName(selectedAdmission)}
+                        />
+                        <AvatarFallback className="rounded-lg text-lg font-semibold">
+                          {getFullName(selectedAdmission)
+                            .slice(0, 2)
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {getFullName(selectedAdmission)}
+                        </p>
+                        <p className="text-muted-foreground text-sm">
+                          {selectedAdmission.primaryEmail || "-"}
+                        </p>
+                      </div>
                     </div>
                     <Badge
                       variant={
@@ -907,6 +748,23 @@ const FeePaymentStaffView = () => {
             ) : null}
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div
+        className="pointer-events-none absolute left-[-10000px] top-0"
+        aria-hidden="true"
+      >
+        <div ref={reportRef}>
+          {reportData ? <FeeReportDocument data={reportData} /> : null}
+        </div>
+      </div>
+      <div
+        className="pointer-events-none absolute left-[-10000px] top-0"
+        aria-hidden="true"
+      >
+        <div ref={receiptRef}>
+          {receiptData ? <FeeReceiptDocument data={receiptData} /> : null}
+        </div>
       </div>
     </div>
   );

@@ -3,10 +3,16 @@ import {
   admissionTypes,
   categoriesAllotted,
   categoriesClaimed,
+  counsellingRounds,
+  nationalities,
   quotas,
 } from "../constants";
 
 export const QuotaSchema = z.enum(quotas);
+
+export const CounsellingRoundSchema = z.enum(counsellingRounds);
+
+export const NationalitySchema = z.enum(nationalities);
 
 const optionalText = z.preprocess((value) => {
   if (typeof value !== "string") return value;
@@ -173,13 +179,18 @@ export const SubmitApplicationSchema = z
     admissionType: AdmissionTypeSchema,
     scholarship: z.enum(["true", "false"]),
     sspId: z.string().trim().optional(),
-    abcAparId: z.string().trim().optional(),
-    counsellingRound: z.string().trim().optional(),
+    abcAparId: z.string().regex(/^\d{12}$/, "ABC/APAAR ID must be 12 digits"),
+    counsellingRound: CounsellingRoundSchema,
     feeReceiptNumber: z.string().trim().optional(),
+    feePaid: optionalText,
     studiedKannadaIn10th: z.enum(["true", "false"]),
     admissionBasedOn: z.enum(["CLASS_12_PUC", "DIPLOMA"]),
-    class10thRollRegNumber: optionalText,
-    class12thRollRegNumber: optionalText,
+    class10thRollRegNumber: z
+      .string()
+      .min(1, "Roll/Registration Number is required"),
+    class12thRollRegNumber: z
+      .string()
+      .min(1, "Roll/Registration Number is required"),
     physicsMarks: optionalText,
     physicsMaxMarks: optionalText,
     chemistryMarks: optionalText,
@@ -193,6 +204,7 @@ export const SubmitApplicationSchema = z
     parentPassportNumber: z.string().trim().optional(),
     parentVisaNumber: z.string().trim().optional(),
     parentVisaExpiryDate: z.string().optional(),
+    nationality: NationalitySchema,
 
     categoryClaimed: z.string().min(1, "Category Claimed is required"),
     categoryAllotted: z.string().min(1, "Category Allotted is required"),
