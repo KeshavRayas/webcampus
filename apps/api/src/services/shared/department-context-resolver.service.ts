@@ -33,7 +33,8 @@ export class DepartmentContextResolver {
     input: ResolveDepartmentContextInput
   ): Promise<DepartmentContext> {
     const strictDepartmentIdOnly =
-      input.strictDepartmentIdOnly ?? DepartmentContextResolver.isStrictModeEnabled();
+      input.strictDepartmentIdOnly ??
+      DepartmentContextResolver.isStrictModeEnabled();
 
     const departmentId = input.departmentId?.trim();
     const departmentName = input.departmentName?.trim();

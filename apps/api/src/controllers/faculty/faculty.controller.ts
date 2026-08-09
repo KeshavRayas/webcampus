@@ -88,7 +88,8 @@ export class FacultyController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
@@ -96,12 +97,19 @@ export class FacultyController {
   }
 
   static async createQualification(
-    req: Request<Record<string, string>, unknown, CreateFacultyQualificationType>,
+    req: Request<
+      Record<string, string>,
+      unknown,
+      CreateFacultyQualificationType
+    >,
     res: Response
   ): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
-      const response = await Faculty.createQualificationByUserId(user.id, req.body);
+      const response = await Faculty.createQualificationByUserId(
+        user.id,
+        req.body
+      );
       if (response.status !== "success") {
         throw new Error(response.message);
       }
@@ -117,7 +125,8 @@ export class FacultyController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
@@ -150,7 +159,8 @@ export class FacultyController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
@@ -182,7 +192,8 @@ export class FacultyController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
@@ -195,7 +206,10 @@ export class FacultyController {
   ): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
-      const response = await Faculty.createPublicationByUserId(user.id, req.body);
+      const response = await Faculty.createPublicationByUserId(
+        user.id,
+        req.body
+      );
       if (response.status !== "success") {
         throw new Error(response.message);
       }
@@ -211,7 +225,8 @@ export class FacultyController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
@@ -244,7 +259,8 @@ export class FacultyController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
@@ -276,7 +292,8 @@ export class FacultyController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
@@ -289,7 +306,10 @@ export class FacultyController {
   ): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
-      const response = await Faculty.createExperienceByUserId(user.id, req.body);
+      const response = await Faculty.createExperienceByUserId(
+        user.id,
+        req.body
+      );
       if (response.status !== "success") {
         throw new Error(response.message);
       }
@@ -305,7 +325,8 @@ export class FacultyController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
@@ -338,7 +359,8 @@ export class FacultyController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });
@@ -370,7 +392,8 @@ export class FacultyController {
       sendResponse({
         res,
         status: "error",
-        message: error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 400,
         error,
       });

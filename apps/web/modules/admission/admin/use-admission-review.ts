@@ -23,7 +23,9 @@ export const useAdmissionReview = () => {
       queryClient.invalidateQueries({ queryKey: ["admissions"] });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
-      toast.error(error.response?.data?.message || "Failed to approve admission");
+      toast.error(
+        error.response?.data?.message || "Failed to approve admission"
+      );
     },
   });
 
@@ -40,7 +42,9 @@ export const useAdmissionReview = () => {
       queryClient.invalidateQueries({ queryKey: ["admissions"] });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
-      toast.error(error.response?.data?.message || "Failed to reject admission");
+      toast.error(
+        error.response?.data?.message || "Failed to reject admission"
+      );
     },
   });
 
