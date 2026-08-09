@@ -5,23 +5,21 @@ import {
   createFilterQueryString,
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
+import { useAdmissionConstants } from "@/lib/use-admission-constants";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { admissionModes, admissionTypes } from "@webcampus/schemas/constants";
+import { admissionTypes } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
-import {
-  FilterActions,
-  FilterBuilder,
-  type FilterFieldConfig,
-} from "@webcampus/ui/components/filter-builder";
+import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { AdmissionResponse } from "../admin/admin-admission-columns";
+import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import { cancelAdmissionColumns } from "./cancel-admission-columns";
 
 const ADMISSION_STATUSES = [
@@ -40,8 +38,6 @@ const CANCELLATION_REASON_VALUES = [
   "CHANGE_ADMISSION_MODE",
   "OTHER",
 ] as const;
-const ALL_FILTERS_VALUE = "__all__";
-
 type CancellationStatus = (typeof CANCELLATION_STATUS_VALUES)[number];
 type CancellationReason = (typeof CANCELLATION_REASON_VALUES)[number];
 
@@ -52,6 +48,7 @@ type CancelAdmissionFilters = {
   status: string;
   mode: string;
   admissionType: string;
+  email: string;
   createdFrom: string;
   createdTo: string;
   cancellationStatus: CancellationStatus | "";
@@ -65,6 +62,7 @@ const EMPTY_FILTERS: CancelAdmissionFilters = {
   status: "",
   mode: "",
   admissionType: "",
+  email: "",
   createdFrom: "",
   createdTo: "",
   cancellationStatus: "",
@@ -87,6 +85,9 @@ export function CancelAdmissionView() {
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
   const { data: departments } = useAdmissionDepartments();
+
+  const { data: admissionConstants } = useAdmissionConstants();
+  const admissionModes = admissionConstants?.modes ?? [];
   const selectedTerm = terms.find(
     (term) => term.id === draftFilters.academicTerm
   );
@@ -105,7 +106,7 @@ export function CancelAdmissionView() {
     setDraftFilters((current) => ({ ...current, [key]: value }));
   };
 
-  const filterFields: FilterFieldConfig<CancelAdmissionFilters>[] = [
+  const simpleFilterFields: FilterFieldConfig<CancelAdmissionFilters>[] = [
     {
       key: "academicTerm",
       label: "Academic Term",
@@ -130,12 +131,36 @@ export function CancelAdmissionView() {
         value: semester.id,
       })),
     },
+  ];
+
+  const advancedFilterFields: FilterFieldConfig<CancelAdmissionFilters>[] = [
+    {
+      key: "email",
+      label: "Email",
+      type: "text",
+      placeholder: "Search by email",
+      inputId: "cancel-email",
+    },
     {
       key: "applicationId",
       label: "Application ID",
       type: "text",
       placeholder: "Search application ID",
       inputId: "cancel-application-id",
+    },
+    {
+      key: "createdFrom",
+      label: "Created From",
+      type: "date",
+      inputId: "cancel-created-from",
+      className: "xl:col-start-1",
+    },
+    {
+      key: "createdTo",
+      label: "Created To",
+      type: "date",
+      inputId: "cancel-created-to",
+      className: "xl:col-start-2",
     },
     {
       key: "status",
@@ -166,20 +191,6 @@ export function CancelAdmissionView() {
         label: type.label,
         value: type.value,
       })),
-    },
-    {
-      key: "createdFrom",
-      label: "Created From",
-      type: "date",
-      inputId: "cancel-created-from",
-      className: "xl:col-start-1",
-    },
-    {
-      key: "createdTo",
-      label: "Created To",
-      type: "date",
-      inputId: "cancel-created-to",
-      className: "xl:col-start-2",
     },
     {
       key: "cancellationStatus",
@@ -233,6 +244,13 @@ export function CancelAdmissionView() {
   const filteredAdmissions = useMemo(() => {
     let admissions = data ?? [];
 
+    const email = appliedFilters.email.trim().toLowerCase();
+    if (email) {
+      admissions = admissions.filter((admission) =>
+        admission.primaryEmail.toLowerCase().includes(email)
+      );
+    }
+
     if (appliedFilters.cancellationStatus === "ACTIVE") {
       admissions = admissions.filter(
         (admission) => admission.status !== "CANCELLED"
@@ -261,6 +279,7 @@ export function CancelAdmissionView() {
   }, [
     appliedFilters.cancellationReason,
     appliedFilters.cancellationStatus,
+    appliedFilters.email,
     data,
   ]);
 
@@ -300,16 +319,16 @@ export function CancelAdmissionView() {
     <div className="space-y-8">
       <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
         <div className="space-y-4">
-          <FilterBuilder
-            fields={filterFields}
+          <AdmissionFilterBar
+            simpleFields={simpleFilterFields}
+            advancedFields={advancedFilterFields}
             draftFilters={draftFilters}
             onDraftChange={updateDraftFilter}
-            allValue={ALL_FILTERS_VALUE}
-            className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+            onApply={applyFilters}
+            onReset={resetFilters}
+            dialogTitle="Advanced Filters"
+            dialogDescription="Filter admissions by email, dates, cancellation status, and reason."
           />
-          <div className="flex justify-end">
-            <FilterActions onApply={applyFilters} onReset={resetFilters} />
-          </div>
         </div>
 
         <div className="flex items-center justify-between gap-3">

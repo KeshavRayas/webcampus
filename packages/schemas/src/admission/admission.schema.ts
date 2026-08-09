@@ -1,14 +1,14 @@
 import { z } from "zod";
 import {
   admissionTypes,
+  allQuotas,
   categoriesAllotted,
   categoriesClaimed,
   counsellingRounds,
   nationalities,
-  quotas,
 } from "../constants";
 
-export const QuotaSchema = z.enum(quotas);
+export const QuotaSchema = z.enum(allQuotas as [string, ...string[]]);
 
 export const CounsellingRoundSchema = z.enum(counsellingRounds);
 
@@ -144,6 +144,31 @@ export const GetAdmissionsQuerySchema = z
   );
 
 export const ExitAdmissionSchema = z.object({});
+
+export const AdmissionReferenceListsSchema = z.object({
+  quotas: z
+    .array(z.string().trim().min(1))
+    .min(1, "At least one quota is required"),
+  categoriesClaimed: z
+    .array(z.string().trim().min(1))
+    .min(1, "At least one category is required"),
+  categoriesAllotted: z
+    .array(z.string().trim().min(1))
+    .min(1, "At least one allotted category is required"),
+});
+
+export const AdmissionReferenceCreateSchema =
+  AdmissionReferenceListsSchema.extend({
+    modeOfAdmission: z
+      .string()
+      .trim()
+      .min(1, "Mode of admission is required")
+      .max(100),
+  });
+
+export const AdmissionReferenceModeParamSchema = z.object({
+  mode: z.string().min(1).max(100),
+});
 
 export const AdmissionCancellationReasonSchema = z.enum([
   "LEAVE_COLLEGE",

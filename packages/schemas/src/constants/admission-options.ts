@@ -9,6 +9,8 @@ export const admissionModes = [
   "GOI",
 ] as const;
 
+export type AdmissionMode = (typeof admissionModes)[number];
+
 export const admissionTypes = [
   { value: "REGULAR", label: "Regular" },
   { value: "LATERAL_ENTRY", label: "Lateral Entry" },
@@ -200,29 +202,35 @@ export const categoriesAllotted = {
   PMSSS: ["GM"],
   GOI: ["GM"],
 } as const;
-export const quotas = [
-  "CET-AIDED",
-  "CET-AIDED-SNQ",
-  "CET-UNAIDED",
-  "CET-UNAIDED-SNQ",
-  "CET-AIDED SC-ST",
-  "CET-UNAIDED SC-ST",
-  "SNQ",
-  "COMED-K",
-  "Management",
-  "PMSSS",
-  "NRI",
-  "GOI",
-  "DCET-AIDED",
-  "DCET-AIDED SC-ST",
-  "DCET-UNAIDED",
-  "DCET-UNAIDED SC-ST",
-  "PGCET",
-  "PGCET-AIDED",
-  "PGCET-UN-AIDED",
-  "PGCET-AIDED-SC-ST",
-  "PGCET-UNAIDED-SC-ST",
-  "PIO",
-  "Foreign",
-  "Gulf",
-] as const;
+
+export const quotas: Record<AdmissionMode, readonly string[]> = {
+  KCET: [
+    "CET-AIDED",
+    "CET-AIDED-SNQ",
+    "CET-UNAIDED",
+    "CET-UNAIDED-SNQ",
+    "CET-AIDED SC-ST",
+    "CET-UNAIDED SC-ST",
+    "SNQ",
+  ],
+  "COMED-K": ["COMED-K"],
+  MANAGEMENT: ["Management"],
+  "PIO/Foreign/Gulf": ["PIO", "Foreign", "Gulf", "NRI"],
+  PMSSS: ["PMSSS"],
+  DCET: [
+    "DCET-AIDED",
+    "DCET-AIDED SC-ST",
+    "DCET-UNAIDED",
+    "DCET-UNAIDED SC-ST",
+  ],
+  PGCET: [
+    "PGCET",
+    "PGCET-AIDED",
+    "PGCET-UN-AIDED",
+    "PGCET-AIDED-SC-ST",
+    "PGCET-UNAIDED-SC-ST",
+  ],
+  GOI: ["GOI"],
+} as const;
+
+export const allQuotas: readonly string[] = Object.values(quotas).flat();

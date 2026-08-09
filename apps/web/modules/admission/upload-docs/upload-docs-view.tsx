@@ -5,22 +5,20 @@ import {
   createFilterQueryString,
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
+import { useAdmissionConstants } from "@/lib/use-admission-constants";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { admissionModes, admissionTypes } from "@webcampus/schemas/constants";
+import { admissionTypes } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
-import {
-  FilterActions,
-  FilterBuilder,
-  type FilterFieldConfig,
-} from "@webcampus/ui/components/filter-builder";
+import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import { uploadDocsColumns, UploadDocsResponse } from "./upload-docs-columns";
 
 const ADMISSION_STATUSES = [
@@ -30,26 +28,26 @@ const ADMISSION_STATUSES = [
   "REJECTED",
 ] as const;
 
-const ALL_FILTERS_VALUE = "__all__";
-
 type UploadDocumentFilters = {
+  academicTerm: string;
+  semester: string;
   applicationId: string;
   status: string;
   mode: string;
   admissionType: string;
-  academicTerm: string;
-  semester: string;
+  email: string;
   createdFrom: string;
   createdTo: string;
 };
 
 const EMPTY_FILTERS: UploadDocumentFilters = {
+  academicTerm: "",
+  semester: "",
   applicationId: "",
   status: "",
   mode: "",
   admissionType: "",
-  academicTerm: "",
-  semester: "",
+  email: "",
   createdFrom: "",
   createdTo: "",
 };
@@ -82,6 +80,9 @@ export function UploadDocsView() {
 
   const { data: departments = [] } = useAdmissionDepartments();
 
+  const { data: admissionConstants } = useAdmissionConstants();
+  const admissionModes = admissionConstants?.modes ?? [];
+
   const selectedTerm = terms.find(
     (term) => term.id === draftFilters.academicTerm
   );
@@ -97,7 +98,10 @@ export function UploadDocsView() {
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["upload-documents", appliedFilters],
     queryFn: async () => {
-      const query = createFilterQueryString(appliedFilters);
+      const apiFilters: Omit<UploadDocumentFilters, "email"> = {
+        ...appliedFilters,
+      };
+      const query = createFilterQueryString(apiFilters);
 
       const res = await apiClient.get<BaseResponse<UploadDocsResponse[]>>(
         `/admission${query ? `?${query}` : ""}`,
@@ -113,6 +117,14 @@ export function UploadDocsView() {
       return [];
     },
   });
+
+  const filteredDocuments = useMemo(() => {
+    const email = appliedFilters.email.trim().toLowerCase();
+    if (!email) return data ?? [];
+    return (data ?? []).filter((admission) =>
+      admission.primaryEmail?.toLowerCase().includes(email)
+    );
+  }, [data, appliedFilters.email]);
 
   const updateDraftFilter = (
     key: keyof UploadDocumentFilters,
@@ -134,7 +146,7 @@ export function UploadDocsView() {
     }));
   };
 
-  const filterFields: FilterFieldConfig<UploadDocumentFilters>[] = [
+  const simpleFilterFields: FilterFieldConfig<UploadDocumentFilters>[] = [
     {
       key: "academicTerm",
       label: "Academic Term",
@@ -159,12 +171,34 @@ export function UploadDocsView() {
         value: semester.id,
       })),
     },
+  ];
+
+  const advancedFilterFields: FilterFieldConfig<UploadDocumentFilters>[] = [
+    {
+      key: "email",
+      label: "Email",
+      type: "text",
+      inputId: "email",
+      placeholder: "Search by email",
+    },
     {
       key: "applicationId",
       label: "Application ID",
       type: "text",
       inputId: "applicationId",
       placeholder: "Search application ID",
+    },
+    {
+      key: "createdFrom",
+      label: "Created From",
+      type: "date",
+      inputId: "createdFrom",
+    },
+    {
+      key: "createdTo",
+      label: "Created To",
+      type: "date",
+      inputId: "createdTo",
     },
     {
       key: "status",
@@ -198,18 +232,6 @@ export function UploadDocsView() {
         label: type.label,
         value: type.value,
       })),
-    },
-    {
-      key: "createdFrom",
-      label: "Created From",
-      type: "date",
-      inputId: "createdFrom",
-    },
-    {
-      key: "createdTo",
-      label: "Created To",
-      type: "date",
-      inputId: "createdTo",
     },
   ];
 
@@ -246,15 +268,16 @@ export function UploadDocsView() {
     <div className="space-y-8">
       <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
         <div className="space-y-4">
-          <FilterBuilder
-            fields={filterFields}
+          <AdmissionFilterBar
+            simpleFields={simpleFilterFields}
+            advancedFields={advancedFilterFields}
             draftFilters={draftFilters}
             onDraftChange={updateDraftFilter}
-            allValue={ALL_FILTERS_VALUE}
-            className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+            onApply={applyFilters}
+            onReset={resetFilters}
+            dialogTitle="Advanced Filters"
+            dialogDescription="Filter admission documents by email, application ID, status, mode, and date range."
           />
-
-          <FilterActions onApply={applyFilters} onReset={resetFilters} />
         </div>
 
         <div>
@@ -281,7 +304,7 @@ export function UploadDocsView() {
               </div>
             )}
 
-            <DataTable columns={uploadDocsColumns} data={data ?? []} />
+            <DataTable columns={uploadDocsColumns} data={filteredDocuments} />
           </div>
         )}
       </div>

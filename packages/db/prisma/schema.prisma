@@ -722,6 +722,19 @@ model Admission {
   @@index([departmentId])
 }
 
+model AdmissionConstants {
+  id               String   @id @default(uuid())
+  modeOfAdmission  String
+  quota            String?
+  categoryClaimed  String
+  categoryAllotted String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([modeOfAdmission, quota, categoryClaimed, categoryAllotted])
+  @@index([modeOfAdmission])
+}
+
 model AttendanceRecord {
   id           String           @id
   sessionId    String

@@ -14,6 +14,7 @@ import {
   LifeBuoy,
   Lock,
   Send,
+  Settings2,
   Upload,
   User,
   Users,
@@ -73,6 +74,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Students",
           url: "/admin/students",
           icon: GraduationCap,
+        },
+        {
+          name: "Admission Setup",
+          url: "/admin/admission-setup",
+          icon: Settings2,
         },
         {
           name: "Courses",
@@ -425,6 +431,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Upload Documents",
           url: "/admission/upload-documents",
           icon: Upload,
+        },
+        {
+          name: "Admission Setup",
+          url: "/admission/setup",
+          icon: Settings2,
         },
       ],
     },

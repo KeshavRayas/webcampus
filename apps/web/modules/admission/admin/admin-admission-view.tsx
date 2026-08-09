@@ -22,11 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@webcampus/ui/components/dialog";
-import {
-  FilterActions,
-  FilterBuilder,
-  type FilterFieldConfig,
-} from "@webcampus/ui/components/filter-builder";
+import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import {
   Form,
   FormControl,
@@ -38,8 +34,9 @@ import {
 import { Input } from "@webcampus/ui/components/input";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import {
   AdmissionResponse,
   getAdminAdmissionColumns,
@@ -55,12 +52,12 @@ import { usePortStudents } from "./use-port-students";
 //   "Other",
 // ] as const;
 // const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
-const ALL_FILTERS_VALUE = "__all__";
 
 type AdmissionFilters = {
   applicationId: string;
   academicTerm: string;
   semester: string;
+  email: string;
   createdFrom: string;
   createdTo: string;
 };
@@ -69,6 +66,7 @@ const EMPTY_FILTERS: AdmissionFilters = {
   applicationId: "",
   academicTerm: "",
   semester: "",
+  email: "",
   createdFrom: "",
   createdTo: "",
 };
@@ -113,7 +111,6 @@ export const AdminAdmissionView = ({
   const [createChoice, setCreateChoice] = useState<null | "profile" | "fill">(
     null
   );
-  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!showFilters) return;
@@ -152,7 +149,10 @@ export const AdminAdmissionView = ({
   } = useQuery({
     queryKey: ["admissions", appliedFilters],
     queryFn: async () => {
-      const query = createFilterQueryString(appliedFilters);
+      const apiFilters: Omit<AdmissionFilters, "email"> = {
+        ...appliedFilters,
+      };
+      const query = createFilterQueryString(apiFilters);
       const res = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
         `/admission${query ? `?${query}` : ""}`,
         { withCredentials: true }
@@ -161,6 +161,13 @@ export const AdminAdmissionView = ({
       return [];
     },
   });
+  const relevantAdmissions = useMemo(() => {
+    const email = appliedFilters.email.trim().toLowerCase();
+    if (!email) return admissions ?? [];
+    return (admissions ?? []).filter((admission) =>
+      admission.primaryEmail.toLowerCase().includes(email)
+    );
+  }, [admissions, appliedFilters.email]);
   const selectedSemesterId = draftFilters.semester;
   const { form, onSubmit } = useCreateAdmissionShellForm(
     selectedSemesterId,
@@ -240,7 +247,7 @@ export const AdminAdmissionView = ({
     }));
   };
 
-  const admissionFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
+  const simpleFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
     {
       key: "academicTerm",
       label: "Academic Term",
@@ -252,9 +259,6 @@ export const AdminAdmissionView = ({
         value: term.id,
       })),
     },
-  ];
-
-  const additionalFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
     {
       key: "semester",
       label: "Semester",
@@ -267,6 +271,16 @@ export const AdminAdmissionView = ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
+    },
+  ];
+
+  const advancedFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
+    {
+      key: "email",
+      label: "Email",
+      type: "text",
+      placeholder: "Search by email",
+      inputId: "admission-email",
     },
     {
       key: "applicationId",
@@ -302,7 +316,6 @@ export const AdminAdmissionView = ({
     }
 
     setAppliedFilters(draftFilters);
-    setIsFilterDialogOpen(false);
     if (showFilters) {
       const query = createFilterQueryString(draftFilters);
       router.replace(`${pathname}${query ? `?${query}` : ""}`, {
@@ -314,7 +327,6 @@ export const AdminAdmissionView = ({
   const resetFilters = () => {
     setDraftFilters(EMPTY_FILTERS);
     setAppliedFilters(EMPTY_FILTERS);
-    setIsFilterDialogOpen(false);
     if (showFilters) {
       router.replace(pathname, { scroll: false });
     }
@@ -336,57 +348,16 @@ export const AdminAdmissionView = ({
     <div className="space-y-8">
       <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
         <div className="space-y-4">
-          <FilterBuilder
-            fields={admissionFilterFields}
+          <AdmissionFilterBar
+            simpleFields={simpleFilterFields}
+            advancedFields={advancedFilterFields}
             draftFilters={draftFilters}
             onDraftChange={updateDraftFilter}
-            allValue={ALL_FILTERS_VALUE}
-            className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+            onApply={applyFilters}
+            onReset={resetFilters}
           />
 
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div className="flex flex-wrap items-center gap-2">
-              <FilterActions onApply={applyFilters} onReset={resetFilters} />
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsFilterDialogOpen(true)}
-              >
-                Filter
-              </Button>
-            </div>
-
-            <Dialog
-              open={isFilterDialogOpen}
-              onOpenChange={setIsFilterDialogOpen}
-            >
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Advanced Filters</DialogTitle>
-                  <DialogDescription>
-                    Filter admissions by semester, application ID, and created
-                    date range.
-                  </DialogDescription>
-                </DialogHeader>
-                <FilterBuilder
-                  fields={additionalFilterFields}
-                  draftFilters={draftFilters}
-                  onDraftChange={updateDraftFilter}
-                  allValue={ALL_FILTERS_VALUE}
-                  className="grid-cols-1 sm:grid-cols-2"
-                />
-                <DialogFooter>
-                  <Button variant="outline" onClick={resetFilters}>
-                    Reset Filters
-                  </Button>
-                  <Button type="button" onClick={applyFilters}>
-                    Apply Filters
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
             {!hideAddForm && canCreate && (
               <Dialog
                 open={isCreateDialogOpen}
@@ -710,8 +681,11 @@ export const AdminAdmissionView = ({
               </div>
             )}
             <DataTable
-              columns={getAdminAdmissionColumns(showFilters)}
-              data={admissions || []}
+              columns={getAdminAdmissionColumns(
+                showFilters,
+                role !== "admission-instructor"
+              )}
+              data={relevantAdmissions}
             />
           </div>
         )}

@@ -1,17 +1,14 @@
 "use client";
 
+import { useAdmissionConstants } from "@/lib/use-admission-constants";
 import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import {
-  admissionModes,
   admissionTypes,
-  categoriesAllotted,
-  categoriesClaimed,
   counsellingRounds,
   nationalities,
-  quotas,
 } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
@@ -490,8 +487,6 @@ export const ApplicantAdmissionView = ({
   const [studiedKannadaEnabled, setStudiedKannadaEnabled] = useState(false);
   const [economicallyBackwardEnabled, setEconomicallyBackwardEnabled] =
     useState(false);
-  const [class12Enabled, setClass12Enabled] = useState(false);
-  const [diplomaEnabled, setDiplomaEnabled] = useState(false);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const photoPreviewRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -535,8 +530,7 @@ export const ApplicantAdmissionView = ({
   const [diplomaCity, setDiplomaCity] = useState("");
   const [diplomaCountry, setDiplomaCountry] = useState("IN");
 
-  const [selectedMode, setSelectedMode] =
-    useState<keyof typeof categoriesClaimed>("KCET");
+  const [selectedMode, setSelectedMode] = useState<string>("KCET");
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedQuota, setSelectedQuota] = useState("");
   const [sportName, setSportName] = useState("");
@@ -557,6 +551,12 @@ export const ApplicantAdmissionView = ({
   const [acknowledged] = useState(true);
   const [signature] = useState("");
   const { data: departments } = useAdmissionDepartments();
+
+  const { data: admissionConstants } = useAdmissionConstants();
+  const admissionModes = admissionConstants?.modes ?? [];
+  const categoriesClaimed = admissionConstants?.categoriesClaimed ?? {};
+  const categoriesAllotted = admissionConstants?.categoriesAllotted ?? {};
+  const quotas = admissionConstants?.quotas ?? {};
   const { data: academicTermsData } = useAcademicTerms(undefined, {
     enabled: staffMode,
   });
@@ -665,11 +665,6 @@ export const ApplicantAdmissionView = ({
 
     const formData = new FormData(e.currentTarget);
 
-    if (!class12Enabled && !diplomaEnabled) {
-      toast.error("Please fill either Class 12 / PUC or Diploma details.");
-      return;
-    }
-
     const invalid = findFirstInvalid(STEP_ORDER.length - 1);
 
     if (invalid) {
@@ -702,8 +697,14 @@ export const ApplicantAdmissionView = ({
     formData.set("feeReceiptNumber", feeReceiptNumber);
     formData.set("nationality", selectedNationality);
     formData.set("counsellingRound", selectedCounsellingRound);
-    formData.set("hasClass12", class12Enabled ? "true" : "false");
-    formData.set("hasDiploma", diplomaEnabled ? "true" : "false");
+    formData.set(
+      "hasClass12",
+      admissionBasedOn === "CLASS_12_PUC" ? "true" : "false"
+    );
+    formData.set(
+      "hasDiploma",
+      admissionBasedOn === "DIPLOMA" ? "true" : "false"
+    );
     formData.set("modeOfAdmission", selectedMode);
     formData.set("departmentId", selectedDepartment);
     formData.set("admissionType", selectedAdmissionType || "REGULAR");
@@ -1258,9 +1259,7 @@ export const ApplicantAdmissionView = ({
     }
 
     if (admission?.modeOfAdmission) {
-      setSelectedMode(
-        admission.modeOfAdmission as keyof typeof categoriesClaimed
-      );
+      setSelectedMode(admission.modeOfAdmission);
     }
 
     if (admission?.admissionType) {
@@ -1380,12 +1379,15 @@ export const ApplicantAdmissionView = ({
     setGuardianPhone(String(a.guardianNumber ?? ""));
     setGuardianEnabled(Boolean(a.guardianName));
 
-    setSelectedMode(
-      (a.modeOfAdmission ?? "KCET") as keyof typeof categoriesClaimed
-    );
+    setSelectedMode(a.modeOfAdmission ?? "KCET");
     setSelectedDepartment(String(a.departmentId ?? ""));
     setSelectedAdmissionType(String(a.admissionType ?? ""));
-    setAdmissionBasedOn(String(a.admissionBasedOn ?? ""));
+    setAdmissionBasedOn(
+      String(
+        a.admissionBasedOn ??
+          (a.hasClass12 ? "CLASS_12_PUC" : a.hasDiploma ? "DIPLOMA" : "")
+      )
+    );
     setSelectedCounsellingRound(String(a.counsellingRound ?? ""));
     setSelectedNationality(String(a.nationality ?? "Indian"));
     setFeePaid(String(a.feePaid ?? ""));
@@ -1404,19 +1406,6 @@ export const ApplicantAdmissionView = ({
     setSelectedClass10SchoolType(String(a.class10thSchoolType ?? ""));
     setSelectedClass12InstituteType(String(a.class12thInstituteType ?? ""));
     setSelectedDiplomaInstituteType(String(a.diplomaInstituteType ?? ""));
-
-    const hasClass12Value = Boolean(
-      a.class12thInstituteName ||
-        a.class12thRollRegNumber ||
-        a.class12thAggregateScore
-    );
-    const hasDiplomaValue = Boolean(
-      a.diplomaInstituteName ||
-        a.diplomaInstituteCity ||
-        a.diplomaAggregateScore
-    );
-    setClass12Enabled(Boolean(a.hasClass12) || hasClass12Value);
-    setDiplomaEnabled(Boolean(a.hasDiploma) || hasDiplomaValue);
 
     setPcmMarks({
       physicsMarks: String(a.physicsMarks ?? ""),
@@ -1717,9 +1706,7 @@ export const ApplicantAdmissionView = ({
                 <Select
                   name="modeOfAdmission"
                   value={selectedMode}
-                  onValueChange={(val) =>
-                    setSelectedMode(val as keyof typeof categoriesClaimed)
-                  }
+                  onValueChange={setSelectedMode}
                   required
                 >
                   <SelectTrigger className="w-full">
@@ -1876,30 +1863,26 @@ export const ApplicantAdmissionView = ({
                   </SelectContent>
                 </Select>
               </div>
-              {selectedMode === "KCET" ? (
-                <div className="space-y-2 md:col-span-1">
-                  <Label htmlFor="quota">Quota *</Label>
-                  <Select
-                    name="quota"
-                    value={selectedQuota}
-                    onValueChange={setSelectedQuota}
-                    required
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select quota" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {quotas.map((quota) => (
-                        <SelectItem key={quota} value={quota}>
-                          {quota}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="space-y-2 md:col-span-1" />
-              )}
+              <div className="space-y-2 md:col-span-1">
+                <Label htmlFor="quota">Quota *</Label>
+                <Select
+                  name="quota"
+                  value={selectedQuota}
+                  onValueChange={setSelectedQuota}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select quota" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(quotas[selectedMode] ?? []).map((quota) => (
+                      <SelectItem key={quota} value={quota}>
+                        {quota}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="space-y-2 md:col-span-1">
                 <Label htmlFor="entranceExamRank">Entrance Exam Rank *</Label>
@@ -1968,14 +1951,63 @@ export const ApplicantAdmissionView = ({
                   placeholder="12-digit ID"
                 />
               </div>
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="sspId">SSP ID</Label>
-                <Input
-                  id="sspId"
-                  name="sspId"
-                  defaultValue={admission.sspId ?? ""}
-                  placeholder="Scholarship SSP ID"
-                />
+              <div className="md:col-span-2">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                  {/* Scholarship */}
+                  <div className="flex shrink-0 items-center gap-4">
+                    <Label
+                      htmlFor="scholarship-yes"
+                      className="whitespace-nowrap"
+                    >
+                      Receiving Scholarship?
+                    </Label>
+
+                    <RadioGroup
+                      value={scholarshipEnabled ? "true" : "false"}
+                      onValueChange={(value) =>
+                        setScholarshipEnabled(value === "true")
+                      }
+                      className="flex items-center gap-4"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="true" id="scholarship-yes" />
+                        <Label
+                          htmlFor="scholarship-yes"
+                          className="font-normal"
+                        >
+                          Yes
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="false" id="scholarship-no" />
+                        <Label htmlFor="scholarship-no" className="font-normal">
+                          No
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {/* SSP ID */}
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <Label
+                      htmlFor="sspId"
+                      className="shrink-0 whitespace-nowrap"
+                    >
+                      SSP ID
+                    </Label>
+
+                    <Input
+                      id="sspId"
+                      name="sspId"
+                      defaultValue={admission.sspId ?? ""}
+                      placeholder="Scholarship SSP ID"
+                      disabled={!scholarshipEnabled}
+                      aria-disabled={!scholarshipEnabled}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
             <div className="mt-6 flex justify-end">
@@ -3057,55 +3089,7 @@ export const ApplicantAdmissionView = ({
                 </RadioGroup>
               </div>
 
-              <div className="space-y-3 border-t pt-6 md:col-span-2">
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                    <Checkbox
-                      id="class12-toggle"
-                      checked={class12Enabled}
-                      onCheckedChange={(checked) => {
-                        setClass12Enabled(Boolean(checked));
-                      }}
-                    />
-                    <Label
-                      htmlFor="class12-toggle"
-                      className="cursor-pointer text-sm font-medium"
-                    >
-                      Class 12 / PUC
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                    <Checkbox
-                      id="diploma-toggle"
-                      checked={diplomaEnabled}
-                      onCheckedChange={(checked) => {
-                        setDiplomaEnabled(Boolean(checked));
-                      }}
-                    />
-                    <Label
-                      htmlFor="diploma-toggle"
-                      className="cursor-pointer text-sm font-medium"
-                    >
-                      Diploma
-                    </Label>
-                  </div>
-                </div>
-                <input
-                  type="hidden"
-                  name="hasClass12"
-                  value={class12Enabled ? "true" : "false"}
-                />
-                <input
-                  type="hidden"
-                  name="hasDiploma"
-                  value={diplomaEnabled ? "true" : "false"}
-                />
-                <p className="text-muted-foreground text-sm">
-                  Choose at least one. You may complete both if applicable.
-                </p>
-              </div>
-
-              {class12Enabled ? (
+              {admissionBasedOn === "CLASS_12_PUC" ? (
                 <fieldset className="contents">
                   <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2">
                     Class XII / PUC Details
@@ -3414,7 +3398,7 @@ export const ApplicantAdmissionView = ({
                 </fieldset>
               ) : null}
 
-              {diplomaEnabled ? (
+              {admissionBasedOn === "DIPLOMA" ? (
                 <fieldset className="contents">
                   <h4 className="mt-6 border-t pt-6 text-lg font-semibold md:col-span-2">
                     Diploma Details
@@ -3426,7 +3410,7 @@ export const ApplicantAdmissionView = ({
                     <Input
                       id="diplomaInstituteName"
                       name="diplomaInstituteName"
-                      required={diplomaEnabled}
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -3437,7 +3421,7 @@ export const ApplicantAdmissionView = ({
                       name="diplomaInstituteType"
                       value={selectedDiplomaInstituteType}
                       onValueChange={setSelectedDiplomaInstituteType}
-                      required={diplomaEnabled}
+                      required
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select" />
@@ -3482,7 +3466,7 @@ export const ApplicantAdmissionView = ({
                       type="hidden"
                       name="diplomaCountry"
                       value={diplomaCountry}
-                      required={diplomaEnabled}
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -3517,7 +3501,7 @@ export const ApplicantAdmissionView = ({
                         educationStates.find((s) => s.isoCode === diplomaState)
                           ?.name ?? ""
                       }
-                      required={diplomaEnabled}
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -3543,16 +3527,12 @@ export const ApplicantAdmissionView = ({
                       type="hidden"
                       name="diplomaInstituteCity"
                       value={diplomaCity}
-                      required={diplomaEnabled}
+                      required
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="diplomaBranch">Branch *</Label>
-                    <Input
-                      id="diplomaBranch"
-                      name="diplomaBranch"
-                      required={diplomaEnabled}
-                    />
+                    <Input id="diplomaBranch" name="diplomaBranch" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="diplomaYearOfPassing">
@@ -3565,7 +3545,7 @@ export const ApplicantAdmissionView = ({
                       inputMode="numeric"
                       pattern="\d{4}"
                       maxLength={4}
-                      required={diplomaEnabled}
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -3575,7 +3555,7 @@ export const ApplicantAdmissionView = ({
                     <Input
                       id="diplomaMediumOfTeaching"
                       name="diplomaMediumOfTeaching"
-                      required={diplomaEnabled}
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -3587,7 +3567,7 @@ export const ApplicantAdmissionView = ({
                       name="diplomaAggregateScore"
                       type="number"
                       step="1"
-                      required={diplomaEnabled}
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -3597,7 +3577,7 @@ export const ApplicantAdmissionView = ({
                       name="diplomaAggregateTotal"
                       type="number"
                       step="1"
-                      required={diplomaEnabled}
+                      required
                     />
                   </div>
                 </fieldset>
@@ -3794,31 +3774,6 @@ export const ApplicantAdmissionView = ({
               Provide details of the fee payment made for this admission.
             </p>
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="receivingScholarship">
-                  Receiving Scholarship?
-                </Label>
-                <RadioGroup
-                  value={scholarshipEnabled ? "true" : "false"}
-                  onValueChange={(value) =>
-                    setScholarshipEnabled(value === "true")
-                  }
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="true" id="scholarship-yes" />
-                    <Label htmlFor="scholarship-yes" className="font-normal">
-                      Yes
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="false" id="scholarship-no" />
-                    <Label htmlFor="scholarship-no" className="font-normal">
-                      No
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="feePaid">Fee Paid (₹)</Label>
                 <Input

@@ -183,52 +183,55 @@ export type AdmissionResponse = {
   uniqueId?: string | null;
 };
 
-const baseColumns: ColumnDef<AdmissionResponse>[] = [
-  {
-    accessorKey: "primaryEmail",
-    header: "College Email",
-    cell: ({ row }) => (
-      <div className="font-medium">{row.original.primaryEmail}</div>
-    ),
-  },
-  {
-    id: "createdAt",
-    header: "Created On",
-    cell: ({ row }) => {
-      const createdAt = row.original.createdAt;
-      if (!createdAt) return <div>-</div>;
-      const date = new Date(createdAt);
-      return (
-        <div suppressHydrationWarning>
-          {Number.isNaN(date.getTime())
-            ? "-"
-            : date.toLocaleDateString("en-IN", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}
-        </div>
-      );
-    },
-  },
-  {
-    id: "filledBy",
-    header: "Filled By",
-    cell: ({ row }) => (
-      <div>
-        <div className="font-medium">{row.original.filledBy.name}</div>
-        <div className="text-muted-foreground text-xs">
-          {row.original.filledBy.role ?? row.original.filledBy.email}
-        </div>
+const emailColumn: ColumnDef<AdmissionResponse> = {
+  accessorKey: "primaryEmail",
+  header: "College Email",
+  cell: ({ row }) => (
+    <div className="font-medium">{row.original.primaryEmail}</div>
+  ),
+};
+
+const createdAtColumn: ColumnDef<AdmissionResponse> = {
+  id: "createdAt",
+  header: "Created On",
+  cell: ({ row }) => {
+    const createdAt = row.original.createdAt;
+    if (!createdAt) return <div>-</div>;
+    const date = new Date(createdAt);
+    return (
+      <div suppressHydrationWarning>
+        {Number.isNaN(date.getTime())
+          ? "-"
+          : date.toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}
       </div>
-    ),
+    );
   },
-];
+};
+
+const filledByColumn: ColumnDef<AdmissionResponse> = {
+  id: "filledBy",
+  header: "Filled By",
+  cell: ({ row }) => (
+    <div>
+      <div className="font-medium">{row.original.filledBy.name}</div>
+      <div className="text-muted-foreground text-xs">
+        {row.original.filledBy.role ?? row.original.filledBy.email}
+      </div>
+    </div>
+  ),
+};
 
 export const getAdminAdmissionColumns = (
-  showViewDetails: boolean
+  showViewDetails: boolean,
+  showFilledBy = true
 ): ColumnDef<AdmissionResponse>[] => [
-  ...baseColumns,
+  emailColumn,
+  createdAtColumn,
+  ...(showFilledBy ? [filledByColumn] : []),
   ...(showViewDetails
     ? [
         {

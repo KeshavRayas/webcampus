@@ -1,16 +1,11 @@
 "use client";
 
+import { useAdmissionConstants } from "@/lib/use-admission-constants";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ChangeAdmissionModeSchema,
   ChangeAdmissionModeType,
 } from "@webcampus/schemas/admission";
-import {
-  admissionModes,
-  categoriesAllotted,
-  categoriesClaimed,
-  quotas,
-} from "@webcampus/schemas/constants";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -43,6 +38,12 @@ export function ChangeAdmissionModeActions({
   const [open, setOpen] = useState(false);
 
   const mutation = useChangeAdmissionMode();
+
+  const { data: admissionConstants } = useAdmissionConstants();
+  const admissionModes = admissionConstants?.modes ?? [];
+  const categoriesClaimed = admissionConstants?.categoriesClaimed ?? {};
+  const categoriesAllotted = admissionConstants?.categoriesAllotted ?? {};
+  const quotas = admissionConstants?.quotas ?? {};
 
   const form = useForm({
     resolver: zodResolver(ChangeAdmissionModeSchema),
@@ -80,9 +81,7 @@ export function ChangeAdmissionModeActions({
     });
   };
 
-  const selectedMode = form.watch(
-    "modeOfAdmission"
-  ) as keyof typeof categoriesClaimed;
+  const selectedMode = form.watch("modeOfAdmission");
 
   useEffect(() => {
     if (selectedMode !== "KCET") {
@@ -212,7 +211,7 @@ export function ChangeAdmissionModeActions({
                   </SelectTrigger>
 
                   <SelectContent>
-                    {quotas.map((quota) => (
+                    {quotas["KCET"]?.map((quota) => (
                       <SelectItem key={quota} value={quota}>
                         {quota}
                       </SelectItem>
