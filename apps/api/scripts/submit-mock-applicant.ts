@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { faker } from "@faker-js/faker";
+import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { AdmissionService } from "@webcampus/api/src/services/admission/admission.service";
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
@@ -27,7 +28,7 @@ const parseCliArguments = (): ParsedArgs => {
       const countValue = args[i + 1];
       if (typeof countValue !== "string") {
         throw new Error(
-          "Missing value for --count. Usage: npm run submit-mock-applicant --count <number> --dept <code>"
+          "Missing value for --count. Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]"
         );
       }
 
@@ -44,7 +45,7 @@ const parseCliArguments = (): ParsedArgs => {
       const departmentValue = args[i + 1];
       if (typeof departmentValue !== "string") {
         throw new Error(
-          "Missing value for --dept. Usage: npm run submit-mock-applicant --count <number> --dept <code>"
+          "Missing value for --dept. Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]"
         );
       }
 
@@ -70,16 +71,18 @@ const parseCliArguments = (): ParsedArgs => {
   if (result.count === undefined) {
     throw new Error(
       "Missing required parameter --count.\n" +
-        "Usage: npm run submit-mock-applicant --count <number> --dept <code>\n" +
-        "Example: npm run submit-mock-applicant --count 500 --dept CS"
+        "Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]\n" +
+        "Example: npm run submit-mock-applicant --count 500 --dept CS\n" +
+        "Example: npm run submit-mock-applicant --count 100 --dept CS --port"
     );
   }
 
   if (!result.departmentCode) {
     throw new Error(
       "Missing required parameter --dept.\n" +
-        "Usage: npm run submit-mock-applicant --count <number> --dept <code>\n" +
-        "Example: npm run submit-mock-applicant --count 500 --dept CS"
+        "Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]\n" +
+        "Example: npm run submit-mock-applicant --count 500 --dept CS\n" +
+        "Example: npm run submit-mock-applicant --count 100 --dept CS --port"
     );
   }
 
@@ -96,44 +99,89 @@ const deterministicAadhar = (serial: number): string => {
   return `9${tail}`;
 };
 
-// const getNextApplicationNumber = async (): Promise<number> => {
-//   const rows = await db.admission.findMany({
-//     select: { applicationId: true },
-//     where: {
-//       applicationId: {
-//         startsWith: "APP",
-//       },
-//     },
-//     orderBy: {
-//       createdAt: "desc",
-//     },
-//     take: 500,
-//   });
+const cleanupPartialApplicant = async (
+  email: string,
+  removeApplicantUser: boolean
+): Promise<void> => {
+  try {
+    await db.admission.deleteMany({
+      where: { primaryEmail: email },
+    });
 
-//   let maxNumber = 2026000;
-//   for (const row of rows) {
-//     const parsed = extractNumericId(row.applicationId);
-//     if (parsed && parsed > maxNumber) {
-//       maxNumber = parsed;
-//     }
-//   }
+    if (removeApplicantUser) {
+      const applicant = await db.user.findFirst({
+        where: { email, role: "applicant" },
+        select: { id: true },
+      });
 
-//   return maxNumber + 1;
-// };
+      if (applicant) {
+        await db.user.delete({ where: { id: applicant.id } });
+      }
+    }
+  } catch (cleanupError) {
+    logger.error("Failed to clean up partial mock applicant", {
+      email,
+      cleanupError,
+    });
+  }
+};
+
+const ADMISSION_INSTRUCTOR = {
+  name: "admission-instructor",
+  email: "admission-instructor@webcampus.com",
+  username: "admission-instructor",
+  password: "password",
+} as const;
+
+const ensureInstructorUser = async (adminHeaders: {
+  Authorization: string;
+}): Promise<string> => {
+  const existing = await db.user.findUnique({
+    where: { email: ADMISSION_INSTRUCTOR.email },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return existing.id;
+  }
+
+  const userService = new UserService({
+    request: {
+      ...ADMISSION_INSTRUCTOR,
+      role: "admission-instructor",
+    },
+    headers: adminHeaders,
+  });
+
+  const response = await userService.create();
+  if (response.status === "error" || !response.data?.id) {
+    throw new Error(
+      response.message || "Failed to create admission-instructor user"
+    );
+  }
+
+  logger.info("Admission instructor user created by mock script", {
+    id: response.data.id,
+  });
+  return response.data.id;
+};
 
 const resolveContext = async (departmentCode: string) => {
   const { ADMIN_USER_EMAIL, ADMIN_USER_PASSWORD } = backendEnv();
 
-  const signInResponse = await auth.api.signInEmail({
+  const adminSignIn = await auth.api.signInEmail({
     body: {
       email: ADMIN_USER_EMAIL,
       password: ADMIN_USER_PASSWORD,
     },
   });
 
-  if (!signInResponse.token) {
+  if (!adminSignIn.token) {
     throw new Error("Admin sign-in failed: token missing");
   }
+
+  const adminHeaders = { Authorization: `Bearer ${adminSignIn.token}` };
+  const filledById = await ensureInstructorUser(adminHeaders);
 
   const department = await db.department.findFirst({
     where: { code: departmentCode },
@@ -183,7 +231,8 @@ const resolveContext = async (departmentCode: string) => {
   }
 
   return {
-    headers: { Authorization: `Bearer ${signInResponse.token}` },
+    headers: adminHeaders,
+    filledById,
     departmentId: department.id,
     semesterId: semester.id,
   };
@@ -193,16 +242,12 @@ const submitAndApprove = async (
   email: string,
   serial: number,
   admissionId: string,
-  firstName: string,
-  lastName: string,
+  fullName: string,
+  filledById: string,
   departmentId: string,
   semesterId: string
 ): Promise<void> => {
-  const fullName = `${firstName} ${lastName}`;
-
   const data: Record<string, string> = {
-    firstName,
-    lastName,
     nameAsPer10th: fullName,
     modeOfAdmission: "KCET",
     categoryClaimed: "GM",
@@ -211,6 +256,8 @@ const submitAndApprove = async (
     primaryEmail: email,
     semesterId,
     departmentId,
+    admissionType: "REGULAR",
+    scholarship: "false",
     primaryPhoneNumber: randomPhone(serial),
     aadharNumber: deterministicAadhar(serial),
     dob: faker.date
@@ -234,7 +281,8 @@ const submitAndApprove = async (
   const submitResponse = await AdmissionService.submitApplication(
     email,
     data,
-    fileUrls
+    fileUrls,
+    filledById
   );
 
   if (submitResponse.status !== "success") {
@@ -279,7 +327,8 @@ async function main() {
   });
 
   for (let attempt = 1; attempt <= args.count; attempt++) {
-    const email = `mock${attempt}@bmsce.ac.in`;
+    const deptCode = args.departmentCode.toLowerCase();
+    const email = `mock${attempt}.${deptCode}26@bmsce.ac.in`;
     const password = "password";
 
     const existing = await db.admission.findUnique({
@@ -296,6 +345,11 @@ async function main() {
       continue;
     }
 
+    const existingApplicantUser = await db.user.findFirst({
+      where: { email, role: "applicant" },
+      select: { id: true },
+    });
+
     try {
       const firstName = faker.person.firstName();
       const lastName = faker.person.lastName();
@@ -305,6 +359,7 @@ async function main() {
           primaryEmail: email,
           password,
           semesterId: context.semesterId,
+          departmentId: context.departmentId,
         },
         context.headers
       );
@@ -358,6 +413,7 @@ async function main() {
         error: errorMsg,
       });
       failedApplicants.push({ email, error: errorMsg });
+      await cleanupPartialApplicant(email, !existingApplicantUser);
     }
   }
 

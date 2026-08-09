@@ -3,23 +3,36 @@ import { AdmissionController } from "@webcampus/api/src/controllers/admission/ad
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   AdmissionActionParamSchema,
-  ChangeAdmissionModeSchema,
+  CancelAdmissionSchema,
   CreateAdmissionShellSchema,
-  ExitAdmissionSchema,
   GetAdmissionsQuerySchema,
   PortStudentsSchema,
 } from "@webcampus/schemas/admission";
 import { Router } from "express";
 import multer from "multer";
+import admissionUploadRouter from "./admission.upload.router";
 
 const upload = multer({ storage: multer.memoryStorage() });
+const applicationUploadFields = [
+  { name: "class10thMarksPdf", maxCount: 1 },
+  { name: "class12thMarksPdf", maxCount: 1 },
+  { name: "diplomaMarksPdf", maxCount: 1 },
+  { name: "casteCertificate", maxCount: 1 },
+  { name: "photo", maxCount: 1 },
+  { name: "disabilityCertificate", maxCount: 1 },
+  { name: "economicallyBackwardCertificate", maxCount: 1 },
+  { name: "aadharCard", maxCount: 1 },
+  { name: "transferCertificate", maxCount: 1 },
+  { name: "studyCertificate", maxCount: 1 },
+  { name: "embassyPermissionLetter", maxCount: 1 },
+];
 const router: Router = Router();
 
 router.get(
   "/",
   validateRequest(GetAdmissionsQuerySchema, "query"),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission", "admission-instructor"],
     permissions: {
       admission: ["read"],
     },
@@ -32,7 +45,7 @@ router.post(
   "/shell",
   validateRequest(CreateAdmissionShellSchema),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission", "admission-instructor"],
     permissions: {
       admission: ["create"],
       user: ["set-role"], // Needed to create the applicant user
@@ -45,7 +58,7 @@ router.post(
 router.get(
   "/semester/:semesterId",
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission", "admission-instructor"],
     permissions: {
       admission: ["read"],
     },
@@ -66,11 +79,13 @@ router.get(
 router.get(
   "/departments",
   protect({
-    role: ["applicant", "admin", "admission"],
+    role: ["applicant", "admin", "admission", "admission-instructor"],
     permissions: { department: ["read"] },
   }),
   DepartmentController.getPublicDepartments
 );
+
+router.use(admissionUploadRouter);
 
 // Endpoint for admin to delete an admission record (and its S3 files)
 router.delete(
@@ -108,28 +123,16 @@ router.patch(
   AdmissionController.reject
 );
 router.patch(
-  "/:id/change-mode",
+  "/:id/cancel",
   validateRequest(AdmissionActionParamSchema, "params"),
-  validateRequest(ChangeAdmissionModeSchema),
+  validateRequest(CancelAdmissionSchema),
   protect({
     role: ["admin", "admission"],
     permissions: {
       admission: ["update"],
     },
   }),
-  AdmissionController.changeAdmissionMode
-);
-router.patch(
-  "/:id/exit",
-  validateRequest(AdmissionActionParamSchema, "params"),
-  validateRequest(ExitAdmissionSchema),
-  protect({
-    role: ["admin", "admission"],
-    permissions: {
-      admission: ["update"],
-    },
-  }),
-  AdmissionController.exitAdmission
+  AdmissionController.cancelAdmission
 );
 router.post(
   "/port",
@@ -150,19 +153,18 @@ router.put(
     role: "applicant",
     permissions: { admission: ["update"] },
   }),
-  upload.fields([
-    { name: "class10thMarksPdf", maxCount: 1 },
-    { name: "class12thMarksPdf", maxCount: 1 },
-    { name: "diplomaMarksPdf", maxCount: 1 },
-    { name: "casteCertificate", maxCount: 1 },
-    { name: "photo", maxCount: 1 },
-    { name: "disabilityCertificate", maxCount: 1 },
-    { name: "economicallyBackwardCertificate", maxCount: 1 },
-    { name: "aadharCard", maxCount: 1 },
-    { name: "transferCertificate", maxCount: 1 },
-    { name: "studyCertificate", maxCount: 1 },
-  ]),
+  upload.fields(applicationUploadFields),
   AdmissionController.submit
+);
+
+router.post(
+  "/admission-submit",
+  protect({
+    role: ["admin", "admission", "admission-instructor"],
+    permissions: { admission: ["create"] },
+  }),
+  upload.fields(applicationUploadFields),
+  AdmissionController.staffSubmit
 );
 
 export default router;

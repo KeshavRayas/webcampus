@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { AdmissionResponse } from "../admin/admin-admission-columns";
 import { useChangeAdmissionMode } from "./use-change-admission-mode";
@@ -72,6 +72,7 @@ export function ChangeAdmissionModeActions({
       id: admission.id,
       data: {
         ...data,
+        quota: selectedMode === "KCET" ? data.quota : undefined,
         originalAdmissionOrderDate: data.originalAdmissionOrderDate
           ? data.originalAdmissionOrderDate
           : undefined,
@@ -83,6 +84,15 @@ export function ChangeAdmissionModeActions({
     "modeOfAdmission"
   ) as keyof typeof categoriesClaimed;
 
+  useEffect(() => {
+    if (selectedMode !== "KCET") {
+      form.setValue("quota", undefined, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [form, selectedMode]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -91,7 +101,7 @@ export function ChangeAdmissionModeActions({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="max-h-[80vh] w-[95vw] max-w-2xl overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Change Admission Mode</DialogTitle>
 
@@ -101,7 +111,7 @@ export function ChangeAdmissionModeActions({
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
             {/* Admission Mode */}
             <div className="space-y-2">
               <Label>Admission Mode</Label>
@@ -184,31 +194,40 @@ export function ChangeAdmissionModeActions({
             </div>
 
             {/* Quota */}
-            <div className="space-y-2">
-              <Label>Quota</Label>
+            {selectedMode === "KCET" ? (
+              <div className="space-y-2 md:col-span-2">
+                <Label>Quota</Label>
 
-              <Select
-                value={form.watch("quota")}
-                onValueChange={(value) =>
-                  form.setValue(
-                    "quota",
-                    value as ChangeAdmissionModeType["quota"]
-                  )
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <Select
+                  value={form.watch("quota")}
+                  onValueChange={(value) =>
+                    form.setValue(
+                      "quota",
+                      value as ChangeAdmissionModeType["quota"]
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
 
-                <SelectContent>
-                  {quotas.map((quota) => (
-                    <SelectItem key={quota} value={quota}>
-                      {quota}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  <SelectContent>
+                    {quotas.map((quota) => (
+                      <SelectItem key={quota} value={quota}>
+                        {quota}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2 md:col-span-2">
+                <Label>Quota</Label>
+                <div className="text-muted-foreground flex h-10 items-center rounded-md border border-dashed px-3 text-sm">
+                  Not required for this admission mode
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Entrance Exam Rank</Label>

@@ -43,7 +43,7 @@ export const useAdmissionUsers = () => {
       formData.append("username", data.username);
       formData.append("email", data.email);
       formData.append("password", data.password);
-      formData.append("role", "admission");
+      formData.append("role", data.role);
       formData.append("photo", photoFile);
 
       const response = await axios.post(

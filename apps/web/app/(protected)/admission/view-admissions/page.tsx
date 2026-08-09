@@ -9,8 +9,8 @@ export default function ViewAdmissionsPage() {
           Admissions Management
         </h1>
         <p className="text-muted-foreground text-sm">
-          Filter admissions by application ID, status, mode, date range, and
-          semester.
+          Filter admissions by application ID, status, admission type, mode,
+          date range, and semester.
         </p>
       </div>
       <Suspense>

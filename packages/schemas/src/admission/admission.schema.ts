@@ -1,12 +1,30 @@
 import { z } from "zod";
-import { categoriesAllotted, categoriesClaimed, quotas } from "../constants";
+import {
+  admissionTypes,
+  categoriesAllotted,
+  categoriesClaimed,
+  counsellingRounds,
+  nationalities,
+  quotas,
+} from "../constants";
 
 export const QuotaSchema = z.enum(quotas);
+
+export const CounsellingRoundSchema = z.enum(counsellingRounds);
+
+export const NationalitySchema = z.enum(nationalities);
+
+const optionalText = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}, z.string().optional());
 
 export const CreateAdmissionShellSchema = z.object({
   primaryEmail: z.email().min(1, "Email is required"),
   password: z.string().min(8),
   semesterId: z.string().uuid("Invalid semester ID"),
+  departmentId: z.string().uuid("Invalid department ID"),
 });
 
 export const AdmissionStatusSchema = z.enum([
@@ -15,7 +33,12 @@ export const AdmissionStatusSchema = z.enum([
   "APPROVED",
   "REJECTED",
   "EXITED",
+  "CANCELLED",
 ]);
+
+export const AdmissionTypeSchema = z.enum(
+  admissionTypes.map((type) => type.value) as [string, ...string[]]
+);
 
 export const AdmissionActionParamSchema = z.object({
   id: z.string().uuid("Invalid admission ID"),
@@ -33,7 +56,7 @@ export const ChangeAdmissionModeSchema = z
 
     categoryAllotted: z.string().min(1, "Category Allotted is required"),
 
-    quota: QuotaSchema,
+    quota: QuotaSchema.optional(),
 
     entranceExamRank: z.coerce.number().nullable().optional(),
 
@@ -74,6 +97,14 @@ export const ChangeAdmissionModeSchema = z
         message: "Invalid allotted category",
       });
     }
+
+    if (data.modeOfAdmission === "KCET" && !data.quota) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["quota"],
+        message: "Quota is required for KCET admissions",
+      });
+    }
   });
 
 const optionalQueryString = <T extends z.ZodTypeAny>(schema: T) =>
@@ -88,6 +119,7 @@ export const GetAdmissionsQuerySchema = z
     applicationId: optionalQueryString(z.string()),
     status: optionalQueryString(AdmissionStatusSchema),
     mode: optionalQueryString(z.string()),
+    admissionType: optionalQueryString(AdmissionTypeSchema),
     semester: optionalQueryString(z.string().uuid("Invalid semester")),
     createdFrom: optionalQueryString(
       z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
@@ -113,25 +145,84 @@ export const GetAdmissionsQuerySchema = z
 
 export const ExitAdmissionSchema = z.object({});
 
+export const AdmissionCancellationReasonSchema = z.enum([
+  "LEAVE_COLLEGE",
+  "CHANGE_ADMISSION_MODE",
+  "OTHER",
+]);
+
+export const CancelAdmissionSchema = z
+  .object({
+    reason: AdmissionCancellationReasonSchema,
+    otherReason: z.string().trim().max(500).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.reason === "OTHER" && !data.otherReason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["otherReason"],
+        message: "A reason is required when Other is selected",
+      });
+    }
+  });
+
 export const SubmitApplicationSchema = z
   .object({
-    applicationId: z.string().min(1, "Application ID is required"),
+    applicationId: z.string().trim().optional(),
 
-    firstName: z.string().min(1, "First Name is required"),
-    middleName: z.string().optional(),
-    lastName: z.string().min(1, "Last Name is required"),
+    nameAsPer10th: z.string().min(1, "Name as per 10th grade is required"),
 
     modeOfAdmission: z.string().min(1, "Mode of Admission is required"),
 
     semesterId: z.string().uuid("Invalid Semester ID"),
     departmentId: z.string().uuid("Invalid Department ID"),
+    admissionType: AdmissionTypeSchema,
+    scholarship: z.enum(["true", "false"]),
+    sspId: z.string().trim().optional(),
+    abcAparId: z.string().regex(/^\d{12}$/, "ABC/APAAR ID must be 12 digits"),
+    counsellingRound: CounsellingRoundSchema,
+    feeReceiptNumber: z.string().trim().optional(),
+    feePaid: optionalText,
+    studiedKannadaIn10th: z.enum(["true", "false"]),
+    admissionBasedOn: z.enum(["CLASS_12_PUC", "DIPLOMA"]),
+    class10thRollRegNumber: z
+      .string()
+      .min(1, "Roll/Registration Number is required"),
+    class12thRollRegNumber: z
+      .string()
+      .min(1, "Roll/Registration Number is required"),
+    physicsMarks: optionalText,
+    physicsMaxMarks: optionalText,
+    chemistryMarks: optionalText,
+    chemistryMaxMarks: optionalText,
+    mathematicsMarks: optionalText,
+    mathematicsMaxMarks: optionalText,
+    passportNumber: z.string().trim().optional(),
+    passportExpiryDate: z.string().optional(),
+    visaNumber: z.string().trim().optional(),
+    visaExpiryDate: z.string().optional(),
+    parentPassportNumber: z.string().trim().optional(),
+    parentVisaNumber: z.string().trim().optional(),
+    parentVisaExpiryDate: z.string().optional(),
+    nationality: NationalitySchema,
 
     categoryClaimed: z.string().min(1, "Category Claimed is required"),
     categoryAllotted: z.string().min(1, "Category Allotted is required"),
 
     quota: QuotaSchema.optional(),
+    schoolCountry: optionalText,
+    instituteCountry: optionalText,
+    diplomaCountry: optionalText,
   })
   .superRefine((data, ctx) => {
+    if (data.scholarship === "true" && !data.sspId?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sspId"],
+        message: "SSP ID is required when scholarship is enabled",
+      });
+    }
+
     const claimed =
       categoriesClaimed[data.modeOfAdmission as keyof typeof categoriesClaimed];
 
@@ -191,3 +282,5 @@ export type PortStudentsType = z.infer<typeof PortStudentsSchema>;
 export type ChangeAdmissionModeType = z.infer<typeof ChangeAdmissionModeSchema>;
 
 export type ExitAdmissionType = z.infer<typeof ExitAdmissionSchema>;
+
+export type CancelAdmissionType = z.infer<typeof CancelAdmissionSchema>;

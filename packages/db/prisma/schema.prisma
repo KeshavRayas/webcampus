@@ -37,6 +37,8 @@ model User {
   feedbackQuestionSetsCreated FeedbackQuestionSet[]
   feedbackRoundsCreated      FeedbackRound[]
   feedbackPresetsCreated     FeedbackQuestionPreset[]
+  admissionArchives     AdmissionArchive[]
+  filledAdmissions      Admission[] @relation("AdmissionFilledBy")
 
   courseMappingAuditLogs CourseMappingAuditLog[]
   supportTicketsCreated  SupportTicket[]         @relation("SupportTicketCreator")
@@ -759,7 +761,10 @@ model Admission {
   hasClass12                      Boolean?
   hasDiploma                      Boolean?
   class10thSchoolName             String?
+  class10thRollRegNumber          String?
+  admissionBasedOn                String?
   modeOfAdmission                 String?
+  admissionType                   String?
   photo                           String?
   createdAt                       DateTime        @default(now())
   applicationId                   String?         @unique
@@ -769,21 +774,32 @@ model Admission {
   updatedAt                       DateTime        @updatedAt
   aadharCard                      String?
   aadharNumber                    String?         @unique
+  abcAparId                       String?
+  sspId                           String?
+  scholarship                     Boolean?
+  counsellingRound                String?
+  feeReceiptNumber                String?
+  dateOfAdmission                 DateTime?
   bloodGroup                      String?
   caste                           String?
   class10thAggregateScore         Float?
   class10thAggregateTotal         Float?
   class10thMediumOfTeaching       String?
+  studiedKannadaIn10th            Boolean?
   class10thSchoolCity             String?
   class10thSchoolCode             String?
   class10thSchoolState            String?
   class10thSchoolType             String?
+  schoolCountry                   String?
   class10thYearOfPassing          String?
   class12thAggregateScore         Float?
   class12thAggregateTotal         Float?
+  class12thRollRegNumber          String?
   class12thBranch                 String?
+  instituteCountry                String?
   diplomaInstituteName            String?
   diplomaInstituteType            String?
+  diplomaCountry                  String?
   diplomaInstituteCity            String?
   diplomaInstituteState           String?
   diplomaYearOfPassing            String?
@@ -798,6 +814,16 @@ model Admission {
   class12thInstituteType          String?
   class12thMediumOfTeaching       String?
   class12thYearOfPassing          String?
+  physicsMarks                    Float?
+  physicsMaxMarks                 Float?
+  physicsPercentage               Float?
+  chemistryMarks                  Float?
+  chemistryMaxMarks               Float?
+  chemistryPercentage             Float?
+  mathematicsMarks                Float?
+  mathematicsMaxMarks             Float?
+  mathematicsPercentage           Float?
+  pcmPercentage                   Float?
   currentAddress                  String?
   currentArea                     String?
   currentCity                     String?
@@ -817,16 +843,12 @@ model Admission {
   fatherOccupation                String?
   fatherPermanentAddress          String?
   feePaid                         Float?
-  firstName                       String?
   guardianEmail                   String?
   guardianName                    String?
   guardianNumber                  String?
   guardianOccupation              String?
   guardianPermanentAddress        String?
   hostel                          Boolean?
-  hostelRoomNumber                String?
-  lastName                        String?
-  middleName                      String?
   motherQualification             String?
   motherOccupation                String?
   motherPermanentAddress          String?
@@ -837,6 +859,13 @@ model Admission {
   originalAdmissionOrderDate      DateTime?
   originalAdmissionOrderNumber    String?
   passportNumber                  String?
+  passportExpiryDate              DateTime?
+  visaNumber                      String?
+  visaExpiryDate                  DateTime?
+  embassyPermissionLetter         String?
+  parentPassportNumber            String?
+  parentVisaNumber                String?
+  parentVisaExpiryDate            DateTime?
   permanentAddress                String?
   permanentArea                   String?
   permanentCity                   String?
@@ -845,7 +874,8 @@ model Admission {
   permanentPincode                String?
   permanentState                  String?
   placeOfBirth                    String?
-  primaryEmail                    String          @unique
+  primaryEmail                    String         @unique
+  filledById                      String
   primaryPhoneNumber              String?
   religion                        String?
   secondaryEmail                  String?
@@ -859,12 +889,14 @@ model Admission {
   visaValidityDetails             String?
   departmentId                    String
   studentId                       String?         @unique
+  archive                         AdmissionArchive?
   categoryAllotted                String?
   categoryClaimed                 String?
   quota                           String?
   department                      Department      @relation(fields: [departmentId], references: [id])
   semester                        Semester        @relation(fields: [semesterId], references: [id])
   student                         Student?        @relation(fields: [studentId], references: [id])
+  filledBy                        User            @relation("AdmissionFilledBy", fields: [filledById], references: [id])
 
   @@index([semesterId])
   @@index([departmentId])
@@ -1166,7 +1198,23 @@ enum AdmissionStatus {
   APPROVED
   REJECTED
   EXITED
+  CANCELLED
 }
+
+model AdmissionArchive {
+  id            String    @id @default(uuid())
+  admissionId   String    @unique
+  reason        String
+  cancelledById String
+  cancelledAt   DateTime  @default(now())
+
+  admission     Admission @relation(fields: [admissionId], references: [id])
+  cancelledBy   User      @relation(fields: [cancelledById], references: [id])
+
+  @@index([cancelledById])
+  @@index([cancelledAt])
+}
+
 
 enum DepartmentType {
   DEGREE_GRANTING

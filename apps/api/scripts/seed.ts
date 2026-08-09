@@ -56,6 +56,23 @@ class Seeder {
       logger.info("Admission user already exists. Skipping.");
     }
   }
+  public async ensureAdmissionInstructorUser(): Promise<void> {
+    await this.signIn(); // sign in as admin
+
+    try {
+      await this.createUser({
+        name: "admission-instructor",
+        email: "admission-instructor@webcampus.com",
+        username: "admission-instructor",
+        password: "password",
+        role: "admission-instructor",
+      });
+
+      logger.info("Admission instructor user created.");
+    } catch {
+      logger.info("Admission instructor user already exists. Skipping.");
+    }
+  }
   public async createUser(userData: CreateUserType): Promise<void> {
     try {
       const userService = new UserService({
@@ -101,6 +118,7 @@ async function main() {
   const seeder = new Seeder();
   try {
     await seeder.ensureAdmissionUser();
+    await seeder.ensureAdmissionInstructorUser();
   } catch (error) {
     logger.error(`Fatal error in seed script: ${(error as Error).message}`);
     process.exit(1);

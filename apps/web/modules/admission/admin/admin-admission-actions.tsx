@@ -12,23 +12,20 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@webcampus/ui/components/dialog";
+import { FileDown, Loader2, Pencil } from "lucide-react";
+import { useRouter } from "next/navigation";
+import React, { useRef, useState } from "react";
+import { toast } from "react-toastify";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@webcampus/ui/components/dropdown-menu";
-import { Eye, MoreHorizontal } from "lucide-react";
-import React, { useState } from "react";
+  AdmissionDocument,
+  type DocData,
+} from "../applicant/admission-document";
+import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { AdmissionResponse } from "./admin-admission-columns";
-import { useAdmissionDelete } from "./use-admission-delete";
-import { useAdmissionReview } from "./use-admission-review";
 
 const getStatusVariant = (status: AdmissionResponse["status"]) => {
   switch (status) {
@@ -89,35 +86,15 @@ const DataField = ({
   );
 };
 
-export const AdminAdmissionActions = ({
-  admission,
-  menuOnly = false,
-}: {
-  admission: AdmissionResponse;
-  menuOnly?: boolean;
-}) => {
-  const { data: session } = authClient.useSession();
-  const role = session?.user?.role;
-  const canReview = role === "admin" || "admission";
-  const canDelete = role === "admin" || role === "admission";
+const toDate = (value?: string | Date | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
+};
 
-  const isPending = admission.status === "PENDING";
-  const isSubmitted = admission.status === "SUBMITTED";
-  const { onDelete } = useAdmissionDelete();
-  const { onApprove, onReject, isApproving, isRejecting } =
-    useAdmissionReview();
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+const yesNo = (value?: boolean | null) => (value ? "Yes" : "No");
 
-  // Compute Full Name
-  const fullName = [
-    admission.firstName,
-    admission.middleName,
-    admission.lastName,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  // Format Address block
+const buildDocData = (admission: AdmissionResponse): DocData => {
   const currentFullAddress = [
     admission.currentAddress,
     admission.currentArea,
@@ -141,65 +118,248 @@ export const AdminAdmissionActions = ({
     .filter(Boolean)
     .join(", ");
 
-  if (menuOnly) {
-    return (
-      <>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            {canDelete && (
-              <DropdownMenuItem
-                onClick={() => setIsDeleteOpen(true)}
-                className="text-red-600 focus:text-red-600"
-              >
-                Delete
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+  const fullName =
+    admission.student?.user?.name ||
+    admission.nameAsPer10th ||
+    [admission.firstName, admission.middleName, admission.lastName]
+      .filter(Boolean)
+      .join(" ") ||
+    "";
 
-        <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete Admission</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete this admission? This action
-                cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  onDelete(admission.id);
-                  setIsDeleteOpen(false);
-                }}
-              >
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </>
-    );
-  }
+  const admissionBasedOn =
+    admission.admissionBasedOn === "CLASS_12_PUC"
+      ? "Class 12th / PUC"
+      : admission.admissionBasedOn === "DIPLOMA"
+        ? "Diploma"
+        : (admission.admissionBasedOn ?? "");
+
+  return {
+    student_name: fullName,
+    dob: toDate(admission.dob),
+    blood_group: admission.bloodGroup ?? "",
+    gender: admission.gender ?? "",
+    primary_phone: admission.primaryPhoneNumber ?? "",
+    secondary_phone: admission.secondaryPhoneNumber ?? "",
+    emergency_phone: admission.emergencyContactNumber ?? "",
+    primary_email: admission.primaryEmail ?? "",
+    secondary_email: admission.secondaryEmail ?? "",
+    current_address: admission.currentAddress ?? "",
+    current_area: admission.currentArea ?? "",
+    current_district: admission.currentDistrict ?? "",
+    current_state: admission.currentState ?? "",
+    current_country: admission.currentCountry ?? "",
+    current_pincode: admission.currentPincode ?? "",
+    permanent_address: admission.permanentAddress ?? "",
+    permanent_area: admission.permanentArea ?? "",
+    permanent_district: admission.permanentDistrict ?? "",
+    permanent_state: admission.permanentState ?? "",
+    permanent_country: admission.permanentCountry ?? "",
+    permanent_pincode: admission.permanentPincode ?? "",
+    current_full: currentFullAddress,
+    permanent_full: permanentFullAddress,
+    place_of_birth: admission.placeOfBirth ?? "",
+    domicile_state: admission.stateOfBirth ?? "",
+    religion: admission.religion ?? "",
+    caste: admission.caste ?? "",
+    sub_caste: admission.subCaste ?? "",
+    mother_tongue: admission.motherTongue ?? "",
+    nationality: admission.nationality ?? "",
+    aadhar_number: admission.aadharNumber ?? "",
+    nri: yesNo(admission.nri),
+    disability: yesNo(admission.disability),
+    disability_type: admission.disabilityType ?? "",
+    economically_backward: yesNo(admission.economicallyBackward),
+    passport_number: admission.passportNumber ?? "",
+    passport_expiry: toDate(admission.passportExpiryDate),
+    visa_number: admission.visaNumber ?? "",
+    visa_expiry: toDate(admission.visaExpiryDate),
+    application_id: admission.applicationId ?? "",
+    mode_of_admission: admission.modeOfAdmission ?? "",
+    branch: admission.department?.name ?? "",
+    admission_type: admission.admissionType ?? "",
+    admission_based_on: admissionBasedOn,
+    semester: "",
+    category_claimed: admission.categoryClaimed ?? "",
+    category_allotted: admission.categoryAllotted ?? "",
+    quota: admission.quota ?? "",
+    entrance_exam_rank: admission.entranceExamRank ?? "",
+    sport_name: "",
+    admission_order_number: admission.originalAdmissionOrderNumber ?? "",
+    admission_order_date: toDate(admission.originalAdmissionOrderDate),
+    counselling_round: admission.counsellingRound ?? "",
+    abc_apar_id: admission.abcAparId ?? "",
+    receiving_scholarship: yesNo(admission.scholarship),
+    fee_paid: admission.feePaid != null ? String(admission.feePaid) : "",
+    fee_receipt: admission.feeReceiptNumber ?? "",
+    class10_school_name: admission.class10thSchoolName ?? "",
+    class10_reg_number: admission.class10thRollRegNumber ?? "",
+    class10_school_type: admission.class10thSchoolType ?? "",
+    class10_country: "",
+    class10_state: admission.class10thSchoolState ?? "",
+    class10_city: admission.class10thSchoolCity ?? "",
+    class10_year: admission.class10thYearOfPassing ?? "",
+    class10_marks:
+      admission.class10thAggregateScore != null
+        ? String(admission.class10thAggregateScore)
+        : "",
+    class10_total:
+      admission.class10thAggregateTotal != null
+        ? String(admission.class10thAggregateTotal)
+        : "",
+    class10_medium: admission.class10thMediumOfTeaching ?? "",
+    class10_kannada: yesNo(admission.studiedKannadaIn10th),
+    class12_institute_name: admission.class12thInstituteName ?? "",
+    class12_institute_type: admission.class12thInstituteType ?? "",
+    class12_country: "",
+    class12_state: admission.class12thInstituteState ?? "",
+    class12_city: admission.class12thInstituteCity ?? "",
+    class12_branch: admission.class12thBranch ?? "",
+    class12_reg_number: admission.class12thRollRegNumber ?? "",
+    class12_year: admission.class12thYearOfPassing ?? "",
+    class12_medium: admission.class12thMediumOfTeaching ?? "",
+    class12_marks:
+      admission.class12thAggregateScore != null
+        ? String(admission.class12thAggregateScore)
+        : "",
+    class12_total:
+      admission.class12thAggregateTotal != null
+        ? String(admission.class12thAggregateTotal)
+        : "",
+    physics_marks:
+      admission.physicsMarks != null ? String(admission.physicsMarks) : "",
+    physics_max:
+      admission.physicsMaxMarks != null
+        ? String(admission.physicsMaxMarks)
+        : "",
+    chemistry_marks:
+      admission.chemistryMarks != null ? String(admission.chemistryMarks) : "",
+    chemistry_max:
+      admission.chemistryMaxMarks != null
+        ? String(admission.chemistryMaxMarks)
+        : "",
+    maths_marks:
+      admission.mathematicsMarks != null
+        ? String(admission.mathematicsMarks)
+        : "",
+    maths_max:
+      admission.mathematicsMaxMarks != null
+        ? String(admission.mathematicsMaxMarks)
+        : "",
+    pcm_percentage:
+      admission.pcmPercentage != null ? String(admission.pcmPercentage) : "",
+    diploma_institute_name: admission.diplomaInstituteName ?? "",
+    diploma_institute_type: admission.diplomaInstituteType ?? "",
+    diploma_country: "",
+    diploma_state: admission.diplomaInstituteState ?? "",
+    diploma_city: admission.diplomaInstituteCity ?? "",
+    diploma_branch: admission.diplomaBranch ?? "",
+    diploma_year: admission.diplomaYearOfPassing ?? "",
+    diploma_medium: admission.diplomaMediumOfTeaching ?? "",
+    diploma_marks:
+      admission.diplomaAggregateScore != null
+        ? String(admission.diplomaAggregateScore)
+        : "",
+    diploma_total:
+      admission.diplomaAggregateTotal != null
+        ? String(admission.diplomaAggregateTotal)
+        : "",
+    father_name: admission.fatherName ?? "",
+    father_occupation: admission.fatherOccupation ?? "",
+    father_income: "",
+    father_mobile: admission.fatherNumber ?? "",
+    father_email: admission.fatherEmail ?? "",
+    father_address: admission.fatherPermanentAddress ?? "",
+    parent_passport: admission.parentPassportNumber ?? "",
+    parent_visa: admission.parentVisaNumber ?? "",
+    parent_visa_expiry: toDate(admission.parentVisaExpiryDate),
+    mother_name: admission.motherName ?? "",
+    mother_occupation: admission.motherOccupation ?? "",
+    mother_income: "",
+    mother_mobile: admission.motherNumber ?? "",
+    mother_email: admission.motherEmail ?? "",
+    mother_address: admission.motherPermanentAddress ?? "",
+    guardian_name: admission.guardianName ?? "",
+    guardian_occupation: admission.guardianOccupation ?? "",
+    guardian_income: "",
+    guardian_mobile: admission.guardianNumber ?? "",
+    guardian_email: admission.guardianEmail ?? "",
+    guardian_address: admission.guardianPermanentAddress ?? "",
+    signature: "",
+    date: new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+  };
+};
+
+export const AdminAdmissionActions = ({
+  admission,
+}: {
+  admission: AdmissionResponse;
+}) => {
+  const { data: session } = authClient.useSession();
+  const role = session?.user?.role;
+  const router = useRouter();
+  const canEdit =
+    role === "admin" || role === "admission" || role === "admission-instructor";
+
+  const isPending = admission.status === "PENDING";
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [docData, setDocData] = useState<DocData | null>(null);
+  const documentRef = useRef<HTMLDivElement | null>(null);
+
+  // Compute Full Name
+  const fullName =
+    admission.student?.user?.name ||
+    admission.nameAsPer10th ||
+    [admission.firstName, admission.middleName, admission.lastName]
+      .filter(Boolean)
+      .join(" ") ||
+    "";
+
+  const openFillForm = () => {
+    const path =
+      role === "admission-instructor"
+        ? "/admission-instructor/fill-applicant"
+        : "/admission/fill-applicant";
+    const params = new URLSearchParams();
+    if (admission.semesterId) params.set("semester", admission.semesterId);
+    if (admission.primaryEmail) params.set("email", admission.primaryEmail);
+    if (admission.applicationId)
+      params.set("applicationId", admission.applicationId);
+    router.push(`${path}?${params.toString()}`);
+  };
+
+  const handleDownloadPdf = async () => {
+    if (isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      setDocData(buildDocData(admission));
+      const node = documentRef.current;
+      if (!node) {
+        toast.error("Could not render the admission form.");
+        return;
+      }
+      await renderNodeToPdf(
+        node,
+        `admission-form-${admission.applicationId ?? "application"}.pdf`
+      );
+      toast.success("Verification PDF downloaded.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to generate the verification PDF. Please try again.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   return (
     <div className="flex items-center gap-1">
-      {/* View Details Dialog */}
       <Dialog>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">
-            <Eye className="mr-2 h-4 w-4" />
+            <Pencil className="mr-2 h-3.5 w-3.5" />
             View Details
           </Button>
         </DialogTrigger>
@@ -238,7 +398,7 @@ export const AdminAdmissionActions = ({
 
                 <div className="w-full space-y-3 border-t pt-4">
                   <DataField
-                    label="Admission Mode"
+                    label="Mode of Admission"
                     value={admission.modeOfAdmission}
                   />
                   <DataField
@@ -254,30 +414,36 @@ export const AdminAdmissionActions = ({
                   <DataField label="Temporary USN" value={admission.tempUsn} />
                   <DataField label="USN" value={admission.student?.usn} />
                   <DataField label="Unique ID" value={admission.uniqueId} />
-
-                  {isSubmitted && canReview && (
-                    <div className="flex flex-col gap-2 border-t pt-3">
-                      <Button
-                        size="sm"
-                        onClick={() => onApprove(admission.id)}
-                        disabled={isApproving || isRejecting}
-                      >
-                        {isApproving ? "Approving..." : "Approve"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => onReject(admission.id)}
-                        disabled={isApproving || isRejecting}
-                      >
-                        {isRejecting ? "Rejecting..." : "Reject"}
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
 
               <div>
+                <div className="mb-6 flex flex-wrap items-center gap-3">
+                  {canEdit && (
+                    <Button size="sm" onClick={openFillForm}>
+                      Fill / Edit Application
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleDownloadPdf()}
+                    disabled={isGeneratingPdf || admission.status === "PENDING"}
+                  >
+                    {isGeneratingPdf ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Download Verification PDF
+                      </>
+                    )}
+                  </Button>
+                </div>
+
                 {isPending ? (
                   <div className="bg-secondary/20 rounded-xl border p-6 text-center">
                     <p className="text-muted-foreground text-sm">
@@ -292,13 +458,37 @@ export const AdminAdmissionActions = ({
                       </h4>
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <DataField
-                          label="Branch"
+                          label="Branch/Dept"
                           value={admission.department?.name}
+                        />
+                        {role !== "admission-instructor" && (
+                          <DataField
+                            label="Filled By"
+                            value={`${admission.filledBy.name} (${admission.filledBy.role ?? admission.filledBy.email})`}
+                          />
+                        )}
+                        <DataField
+                          label="Admission Based On"
+                          value={
+                            admission.admissionBasedOn === "CLASS_12_PUC"
+                              ? "Class 12th / PUC"
+                              : admission.admissionBasedOn === "DIPLOMA"
+                                ? "Diploma"
+                                : admission.admissionBasedOn
+                          }
                         />
                         <DataField label="Quota" value={admission.quota} />
                         <DataField
                           label="Entrance Exam Rank"
                           value={admission.entranceExamRank}
+                        />
+                        <DataField
+                          label="Counselling Round"
+                          value={admission.counsellingRound}
+                        />
+                        <DataField
+                          label="Admission Type"
+                          value={admission.admissionType}
                         />
                         <DataField
                           label="Category Claimed"
@@ -313,22 +503,28 @@ export const AdminAdmissionActions = ({
                           value={admission.originalAdmissionOrderNumber}
                         />
                         <DataField
-                          label="Admission Order Date"
-                          value={admission.originalAdmissionOrderDate}
+                          label="ABC/APAAR ID"
+                          value={admission.abcAparId}
                         />
                         <DataField
-                          label="Fee Paid"
+                          label="Receiving Scholarship?"
+                          value={yesNo(admission.scholarship)}
+                        />
+                        <DataField
+                          label="Fee Paid (₹)"
                           value={
-                            admission.feePaid ? `₹${admission.feePaid}` : null
+                            admission.feePaid != null
+                              ? String(admission.feePaid)
+                              : null
                           }
                         />
                         <DataField
-                          label="Hostel Required"
-                          value={admission.hostel}
+                          label="Fee Receipt No."
+                          value={admission.feeReceiptNumber}
                         />
                         <DataField
-                          label="Hostel Room No."
-                          value={admission.hostelRoomNumber}
+                          label="Hostel Required"
+                          value={yesNo(admission.hostel)}
                         />
                       </div>
                     </section>
@@ -338,7 +534,6 @@ export const AdminAdmissionActions = ({
                         Personal Information
                       </h4>
                       <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <DataField label="Name" value={fullName} />
                         <DataField
                           label="Name as per 10th"
                           value={admission.nameAsPer10th}
@@ -353,10 +548,6 @@ export const AdminAdmissionActions = ({
                           value={admission.bloodGroup}
                         />
                         <DataField
-                          label="Nationality"
-                          value={admission.nationality}
-                        />
-                        <DataField
                           label="Mother Tongue"
                           value={admission.motherTongue}
                         />
@@ -366,7 +557,7 @@ export const AdminAdmissionActions = ({
                         />
                         <DataField label="Caste" value={admission.caste} />
                         <DataField
-                          label="Sub-Caste"
+                          label="Sub Caste"
                           value={admission.subCaste}
                         />
                         <DataField
@@ -374,26 +565,32 @@ export const AdminAdmissionActions = ({
                           value={admission.placeOfBirth}
                         />
                         <DataField
-                          label="State of Birth"
+                          label="Domicile of State"
                           value={admission.stateOfBirth}
                         />
-                        <DataField label="NRI" value={admission.nri} />
                         <DataField
-                          label="Economically Backward"
-                          value={admission.economicallyBackward}
+                          label="Nationality"
+                          value={admission.nationality}
                         />
+                        <DataField label="NRI" value={yesNo(admission.nri)} />
                         <DataField
                           label="Disability"
-                          value={admission.disability}
+                          value={yesNo(admission.disability)}
                         />
-                        {admission.disability && (
+                        {admission.disability ? (
                           <DataField
                             label="Disability Type"
                             value={admission.disabilityType}
                           />
+                        ) : (
+                          <div />
                         )}
                         <DataField
-                          label="Aadhar Number"
+                          label="Economically Backward"
+                          value={yesNo(admission.economicallyBackward)}
+                        />
+                        <DataField
+                          label="Aadhaar Number"
                           value={admission.aadharNumber}
                         />
                       </div>
@@ -418,22 +615,58 @@ export const AdminAdmissionActions = ({
                           label="Emergency Contact"
                           value={admission.emergencyContactNumber}
                         />
+                        <DataField
+                          label="Student Passport No."
+                          value={admission.passportNumber}
+                        />
+                        <DataField
+                          label="Passport Expiry"
+                          value={toDate(admission.passportExpiryDate)}
+                        />
+                        <DataField
+                          label="Student Visa No."
+                          value={admission.visaNumber}
+                        />
+                        <DataField
+                          label="Visa Expiry"
+                          value={toDate(admission.visaExpiryDate)}
+                        />
                       </div>
                       <div className="grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-2">
-                        <div className="space-y-1 md:col-span-1">
+                        <div className="space-y-1">
                           <p className="text-muted-foreground text-sm">
                             Current Address
                           </p>
                           <p className="break-words font-medium">
-                            {currentFullAddress || "-"}
+                            {[
+                              admission.currentAddress,
+                              admission.currentArea,
+                              admission.currentCity,
+                              admission.currentDistrict,
+                              admission.currentState,
+                              admission.currentCountry,
+                              admission.currentPincode,
+                            ]
+                              .filter(Boolean)
+                              .join(", ") || "-"}
                           </p>
                         </div>
-                        <div className="space-y-1 md:col-span-1">
+                        <div className="space-y-1">
                           <p className="text-muted-foreground text-sm">
                             Permanent Address
                           </p>
                           <p className="break-words font-medium">
-                            {permanentFullAddress || "-"}
+                            {[
+                              admission.permanentAddress,
+                              admission.permanentArea,
+                              admission.permanentCity,
+                              admission.permanentDistrict,
+                              admission.permanentState,
+                              admission.permanentCountry,
+                              admission.permanentPincode,
+                            ]
+                              .filter(Boolean)
+                              .join(", ") || "-"}
                           </p>
                         </div>
                       </div>
@@ -450,6 +683,10 @@ export const AdminAdmissionActions = ({
                         <DataField
                           label="School Name"
                           value={admission.class10thSchoolName}
+                        />
+                        <DataField
+                          label="Roll / Registration Number"
+                          value={admission.class10thRollRegNumber}
                         />
                         <DataField
                           label="School Type"
@@ -482,11 +719,15 @@ export const AdminAdmissionActions = ({
                         <DataField
                           label="Percentage"
                           value={
-                            admission.class10thAggregateScore &&
+                            admission.class10thAggregateScore != null &&
                             admission.class10thAggregateTotal
                               ? `${((admission.class10thAggregateScore / admission.class10thAggregateTotal) * 100).toFixed(2)}%`
                               : "-"
                           }
+                        />
+                        <DataField
+                          label="Studied Kannada in 10th"
+                          value={yesNo(admission.studiedKannadaIn10th)}
                         />
                       </div>
 
@@ -499,11 +740,15 @@ export const AdminAdmissionActions = ({
                           value={admission.class12thInstituteName}
                         />
                         <DataField
+                          label="Roll / Registration Number"
+                          value={admission.class12thRollRegNumber}
+                        />
+                        <DataField
                           label="Institute Type"
                           value={admission.class12thInstituteType}
                         />
                         <DataField
-                          label="Branch/Stream"
+                          label="Branch/Dept"
                           value={admission.class12thBranch}
                         />
                         <DataField
@@ -533,9 +778,29 @@ export const AdminAdmissionActions = ({
                         <DataField
                           label="Percentage"
                           value={
-                            admission.class12thAggregateScore &&
+                            admission.class12thAggregateScore != null &&
                             admission.class12thAggregateTotal
                               ? `${((admission.class12thAggregateScore / admission.class12thAggregateTotal) * 100).toFixed(2)}%`
+                              : "-"
+                          }
+                        />
+                        <DataField
+                          label="Physics Marks / Max"
+                          value={`${admission.physicsMarks ?? "-"} / ${admission.physicsMaxMarks ?? "-"}`}
+                        />
+                        <DataField
+                          label="Chemistry Marks / Max"
+                          value={`${admission.chemistryMarks ?? "-"} / ${admission.chemistryMaxMarks ?? "-"}`}
+                        />
+                        <DataField
+                          label="Mathematics Marks / Max"
+                          value={`${admission.mathematicsMarks ?? "-"} / ${admission.mathematicsMaxMarks ?? "-"}`}
+                        />
+                        <DataField
+                          label="PCM Grade (%)"
+                          value={
+                            admission.pcmPercentage != null
+                              ? `${admission.pcmPercentage.toFixed(2)}%`
                               : "-"
                           }
                         />
@@ -544,12 +809,12 @@ export const AdminAdmissionActions = ({
 
                     <section className="bg-card mb-6 rounded-xl border p-6">
                       <h4 className="mb-4 border-b pb-2 text-lg font-semibold">
-                        Parent / Guardian Information
+                        Parent Details
                       </h4>
                       <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
                         <div className="space-y-4">
                           <h5 className="text-md text-primary font-semibold">
-                            Father's Details
+                            Father&apos;s Details
                           </h5>
                           <DataField
                             label="Name"
@@ -570,7 +835,7 @@ export const AdminAdmissionActions = ({
                         </div>
                         <div className="space-y-4">
                           <h5 className="text-md text-primary font-semibold">
-                            Mother's Details
+                            Mother&apos;s Details
                           </h5>
                           <DataField
                             label="Name"
@@ -591,7 +856,7 @@ export const AdminAdmissionActions = ({
                         </div>
                         <div className="space-y-4">
                           <h5 className="text-md text-primary font-semibold">
-                            Guardian's Details
+                            Guardian&apos;s Details
                           </h5>
                           <DataField
                             label="Name"
@@ -618,159 +883,44 @@ export const AdminAdmissionActions = ({
                         Documents
                       </h4>
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground text-sm">
-                            Passport Photo
-                          </p>
-                          {admission.photo ? (
-                            <a
-                              href={admission.photo}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary font-medium hover:underline"
-                            >
-                              View file
-                            </a>
-                          ) : (
-                            <p className="font-medium">-</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground text-sm">
-                            Aadhar Card
-                          </p>
-                          {admission.aadharCard ? (
-                            <a
-                              href={admission.aadharCard}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary font-medium hover:underline"
-                            >
-                              View file
-                            </a>
-                          ) : (
-                            <p className="font-medium">-</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground text-sm">
-                            10th Marks Card
-                          </p>
-                          {admission.class10thMarksPdf ? (
-                            <a
-                              href={admission.class10thMarksPdf}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary font-medium hover:underline"
-                            >
-                              View file
-                            </a>
-                          ) : (
-                            <p className="font-medium">-</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground text-sm">
-                            12th Marks Card
-                          </p>
-                          {admission.class12thMarksPdf ? (
-                            <a
-                              href={admission.class12thMarksPdf}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary font-medium hover:underline"
-                            >
-                              View file
-                            </a>
-                          ) : (
-                            <p className="font-medium">-</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground text-sm">
-                            Caste Certificate
-                          </p>
-                          {admission.casteCertificate ? (
-                            <a
-                              href={admission.casteCertificate}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary font-medium hover:underline"
-                            >
-                              View file
-                            </a>
-                          ) : (
-                            <p className="font-medium">-</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground text-sm">
-                            Disability Certificate
-                          </p>
-                          {admission.disabilityCertificate ? (
-                            <a
-                              href={admission.disabilityCertificate}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary font-medium hover:underline"
-                            >
-                              View file
-                            </a>
-                          ) : (
-                            <p className="font-medium">-</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground text-sm">
-                            EWS Certificate
-                          </p>
-                          {admission.economicallyBackwardCertificate ? (
-                            <a
-                              href={admission.economicallyBackwardCertificate}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary font-medium hover:underline"
-                            >
-                              View file
-                            </a>
-                          ) : (
-                            <p className="font-medium">-</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground text-sm">
-                            Transfer Certificate
-                          </p>
-                          {admission.transferCertificate ? (
-                            <a
-                              href={admission.transferCertificate}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary font-medium hover:underline"
-                            >
-                              View file
-                            </a>
-                          ) : (
-                            <p className="font-medium">-</p>
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-muted-foreground text-sm">
-                            Study Certificate
-                          </p>
-                          {admission.studyCertificate ? (
-                            <a
-                              href={admission.studyCertificate}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary font-medium hover:underline"
-                            >
-                              View file
-                            </a>
-                          ) : (
-                            <p className="font-medium">-</p>
-                          )}
-                        </div>
+                        {[
+                          ["Passport Photo", admission.photo],
+                          ["Aadhaar Card", admission.aadharCard],
+                          ["10th Marks Card", admission.class10thMarksPdf],
+                          ["12th Marks Card", admission.class12thMarksPdf],
+                          ["Caste Certificate", admission.casteCertificate],
+                          [
+                            "Disability Certificate",
+                            admission.disabilityCertificate,
+                          ],
+                          [
+                            "EWS Certificate",
+                            admission.economicallyBackwardCertificate,
+                          ],
+                          [
+                            "Transfer Certificate",
+                            admission.transferCertificate,
+                          ],
+                          ["Study Certificate", admission.studyCertificate],
+                        ].map(([label, url]) => (
+                          <div className="space-y-1" key={String(label)}>
+                            <p className="text-muted-foreground text-sm">
+                              {String(label)}
+                            </p>
+                            {url ? (
+                              <a
+                                href={String(url)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary font-medium hover:underline"
+                              >
+                                View file
+                              </a>
+                            ) : (
+                              <p className="font-medium">-</p>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </section>
                   </>
@@ -780,6 +930,16 @@ export const AdminAdmissionActions = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {docData && (
+        <div
+          ref={documentRef}
+          className="pointer-events-none absolute left-[-10000px] top-0"
+          aria-hidden="true"
+        >
+          <AdmissionDocument data={docData ?? {}} />
+        </div>
+      )}
     </div>
   );
 };

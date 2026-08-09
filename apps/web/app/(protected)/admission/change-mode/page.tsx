@@ -1,5 +1,5 @@
-import { ChangeAdmissionModeView } from "@/modules/admission/change-admission-mode/change-admission-mode-view";
+import { redirect } from "next/navigation";
 
 export default function ChangeAdmissionModePage() {
-  return <ChangeAdmissionModeView />;
+  redirect("/admission/cancel-admission");
 }

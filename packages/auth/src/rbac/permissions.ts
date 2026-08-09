@@ -111,6 +111,12 @@ export const roles = {
     department: ["read"],
     support: ["create", "read", "reply"],
   }),
+  "admission-instructor": ac.newRole({
+    semester: ["read"],
+    admission: ["create", "read"],
+    user: ["set-role"],
+    department: ["read"],
+  }),
 } satisfies Record<Role, unknown>;
 
 export type Permissions = {

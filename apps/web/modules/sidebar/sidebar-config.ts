@@ -14,6 +14,7 @@ import {
   LifeBuoy,
   Lock,
   MessageSquareText,
+  Upload,
   User,
   Users,
   UserSearch,
@@ -495,7 +496,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     navMain: {
       items: [
         {
-          name: "Add Admissions",
+          name: "Create Admission",
           url: "/admission",
           icon: LayoutDashboard,
         },
@@ -505,13 +506,36 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: BookCopy,
         },
         {
-          name: "Leave College",
-          url: "/admission/leave-college",
+          name: "Fee Payment",
+          url: "/admission/fee-payment",
+          icon: IndianRupee,
+        },
+        {
+          name: "Cancel Admission",
+          url: "/admission/cancel-admission",
           icon: GraduationCap,
         },
         {
-          name: "Change Admission Mode",
-          url: "/admission/change-mode",
+          name: "Upload Documents",
+          url: "/admission/upload-documents",
+          icon: Upload,
+        },
+      ],
+    },
+    navSecondary,
+  },
+
+  "admission-instructor": {
+    navMain: {
+      items: [
+        {
+          name: "Create Admission",
+          url: "/admission-instructor",
+          icon: LayoutDashboard,
+        },
+        {
+          name: "View Admissions",
+          url: "/admission-instructor/view-admissions",
           icon: BookCopy,
         },
       ],

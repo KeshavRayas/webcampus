@@ -1,5 +1,5 @@
-import { LeaveCollegeView } from "@/modules/admission/leave-college/leave-college-view";
+import { redirect } from "next/navigation";
 
 export default function LeaveCollegePage() {
-  return <LeaveCollegeView />;
+  redirect("/admission/cancel-admission");
 }
