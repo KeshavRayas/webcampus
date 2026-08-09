@@ -4,40 +4,39 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_UNPOOLED_URL")
 }
 
 model User {
-  id                    String           @id
-  name                  String
-  email                 String           @unique
-  emailVerified         Boolean
-  image                 String?
-  createdAt             DateTime
-  updatedAt             DateTime
-  username              String?          @unique
-  displayUsername       String?
-  banned                Boolean?
-  banReason             String?
-  banExpires            DateTime?
-  role                  String?
-  admin                 Admin?
-  coe                   Coe?
-  Department            Department[]
-  departmentMemberships DepartmentUser[]
-  faculty               Faculty?
-
-  hod           Hod?
-  Semester      Semester[]
-  student       Student?
-  accounts      Account[]
-  sessions      Session[]
-  adminEditLogs AdminEditLog[]
-
+  id                     String                  @id
+  name                   String
+  email                  String                  @unique
+  emailVerified          Boolean
+  image                  String?
+  createdAt              DateTime
+  updatedAt              DateTime
+  username               String?                 @unique
+  displayUsername        String?
+  banned                 Boolean?
+  banReason              String?
+  banExpires             DateTime?
+  role                   String?
+  admin                  Admin?
+  adminEditLogs          AdminEditLog[]
+  coe                    Coe?
   courseMappingAuditLogs CourseMappingAuditLog[]
-  supportTicketsCreated SupportTicket[]        @relation("SupportTicketCreator")
-  supportMessages       SupportTicketMessage[] @relation("SupportMessageAuthor")
+  Department             Department[]
+  departmentMemberships  DepartmentUser[]
+  faculty                Faculty?
+  hod                    Hod?
+  Semester               Semester[]
+  student                Student?
+  supportTicketsCreated  SupportTicket[]         @relation("SupportTicketCreator")
+  supportMessages        SupportTicketMessage[]  @relation("SupportMessageAuthor")
+  accounts               Account[]
+  sessions               Session[]
 
   @@map("user")
 }
@@ -47,10 +46,10 @@ model AcademicTerm {
   type                SemesterType
   year                String
   isCurrent           Boolean              @default(false)
-  Semester            Semester[]
-  registrationWindows RegistrationWindow[]
   courseRegistrations CourseRegistration[]
   hallTickets         HallTicket[]
+  registrationWindows RegistrationWindow[]
+  Semester            Semester[]
 
   @@unique([type, year])
 }
@@ -67,10 +66,10 @@ model Semester {
   programType         ProgramType
   Admission           Admission[]
   Course              Course[]
-  registrationWindows RegistrationWindow[]
   courseRegistrations CourseRegistration[]
-  Section             Section[]
   hallTickets         HallTicket[]
+  registrationWindows RegistrationWindow[]
+  Section             Section[]
   academicTerm        AcademicTerm         @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
   createdBy           User                 @relation(fields: [userId], references: [id])
 
@@ -136,24 +135,23 @@ model Department {
   userMemberships     DepartmentUser[]
   faculties           Faculty[]
   hods                Hod[]
+  registrationWindows RegistrationWindow[]
   sections            Section[]
   students            Student[]
-  registrationWindows RegistrationWindow[]
 
   @@index([name])
 }
 
 model RegistrationWindow {
-  id             String  @id @default(uuid())
+  id             String       @id @default(uuid())
   academicTermId String
   semesterId     String
   departmentId   String?
   cycle          Cycle?
-  isOpen         Boolean @default(false)
-
-  academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
-  semester     Semester     @relation(fields: [semesterId], references: [id], onDelete: Cascade)
-  department   Department?  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  isOpen         Boolean      @default(false)
+  academicTerm   AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+  department     Department?  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  semester       Semester     @relation(fields: [semesterId], references: [id], onDelete: Cascade)
 
   @@unique([academicTermId, semesterId, departmentId, cycle])
   @@index([academicTermId, semesterId])
@@ -203,18 +201,17 @@ model Section {
 }
 
 /// *
-///  * TODO Change the Name of this model to support L-T-P
+/// * TODO Change the Name of this model to support L-T-P
 model Batch {
-  id               String             @id @default(uuid())
-  name             String
-  sectionId        String
-  section          Section            @relation(fields: [sectionId], references: [id])
-  ClassSession     ClassSession[]
-  CourseAssignment CourseAssignment[]
-  students         Student[]          @relation("BatchStudents")
-
-  attendances       Attendance[] // <-- NEW: Back-relation
-  attendanceRecords AttendanceRecord[] // <-- NEW: Back-relation
+  id                String             @id @default(uuid())
+  name              String
+  sectionId         String
+  attendances       Attendance[]
+  attendanceRecords AttendanceRecord[]
+  section           Section            @relation(fields: [sectionId], references: [id])
+  ClassSession      ClassSession[]
+  CourseAssignment  CourseAssignment[]
+  students          Student[]          @relation("BatchStudents")
 
   @@unique([name, sectionId])
   @@index([sectionId])
@@ -253,14 +250,15 @@ model Student {
   attendances       Attendance[]
   AttendanceRecord  AttendanceRecord[]
   registrations     CourseRegistration[]
-  assessments       StudentAssessment[]
+  finances          Finance[]
+  hallTickets       HallTicket[]
   marks             Mark[]
   department        Department           @relation(fields: [departmentName], references: [name])
   user              User                 @relation(fields: [userId], references: [id])
+  assessments       StudentAssessment[]
   studentSections   StudentSection[]
   batches           Batch[]              @relation("BatchStudents")
-  hallTickets       HallTicket[]
-  finances          Finance[]
+
   @@index([departmentName])
   @@index([departmentName, currentSemester])
   @@index([semesterId])
@@ -370,58 +368,36 @@ model Admin {
 }
 
 model Course {
-  id             String     @id @default(uuid())
-  code           String     @unique
-  name           String
-  departmentName String?
-  departmentId   String
-  semesterId     String
-  semesterNumber Int
-  courseMode     CourseMode
-  courseType     CourseType
-  cycle          Cycle      @default(NONE)
-
-  // Credit fields (L-T-P-S)
-  lectureCredits   Int @default(0)
-  tutorialCredits  Int @default(0)
-  practicalCredits Int @default(0)
-  skillCredits     Int @default(0)
-  totalCredits     Int
-
-  // Computed Field
-  hasLaboratoryComponent Boolean @default(false)
-
-  // ─── NEW CONFIGURATION FIELDS ───
-
-  // SEE
-  seeMaxMarks    Int @default(0)
-  seeEligibility Int @default(40)
-
-  // CIE
-  cieMaxMarks          Int                  @default(0)
-  cieEligibility       Int                  @default(40)
-  cieEligibilityPolicy CieEligibilityPolicy @default(COMPONENT_AND_OVERALL)
-
-  // Theory Exam
-  theoryExamMaxMarks Int @default(0)
-  theoryMaxExams     Int @default(0)
-  theoryMinExams     Int @default(0)
-  theoryEligibility  Int @default(40)
-
-  // Lab
-  labMaxMarks    Int @default(0)
-  labEligibility Int @default(40)
-
-  // AAT
-  aatMaxMarks    Int @default(0)
-  aatEligibility Int @default(40)
-
-  // Settings
-  allowFeedback      Boolean @default(false)
-  attendanceRequired Boolean @default(true)
-
-  // ─── APPROVAL & TRACKING FIELDS ───
-  approvalStatus          CourseApprovalStatus @default(DRAFT)
+  id                      String                  @id @default(uuid())
+  code                    String                  @unique
+  name                    String
+  departmentName          String?
+  departmentId            String
+  semesterId              String
+  semesterNumber          Int
+  courseMode              CourseMode
+  courseType              CourseType
+  cycle                   Cycle                   @default(NONE)
+  lectureCredits          Int                     @default(0)
+  tutorialCredits         Int                     @default(0)
+  practicalCredits        Int                     @default(0)
+  skillCredits            Int                     @default(0)
+  totalCredits            Int
+  hasLaboratoryComponent  Boolean                 @default(false)
+  seeMaxMarks             Int                     @default(0)
+  seeEligibility          Int                     @default(40)
+  cieMaxMarks             Int                     @default(0)
+  cieEligibility          Int                     @default(40)
+  theoryExamMaxMarks      Int                     @default(0)
+  theoryMinExams          Int                     @default(0)
+  theoryEligibility       Int                     @default(40)
+  labMaxMarks             Int                     @default(0)
+  labEligibility          Int                     @default(40)
+  aatMaxMarks             Int                     @default(0)
+  aatEligibility          Int                     @default(40)
+  allowFeedback           Boolean                 @default(false)
+  attendanceRequired      Boolean                 @default(true)
+  approvalStatus          CourseApprovalStatus    @default(DRAFT)
   approvedByRole          String?
   approvedByUsername      String?
   approvedByDisplay       String?
@@ -429,26 +405,25 @@ model Course {
   revisionRequestedByRole String?
   revisionNotes           String?
   revisionRequestedAt     DateTime?
-  version                 Int                  @default(1)
+  version                 Int                     @default(1)
   lastOverrideAt          DateTime?
   lastOverrideById        String?
-  overrideCount           Int                  @default(0)
-  hasPostApprovalEdits    Boolean              @default(false)
+  overrideCount           Int                     @default(0)
+  hasPostApprovalEdits    Boolean                 @default(false)
+  theoryMaxExams          Int                     @default(0)
+  cieEligibilityPolicy    CieEligibilityPolicy    @default(COMPONENT_AND_OVERALL)
+  assessments             AssessmentTemplate[]
+  attendances             Attendance[]
+  ClassSession            ClassSession[]
+  department              Department              @relation(fields: [departmentId], references: [id])
+  semester                Semester                @relation(fields: [semesterId], references: [id])
+  assignments             CourseAssignment[]
+  coordinators            CourseCoordinator[]
+  mappingAuditLogs        CourseMappingAuditLog[]
+  registrations           CourseRegistration[]
+  marks                   Mark[]
+  studentAssessments      StudentAssessment[]
 
-  // ─── RELATIONS ───
-  department         Department              @relation(fields: [departmentId], references: [id])
-  semester           Semester                @relation(fields: [semesterId], references: [id])
-  attendances        Attendance[]
-  ClassSession       ClassSession[]
-  coordinators       CourseCoordinator[]
-  assessments        AssessmentTemplate[]
-  assignments        CourseAssignment[]
-  registrations      CourseRegistration[]
-  marks              Mark[]
-  studentAssessments StudentAssessment[]
-  mappingAuditLogs   CourseMappingAuditLog[]
-
-  // ─── INDEXES ───
   @@unique([id, departmentId])
   @@index([code])
   @@index([departmentId, semesterId])
@@ -505,17 +480,16 @@ model Attendance {
   id                String            @id @default(uuid())
   studentId         String
   courseId          String
-  batchId           String? // <-- NEW: Added to track lab vs theory
+  batchId           String?
   total             Int
   present           Int
   absent            Int
   condonationStatus CondonationStatus @default(NOT_REQUESTED)
   percentage        Float
+  batch             Batch?            @relation(fields: [batchId], references: [id])
   course            Course            @relation(fields: [courseId], references: [id])
   student           Student           @relation(fields: [studentId], references: [id])
-  batch             Batch?            @relation(fields: [batchId], references: [id]) // <-- NEW: Relation to Batch
 
-  // Updated unique constraint to allow separate aggregates for theory and lab
   @@unique([studentId, courseId, batchId])
   @@index([courseId])
   @@index([batchId])
@@ -572,17 +546,16 @@ model Freeze {
 }
 
 model HallTicket {
-  id             String    @id @default(uuid())
+  id             String       @id @default(uuid())
   studentId      String
   academicTermId String
   semesterId     String
-  isSent         Boolean   @default(false)
+  isSent         Boolean      @default(false)
   sentAt         DateTime?
   sentBy         String?
-
-  student      Student      @relation(fields: [studentId], references: [id])
-  academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id])
-  semester     Semester     @relation(fields: [semesterId], references: [id])
+  academicTerm   AcademicTerm @relation(fields: [academicTermId], references: [id])
+  semester       Semester     @relation(fields: [semesterId], references: [id])
+  student        Student      @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, academicTermId, semesterId])
   @@index([studentId])
@@ -719,12 +692,12 @@ model AttendanceRecord {
   id           String           @id
   sessionId    String
   studentId    String
-  batchId      String? // <-- NEW: Added to link individual records to a batch
+  batchId      String?
   status       AttendanceStatus
   markedAt     DateTime         @default(now())
+  Batch        Batch?           @relation(fields: [batchId], references: [id])
   ClassSession ClassSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   Student      Student          @relation(fields: [studentId], references: [id])
-  Batch        Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull) // <-- NEW: Relation
 
   @@unique([sessionId, studentId])
   @@index([studentId])
@@ -744,7 +717,7 @@ model ClassSession {
   timingStartTime  String
   timingEndTime    String
   AttendanceRecord AttendanceRecord[]
-  Batch            Batch?             @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  Batch            Batch?             @relation(fields: [batchId], references: [id])
   Course           Course             @relation(fields: [courseId], references: [id])
   Faculty          Faculty            @relation(fields: [facultyId], references: [id])
   Section          Section            @relation(fields: [sectionId], references: [id])
@@ -756,35 +729,33 @@ model ClassSession {
 }
 
 model CourseCoordinator {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   courseId  String
   facultyId String
-
-  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  faculty Faculty @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  faculty   Faculty @relation(fields: [facultyId], references: [id], onDelete: Cascade)
 
   @@unique([courseId, facultyId])
   @@index([courseId])
 }
 
 model AssessmentTemplate {
-  id            String                  @id @default(uuid())
-  courseId      String
-  semesterId    String
-  title         String
-  totalMarks    Int
-  componentType AssessmentComponentType
-  sequence      Int                     @default(1)
-
+  id             String                  @id @default(uuid())
+  courseId       String
+  semesterId     String
+  title          String
+  totalMarks     Int
+  componentType  AssessmentComponentType
+  sequence       Int                     @default(1)
   questions      AssessmentQuestion[]
+  course         Course                  @relation(fields: [courseId], references: [id])
   studentRecords StudentAssessment[]
-  course         Course               @relation(fields: [courseId], references: [id])
 
   @@unique([courseId, componentType, sequence])
 }
 
 model AssessmentQuestion {
-  id           String  @id @default(uuid())
+  id           String                @id @default(uuid())
   assessmentId String
   part         String
   qNumber      String
@@ -793,37 +764,149 @@ model AssessmentQuestion {
   po           String?
   bl           String?
   orGroupId    String?
-
   assessment   AssessmentTemplate    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   studentMarks StudentQuestionMark[]
 }
 
 model StudentAssessment {
-  id           String @id @default(uuid())
-  studentId    String
-  assessmentId String
-  courseId     String
-  totalMarks   Float
-  status       String @default("PRESENT")
-
-  student       Student               @relation(fields: [studentId], references: [id])
+  id            String                @id @default(uuid())
+  studentId     String
+  assessmentId  String
+  courseId      String
+  totalMarks    Float
+  status        String                @default("PRESENT")
   assessment    AssessmentTemplate    @relation(fields: [assessmentId], references: [id])
   course        Course                @relation(fields: [courseId], references: [id])
+  student       Student               @relation(fields: [studentId], references: [id])
   questionMarks StudentQuestionMark[]
 
   @@unique([studentId, assessmentId])
 }
 
 model StudentQuestionMark {
-  id            String @id @default(uuid())
+  id            String             @id @default(uuid())
   recordId      String
   questionId    String
   marksObtained Float
-
-  record   StudentAssessment  @relation(fields: [recordId], references: [id], onDelete: Cascade)
-  question AssessmentQuestion @relation(fields: [questionId], references: [id])
+  question      AssessmentQuestion @relation(fields: [questionId], references: [id])
+  record        StudentAssessment  @relation(fields: [recordId], references: [id], onDelete: Cascade)
 
   @@unique([recordId, questionId])
+}
+
+model AdminEditLog {
+  id            String          @id @default(uuid())
+  changeGroupId String
+  entityId      String
+  entityType    AuditEntityType
+  courseId      String?
+  fieldName     String?
+  oldValue      Json?
+  newValue      Json?
+  action        AuditAction
+  reason        String?
+  ipAddress     String?
+  userAgent     String?
+  details       String?
+  adminUserId   String
+  editedAt      DateTime        @default(now())
+  adminUser     User            @relation(fields: [adminUserId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([changeGroupId])
+  @@index([courseId])
+  @@index([editedAt])
+  @@index([adminUserId])
+}
+
+model CourseMappingAuditLog {
+  id        String   @id @default(uuid())
+  courseId  String
+  adminId   String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([adminId])
+}
+
+model Finance {
+  id           String           @id @default(uuid())
+  studentId    String
+  academicYear String
+  finalFee     Float            @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  payments     FinancePayment[]
+
+  @@unique([studentId, academicYear])
+  @@index([studentId])
+  @@index([academicYear])
+}
+
+model FinancePayment {
+  id        String   @id @default(uuid())
+  financeId String
+  amount    Float
+  paidAt    DateTime @default(now())
+  reference String?
+  remarks   String?
+  createdAt DateTime @default(now())
+  finance   Finance  @relation(fields: [financeId], references: [id], onDelete: Cascade)
+
+  @@index([financeId])
+  @@index([paidAt])
+}
+
+model SupportTicket {
+  id           String                 @id @default(uuid())
+  ticketNumber String                 @unique
+  createdById  String
+  category     SupportTicketCategory
+  priority     SupportTicketPriority  @default(MEDIUM)
+  status       SupportTicketStatus    @default(OPEN)
+  subject      String
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  resolvedAt   DateTime?
+  closedAt     DateTime?
+  createdBy    User                   @relation("SupportTicketCreator", fields: [createdById], references: [id])
+  messages     SupportTicketMessage[]
+
+  @@index([createdById])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SupportTicketMessage {
+  id          String                    @id @default(uuid())
+  ticketId    String
+  authorId    String
+  body        String
+  createdAt   DateTime                  @default(now())
+  attachments SupportTicketAttachment[]
+  author      User                      @relation("SupportMessageAuthor", fields: [authorId], references: [id])
+  ticket      SupportTicket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@index([authorId])
+}
+
+model SupportTicketAttachment {
+  id         String               @id @default(uuid())
+  messageId  String
+  fileName   String
+  storageKey String               @unique
+  mimeType   String
+  fileSize   Int
+  createdAt  DateTime             @default(now())
+  message    SupportTicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
 }
 
 enum DepartmentScopedRole {
@@ -978,126 +1061,6 @@ enum AuditAction {
   UPSERT_MAPPING
   DELETE_MAPPING
   UPDATE_COORDINATOR
-}
-
-model AdminEditLog {
-  id            String          @id @default(uuid())
-  changeGroupId String // UUID grouping all changes from one save
-  entityId      String
-  entityType    AuditEntityType // "COURSE" | "COURSE_ASSIGNMENT" | "COORDINATOR" | etc.
-  courseId      String? // always set for new rows; nullable for backward compat
-  fieldName     String? // per-field name: "facultyId", "credits", etc.
-  oldValue      Json?
-  newValue      Json?
-  action        AuditAction // SUPER_EDIT, UPSERT_MAPPING, DELETE_MAPPING, UPDATE_COORDINATOR
-  reason        String? // required when entity is locked/approved
-  ipAddress     String?
-  userAgent     String?
-  details       String? // preserved for backward compat (existing records)
-  adminUserId   String
-  editedAt      DateTime        @default(now())
-
-  adminUser User @relation(fields: [adminUserId], references: [id])
-
-  @@index([entityType, entityId])
-  @@index([changeGroupId])
-  @@index([courseId])
-  @@index([editedAt])
-  @@index([adminUserId])
-}
-
-model CourseMappingAuditLog {
-  id        String   @id @default(uuid())
-  courseId  String
-  adminId   String
-  action    String // e.g., "SUPER_EDIT_MAPPING"
-  details   String? // JSON string storing the exact changes made
-  createdAt DateTime @default(now())
-
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  admin  User   @relation(fields: [adminId], references: [id], onDelete: Cascade)
-
-  @@index([courseId])
-  @@index([adminId])
-}
-
-model Finance {
-  id           String           @id @default(uuid())
-  studentId    String
-  academicYear String
-  finalFee     Float            @default(0)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  payments     FinancePayment[]
-
-  @@unique([studentId, academicYear])
-  @@index([studentId])
-  @@index([academicYear])
-}
-
-model FinancePayment {
-  id        String   @id @default(uuid())
-  financeId String
-  amount    Float
-  paidAt    DateTime @default(now())
-  reference String?
-  remarks   String?
-  createdAt DateTime @default(now())
-  finance   Finance  @relation(fields: [financeId], references: [id], onDelete: Cascade)
-
-  @@index([financeId])
-  @@index([paidAt])
-}
-
-model SupportTicket {
-  id           String                @id @default(uuid())
-  ticketNumber String                @unique
-  createdById  String
-  category     SupportTicketCategory
-  priority     SupportTicketPriority @default(MEDIUM)
-  status       SupportTicketStatus   @default(OPEN)
-  subject      String
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
-  resolvedAt   DateTime?
-  closedAt     DateTime?
-
-  createdBy User                  @relation("SupportTicketCreator", fields: [createdById], references: [id])
-  messages  SupportTicketMessage[]
-
-  @@index([createdById])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model SupportTicketMessage {
-  id          String   @id @default(uuid())
-  ticketId    String
-  authorId    String
-  body        String
-  createdAt   DateTime @default(now())
-
-  ticket      SupportTicket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  author      User                      @relation("SupportMessageAuthor", fields: [authorId], references: [id])
-  attachments SupportTicketAttachment[]
-
-  @@index([ticketId, createdAt])
-  @@index([authorId])
-}
-
-model SupportTicketAttachment {
-  id        String   @id @default(uuid())
-  messageId String
-  fileName  String
-  storageKey String  @unique
-  mimeType  String
-  fileSize  Int
-  createdAt DateTime @default(now())
-
-  message SupportTicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-
-  @@index([messageId])
 }
 
 enum SupportTicketStatus {
