@@ -66,6 +66,26 @@ services:
       - db
 
   # ----------------------------------------
+  # Redis (In-Memory Cache)
+  # ----------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: webcampus-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    # Command arguments to set the RAM limit and eviction policy
+    command: >
+      redis-server 
+      --maxmemory 256mb 
+      --maxmemory-policy allkeys-lru
+      # Uncomment the below lines if you want Redis data persistence
+      # --save 60 1
+      # --appendonly yes
+    # volumes:
+    #   - ./data/redis:/data
+
+  # ----------------------------------------
   # Volume Declarations
   # ----------------------------------------
   # volumes:
