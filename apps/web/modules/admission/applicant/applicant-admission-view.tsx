@@ -650,8 +650,6 @@ export const ApplicantAdmissionView = ({
     ? (fetchedStaffAdmission ?? EMPTY_ADMISSION)
     : (fetchedAdmission ?? EMPTY_ADMISSION);
   const countries = Country.getAllCountries();
-  console.log("Admission:", admission);
-  console.log("Primary Email:", admission?.primaryEmail);
 
   const fullName = [
     admission?.firstName,
@@ -954,15 +952,15 @@ export const ApplicantAdmissionView = ({
 
     setIsGeneratingPdf(true);
     try {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
       const node = documentRef.current;
       if (!node) {
         toast.error("Could not render the admission form.");
         return;
       }
-
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      await new Promise((resolve) => setTimeout(resolve, 150));
 
       const previousStyle = node.style.cssText;
       node.style.position = "fixed";
