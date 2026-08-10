@@ -185,10 +185,7 @@ export const ProctorGroupsTab = () => {
                           <SelectItem value="unassigned">Unassigned</SelectItem>
                           {faculties?.map((faculty: any) => (
                             <SelectItem key={faculty.id} value={faculty.id}>
-                              {faculty.user?.name}{" "}
-                              {faculty.designation
-                                ? `(${faculty.designation})`
-                                : ""}
+                              {faculty.name}
                             </SelectItem>
                           ))}
                         </SelectContent>

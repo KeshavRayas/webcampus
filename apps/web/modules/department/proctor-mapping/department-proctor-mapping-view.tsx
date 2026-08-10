@@ -17,27 +17,14 @@ export const DepartmentProctorMappingView = () => {
       </div>
 
       <Tabs defaultValue="groups" className="w-full">
-        <TabsList className="mb-4 w-full justify-start rounded-none border-b bg-transparent p-0">
-          <TabsTrigger
-            value="groups"
-            className="data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-medium shadow-none transition-none focus-visible:ring-0 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-          >
-            Groups
-          </TabsTrigger>
-          <TabsTrigger
-            value="students"
-            className="data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground relative h-9 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-medium shadow-none transition-none focus-visible:ring-0 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-          >
-            Students
-          </TabsTrigger>
+        <TabsList className="mb-4">
+          <TabsTrigger value="groups">Groups</TabsTrigger>
+          <TabsTrigger value="students">Students</TabsTrigger>
         </TabsList>
-        <TabsContent value="groups" className="mt-0 border-0 p-0 outline-none">
+        <TabsContent value="groups" className="mt-0">
           <ProctorGroupsTab />
         </TabsContent>
-        <TabsContent
-          value="students"
-          className="mt-0 border-0 p-0 outline-none"
-        >
+        <TabsContent value="students" className="mt-0">
           <ProctorStudentsTab />
         </TabsContent>
       </Tabs>
