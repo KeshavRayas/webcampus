@@ -107,6 +107,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
                   name: "Attendance Report",
                   url: "/admin/academics/attendance",
                 },
+                {
+                  name: "Bonus Attendance",
+                  url: "/admin/academics/bonus-attendance",
+                },
               ],
             },
             {
@@ -203,7 +207,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Academics",
           url: "/department/feedback",
           icon: GraduationCap,
-          children: [{ name: "Feedback", url: "/department/feedback" }],
+          children: [
+            { name: "Feedback", url: "/department/feedback" },
+            { name: "Proctor Mapping", url: "/department/proctor-mapping" },
+          ],
         },
       ],
     },
@@ -251,6 +258,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
               name: "Feedback",
               url: "/feedback",
               children: [{ name: "Course/s", url: "/feedback" }],
+            },
+            {
+              name: "Proctor",
+              url: "/student/proctor",
+              children: [{ name: "Proctor Details", url: "/student/proctor" }],
             },
           ],
         },
@@ -318,7 +330,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Academics",
           url: "/faculty/feedback",
           icon: GraduationCap,
-          children: [{ name: "Feedback", url: "/faculty/feedback" }],
+          children: [
+            { name: "Feedback", url: "/faculty/feedback" },
+            { name: "Proctor", url: "/faculty/proctor" },
+          ],
         },
       ],
     },
