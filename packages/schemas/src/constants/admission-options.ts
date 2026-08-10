@@ -17,13 +17,7 @@ export const admissionTypes = [
   { value: "COLLEGE_CHANGE", label: "College Change" },
 ] as const;
 
-export const counsellingRounds = [
-  "Round 1",
-  "Round 2",
-  "Round 3",
-  "Round 4",
-  "Round 5",
-] as const;
+export const counsellingRounds = ["Round 1", "Round 2", "Round 3"] as const;
 
 export const nationalities = [
   "Indian",
