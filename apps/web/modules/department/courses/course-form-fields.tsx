@@ -669,7 +669,7 @@ export const CourseFormFields = ({
             control={form.control}
             name="openElectiveEligibility"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="mt-3">
                 <FormLabel>Who can register? *</FormLabel>
                 <FormControl>
                   <Combobox
@@ -695,7 +695,7 @@ export const CourseFormFields = ({
               control={form.control}
               name="eligibleDepartmentIds"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="mt-3">
                   <FormLabel>Eligible Departments *</FormLabel>
                   <FormControl>
                     <MultiCombobox
