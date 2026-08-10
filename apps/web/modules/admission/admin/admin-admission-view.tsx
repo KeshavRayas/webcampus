@@ -22,11 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@webcampus/ui/components/dialog";
-import {
-  FilterActions,
-  FilterBuilder,
-  type FilterFieldConfig,
-} from "@webcampus/ui/components/filter-builder";
+import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import {
   Form,
   FormControl,
@@ -38,8 +34,9 @@ import {
 import { Input } from "@webcampus/ui/components/input";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import {
   AdmissionResponse,
   getAdminAdmissionColumns,
@@ -55,12 +52,12 @@ import { usePortStudents } from "./use-port-students";
 //   "Other",
 // ] as const;
 // const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
-const ALL_FILTERS_VALUE = "__all__";
 
 type AdmissionFilters = {
   applicationId: string;
   academicTerm: string;
   semester: string;
+  email: string;
   createdFrom: string;
   createdTo: string;
 };
@@ -69,6 +66,7 @@ const EMPTY_FILTERS: AdmissionFilters = {
   applicationId: "",
   academicTerm: "",
   semester: "",
+  email: "",
   createdFrom: "",
   createdTo: "",
 };
@@ -113,7 +111,6 @@ export const AdminAdmissionView = ({
   const [createChoice, setCreateChoice] = useState<null | "profile" | "fill">(
     null
   );
-  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!showFilters) return;
@@ -152,7 +149,10 @@ export const AdminAdmissionView = ({
   } = useQuery({
     queryKey: ["admissions", appliedFilters],
     queryFn: async () => {
-      const query = createFilterQueryString(appliedFilters);
+      const apiFilters: Omit<AdmissionFilters, "email"> = {
+        ...appliedFilters,
+      };
+      const query = createFilterQueryString(apiFilters);
       const res = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
         `/admission${query ? `?${query}` : ""}`,
         { withCredentials: true }
@@ -161,6 +161,13 @@ export const AdminAdmissionView = ({
       return [];
     },
   });
+  const relevantAdmissions = useMemo(() => {
+    const email = appliedFilters.email.trim().toLowerCase();
+    if (!email) return admissions ?? [];
+    return (admissions ?? []).filter((admission) =>
+      admission.primaryEmail.toLowerCase().includes(email)
+    );
+  }, [admissions, appliedFilters.email]);
   const selectedSemesterId = draftFilters.semester;
   const { form, onSubmit } = useCreateAdmissionShellForm(
     selectedSemesterId,
@@ -240,7 +247,7 @@ export const AdminAdmissionView = ({
     }));
   };
 
-  const admissionFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
+  const simpleFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
     {
       key: "academicTerm",
       label: "Academic Term",
@@ -248,13 +255,10 @@ export const AdminAdmissionView = ({
       placeholder: "All terms",
       allOptionLabel: "All terms",
       options: terms.map((term) => ({
-        label: `${term.type.toUpperCase()} ${term.year}`,
+        label: `${term.type} ${term.year}`,
         value: term.id,
       })),
     },
-  ];
-
-  const additionalFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
     {
       key: "semester",
       label: "Semester",
@@ -267,6 +271,16 @@ export const AdminAdmissionView = ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
+    },
+  ];
+
+  const advancedFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
+    {
+      key: "email",
+      label: "Email",
+      type: "text",
+      placeholder: "Search by email",
+      inputId: "admission-email",
     },
     {
       key: "applicationId",
@@ -302,7 +316,6 @@ export const AdminAdmissionView = ({
     }
 
     setAppliedFilters(draftFilters);
-    setIsFilterDialogOpen(false);
     if (showFilters) {
       const query = createFilterQueryString(draftFilters);
       router.replace(`${pathname}${query ? `?${query}` : ""}`, {
@@ -314,7 +327,6 @@ export const AdminAdmissionView = ({
   const resetFilters = () => {
     setDraftFilters(EMPTY_FILTERS);
     setAppliedFilters(EMPTY_FILTERS);
-    setIsFilterDialogOpen(false);
     if (showFilters) {
       router.replace(pathname, { scroll: false });
     }
@@ -336,383 +348,348 @@ export const AdminAdmissionView = ({
     <div className="space-y-8">
       <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
         <div className="space-y-4">
-          <FilterBuilder
-            fields={admissionFilterFields}
+          <AdmissionFilterBar
+            simpleFields={simpleFilterFields}
+            advancedFields={advancedFilterFields}
             draftFilters={draftFilters}
             onDraftChange={updateDraftFilter}
-            allValue={ALL_FILTERS_VALUE}
-            className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+            onApply={applyFilters}
+            onReset={resetFilters}
           />
-        </div>
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div className="flex flex-wrap items-center gap-2">
-            <FilterActions onApply={applyFilters} onReset={resetFilters} />
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsFilterDialogOpen(true)}
-            >
-              Filter
-            </Button>
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            {!hideAddForm && canCreate && (
+              <Dialog
+                open={isCreateDialogOpen}
+                onOpenChange={handleCreateDialogOpenChange}
+              >
+                <DialogTrigger asChild>
+                  <Button disabled={!draftFilters.semester}>
+                    Create Admission
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                  {createChoice === null ? (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle>Create Admission</DialogTitle>
+                        <DialogDescription>
+                          Choose how you want to create the admission for the
+                          selected semester.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-3">
+                        <button
+                          type="button"
+                          className="bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
+                          onClick={() => setCreateChoice("profile")}
+                        >
+                          <p className="font-medium">
+                            Create Admission Profile / Shell
+                          </p>
+                          <p className="text-muted-foreground mt-1 text-sm">
+                            Create a shell so the applicant can log in and fill
+                            the form themselves.
+                          </p>
+                        </button>
+                        <button
+                          type="button"
+                          className="bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
+                          onClick={() => {
+                            setCreateChoice(null);
+                            setIsCreateDialogOpen(false);
+                            router.push(
+                              `${fillApplicantPath}?semester=${draftFilters.semester}`
+                            );
+                          }}
+                        >
+                          <p className="font-medium">Fill Application Now</p>
+                          <p className="text-muted-foreground mt-1 text-sm">
+                            Fill and submit the application form directly for
+                            the selected semester.
+                          </p>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <Form {...form}>
+                      <form
+                        onSubmit={form.handleSubmit((values) => {
+                          onSubmit(values);
+                          setIsCreateDialogOpen(false);
+                          setCreateChoice(null);
+                        })}
+                        className="space-y-4"
+                      >
+                        <DialogHeader>
+                          <DialogTitle>Create Admission Profile</DialogTitle>
+                          <DialogDescription>
+                            The applicant will use these credentials to log in
+                            and complete the admission form.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <FormField
+                          control={form.control}
+                          name="primaryEmail"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Primary Email *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="email"
+                                  placeholder="student@bmsce.ac.in"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password *</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Enter initial password"
+                                    {...field}
+                                    value={field.value ?? ""}
+                                    className="pr-10"
+                                  />
+
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                                    onClick={() => setShowPassword((v) => !v)}
+                                  >
+                                    {showPassword ? (
+                                      <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                      <Eye className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <DialogFooter>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setCreateChoice(null)}
+                          >
+                            Back
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={form.formState.isSubmitting}
+                          >
+                            Create Profile
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                  )}
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </div>
+
+        {!hideAddForm && canCreate && !draftFilters.semester && (
+          <p className="text-muted-foreground text-sm">
+            Select an admission semester above before creating a new admission
+            shell.
+          </p>
+        )}
+
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-semibold tracking-tight">Admissions</h3>
+            <p className="text-muted-foreground text-sm">
+              {showFilters
+                ? "Filter by academic term, semester, application ID, and created date."
+                : "Showing admissions for the selected semester."}
+            </p>
+            {showFilters && selectedSemesterId && (
+              <p
+                className="text-muted-foreground mt-1 text-sm"
+                suppressHydrationWarning
+              >
+                {isFetchingSemesterAdmissions
+                  ? "Checking port readiness..."
+                  : unresolvedAdmissionsCount > 0
+                    ? `${unresolvedAdmissionsCount} application(s) still pending review before porting.`
+                    : "All applications are reviewed. Ready to port approved students."}
+              </p>
+            )}
           </div>
 
-          <Dialog
-            open={isFilterDialogOpen}
-            onOpenChange={setIsFilterDialogOpen}
-          >
-            <DialogContent className="sm:max-w-lg">
+          {showFilters && canPort && (
+            <Button
+              onClick={() => {
+                if (!selectedSemesterId) {
+                  toast.error("Please select a semester first");
+                  return;
+                }
+                setIsPortPreviewOpen(true);
+              }}
+              disabled={
+                !selectedSemesterId || isFetchingSemesterAdmissions || isPorting
+              }
+            >
+              {isPorting ? "Porting..." : "Preview Port"}
+            </Button>
+          )}
+        </div>
+
+        {showFilters && (
+          <Dialog open={isPortPreviewOpen} onOpenChange={setIsPortPreviewOpen}>
+            <DialogContent className="sm:max-w-3xl">
               <DialogHeader>
-                <DialogTitle>Advanced Filters</DialogTitle>
+                <DialogTitle>Preview Student Port</DialogTitle>
                 <DialogDescription>
-                  Filter admissions by semester, application ID, and created
-                  date range.
+                  Review admissions for{" "}
+                  {selectedSemester
+                    ? `${selectedSemester.programType} - Semester ${selectedSemester.semesterNumber}`
+                    : "the selected semester"}{" "}
+                  before final port.
                 </DialogDescription>
               </DialogHeader>
-              <FilterBuilder
-                fields={additionalFilterFields}
-                draftFilters={draftFilters}
-                onDraftChange={updateDraftFilter}
-                allValue={ALL_FILTERS_VALUE}
-                className="grid-cols-1 sm:grid-cols-2"
-              />
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                  <div className="bg-muted/30 rounded-md border p-3">
+                    <p className="text-muted-foreground">Pending/Submitted</p>
+                    <p className="text-lg font-semibold">
+                      {unresolvedAdmissionsCount}
+                    </p>
+                  </div>
+                  <div className="bg-muted/30 rounded-md border p-3">
+                    <p className="text-muted-foreground">Will be ported</p>
+                    <p className="text-lg font-semibold">
+                      {admissionsToPort.length}
+                    </p>
+                  </div>
+                  <div className="bg-muted/30 rounded-md border p-3">
+                    <p className="text-muted-foreground">Already ported</p>
+                    <p className="text-lg font-semibold">
+                      {alreadyPortedAdmissions.length}
+                    </p>
+                  </div>
+                </div>
+
+                {admissionsToPort.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">
+                      Admissions that will be ported
+                    </p>
+                    <div className="max-h-56 overflow-auto rounded-md border">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted sticky top-0 z-10">
+                          <tr>
+                            <th className="bg-muted px-3 py-2 text-left font-medium">
+                              Application ID
+                            </th>
+                            <th className="bg-muted px-3 py-2 text-left font-medium">
+                              Student Name
+                            </th>
+                            <th className="bg-muted px-3 py-2 text-left font-medium">
+                              Status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {admissionsToPort.map((admission) => {
+                            const fullName = admission.nameAsPer10th?.trim();
+                            return (
+                              <tr key={admission.id} className="border-t">
+                                <td className="px-3 py-2">
+                                  {admission.applicationId}
+                                </td>
+                                <td className="px-3 py-2">{fullName || "-"}</td>
+                                <td className="px-3 py-2">
+                                  {admission.status}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    No approved admissions pending port in this semester.
+                  </p>
+                )}
+
+                {unresolvedAdmissionsCount > 0 && (
+                  <p className="text-sm font-medium text-amber-700">
+                    Port is disabled until all admissions are reviewed (no
+                    pending or submitted records).
+                  </p>
+                )}
+              </div>
+
               <DialogFooter>
-                <Button variant="outline" onClick={resetFilters}>
-                  Reset Filters
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsPortPreviewOpen(false)}
+                >
+                  Cancel
                 </Button>
-                <Button type="button" onClick={applyFilters}>
-                  Apply Filters
+                <Button
+                  type="button"
+                  onClick={handleConfirmPort}
+                  disabled={
+                    isPorting ||
+                    unresolvedAdmissionsCount > 0 ||
+                    admissionsToPort.length === 0
+                  }
+                >
+                  {isPorting
+                    ? "Porting..."
+                    : `Confirm Port (${admissionsToPort.length})`}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        )}
 
-          {!hideAddForm && canCreate && (
-            <Dialog
-              open={isCreateDialogOpen}
-              onOpenChange={handleCreateDialogOpenChange}
-            >
-              <DialogTrigger asChild>
-                <Button disabled={!draftFilters.semester}>
-                  Create Admission
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                {createChoice === null ? (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle>Create Admission</DialogTitle>
-                      <DialogDescription>
-                        Choose how you want to create the admission for the
-                        selected semester.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-3">
-                      <button
-                        type="button"
-                        className="bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
-                        onClick={() => setCreateChoice("profile")}
-                      >
-                        <p className="font-medium">
-                          Create Admission Profile / Shell
-                        </p>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                          Create a shell so the applicant can log in and fill
-                          the form themselves.
-                        </p>
-                      </button>
-                      <button
-                        type="button"
-                        className="bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
-                        onClick={() => {
-                          setCreateChoice(null);
-                          setIsCreateDialogOpen(false);
-                          router.push(
-                            `${fillApplicantPath}?semester=${draftFilters.semester}`
-                          );
-                        }}
-                      >
-                        <p className="font-medium">Fill Application Now</p>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                          Fill and submit the application form directly for the
-                          selected semester.
-                        </p>
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <Form {...form}>
-                    <form
-                      onSubmit={form.handleSubmit((values) => {
-                        onSubmit(values);
-                        setIsCreateDialogOpen(false);
-                        setCreateChoice(null);
-                      })}
-                      className="space-y-4"
-                    >
-                      <DialogHeader>
-                        <DialogTitle>Create Admission Profile</DialogTitle>
-                        <DialogDescription>
-                          The applicant will use these credentials to log in and
-                          complete the admission form.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <FormField
-                        control={form.control}
-                        name="primaryEmail"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Primary Email *</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="email"
-                                placeholder="student@bmsce.ac.in"
-                                {...field}
-                                value={field.value ?? ""}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Password *</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Input
-                                  type={showPassword ? "text" : "password"}
-                                  placeholder="Enter initial password"
-                                  {...field}
-                                  value={field.value ?? ""}
-                                  className="pr-10"
-                                />
-
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-                                  onClick={() => setShowPassword((v) => !v)}
-                                >
-                                  {showPassword ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <DialogFooter>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setCreateChoice(null)}
-                        >
-                          Back
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={form.formState.isSubmitting}
-                        >
-                          Create Profile
-                        </Button>
-                      </DialogFooter>
-                    </form>
-                  </Form>
-                )}
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-      </div>
-
-      {!hideAddForm && canCreate && !draftFilters.semester && (
-        <p className="text-muted-foreground text-sm">
-          Select an admission semester above before creating a new admission
-          shell.
-        </p>
-      )}
-
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-xl font-semibold tracking-tight">Admissions</h3>
-          <p className="text-muted-foreground text-sm">
-            {showFilters
-              ? "Filter by academic term, semester, application ID, and created date."
-              : "Showing admissions for the selected semester."}
-          </p>
-          {showFilters && selectedSemesterId && (
-            <p
-              className="text-muted-foreground mt-1 text-sm"
-              suppressHydrationWarning
-            >
-              {isFetchingSemesterAdmissions
-                ? "Checking port readiness..."
-                : unresolvedAdmissionsCount > 0
-                  ? `${unresolvedAdmissionsCount} application(s) still pending review before porting.`
-                  : "All applications are reviewed. Ready to port approved students."}
-            </p>
-          )}
-        </div>
-
-        {showFilters && canPort && (
-          <Button
-            onClick={() => {
-              if (!selectedSemesterId) {
-                toast.error("Please select a semester first");
-                return;
-              }
-              setIsPortPreviewOpen(true);
-            }}
-            disabled={
-              !selectedSemesterId || isFetchingSemesterAdmissions || isPorting
-            }
-          >
-            {isPorting ? "Porting..." : "Preview Port"}
-          </Button>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading admissions...
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {isFetching && (
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Applying filters...
+              </div>
+            )}
+            <DataTable
+              columns={getAdminAdmissionColumns(
+                showFilters,
+                role !== "admission-instructor"
+              )}
+              data={relevantAdmissions}
+            />
+          </div>
         )}
       </div>
-
-      {showFilters && (
-        <Dialog open={isPortPreviewOpen} onOpenChange={setIsPortPreviewOpen}>
-          <DialogContent className="sm:max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Preview Student Port</DialogTitle>
-              <DialogDescription>
-                Review admissions for{" "}
-                {selectedSemester
-                  ? `${selectedSemester.programType} - Semester ${selectedSemester.semesterNumber}`
-                  : "the selected semester"}{" "}
-                before final port.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
-                <div className="bg-muted/30 rounded-md border p-3">
-                  <p className="text-muted-foreground">Pending/Submitted</p>
-                  <p className="text-lg font-semibold">
-                    {unresolvedAdmissionsCount}
-                  </p>
-                </div>
-                <div className="bg-muted/30 rounded-md border p-3">
-                  <p className="text-muted-foreground">Will be ported</p>
-                  <p className="text-lg font-semibold">
-                    {admissionsToPort.length}
-                  </p>
-                </div>
-                <div className="bg-muted/30 rounded-md border p-3">
-                  <p className="text-muted-foreground">Already ported</p>
-                  <p className="text-lg font-semibold">
-                    {alreadyPortedAdmissions.length}
-                  </p>
-                </div>
-              </div>
-
-              {admissionsToPort.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">
-                    Admissions that will be ported
-                  </p>
-                  <div className="max-h-56 overflow-auto rounded-md border">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted sticky top-0 z-10">
-                        <tr>
-                          <th className="bg-muted px-3 py-2 text-left font-medium">
-                            Application ID
-                          </th>
-                          <th className="bg-muted px-3 py-2 text-left font-medium">
-                            Student Name
-                          </th>
-                          <th className="bg-muted px-3 py-2 text-left font-medium">
-                            Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {admissionsToPort.map((admission) => {
-                          const fullName = admission.nameAsPer10th?.trim();
-                          return (
-                            <tr key={admission.id} className="border-t">
-                              <td className="px-3 py-2">
-                                {admission.applicationId}
-                              </td>
-                              <td className="px-3 py-2">{fullName || "-"}</td>
-                              <td className="px-3 py-2">{admission.status}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">
-                  No approved admissions pending port in this semester.
-                </p>
-              )}
-
-              {unresolvedAdmissionsCount > 0 && (
-                <p className="text-sm font-medium text-amber-700">
-                  Port is disabled until all admissions are reviewed (no pending
-                  or submitted records).
-                </p>
-              )}
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsPortPreviewOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={handleConfirmPort}
-                disabled={
-                  isPorting ||
-                  unresolvedAdmissionsCount > 0 ||
-                  admissionsToPort.length === 0
-                }
-              >
-                {isPorting
-                  ? "Porting..."
-                  : `Confirm Port (${admissionsToPort.length})`}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {isLoading ? (
-        <div className="flex items-center gap-2 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading admissions...
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {isFetching && (
-            <div className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Applying filters...
-            </div>
-          )}
-          <DataTable
-            columns={getAdminAdmissionColumns(showFilters)}
-            data={admissions || []}
-          />
-        </div>
-      )}
     </div>
   );
 };

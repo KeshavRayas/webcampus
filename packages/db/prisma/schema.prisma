@@ -869,16 +869,19 @@ model Admission {
   fatherQualification             String?
   fatherOccupation                String?
   fatherPermanentAddress          String?
+  fatherAnnualIncome              String?
   feePaid                         Float?
   guardianEmail                   String?
   guardianName                    String?
   guardianNumber                  String?
   guardianOccupation              String?
   guardianPermanentAddress        String?
+  guardianAnnualIncome            String?
   hostel                          Boolean?
   motherQualification             String?
   motherOccupation                String?
   motherPermanentAddress          String?
+  motherAnnualIncome              String?
   motherTongue                    String?
   nameAsPer10th                   String?
   nationality                     String?
@@ -927,6 +930,19 @@ model Admission {
 
   @@index([semesterId])
   @@index([departmentId])
+}
+
+model AdmissionConstants {
+  id               String   @id @default(uuid())
+  modeOfAdmission  String
+  quota            String?
+  categoryClaimed  String
+  categoryAllotted String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([modeOfAdmission, quota, categoryClaimed, categoryAllotted])
+  @@index([modeOfAdmission])
 }
 
 model AttendanceRecord {

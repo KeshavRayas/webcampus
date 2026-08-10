@@ -212,3 +212,29 @@ export type DeleteFacultyAttendanceSessionDTO = {
   courseId: string;
   affectedStudentCount: number;
 };
+
+export type AdmissionConstantRecordDTO = {
+  id: string;
+  modeOfAdmission: string;
+  quota: string | null;
+  categoryClaimed: string;
+  categoryAllotted: string;
+};
+
+export type AdmissionConstantsOptionsDTO = {
+  modes: string[];
+  categoriesClaimed: Record<string, string[]>;
+  categoriesAllotted: Record<string, string[]>;
+  quotas: Record<string, string[]>;
+};
+
+export type AdmissionReferenceListsPayloadDTO = {
+  quotas: string[];
+  categoriesClaimed: string[];
+  categoriesAllotted: string[];
+};
+
+export type AdmissionReferenceCreatePayloadDTO =
+  AdmissionReferenceListsPayloadDTO & {
+    modeOfAdmission: string;
+  };

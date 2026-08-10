@@ -6,11 +6,12 @@ import {
   createFilterQueryString,
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
+import { useAdmissionConstants } from "@/lib/use-admission-constants";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { admissionModes, admissionTypes } from "@webcampus/schemas/constants";
+import { admissionTypes } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import {
   Avatar,
@@ -27,17 +28,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
-import {
-  FilterActions,
-  FilterBuilder,
-  type FilterFieldConfig,
-} from "@webcampus/ui/components/filter-builder";
+import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import { FileDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { ApplicantAdmissionView } from "../applicant/applicant-admission-view";
+import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import {
   FeeReceiptDocument,
   FeeReportDocument,
@@ -53,7 +51,6 @@ const ADMISSION_STATUSES = [
   "APPROVED",
   "REJECTED",
 ] as const;
-const ALL_FILTERS_VALUE = "__all__";
 
 type FeePaymentFilters = {
   academicTerm: string;
@@ -62,6 +59,7 @@ type FeePaymentFilters = {
   status: string;
   mode: string;
   admissionType: string;
+  email: string;
   createdFrom: string;
   createdTo: string;
 };
@@ -73,6 +71,7 @@ const EMPTY_FILTERS: FeePaymentFilters = {
   status: "",
   mode: "",
   admissionType: "",
+  email: "",
   createdFrom: "",
   createdTo: "",
 };
@@ -210,6 +209,9 @@ const FeePaymentStaffView = () => {
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
   const { data: departments = [] } = useAdmissionDepartments();
+
+  const { data: admissionConstants } = useAdmissionConstants();
+  const admissionModes = admissionConstants?.modes ?? [];
   const selectedTerm = terms.find((t) => t.id === draftFilters.academicTerm);
   const nestedSemesters = selectedTerm?.Semester || [];
 
@@ -235,7 +237,7 @@ const FeePaymentStaffView = () => {
     }));
   };
 
-  const filterFields: FilterFieldConfig<FeePaymentFilters>[] = [
+  const simpleFilterFields: FilterFieldConfig<FeePaymentFilters>[] = [
     {
       key: "academicTerm",
       label: "Academic Term",
@@ -260,12 +262,34 @@ const FeePaymentStaffView = () => {
         value: semester.id,
       })),
     },
+  ];
+
+  const advancedFilterFields: FilterFieldConfig<FeePaymentFilters>[] = [
+    {
+      key: "email",
+      label: "Email",
+      type: "text",
+      placeholder: "Search by email",
+      inputId: "fee-payment-email",
+    },
     {
       key: "applicationId",
       label: "Application ID",
       type: "text",
       placeholder: "Search application ID",
       inputId: "fee-payment-application-id",
+    },
+    {
+      key: "createdFrom",
+      label: "Created From",
+      type: "date",
+      inputId: "fee-payment-created-from",
+    },
+    {
+      key: "createdTo",
+      label: "Created To",
+      type: "date",
+      inputId: "fee-payment-created-to",
     },
     {
       key: "status",
@@ -297,21 +321,16 @@ const FeePaymentStaffView = () => {
         value: type.value,
       })),
     },
-    {
-      key: "createdFrom",
-      label: "Created From",
-      type: "date",
-      inputId: "fee-payment-created-from",
-    },
-    {
-      key: "createdTo",
-      label: "Created To",
-      type: "date",
-      inputId: "fee-payment-created-to",
-    },
   ];
 
-  const query = createFilterQueryString(appliedFilters);
+  const query = createFilterQueryString(
+    (() => {
+      const apiFilters: Omit<FeePaymentFilters, "email"> = {
+        ...appliedFilters,
+      };
+      return apiFilters;
+    })()
+  );
   const { data, isFetching, isLoading } = useQuery({
     queryKey: ["fee-payments", appliedFilters],
     queryFn: async () => {
@@ -326,7 +345,13 @@ const FeePaymentStaffView = () => {
     },
   });
 
-  const admissions = data ?? [];
+  const admissions = useMemo(() => {
+    const email = appliedFilters.email.trim().toLowerCase();
+    if (!email) return data ?? [];
+    return (data ?? []).filter((admission) =>
+      admission.primaryEmail?.toLowerCase().includes(email)
+    );
+  }, [data, appliedFilters.email]);
 
   const summary = useMemo(
     () => buildFeePaymentSummary(admissions),
@@ -580,17 +605,18 @@ const FeePaymentStaffView = () => {
     <div className="space-y-8">
       <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
         <div className="space-y-4">
-          <FilterBuilder
-            fields={filterFields}
+          <AdmissionFilterBar
+            simpleFields={simpleFilterFields}
+            advancedFields={advancedFilterFields}
             draftFilters={draftFilters}
             onDraftChange={updateDraftFilter}
-            allValue={ALL_FILTERS_VALUE}
-            className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4"
+            onApply={applyFilters}
+            onReset={resetFilters}
+            dialogTitle="Advanced Filters"
+            dialogDescription="Filter fee payments by email, application ID, status, mode, and date range."
           />
 
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <FilterActions onApply={applyFilters} onReset={resetFilters} />
-
             <Button variant="outline" onClick={generateReportPdf}>
               <FileDown className="mr-2 h-4 w-4" />
               Generate Fee Report PDF
