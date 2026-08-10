@@ -11,28 +11,42 @@ import {
 } from "@webcampus/ui/components/dialog";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface WindowDaysDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (days: number) => void;
-  isCreating: boolean;
+  isSaving: boolean;
+  isEditing?: boolean;
+  initialDays?: number;
 }
 
 export const WindowDaysDialog = ({
   open,
   onOpenChange,
   onConfirm,
-  isCreating,
+  isSaving,
+  isEditing = false,
+  initialDays = 1,
 }: WindowDaysDialogProps) => {
   const [days, setDays] = useState<number>(1);
+
+  useEffect(() => {
+    if (open) {
+      setDays(initialDays);
+    }
+  }, [open, initialDays]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Set Bonus Attendance Days</DialogTitle>
+          <DialogTitle>
+            {isEditing
+              ? "Edit Bonus Attendance Days"
+              : "Set Bonus Attendance Days"}
+          </DialogTitle>
           <DialogDescription>
             Specify how many days into the future faculty can take attendance
             when this window is open.
@@ -59,7 +73,7 @@ export const WindowDaysDialog = ({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={isCreating}
+            disabled={isSaving}
           >
             Cancel
           </Button>
@@ -68,9 +82,9 @@ export const WindowDaysDialog = ({
               onConfirm(days);
               onOpenChange(false);
             }}
-            disabled={isCreating}
+            disabled={isSaving}
           >
-            {isCreating ? "Creating..." : "Create"}
+            {isSaving ? "Saving..." : isEditing ? "Save" : "Create"}
           </Button>
         </DialogFooter>
       </DialogContent>

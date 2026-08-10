@@ -18,12 +18,15 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
+import { Pencil } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   BonusAttendanceFilters,
+  BonusAttendanceWindowRow,
   useBonusAttendanceWindows,
   useCreateBonusAttendanceWindow,
   useToggleBonusAttendanceWindow,
+  useUpdateBonusAttendanceWindow,
 } from "./use-bonus-attendance";
 import { WindowDaysDialog } from "./window-days-dialog";
 
@@ -56,6 +59,8 @@ export const BonusAttendanceView = () => {
     useState<BonusAttendanceFilterState>(EMPTY_FILTERS);
 
   const [isDaysDialogOpen, setIsDaysDialogOpen] = useState(false);
+  const [editingWindow, setEditingWindow] =
+    useState<BonusAttendanceWindowRow | null>(null);
 
   const selectedDraftTerm = terms.find(
     (term) => term.id === draftFilters.academicTermId
@@ -104,6 +109,8 @@ export const BonusAttendanceView = () => {
     useCreateBonusAttendanceWindow();
   const { mutate: toggleWindow, isPending: isToggling } =
     useToggleBonusAttendanceWindow();
+  const { mutate: updateWindow, isPending: isUpdating } =
+    useUpdateBonusAttendanceWindow();
 
   const filterFields = useMemo<
     FilterFieldConfig<BonusAttendanceFilterState>[]
@@ -211,6 +218,15 @@ export const BonusAttendanceView = () => {
     });
   };
 
+  const handleUpdateWindow = (days: number) => {
+    if (!editingWindow) {
+      return;
+    }
+
+    updateWindow({ id: editingWindow.id, days });
+    setEditingWindow(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -298,7 +314,23 @@ export const BonusAttendanceView = () => {
                   <TableCell className="font-medium">
                     {window.instanceName}
                   </TableCell>
-                  <TableCell>{window.days} Days</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span>{window.days} Days</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditingWindow(window);
+                          setIsDaysDialogOpen(true);
+                        }}
+                        disabled={isUpdating}
+                        aria-label={`Edit days for ${window.instanceName}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Switch
@@ -322,9 +354,16 @@ export const BonusAttendanceView = () => {
 
       <WindowDaysDialog
         open={isDaysDialogOpen}
-        onOpenChange={setIsDaysDialogOpen}
-        onConfirm={handleCreateWindow}
-        isCreating={isCreating}
+        onOpenChange={(open) => {
+          setIsDaysDialogOpen(open);
+          if (!open) {
+            setEditingWindow(null);
+          }
+        }}
+        onConfirm={editingWindow ? handleUpdateWindow : handleCreateWindow}
+        isSaving={isCreating || isUpdating}
+        isEditing={Boolean(editingWindow)}
+        initialDays={editingWindow?.days ?? 1}
       />
     </div>
   );

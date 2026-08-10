@@ -42,6 +42,14 @@ export const ToggleBonusAttendanceWindowBodySchema = z.object({
   isOpen: z.boolean(),
 });
 
+export const UpdateBonusAttendanceWindowParamsSchema = z.object({
+  id: z.uuid("Invalid window ID"),
+});
+
+export const UpdateBonusAttendanceWindowBodySchema = z.object({
+  days: z.coerce.number().min(1),
+});
+
 export type BonusAttendanceCycleType = z.infer<
   typeof BonusAttendanceCycleSchema
 >;
@@ -56,4 +64,10 @@ export type ToggleBonusAttendanceWindowParamsType = z.infer<
 >;
 export type ToggleBonusAttendanceWindowBodyType = z.infer<
   typeof ToggleBonusAttendanceWindowBodySchema
+>;
+export type UpdateBonusAttendanceWindowParamsType = z.infer<
+  typeof UpdateBonusAttendanceWindowParamsSchema
+>;
+export type UpdateBonusAttendanceWindowBodyType = z.infer<
+  typeof UpdateBonusAttendanceWindowBodySchema
 >;

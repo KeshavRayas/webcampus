@@ -32,6 +32,11 @@ export interface CreateBonusAttendancePayload extends BonusAttendanceFilters {
   days: number;
 }
 
+export interface UpdateBonusAttendancePayload {
+  id: string;
+  days: number;
+}
+
 export const useBonusAttendanceWindows = (
   filters: BonusAttendanceFilters,
   enabled: boolean
@@ -102,6 +107,33 @@ export const useToggleBonusAttendanceWindow = () => {
       return axios.patch<BaseResponse<BonusAttendanceWindowRow>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/bonus-attendance/${id}/toggle`,
         { isOpen },
+        { withCredentials: true }
+      );
+    },
+    onSuccess: (res) => {
+      toast.success(res.data.message);
+      queryClient.invalidateQueries({
+        queryKey: ["admin-bonus-attendance-windows"],
+      });
+    },
+    onError: (error: AxiosError<ErrorResponse>) => {
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to update bonus attendance window"
+      );
+    },
+  });
+};
+
+export const useUpdateBonusAttendanceWindow = () => {
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, days }: UpdateBonusAttendancePayload) => {
+      return axios.patch<BaseResponse<BonusAttendanceWindowRow>>(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/bonus-attendance/${id}`,
+        { days },
         { withCredentials: true }
       );
     },

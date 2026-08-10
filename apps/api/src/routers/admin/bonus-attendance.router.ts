@@ -4,6 +4,8 @@ import {
   GetBonusAttendanceWindowsQuerySchema,
   ToggleBonusAttendanceWindowBodySchema,
   ToggleBonusAttendanceWindowParamsSchema,
+  UpdateBonusAttendanceWindowBodySchema,
+  UpdateBonusAttendanceWindowParamsSchema,
 } from "@webcampus/schemas/admin";
 import { Router } from "express";
 import { BonusAttendanceWindowController } from "../../controllers/admin/bonus-attendance.controller";
@@ -27,6 +29,13 @@ router.patch(
   validateRequest(ToggleBonusAttendanceWindowParamsSchema, "params"),
   validateRequest(ToggleBonusAttendanceWindowBodySchema),
   BonusAttendanceWindowController.toggleWindow
+);
+
+router.patch(
+  "/:id",
+  validateRequest(UpdateBonusAttendanceWindowParamsSchema, "params"),
+  validateRequest(UpdateBonusAttendanceWindowBodySchema),
+  BonusAttendanceWindowController.updateWindow
 );
 
 export { router as bonusAttendanceRouter };

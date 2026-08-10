@@ -260,4 +260,43 @@ export class BonusAttendanceWindowService {
       throw new Error("Failed to toggle bonus attendance window");
     }
   }
+
+  static async updateWindow(
+    id: string,
+    days: number
+  ): Promise<BaseResponse<BonusAttendanceWindowListItem>> {
+    try {
+      const existing = await db.bonusAttendanceWindow.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        throw new Error("Bonus attendance window not found");
+      }
+
+      const updated = await db.bonusAttendanceWindow.update({
+        where: { id },
+        data: { days },
+        include: {
+          academicTerm: { select: { type: true, year: true } },
+          semester: { select: { semesterNumber: true, programType: true } },
+          department: { select: { id: true, code: true, name: true } },
+        },
+      });
+
+      return {
+        status: "success",
+        message: "Bonus attendance window updated successfully",
+        data: this.mapWindowToListItem(updated),
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+
+      logger.error("Failed to update bonus attendance window", error);
+      throw new Error("Failed to update bonus attendance window");
+    }
+  }
 }
