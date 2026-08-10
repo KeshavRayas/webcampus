@@ -29,6 +29,7 @@ export interface CourseEligibility {
   markEligible: boolean;
   attendanceEligible: boolean;
   eligible: boolean;
+  reason?: string | null;
 }
 
 export interface HallTicketData {

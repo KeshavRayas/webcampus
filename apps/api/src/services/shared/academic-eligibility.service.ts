@@ -1,6 +1,9 @@
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
-import { findCourseAssignments } from "./course-assignment.service";
+import {
+  findCourseAssignments,
+  type CourseAssignmentWithFreeze,
+} from "./course-assignment.service";
 
 export type CourseEligibilityItem = {
   courseAssignmentId: string;
@@ -14,6 +17,7 @@ export type CourseEligibilityItem = {
   markEligible: boolean;
   attendanceEligible: boolean;
   eligible: boolean;
+  reason: string | null;
 };
 
 export type StudentEligibility = {
@@ -39,25 +43,26 @@ export type EligibilityFilters = {
   search?: string;
 };
 
-function isFrozen(
-  freeze: {
-    facultyFrozen: boolean;
-    hodFrozen: boolean;
-    adminFrozen: boolean;
-  } | null
-): boolean {
+type FreezeFlags = {
+  facultyFrozen: boolean;
+  hodFrozen: boolean;
+  adminFrozen: boolean;
+};
+
+type AttendanceRecord = {
+  percentage: number | null;
+  condonationStatus: string;
+};
+
+function isFrozen(freeze: FreezeFlags | null): boolean {
   if (!freeze) return false;
   return freeze.facultyFrozen || freeze.hodFrozen || freeze.adminFrozen;
 }
 
 function computeCourseEligibility(
   mark: { cieTotal: number | null; status: string } | null,
-  attendance: { percentage: number | null; condonationStatus: string } | null,
-  freeze: {
-    facultyFrozen: boolean;
-    hodFrozen: boolean;
-    adminFrozen: boolean;
-  } | null
+  attendance: AttendanceRecord | null,
+  freeze: FreezeFlags | null
 ): {
   isFrozen: boolean;
   markEligible: boolean;
@@ -82,6 +87,66 @@ function assignmentKey(sectionId: string, courseId: string): string {
   return `${sectionId}:${courseId}`;
 }
 
+/**
+ * Maps each student section's semester to its section id, so a course
+ * registered for a given semester resolves to the section the student
+ * actually belongs to in that semester (latest section wins on conflict).
+ */
+export function buildSectionBySemester(
+  studentSections: {
+    sectionId: string;
+    section: { semesterId: string } | null;
+  }[]
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const ss of studentSections) {
+    const semId = ss.section?.semesterId;
+    if (semId) map.set(semId, ss.sectionId);
+  }
+  return map;
+}
+
+/**
+ * Resolves the section for a registration: prefer the section of the
+ * registration's semester, falling back to the student's latest section.
+ */
+export function pickSectionForRegistration(
+  semesterId: string,
+  sectionBySemester: ReadonlyMap<string, string>,
+  fallbackSectionId: string | null
+): string | null {
+  return sectionBySemester.get(semesterId) ?? fallbackSectionId;
+}
+
+function buildCourseReason(
+  eligibility: {
+    isFrozen: boolean;
+    markEligible: boolean;
+    attendanceEligible: boolean;
+    eligible: boolean;
+  },
+  freeze: FreezeFlags | null
+): string | null {
+  if (!eligibility.isFrozen) {
+    return freeze
+      ? "Not frozen by faculty/HOD/admin"
+      : "No course assignment or freeze record found";
+  }
+  if (!eligibility.markEligible) return "Not mark-eligible (CIE status)";
+  if (!eligibility.attendanceEligible) return "Attendance below 75%";
+  return null;
+}
+
+function preferFrozenAssignment(
+  current: CourseAssignmentWithFreeze | undefined,
+  candidate: CourseAssignmentWithFreeze
+): CourseAssignmentWithFreeze {
+  if (!current) return candidate;
+  if (isFrozen(candidate.freezes) && !isFrozen(current.freezes))
+    return candidate;
+  return current;
+}
+
 export const academicEligibility = {
   async getCourseEligibility(
     studentId: string,
@@ -93,7 +158,6 @@ export const academicEligibility = {
         user: { select: { name: true, image: true, email: true } },
         admission: { select: { photo: true } },
         studentSections: {
-          take: 1,
           orderBy: { semester: "desc" },
           include: { section: true },
         },
@@ -108,11 +172,18 @@ export const academicEligibility = {
 
     if (registrations.length === 0) return null;
 
-    const section = student.studentSections[0];
-    const sectionId = section?.sectionId ?? null;
+    const latestSectionId = student.studentSections[0]?.sectionId ?? null;
+    const sectionBySemester = buildSectionBySemester(student.studentSections);
+    const sectionIdFor = (semesterId: string): string | null =>
+      pickSectionForRegistration(
+        semesterId,
+        sectionBySemester,
+        latestSectionId
+      );
+
     const courseIds = registrations.map((r) => r.courseId);
 
-    const [marks, attendanceRecords, assignments] = await Promise.all([
+    const [marks, theoryAttendance] = await Promise.all([
       db.mark.findMany({
         where: { studentId, courseId: { in: courseIds } },
         select: { courseId: true, cieTotal: true, status: true },
@@ -121,26 +192,78 @@ export const academicEligibility = {
         where: { studentId, courseId: { in: courseIds }, batchId: null },
         select: { courseId: true, percentage: true, condonationStatus: true },
       }),
-      sectionId
-        ? findCourseAssignments({ sectionId, courseIds, batchId: null })
-        : Promise.resolve([]),
     ]);
 
     const marksMap = new Map(marks.map((m) => [m.courseId, m]));
-    const attendanceMap = new Map(
-      attendanceRecords.map((a) => [a.courseId, a])
+    const theoryAttendanceMap = new Map(
+      theoryAttendance.map((a) => [a.courseId, a])
+    );
+    const batchAttendanceMap = await this.buildStudentBatchAttendance(
+      studentId,
+      courseIds,
+      theoryAttendanceMap
     );
 
-    const assignmentMap = new Map<string, (typeof assignments)[number]>();
-    for (const a of assignments) {
-      const existing = assignmentMap.get(a.courseId);
-      if (existing) {
-        const err = `Duplicate CourseAssignment for student=${studentId} section=${sectionId} course=${a.courseId}: ids ${existing.id}, ${a.id}`;
-        logger.error(err);
-        throw new Error(err);
-      }
-      assignmentMap.set(a.courseId, a);
+    const assignmentMap = new Map<string, CourseAssignmentWithFreeze>();
+    const batchAssignmentMap = new Map<string, CourseAssignmentWithFreeze>();
+    const sectionsToQuery = new Set<string>();
+    for (const reg of registrations) {
+      const secId = sectionIdFor(reg.semesterId);
+      if (secId) sectionsToQuery.add(secId);
     }
+
+    for (const secId of sectionsToQuery) {
+      const courseIdsForSection = [
+        ...new Set(
+          registrations
+            .filter((r) => sectionIdFor(r.semesterId) === secId)
+            .map((r) => r.courseId)
+        ),
+      ];
+      const theoryAssignments = await findCourseAssignments({
+        sectionId: secId,
+        courseIds: courseIdsForSection,
+        batchId: null,
+      });
+      for (const a of theoryAssignments) {
+        const key = assignmentKey(secId, a.courseId);
+        const existing = assignmentMap.get(key);
+        if (existing) {
+          const err = `Duplicate CourseAssignment for student=${studentId} section=${secId} course=${a.courseId}: ids ${existing.id}, ${a.id}`;
+          logger.error(err);
+          throw new Error(err);
+        }
+        assignmentMap.set(key, a);
+      }
+
+      const missingCourseIds = courseIdsForSection.filter(
+        (cid) => !assignmentMap.has(assignmentKey(secId, cid))
+      );
+      if (missingCourseIds.length > 0) {
+        const batchAssignments = await findCourseAssignments({
+          sectionId: secId,
+          courseIds: missingCourseIds,
+          batchId: { not: null },
+        });
+        for (const a of batchAssignments) {
+          const key = assignmentKey(secId, a.courseId);
+          batchAssignmentMap.set(
+            key,
+            preferFrozenAssignment(batchAssignmentMap.get(key), a)
+          );
+        }
+      }
+    }
+
+    const assignmentFor = (sectionId: string | null, courseId: string) => {
+      if (!sectionId) return null;
+      const key = assignmentKey(sectionId, courseId);
+      return assignmentMap.get(key) ?? batchAssignmentMap.get(key) ?? null;
+    };
+    const attendanceFor = (courseId: string) =>
+      theoryAttendanceMap.get(courseId) ??
+      batchAttendanceMap.get(courseId) ??
+      null;
 
     const courses: CourseEligibilityItem[] = [];
     let allFrozen = true;
@@ -148,8 +271,11 @@ export const academicEligibility = {
 
     for (const reg of registrations) {
       const mark = marksMap.get(reg.courseId) ?? null;
-      const attendance = attendanceMap.get(reg.courseId) ?? null;
-      const assignment = assignmentMap.get(reg.courseId) ?? null;
+      const attendance = attendanceFor(reg.courseId);
+      const assignment = assignmentFor(
+        sectionIdFor(reg.semesterId),
+        reg.courseId
+      );
       const freeze = assignment?.freezes ?? null;
       const eligibility = computeCourseEligibility(mark, attendance, freeze);
 
@@ -166,6 +292,7 @@ export const academicEligibility = {
         cieTotal: mark?.cieTotal ?? null,
         attendancePercentage: attendance?.percentage ?? null,
         ...eligibility,
+        reason: buildCourseReason(eligibility, freeze),
       });
     }
 
@@ -180,7 +307,7 @@ export const academicEligibility = {
       departmentName: student.departmentName,
       currentSemester: student.currentSemester,
       programType: student.programType,
-      sectionName: section?.section?.name ?? null,
+      sectionName: student.studentSections[0]?.section?.name ?? null,
       courses,
       allCoursesFrozen: allFrozen,
       eligible: allEligible,
@@ -225,7 +352,6 @@ export const academicEligibility = {
             user: { select: { name: true, image: true, email: true } },
             admission: { select: { photo: true } },
             studentSections: {
-              take: 1,
               orderBy: { semester: "desc" },
               include: { section: true },
             },
@@ -246,54 +372,59 @@ export const academicEligibility = {
     if (studentIds.length === 0) return [];
 
     const allCourseIds = [...new Set(registrations.map((r) => r.courseId))];
-    const [marksMap, attendanceMap] = await Promise.all([
+    const [marksMap, theoryAttendanceMap] = await Promise.all([
       this.buildMarksMap(studentIds, allCourseIds),
       this.buildAttendanceMap(studentIds, allCourseIds),
     ]);
+    const batchAttendanceMap = await this.buildBatchAttendanceMap(
+      studentIds,
+      allCourseIds,
+      theoryAttendanceMap
+    );
 
-    const sectionGroups = new Map<
+    const studentSectionInfo = new Map<
       string,
-      {
-        regs: (typeof registrations)[number][];
-        student: (typeof registrations)[number]["student"];
-      }[]
+      { latestSectionId: string | null; bySemester: Map<string, string> }
     >();
-    for (const [, regs] of studentRegMap) {
+    for (const [sid, regs] of studentRegMap) {
       const firstReg = regs[0];
       if (!firstReg) continue;
-      const student = firstReg.student;
-      const s = student.studentSections[0];
-      const secId = s?.sectionId ?? "__no_section__";
-      const group = sectionGroups.get(secId) ?? [];
-      group.push({ regs, student });
-      sectionGroups.set(secId, group);
+      const sections = firstReg.student.studentSections;
+      studentSectionInfo.set(sid, {
+        latestSectionId: sections[0]?.sectionId ?? null,
+        bySemester: buildSectionBySemester(sections),
+      });
+    }
+    const sectionIdFor = (sid: string, semesterId: string): string | null => {
+      const info = studentSectionInfo.get(sid);
+      if (!info) return null;
+      return pickSectionForRegistration(
+        semesterId,
+        info.bySemester,
+        info.latestSectionId
+      );
+    };
+
+    const sectionCourseIds = new Map<string, string[]>();
+    for (const [, regs] of studentRegMap) {
+      for (const reg of regs) {
+        const secId = sectionIdFor(reg.studentId, reg.semesterId);
+        if (!secId) continue;
+        const list = sectionCourseIds.get(secId) ?? [];
+        if (!list.includes(reg.courseId)) list.push(reg.courseId);
+        sectionCourseIds.set(secId, list);
+      }
     }
 
-    const assignmentMap = new Map<
-      string,
-      {
-        id: string;
-        courseId: string;
-        freezes: {
-          facultyFrozen: boolean;
-          hodFrozen: boolean;
-          adminFrozen: boolean;
-        } | null;
-      }
-    >();
-
-    for (const [secId, group] of sectionGroups) {
-      if (secId === "__no_section__") continue;
-      const groupedCourseIds = [
-        ...new Set(group.flatMap((g) => g.regs.map((r) => r.courseId))),
-      ];
-      const assignments = await findCourseAssignments({
+    const assignmentMap = new Map<string, CourseAssignmentWithFreeze>();
+    const batchAssignmentMap = new Map<string, CourseAssignmentWithFreeze>();
+    for (const [secId, courseIdsForSection] of sectionCourseIds) {
+      const theoryAssignments = await findCourseAssignments({
         sectionId: secId,
-        courseIds: groupedCourseIds,
+        courseIds: courseIdsForSection,
         batchId: null,
       });
-
-      for (const a of assignments) {
+      for (const a of theoryAssignments) {
         const key = assignmentKey(a.sectionId, a.courseId);
         const existing = assignmentMap.get(key);
         if (existing) {
@@ -303,6 +434,24 @@ export const academicEligibility = {
         }
         assignmentMap.set(key, a);
       }
+
+      const missingCourseIds = courseIdsForSection.filter(
+        (cid) => !assignmentMap.has(assignmentKey(secId, cid))
+      );
+      if (missingCourseIds.length > 0) {
+        const batchAssignments = await findCourseAssignments({
+          sectionId: secId,
+          courseIds: missingCourseIds,
+          batchId: { not: null },
+        });
+        for (const a of batchAssignments) {
+          const key = assignmentKey(secId, a.courseId);
+          batchAssignmentMap.set(
+            key,
+            preferFrozenAssignment(batchAssignmentMap.get(key), a)
+          );
+        }
+      }
     }
 
     const results: StudentEligibility[] = [];
@@ -311,8 +460,6 @@ export const academicEligibility = {
       const firstReg = regs[0];
       if (!firstReg) continue;
       const student = firstReg.student;
-      const s = student.studentSections[0];
-      const secId = s?.sectionId ?? null;
 
       const courses: CourseEligibilityItem[] = [];
       let allFrozen = true;
@@ -321,20 +468,17 @@ export const academicEligibility = {
       for (const reg of regs) {
         const markKey = `${sid}_${reg.courseId}`;
         const mark = marksMap.get(markKey) ?? null;
-        const attendance = attendanceMap.get(markKey) ?? null;
+        const attendance =
+          theoryAttendanceMap.get(markKey) ??
+          batchAttendanceMap.get(markKey) ??
+          null;
 
-        let assignment: {
-          id: string;
-          courseId: string;
-          freezes: {
-            facultyFrozen: boolean;
-            hodFrozen: boolean;
-            adminFrozen: boolean;
-          } | null;
-        } | null = null;
+        const secId = sectionIdFor(sid, reg.semesterId);
+        let assignment: CourseAssignmentWithFreeze | null = null;
         if (secId) {
           const key = assignmentKey(secId, reg.courseId);
-          assignment = assignmentMap.get(key) ?? null;
+          assignment =
+            assignmentMap.get(key) ?? batchAssignmentMap.get(key) ?? null;
         }
 
         const freeze = assignment?.freezes ?? null;
@@ -353,6 +497,7 @@ export const academicEligibility = {
           cieTotal: mark?.cieTotal ?? null,
           attendancePercentage: attendance?.percentage ?? null,
           ...eligibility,
+          reason: buildCourseReason(eligibility, freeze),
         });
       }
 
@@ -366,7 +511,7 @@ export const academicEligibility = {
         departmentName: student.departmentName,
         currentSemester: student.currentSemester,
         programType: student.programType,
-        sectionName: s?.section?.name ?? null,
+        sectionName: student.studentSections[0]?.section?.name ?? null,
         courses,
         allCoursesFrozen: allFrozen,
         eligible: allEligible,
@@ -374,6 +519,70 @@ export const academicEligibility = {
     }
 
     return results;
+  },
+
+  async buildStudentBatchAttendance(
+    studentId: string,
+    courseIds: string[],
+    theoryAttendanceMap: Map<string, AttendanceRecord>
+  ): Promise<Map<string, AttendanceRecord>> {
+    const missing = courseIds.filter((cid) => !theoryAttendanceMap.has(cid));
+    if (missing.length === 0) return new Map();
+    const records = await db.attendance.findMany({
+      where: {
+        studentId,
+        courseId: { in: missing },
+        batchId: { not: null },
+      },
+      select: { courseId: true, percentage: true, condonationStatus: true },
+    });
+    return new Map(
+      records.map((a) => [
+        a.courseId,
+        { percentage: a.percentage, condonationStatus: a.condonationStatus },
+      ])
+    );
+  },
+
+  async buildBatchAttendanceMap(
+    studentIds: string[],
+    courseIds: string[],
+    theoryAttendanceMap: Map<string, AttendanceRecord>
+  ): Promise<Map<string, AttendanceRecord>> {
+    const missingPairs: { sid: string; cid: string }[] = [];
+    for (const sid of studentIds) {
+      for (const cid of courseIds) {
+        if (!theoryAttendanceMap.has(`${sid}_${cid}`)) {
+          missingPairs.push({ sid, cid });
+        }
+      }
+    }
+    if (missingPairs.length === 0) return new Map();
+
+    const records = await db.attendance.findMany({
+      where: {
+        studentId: { in: [...new Set(missingPairs.map((p) => p.sid))] },
+        courseId: { in: courseIds },
+        batchId: { not: null },
+      },
+      select: {
+        studentId: true,
+        courseId: true,
+        percentage: true,
+        condonationStatus: true,
+      },
+    });
+    const map = new Map<string, AttendanceRecord>();
+    for (const a of records) {
+      const key = `${a.studentId}_${a.courseId}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          percentage: a.percentage,
+          condonationStatus: a.condonationStatus,
+        });
+      }
+    }
+    return map;
   },
 
   async buildMarksMap(
@@ -396,9 +605,7 @@ export const academicEligibility = {
   async buildAttendanceMap(
     studentIds: string[],
     courseIds: string[]
-  ): Promise<
-    Map<string, { percentage: number | null; condonationStatus: string }>
-  > {
+  ): Promise<Map<string, AttendanceRecord>> {
     const records = await db.attendance.findMany({
       where: {
         studentId: { in: studentIds },
@@ -412,10 +619,7 @@ export const academicEligibility = {
         condonationStatus: true,
       },
     });
-    const map = new Map<
-      string,
-      { percentage: number | null; condonationStatus: string }
-    >();
+    const map = new Map<string, AttendanceRecord>();
     for (const a of records)
       map.set(`${a.studentId}_${a.courseId}`, {
         percentage: a.percentage,

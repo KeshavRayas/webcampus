@@ -33,6 +33,7 @@ export interface EligibleStudent {
     markEligible: boolean;
     attendanceEligible: boolean;
     eligible: boolean;
+    reason?: string | null;
   }[];
 }
 

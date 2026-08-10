@@ -9,9 +9,10 @@ export type CourseAssignmentFilters = {
   /**
    * When set to `null`, restricts results to THEORY assignments (batchId IS NULL).
    * When set to a string, restricts to the specific batch.
+   * When set to `{ not: null }`, restricts to batch-scoped (LAB/PE) assignments.
    * When omitted (undefined), no batchId filter is applied.
    */
-  batchId?: string | null;
+  batchId?: string | null | { not: null };
 };
 
 export function buildCourseAssignmentWhere(

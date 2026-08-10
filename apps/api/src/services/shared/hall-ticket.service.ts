@@ -76,6 +76,8 @@ type HallTicketWithAcademics = StudentEligibility & {
   isSent: boolean;
   sentAt: string | null;
   sentBy: string | null;
+  peReady?: boolean;
+  blockReason?: string | null;
 };
 
 export const hallTicketService = {
@@ -138,19 +140,7 @@ export const hallTicketService = {
       academicTermId,
       ...rest,
     });
-
-    const frozenStudents = eligibleStudents.filter((s) => s.allCoursesFrozen);
-    if (frozenStudents.length === 0) return [];
-
-    const peReady = await Promise.all(
-      frozenStudents.map(async (s) =>
-        (await this.isStudentPeReady(s.studentId, academicTermId)) ? s : null
-      )
-    );
-    const readyFrozenStudents = peReady.filter(
-      (s): s is (typeof frozenStudents)[number] => s !== null
-    );
-    if (readyFrozenStudents.length === 0) return [];
+    if (eligibleStudents.length === 0) return [];
 
     const term = await db.academicTerm.findUnique({
       where: { id: academicTermId },
@@ -160,7 +150,7 @@ export const hallTicketService = {
       ? `${term.type.toUpperCase()} ${term.year}`
       : "N/A";
 
-    const studentIds = readyFrozenStudents.map((s) => s.studentId);
+    const studentIds = eligibleStudents.map((s) => s.studentId);
     const sendRecords = await db.hallTicket.findMany({
       where: {
         studentId: { in: studentIds },
@@ -177,13 +167,42 @@ export const hallTicketService = {
 
     const sendMap = new Map(sendRecords.map((r) => [r.studentId, r]));
 
-    return readyFrozenStudents.map((student) => ({
-      ...student,
-      academicTermLabel,
-      isSent: sendMap.get(student.studentId)?.isSent ?? false,
-      sentAt: sendMap.get(student.studentId)?.sentAt?.toISOString() ?? null,
-      sentBy: sendMap.get(student.studentId)?.sentBy ?? null,
-    }));
+    const peReadyMap = new Map<string, boolean>();
+    for (const student of eligibleStudents) {
+      if (student.allCoursesFrozen) {
+        peReadyMap.set(
+          student.studentId,
+          await this.isStudentPeReady(student.studentId, academicTermId)
+        );
+      } else {
+        peReadyMap.set(student.studentId, true);
+      }
+    }
+
+    return eligibleStudents.map((student) => {
+      const peReady = peReadyMap.get(student.studentId) ?? false;
+      let blockReason: string | null = null;
+      if (!student.allCoursesFrozen) {
+        const blocked = student.courses.filter((c) => !c.isFrozen);
+        blockReason =
+          blocked.length > 0
+            ? blocked
+                .map((c) => `${c.courseCode}: ${c.reason ?? "not frozen"}`)
+                .join("; ")
+            : "Not all courses are frozen";
+      } else if (!peReady) {
+        blockReason = "PE course mapping is not complete";
+      }
+      return {
+        ...student,
+        academicTermLabel,
+        isSent: sendMap.get(student.studentId)?.isSent ?? false,
+        sentAt: sendMap.get(student.studentId)?.sentAt?.toISOString() ?? null,
+        sentBy: sendMap.get(student.studentId)?.sentBy ?? null,
+        peReady,
+        blockReason,
+      };
+    });
   },
 
   async unsend(params: {
