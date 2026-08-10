@@ -874,18 +874,21 @@ export class AdmissionService {
           fatherNumber: data.fatherNumber,
           fatherPermanentAddress: data.fatherPermanentAddress,
           fatherOccupation: data.fatherOccupation ?? null,
+          fatherAnnualIncome: data.fatherAnnualIncome ?? null,
 
           motherName: data.motherName,
           motherEmail: data.motherEmail,
           motherNumber: data.motherNumber,
           motherPermanentAddress: data.motherPermanentAddress,
           motherOccupation: data.motherOccupation ?? null,
+          motherAnnualIncome: data.motherAnnualIncome ?? null,
 
           guardianName: data.guardianName ?? null,
           guardianEmail: data.guardianEmail ?? null,
           guardianNumber: data.guardianNumber ?? null,
           guardianPermanentAddress: data.guardianPermanentAddress ?? null,
           guardianOccupation: data.guardianOccupation ?? null,
+          guardianAnnualIncome: data.guardianAnnualIncome ?? null,
 
           ...fileUrls,
         },

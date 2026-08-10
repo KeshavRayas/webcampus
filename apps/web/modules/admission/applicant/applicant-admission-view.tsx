@@ -71,6 +71,14 @@ type ApplicantAdmissionData = {
   parentVisaExpiryDate?: string | null;
   placeOfBirth?: string | null;
   stateOfBirth?: string | null;
+  currentPincode?: string | null;
+  permanentPincode?: string | null;
+  fatherPermanentAddress?: string | null;
+  motherPermanentAddress?: string | null;
+  guardianPermanentAddress?: string | null;
+  fatherAnnualIncome?: string | null;
+  motherAnnualIncome?: string | null;
+  guardianAnnualIncome?: string | null;
   semester?: {
     id: string;
     semesterNumber: number;
@@ -139,16 +147,44 @@ const INCOME_RANGES = [
   "More than ₹10,00,000",
 ];
 
+function SelectItems({
+  items,
+  value,
+}: {
+  items: { value: string; label: string }[];
+  value?: string;
+}) {
+  const v = String(value ?? "").trim();
+  const list = items.length > 0 ? items : [];
+  const fallback =
+    v && !list.some((item) => item.value === v) ? [{ value: v, label: v }] : [];
+  return (
+    <>
+      {[...fallback, ...list].map((item) => (
+        <SelectItem key={item.value} value={item.value}>
+          {item.label}
+        </SelectItem>
+      ))}
+    </>
+  );
+}
+
 function MemberAddressBlock({
   memberKey,
   source,
   onSourceChange,
   autoAddress,
+  autoCurrent,
+  autoPermanent,
+  savedAddress,
 }: {
   memberKey: "father" | "mother" | "guardian";
   source: MemberSource;
   onSourceChange: (source: MemberSource) => void;
   autoAddress: string;
+  autoCurrent: string;
+  autoPermanent: string;
+  savedAddress?: string;
 }) {
   const [line1, setLine1] = useState("");
   const [line2, setLine2] = useState("");
@@ -157,6 +193,29 @@ function MemberAddressBlock({
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
   const [pincode, setPincode] = useState("");
+
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (hydratedRef.current || !savedAddress) return;
+    const text = String(savedAddress).trim();
+    if (!text) return;
+
+    if (text === String(autoCurrent).trim()) {
+      hydratedRef.current = true;
+      onSourceChange("current");
+      return;
+    }
+    if (text === String(autoPermanent).trim()) {
+      hydratedRef.current = true;
+      onSourceChange("permanent");
+      return;
+    }
+
+    hydratedRef.current = true;
+    onSourceChange("custom");
+    setLine1(text);
+  }, [savedAddress, autoCurrent, autoPermanent, onSourceChange]);
 
   const custom = source === "custom";
   const customAddress = [line1, line2, line3, city, state, pincode, country]
@@ -307,8 +366,11 @@ function ParentMemberCard({
   emailRequired = false,
   phone,
   onPhoneChange,
+  incomeValue,
+  onIncomeChange,
   autoCurrent,
   autoPermanent,
+  savedAddress,
   wide = false,
   children,
 }: {
@@ -323,8 +385,11 @@ function ParentMemberCard({
   emailRequired?: boolean;
   phone: string;
   onPhoneChange: (value: string) => void;
+  incomeValue?: string;
+  onIncomeChange?: (value: string) => void;
   autoCurrent: string;
   autoPermanent: string;
+  savedAddress?: string;
   wide?: boolean;
   children?: React.ReactNode;
 }) {
@@ -374,22 +439,30 @@ function ParentMemberCard({
               Annual Income {incomeRequired ? "*" : ""}
             </Label>
             {income === "range" ? (
-              <Select name={`${memberKey}AnnualIncome`}>
+              <Select
+                name={`${memberKey}AnnualIncome`}
+                value={incomeValue}
+                onValueChange={onIncomeChange}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select income range" />
                 </SelectTrigger>
                 <SelectContent>
-                  {INCOME_RANGES.map((range) => (
-                    <SelectItem key={range} value={range}>
-                      {range}
-                    </SelectItem>
-                  ))}
+                  <SelectItems
+                    value={incomeValue}
+                    items={INCOME_RANGES.map((range) => ({
+                      value: range,
+                      label: range,
+                    }))}
+                  />
                 </SelectContent>
               </Select>
             ) : (
               <Input
                 id={`${memberKey}AnnualIncome`}
                 name={`${memberKey}AnnualIncome`}
+                value={incomeValue}
+                onChange={(event) => onIncomeChange?.(event.target.value)}
                 type="number"
                 min="0"
                 required={incomeRequired}
@@ -428,6 +501,9 @@ function ParentMemberCard({
         source={source}
         onSourceChange={setSource}
         autoAddress={source === "current" ? autoCurrent : autoPermanent}
+        autoCurrent={autoCurrent}
+        autoPermanent={autoPermanent}
+        savedAddress={savedAddress}
       />
 
       {children}
@@ -476,6 +552,9 @@ export const ApplicantAdmissionView = ({
   const [fatherPhone, setFatherPhone] = useState("");
   const [motherPhone, setMotherPhone] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
+  const [fatherAnnualIncome, setFatherAnnualIncome] = useState("");
+  const [motherAnnualIncome, setMotherAnnualIncome] = useState("");
+  const [guardianAnnualIncome, setGuardianAnnualIncome] = useState("");
   const [guardianEnabled, setGuardianEnabled] = useState(false);
   const [selectedAdmissionType, setSelectedAdmissionType] = useState("");
   const [admissionBasedOn, setAdmissionBasedOn] = useState("");
@@ -1378,6 +1457,9 @@ export const ApplicantAdmissionView = ({
     setMotherPhone(String(a.motherNumber ?? ""));
     setGuardianPhone(String(a.guardianNumber ?? ""));
     setGuardianEnabled(Boolean(a.guardianName));
+    setFatherAnnualIncome(String(a.fatherAnnualIncome ?? ""));
+    setMotherAnnualIncome(String(a.motherAnnualIncome ?? ""));
+    setGuardianAnnualIncome(String(a.guardianAnnualIncome ?? ""));
 
     setSelectedMode(a.modeOfAdmission ?? "KCET");
     setSelectedDepartment(String(a.departmentId ?? ""));
@@ -1713,11 +1795,13 @@ export const ApplicantAdmissionView = ({
                     <SelectValue placeholder="Select mode" />
                   </SelectTrigger>
                   <SelectContent>
-                    {admissionModes.map((mode) => (
-                      <SelectItem key={mode} value={mode}>
-                        {mode}
-                      </SelectItem>
-                    ))}
+                    <SelectItems
+                      value={selectedMode}
+                      items={admissionModes.map((mode) => ({
+                        value: mode,
+                        label: mode,
+                      }))}
+                    />
                   </SelectContent>
                 </Select>
               </div>
@@ -1734,11 +1818,13 @@ export const ApplicantAdmissionView = ({
                     <SelectValue placeholder="Select branch" />
                   </SelectTrigger>
                   <SelectContent>
-                    {departments?.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItems
+                      value={selectedDepartment}
+                      items={(departments ?? []).map((dept) => ({
+                        value: dept.id,
+                        label: dept.name,
+                      }))}
+                    />
                   </SelectContent>
                 </Select>
               </div>
@@ -1754,11 +1840,13 @@ export const ApplicantAdmissionView = ({
                     <SelectValue placeholder="Select admission type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {validAdmissionTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
+                    <SelectItems
+                      value={selectedAdmissionType}
+                      items={validAdmissionTypes.map((type) => ({
+                        value: type.value,
+                        label: type.label,
+                      }))}
+                    />
                   </SelectContent>
                 </Select>
               </div>
@@ -2239,14 +2327,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {countries.map((country) => (
-                          <SelectItem
-                            key={country.isoCode}
-                            value={country.isoCode}
-                          >
-                            {country.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={currentCountry}
+                          items={countries.map((country) => ({
+                            value: country.isoCode,
+                            label: country.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -2277,11 +2364,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {currentStates.map((state) => (
-                          <SelectItem key={state.isoCode} value={state.isoCode}>
-                            {state.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={currentState}
+                          items={currentStates.map((state) => ({
+                            value: state.isoCode,
+                            label: state.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -2309,11 +2398,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {currentDistricts.map((city) => (
-                          <SelectItem key={city.name} value={city.name}>
-                            {city.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={currentDistrict}
+                          items={currentDistricts.map((city) => ({
+                            value: city.name,
+                            label: city.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -2411,14 +2502,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {countries.map((country) => (
-                          <SelectItem
-                            key={country.isoCode}
-                            value={country.isoCode}
-                          >
-                            {country.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={permanentCountry}
+                          items={countries.map((country) => ({
+                            value: country.isoCode,
+                            label: country.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -2449,11 +2539,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {permanentStates.map((state) => (
-                          <SelectItem key={state.isoCode} value={state.isoCode}>
-                            {state.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={permanentState}
+                          items={permanentStates.map((state) => ({
+                            value: state.isoCode,
+                            label: state.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -2482,11 +2574,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {permanentDistricts.map((city) => (
-                          <SelectItem key={city.name} value={city.name}>
-                            {city.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={permanentDistrict}
+                          items={permanentDistricts.map((city) => ({
+                            value: city.name,
+                            label: city.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -2529,11 +2623,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {birthStates.map((state) => (
-                          <SelectItem key={state.isoCode} value={state.isoCode}>
-                            {state.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={birthState}
+                          items={birthStates.map((state) => ({
+                            value: state.isoCode,
+                            label: state.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -2558,11 +2654,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {birthStates.map((state) => (
-                          <SelectItem key={state.isoCode} value={state.isoCode}>
-                            {state.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={domicileState}
+                          items={birthStates.map((state) => ({
+                            value: state.isoCode,
+                            label: state.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -2937,11 +3035,13 @@ export const ApplicantAdmissionView = ({
                   </SelectTrigger>
 
                   <SelectContent>
-                    {countries.map((country) => (
-                      <SelectItem key={country.isoCode} value={country.isoCode}>
-                        {country.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItems
+                      value={class10Country}
+                      items={countries.map((country) => ({
+                        value: country.isoCode,
+                        label: country.name,
+                      }))}
+                    />
                   </SelectContent>
                 </Select>
 
@@ -2968,11 +3068,13 @@ export const ApplicantAdmissionView = ({
                   </SelectTrigger>
 
                   <SelectContent>
-                    {educationStates.map((state) => (
-                      <SelectItem key={state.isoCode} value={state.isoCode}>
-                        {state.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItems
+                      value={class10State}
+                      items={educationStates.map((state) => ({
+                        value: state.isoCode,
+                        label: state.name,
+                      }))}
+                    />
                   </SelectContent>
                 </Select>
 
@@ -2996,11 +3098,13 @@ export const ApplicantAdmissionView = ({
                   </SelectTrigger>
 
                   <SelectContent>
-                    {class10Cities.map((city) => (
-                      <SelectItem key={city.name} value={city.name}>
-                        {city.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItems
+                      value={class10City}
+                      items={class10Cities.map((city) => ({
+                        value: city.name,
+                        label: city.name,
+                      }))}
+                    />
                   </SelectContent>
                 </Select>
 
@@ -3150,14 +3254,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {countries.map((country) => (
-                          <SelectItem
-                            key={country.isoCode}
-                            value={country.isoCode}
-                          >
-                            {country.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={class12Country}
+                          items={countries.map((country) => ({
+                            value: country.isoCode,
+                            label: country.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -3185,11 +3288,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {educationStates.map((state) => (
-                          <SelectItem key={state.isoCode} value={state.isoCode}>
-                            {state.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={class12State}
+                          items={educationStates.map((state) => ({
+                            value: state.isoCode,
+                            label: state.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -3214,11 +3319,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {class12Cities.map((city) => (
-                          <SelectItem key={city.name} value={city.name}>
-                            {city.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={class12City}
+                          items={class12Cities.map((city) => ({
+                            value: city.name,
+                            label: city.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -3451,14 +3558,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {countries.map((country) => (
-                          <SelectItem
-                            key={country.isoCode}
-                            value={country.isoCode}
-                          >
-                            {country.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={diplomaCountry}
+                          items={countries.map((country) => ({
+                            value: country.isoCode,
+                            label: country.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -3486,11 +3592,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {educationStates.map((state) => (
-                          <SelectItem key={state.isoCode} value={state.isoCode}>
-                            {state.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={diplomaState}
+                          items={educationStates.map((state) => ({
+                            value: state.isoCode,
+                            label: state.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -3515,11 +3623,13 @@ export const ApplicantAdmissionView = ({
                       </SelectTrigger>
 
                       <SelectContent>
-                        {diplomaCities.map((city) => (
-                          <SelectItem key={city.name} value={city.name}>
-                            {city.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItems
+                          value={diplomaCity}
+                          items={diplomaCities.map((city) => ({
+                            value: city.name,
+                            label: city.name,
+                          }))}
+                        />
                       </SelectContent>
                     </Select>
 
@@ -3624,8 +3734,11 @@ export const ApplicantAdmissionView = ({
               mobileRequired
               phone={fatherPhone}
               onPhoneChange={(value) => setFatherPhone(value ?? "")}
+              incomeValue={fatherAnnualIncome}
+              onIncomeChange={(value) => setFatherAnnualIncome(value ?? "")}
               autoCurrent={getAddress("current")}
               autoPermanent={getAddress("permanent")}
+              savedAddress={String(admission?.fatherPermanentAddress ?? "")}
             />
 
             <ParentMemberCard
@@ -3635,8 +3748,11 @@ export const ApplicantAdmissionView = ({
               income="range"
               phone={motherPhone}
               onPhoneChange={(value) => setMotherPhone(value ?? "")}
+              incomeValue={motherAnnualIncome}
+              onIncomeChange={(value) => setMotherAnnualIncome(value ?? "")}
               autoCurrent={getAddress("current")}
               autoPermanent={getAddress("permanent")}
+              savedAddress={String(admission?.motherPermanentAddress ?? "")}
             />
 
             <div className="lg:col-span-2">
@@ -3665,8 +3781,11 @@ export const ApplicantAdmissionView = ({
                 wide
                 phone={guardianPhone}
                 onPhoneChange={(value) => setGuardianPhone(value ?? "")}
+                incomeValue={guardianAnnualIncome}
+                onIncomeChange={(value) => setGuardianAnnualIncome(value ?? "")}
                 autoCurrent={getAddress("current")}
                 autoPermanent={getAddress("permanent")}
+                savedAddress={String(admission?.guardianPermanentAddress ?? "")}
               />
             ) : null}
           </div>

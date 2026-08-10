@@ -23,6 +23,7 @@ export const useAdmissionPayment = () => {
         data.data.message || "Payment successful. Admission approved"
       );
       queryClient.invalidateQueries({ queryKey: ["admissions"] });
+      queryClient.invalidateQueries({ queryKey: ["fee-payments"] });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(error.response?.data?.message || "Failed to process payment");

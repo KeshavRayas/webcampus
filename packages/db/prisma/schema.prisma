@@ -662,16 +662,19 @@ model Admission {
   fatherQualification             String?
   fatherOccupation                String?
   fatherPermanentAddress          String?
+  fatherAnnualIncome              String?
   feePaid                         Float?
   guardianEmail                   String?
   guardianName                    String?
   guardianNumber                  String?
   guardianOccupation              String?
   guardianPermanentAddress        String?
+  guardianAnnualIncome            String?
   hostel                          Boolean?
   motherQualification             String?
   motherOccupation                String?
   motherPermanentAddress          String?
+  motherAnnualIncome              String?
   motherTongue                    String?
   nameAsPer10th                   String?
   nationality                     String?
