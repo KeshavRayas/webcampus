@@ -22,6 +22,7 @@ export type CampaignCounts = {
 
 export async function persistCampaign(input: {
   config: SendConfigType;
+  channel: "WHATSAPP" | "SMS";
   category: MessageCategory;
   scope: MessageScope;
   studentTemplateId?: string;
@@ -39,7 +40,7 @@ export async function persistCampaign(input: {
 
   const campaign = await db.messageCampaign.create({
     data: {
-      channel: "WHATSAPP",
+      channel: input.channel,
       category: input.category,
       scope: input.scope,
       filterSnapshot: {

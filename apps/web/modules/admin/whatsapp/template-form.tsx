@@ -63,6 +63,7 @@ const emptyForm: TemplateFormValues = {
   category: "CIE",
   recipientType: "STUDENT",
   externalTemplateId: "",
+  smsTemplateId: "",
   messageBody: "",
   isActive: true,
   variables: [],
@@ -86,6 +87,7 @@ export const TemplateForm = ({
           category: editing.category,
           recipientType: editing.recipientType,
           externalTemplateId: editing.externalTemplateId,
+          smsTemplateId: editing.smsTemplateId ?? "",
           messageBody: editing.messageBody,
           isActive: editing.isActive,
           variables: editing.variables
@@ -108,6 +110,33 @@ export const TemplateForm = ({
   }, [form.category]);
 
   const { data: fieldSources = [] } = useTemplateFieldSources(category);
+
+  useEffect(() => {
+    const positions = Array.from(
+      form.messageBody.matchAll(/\{\{(\d+)\}\}/g),
+      (match) => Number(match[1])
+    );
+    if (positions.length === 0) return;
+    const positionSet = new Set(positions);
+    const defaultSource = fieldSources[0]?.value ?? "STUDENT_NAME";
+    setForm((prev) => {
+      const existing = new Map(prev.variables.map((v) => [v.position, v]));
+      const next = prev.variables.filter((v) => positionSet.has(v.position));
+      for (const position of positionSet) {
+        if (!existing.has(position)) {
+          next.push({
+            position,
+            label: "",
+            fieldSource: defaultSource,
+          });
+        }
+      }
+      return {
+        ...prev,
+        variables: next.sort((a, b) => a.position - b.position),
+      };
+    });
+  }, [form.messageBody, fieldSources]);
 
   const set = <K extends keyof TemplateFormValues>(
     key: K,
@@ -203,6 +232,17 @@ export const TemplateForm = ({
                 value={form.externalTemplateId}
                 onChange={(e) => set("externalTemplateId", e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>SMS Template ID (optional)</Label>
+              <Input
+                placeholder="SMS / DLT template id"
+                value={form.smsTemplateId}
+                onChange={(e) => set("smsTemplateId", e.target.value)}
+              />
+              <p className="text-muted-foreground text-xs">
+                Used only for SMS sends. Can be left empty.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Category</Label>
