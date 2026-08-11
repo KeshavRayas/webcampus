@@ -241,7 +241,10 @@ export class AdmissionService {
 
     const updatedAdmission = await db.admission.update({
       where: { id },
-      data: { status },
+      data: {
+        status,
+        ...(status === "APPROVED" ? { feeStatus: true } : {}),
+      },
       include: { semester: true },
     });
 
@@ -380,6 +383,12 @@ export class AdmissionService {
               }
             : undefined,
           status: filters.status,
+          feeStatus:
+            filters.feeStatus === "true"
+              ? true
+              : filters.feeStatus === "false"
+                ? false
+                : undefined,
           modeOfAdmission: filters.mode
             ? {
                 equals: filters.mode,
@@ -425,7 +434,7 @@ export class AdmissionService {
               role: true,
             },
           },
-          archive: {
+          cancellation: {
             select: {
               reason: true,
               cancelledAt: true,
@@ -1137,15 +1146,15 @@ export class AdmissionService {
           throw new Error("Admission not found");
         }
 
-        const existingArchive = await tx.admissionArchive.findUnique({
+        const existingCancellation = await tx.cancelledAdmissions.findUnique({
           where: { admissionId: id },
         });
 
-        if (existingArchive) {
+        if (existingCancellation) {
           throw new Error("Admission has already been cancelled");
         }
 
-        const archive = await tx.admissionArchive.create({
+        const cancellation = await tx.cancelledAdmissions.create({
           data: {
             admissionId: id,
             reason,
@@ -1164,7 +1173,7 @@ export class AdmissionService {
           data: { status: "CANCELLED" },
         });
 
-        return archive;
+        return cancellation;
       });
 
       return {

@@ -37,8 +37,8 @@ model User {
   feedbackQuestionSetsCreated FeedbackQuestionSet[]
   feedbackRoundsCreated       FeedbackRound[]
   feedbackPresetsCreated      FeedbackQuestionPreset[]
-  admissionArchives     AdmissionArchive[]
-  filledAdmissions      Admission[] @relation("AdmissionFilledBy")
+  cancelledAdmissions             CancelledAdmissions[]
+  filledAdmissions            Admission[] @relation("AdmissionFilledBy")
 
   courseMappingAuditLogs CourseMappingAuditLog[]
   supportTicketsCreated  SupportTicket[]         @relation("SupportTicketCreator")
@@ -871,6 +871,7 @@ model Admission {
   fatherPermanentAddress          String?
   fatherAnnualIncome              String?
   feePaid                         Float?
+  feeStatus                       Boolean         @default(false)
   guardianEmail                   String?
   guardianName                    String?
   guardianNumber                  String?
@@ -919,7 +920,7 @@ model Admission {
   visaValidityDetails             String?
   departmentId                    String
   studentId                       String?         @unique
-  archive                         AdmissionArchive?
+  cancellation                    CancelledAdmissions?
   categoryAllotted                String?
   categoryClaimed                 String?
   quota                           String?
@@ -1244,7 +1245,7 @@ enum AdmissionStatus {
   CANCELLED
 }
 
-model AdmissionArchive {
+model CancelledAdmissions {
   id            String    @id @default(uuid())
   admissionId   String    @unique
   reason        String

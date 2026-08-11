@@ -57,6 +57,7 @@ type FeePaymentFilters = {
   semester: string;
   applicationId: string;
   status: string;
+  feeStatus: string;
   mode: string;
   admissionType: string;
   email: string;
@@ -69,6 +70,7 @@ const EMPTY_FILTERS: FeePaymentFilters = {
   semester: "",
   applicationId: "",
   status: "",
+  feeStatus: "",
   mode: "",
   admissionType: "",
   email: "",
@@ -78,7 +80,7 @@ const EMPTY_FILTERS: FeePaymentFilters = {
 
 const buildFeePaymentSummary = (admissions: FeePaymentResponse[]) => {
   const paid = admissions.filter(
-    (admission) => (admission.feePaid ?? 0) > 0
+    (admission) => admission.feeStatus === true
   ).length;
   const unpaid = admissions.length - paid;
   const approved = admissions.filter(
@@ -301,6 +303,17 @@ const FeePaymentStaffView = () => {
         label: status,
         value: status,
       })),
+    },
+    {
+      key: "feeStatus",
+      label: "Fee Status",
+      type: "select",
+      placeholder: "All fee statuses",
+      allOptionLabel: "All fee statuses",
+      options: [
+        { label: "Paid", value: "true" },
+        { label: "Unpaid", value: "false" },
+      ],
     },
     {
       key: "mode",
@@ -535,7 +548,7 @@ const FeePaymentStaffView = () => {
         id: "feeStatus",
         header: "Fee Status",
         cell: ({ row }: { row: { original: FeePaymentResponse } }) => {
-          const isPaid = row.original.status === "APPROVED";
+          const isPaid = row.original.feeStatus === true;
           return isPaid ? (
             <Badge variant="default">Paid</Badge>
           ) : (
@@ -548,7 +561,7 @@ const FeePaymentStaffView = () => {
         header: "Action",
         cell: ({ row }: { row: { original: FeePaymentResponse } }) => {
           const admission = row.original;
-          const isPaid = admission.status === "APPROVED";
+          const isPaid = admission.feeStatus === true;
           const canPay = admission.status === "SUBMITTED";
           const isPaying = isProcessing && payingId === admission.id;
 

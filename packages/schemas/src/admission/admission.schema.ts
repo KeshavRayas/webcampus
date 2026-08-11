@@ -118,6 +118,7 @@ export const GetAdmissionsQuerySchema = z
   .object({
     applicationId: optionalQueryString(z.string()),
     status: optionalQueryString(AdmissionStatusSchema),
+    feeStatus: optionalQueryString(z.enum(["true", "false"])),
     mode: optionalQueryString(z.string()),
     admissionType: optionalQueryString(AdmissionTypeSchema),
     semester: optionalQueryString(z.string().uuid("Invalid semester")),

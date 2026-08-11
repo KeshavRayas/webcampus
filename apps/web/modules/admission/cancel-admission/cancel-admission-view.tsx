@@ -276,7 +276,7 @@ export function CancelAdmissionView() {
       appliedFilters.cancellationReason !== "ALL"
     ) {
       admissions = admissions.filter((admission) => {
-        const reason = admission.archive?.reason;
+        const reason = admission.cancellation?.reason;
         if (!reason) return false;
         if (appliedFilters.cancellationReason === "OTHER") {
           return reason.startsWith("OTHER:");
