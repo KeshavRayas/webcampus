@@ -25,7 +25,7 @@ export type AdmissionResponse = {
       name: string;
     };
   } | null;
-  archive?: {
+  cancellation?: {
     reason: string;
     cancelledAt: string;
   } | null;
@@ -47,6 +47,7 @@ export type AdmissionResponse = {
   middleName?: string | null;
   lastName?: string | null;
   feePaid?: number | null;
+  feeStatus?: boolean;
   feeReceiptNumber?: string | null;
   hostel?: boolean | null;
   scholarship?: boolean | null;

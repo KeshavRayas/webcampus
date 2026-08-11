@@ -63,7 +63,7 @@ export const createFeePaymentColumns = ({
     id: "feeStatus",
     header: "Fee Status",
     cell: ({ row }) => {
-      const isPaid = (row.original.feePaid ?? 0) > 0;
+      const isPaid = row.original.feeStatus === true;
       return isPaid ? (
         <Badge variant="default">Paid</Badge>
       ) : (

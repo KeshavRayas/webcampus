@@ -19,8 +19,11 @@ import {
 import { Label } from "@webcampus/ui/components/label";
 import { Upload } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { toast } from "react-toastify";
 import { UploadDocsResponse } from "./upload-docs-columns";
 import { useUploadDocuments } from "./use-upload-documents";
+
+const MAX_DOCUMENT_SIZE = 2 * 1024 * 1024;
 
 const getStatusVariant = (status: UploadDocsResponse["status"]) => {
   switch (status) {
@@ -161,7 +164,14 @@ function DocumentCard({
           accept=".pdf,.jpg,.jpeg,.png"
           className="sr-only"
           onChange={(event) => {
-            onFileChange(field, event.target.files?.[0] ?? null);
+            const file = event.target.files?.[0] ?? null;
+            if (file && file.size > MAX_DOCUMENT_SIZE) {
+              toast.error(`${title} must be less than 2 MB.`);
+              onFileChange(field, null);
+              event.target.value = "";
+              return;
+            }
+            onFileChange(field, file);
             event.target.value = "";
           }}
         />
