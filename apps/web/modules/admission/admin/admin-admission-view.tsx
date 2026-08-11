@@ -36,14 +36,19 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, FileDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { renderNodeToPdf } from "../applicant/admission-pdf";
 import {
   AdmissionResponse,
   getAdminAdmissionColumns,
 } from "./admin-admission-columns";
+import {
+  AdmissionsReportDocument,
+  type AdmissionsReportData,
+} from "./admissions-report-document";
 import { useCreateAdmissionShellForm } from "./use-create-admission-shell-form";
 import { usePortStudents } from "./use-port-students";
 
@@ -114,6 +119,10 @@ export const AdminAdmissionView = ({
     null
   );
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+  const [reportData, setReportData] = useState<AdmissionsReportData | null>(
+    null
+  );
+  const reportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!showFilters) return;
@@ -224,6 +233,64 @@ export const AdminAdmissionView = ({
     );
   };
 
+  const getFullName = (admission: AdmissionResponse) => {
+    const studentName = admission.student?.user?.name?.trim();
+    const admissionName = [
+      admission.firstName,
+      admission.middleName,
+      admission.lastName,
+      admission.nameAsPer10th,
+    ]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .join(" ");
+
+    return studentName || admissionName || "-";
+  };
+
+  const generateReportPdf = () => {
+    const rows = admissions ?? [];
+    if (rows.length === 0) {
+      toast.error("No admissions to include in the report.");
+      return;
+    }
+
+    const statusCount = (status: AdmissionResponse["status"]) =>
+      rows.filter((admission) => admission.status === status).length;
+
+    setReportData({
+      generatedAt: new Date().toLocaleString(),
+      total: rows.length,
+      approved: statusCount("APPROVED"),
+      submitted: statusCount("SUBMITTED"),
+      pending: statusCount("PENDING") + statusCount("SUBMITTED"),
+      rejected: statusCount("REJECTED"),
+      rows: rows.map((admission) => ({
+        applicationId: admission.applicationId || "-",
+        name: getFullName(admission),
+        email: admission.primaryEmail || "-",
+        status: admission.status || "-",
+        branch: admission.department?.name || "-",
+        mode: admission.modeOfAdmission || "-",
+        quota: admission.quota || "-",
+        feePaid: admission.feePaid != null ? String(admission.feePaid) : "-",
+        receiptNo: admission.feeReceiptNumber || "-",
+      })),
+    });
+  };
+
+  useEffect(() => {
+    if (!reportData) return;
+    const node = reportRef.current;
+    if (!node) return;
+    void renderNodeToPdf(
+      node,
+      `admissions-report-${new Date().toISOString().slice(0, 10)}.pdf`
+    )
+      .then(() => toast.success("Admissions report PDF downloaded."))
+      .catch(() => toast.error("Failed to generate the admissions report PDF."))
+      .finally(() => setReportData(null));
+  }, [reportData]);
+
   const updateDraftFilter = (key: keyof AdmissionFilters, value: string) => {
     if (key === "academicTerm") {
       setDraftFilters((current) => ({
@@ -252,9 +319,6 @@ export const AdminAdmissionView = ({
         value: term.id,
       })),
     },
-  ];
-
-  const additionalFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
     {
       key: "semester",
       label: "Semester",
@@ -268,6 +332,9 @@ export const AdminAdmissionView = ({
         value: semester.id,
       })),
     },
+  ];
+
+  const additionalFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
     {
       key: "applicationId",
       label: "Application ID",
@@ -355,6 +422,15 @@ export const AdminAdmissionView = ({
               >
                 Filter
               </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={generateReportPdf}
+              >
+                <FileDown className="mr-2 h-4 w-4" />
+                Generate Admissions Report PDF
+              </Button>
             </div>
 
             <Dialog
@@ -365,8 +441,7 @@ export const AdminAdmissionView = ({
                 <DialogHeader>
                   <DialogTitle>Advanced Filters</DialogTitle>
                   <DialogDescription>
-                    Filter admissions by semester, application ID, and created
-                    date range.
+                    Filter admissions by application ID and created date range.
                   </DialogDescription>
                 </DialogHeader>
                 <FilterBuilder
@@ -715,6 +790,15 @@ export const AdminAdmissionView = ({
             />
           </div>
         )}
+      </div>
+
+      <div
+        className="pointer-events-none absolute left-[-10000px] top-0"
+        aria-hidden="true"
+      >
+        <div ref={reportRef}>
+          {reportData ? <AdmissionsReportDocument data={reportData} /> : null}
+        </div>
       </div>
     </div>
   );

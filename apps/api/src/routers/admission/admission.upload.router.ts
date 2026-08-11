@@ -1,13 +1,14 @@
 import { AdmissionUploadController } from "@webcampus/api/src/controllers/admission/admission.upload.controller";
+import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import { AdmissionActionParamSchema } from "@webcampus/schemas/admission";
-import { Router } from "express";
+import { ErrorRequestHandler, Router } from "express";
 import multer from "multer";
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024,
+    fileSize: 2 * 1024 * 1024,
     files: 10,
   },
   fileFilter: (_req, file, callback) => {
@@ -51,5 +52,30 @@ router.patch(
   ]),
   AdmissionUploadController.uploadDocuments
 );
+
+const uploadErrorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+  void _next;
+
+  if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+    sendResponse({
+      res,
+      status: "error",
+      statusCode: 413,
+      message: "Each uploaded document must be less than 2 MB.",
+      error,
+    });
+    return;
+  }
+
+  sendResponse({
+    res,
+    status: "error",
+    statusCode: 400,
+    message: error instanceof Error ? error.message : "Upload failed",
+    error,
+  });
+};
+
+router.use(uploadErrorHandler);
 
 export default router;
