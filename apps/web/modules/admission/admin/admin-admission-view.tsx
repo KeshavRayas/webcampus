@@ -22,7 +22,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@webcampus/ui/components/dialog";
-import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
+import {
+  FilterActions,
+  FilterBuilder,
+  type FilterFieldConfig,
+} from "@webcampus/ui/components/filter-builder";
 import {
   Form,
   FormControl,
@@ -32,15 +36,20 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, FileDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import {
   AdmissionResponse,
   getAdminAdmissionColumns,
 } from "./admin-admission-columns";
+import {
+  AdmissionsReportDocument,
+  type AdmissionsReportData,
+} from "./admissions-report-document";
 import { useCreateAdmissionShellForm } from "./use-create-admission-shell-form";
 import { usePortStudents } from "./use-port-students";
 
@@ -52,6 +61,7 @@ import { usePortStudents } from "./use-port-students";
 //   "Other",
 // ] as const;
 // const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
+const ALL_FILTERS_VALUE = "__all__";
 
 type AdmissionFilters = {
   applicationId: string;
@@ -111,6 +121,11 @@ export const AdminAdmissionView = ({
   const [createChoice, setCreateChoice] = useState<null | "profile" | "fill">(
     null
   );
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+  const [reportData, setReportData] = useState<AdmissionsReportData | null>(
+    null
+  );
+  const reportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!showFilters) return;
@@ -231,6 +246,64 @@ export const AdminAdmissionView = ({
     );
   };
 
+  const getFullName = (admission: AdmissionResponse) => {
+    const studentName = admission.student?.user?.name?.trim();
+    const admissionName = [
+      admission.firstName,
+      admission.middleName,
+      admission.lastName,
+      admission.nameAsPer10th,
+    ]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .join(" ");
+
+    return studentName || admissionName || "-";
+  };
+
+  const generateReportPdf = () => {
+    const rows = admissions ?? [];
+    if (rows.length === 0) {
+      toast.error("No admissions to include in the report.");
+      return;
+    }
+
+    const statusCount = (status: AdmissionResponse["status"]) =>
+      rows.filter((admission) => admission.status === status).length;
+
+    setReportData({
+      generatedAt: new Date().toLocaleString(),
+      total: rows.length,
+      approved: statusCount("APPROVED"),
+      submitted: statusCount("SUBMITTED"),
+      pending: statusCount("PENDING") + statusCount("SUBMITTED"),
+      rejected: statusCount("REJECTED"),
+      rows: rows.map((admission) => ({
+        applicationId: admission.applicationId || "-",
+        name: getFullName(admission),
+        email: admission.primaryEmail || "-",
+        status: admission.status || "-",
+        branch: admission.department?.name || "-",
+        mode: admission.modeOfAdmission || "-",
+        quota: admission.quota || "-",
+        feePaid: admission.feePaid != null ? String(admission.feePaid) : "-",
+        receiptNo: admission.feeReceiptNumber || "-",
+      })),
+    });
+  };
+
+  useEffect(() => {
+    if (!reportData) return;
+    const node = reportRef.current;
+    if (!node) return;
+    void renderNodeToPdf(
+      node,
+      `admissions-report-${new Date().toISOString().slice(0, 10)}.pdf`
+    )
+      .then(() => toast.success("Admissions report PDF downloaded."))
+      .catch(() => toast.error("Failed to generate the admissions report PDF."))
+      .finally(() => setReportData(null));
+  }, [reportData]);
+
   const updateDraftFilter = (key: keyof AdmissionFilters, value: string) => {
     if (key === "academicTerm") {
       setDraftFilters((current) => ({
@@ -305,6 +378,30 @@ export const AdminAdmissionView = ({
     },
   ];
 
+  const additionalFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
+    {
+      key: "applicationId",
+      label: "Application ID",
+      type: "text",
+      placeholder: "Search application ID",
+      inputId: "admission-application-id",
+    },
+    {
+      key: "createdFrom",
+      label: "Created From",
+      type: "date",
+      inputId: "admission-created-from",
+      className: "xl:col-start-1",
+    },
+    {
+      key: "createdTo",
+      label: "Created To",
+      type: "date",
+      inputId: "admission-created-to",
+      className: "xl:col-start-2",
+    },
+  ];
+
   const applyFilters = () => {
     if (
       draftFilters.createdFrom &&
@@ -316,6 +413,7 @@ export const AdminAdmissionView = ({
     }
 
     setAppliedFilters(draftFilters);
+    setIsFilterDialogOpen(false);
     if (showFilters) {
       const query = createFilterQueryString(draftFilters);
       router.replace(`${pathname}${query ? `?${query}` : ""}`, {
@@ -327,6 +425,7 @@ export const AdminAdmissionView = ({
   const resetFilters = () => {
     setDraftFilters(EMPTY_FILTERS);
     setAppliedFilters(EMPTY_FILTERS);
+    setIsFilterDialogOpen(false);
     if (showFilters) {
       router.replace(pathname, { scroll: false });
     }
@@ -358,6 +457,56 @@ export const AdminAdmissionView = ({
           />
 
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div className="flex flex-wrap items-center gap-2">
+              <FilterActions onApply={applyFilters} onReset={resetFilters} />
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsFilterDialogOpen(true)}
+              >
+                Filter
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={generateReportPdf}
+              >
+                <FileDown className="mr-2 h-4 w-4" />
+                Generate Admissions Report PDF
+              </Button>
+            </div>
+
+            <Dialog
+              open={isFilterDialogOpen}
+              onOpenChange={setIsFilterDialogOpen}
+            >
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Advanced Filters</DialogTitle>
+                  <DialogDescription>
+                    Filter admissions by application ID and created date range.
+                  </DialogDescription>
+                </DialogHeader>
+                <FilterBuilder
+                  fields={additionalFilterFields}
+                  draftFilters={draftFilters}
+                  onDraftChange={updateDraftFilter}
+                  allValue={ALL_FILTERS_VALUE}
+                  className="grid-cols-1 sm:grid-cols-2"
+                />
+                <DialogFooter>
+                  <Button variant="outline" onClick={resetFilters}>
+                    Reset Filters
+                  </Button>
+                  <Button type="button" onClick={applyFilters}>
+                    Apply Filters
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             {!hideAddForm && canCreate && (
               <Dialog
                 open={isCreateDialogOpen}
@@ -689,6 +838,15 @@ export const AdminAdmissionView = ({
             />
           </div>
         )}
+      </div>
+
+      <div
+        className="pointer-events-none absolute left-[-10000px] top-0"
+        aria-hidden="true"
+      >
+        <div ref={reportRef}>
+          {reportData ? <AdmissionsReportDocument data={reportData} /> : null}
+        </div>
       </div>
     </div>
   );

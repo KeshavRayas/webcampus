@@ -1057,15 +1057,15 @@ export const ApplicantAdmissionView = ({
 
     setIsGeneratingPdf(true);
     try {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
       const node = documentRef.current;
       if (!node) {
         toast.error("Could not render the admission form.");
         return;
       }
-
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      await new Promise((resolve) => setTimeout(resolve, 150));
 
       const previousStyle = node.style.cssText;
       node.style.position = "fixed";

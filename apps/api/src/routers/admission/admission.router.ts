@@ -1,6 +1,7 @@
 import { DepartmentController } from "@webcampus/api/src/controllers/admin/department.controller";
 import { AdmissionConstantsController } from "@webcampus/api/src/controllers/admission/admission-constants.controller";
 import { AdmissionController } from "@webcampus/api/src/controllers/admission/admission.controller";
+import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   AdmissionActionParamSchema,
@@ -12,11 +13,16 @@ import {
   GetAdmissionsQuerySchema,
   PortStudentsSchema,
 } from "@webcampus/schemas/admission";
-import { Router } from "express";
+import { ErrorRequestHandler, Router } from "express";
 import multer from "multer";
 import admissionUploadRouter from "./admission.upload.router";
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+});
 const applicationUploadFields = [
   { name: "class10thMarksPdf", maxCount: 1 },
   { name: "class12thMarksPdf", maxCount: 1 },
@@ -221,5 +227,30 @@ router.post(
   upload.fields(applicationUploadFields),
   AdmissionController.staffSubmit
 );
+
+const uploadErrorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+  void _next;
+
+  if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+    sendResponse({
+      res,
+      status: "error",
+      statusCode: 413,
+      message: "Each uploaded document must be less than 2 MB.",
+      error,
+    });
+    return;
+  }
+
+  sendResponse({
+    res,
+    status: "error",
+    statusCode: 400,
+    message: error instanceof Error ? error.message : "Upload failed",
+    error,
+  });
+};
+
+router.use(uploadErrorHandler);
 
 export default router;

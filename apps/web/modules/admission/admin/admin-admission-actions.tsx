@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@webcampus/ui/components/dialog";
-import { FileDown, Loader2, Pencil } from "lucide-react";
+import { FileDown, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useRef, useState } from "react";
 import { toast } from "react-toastify";
@@ -307,6 +307,7 @@ export const AdminAdmissionActions = ({
   const isPending = admission.status === "PENDING";
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [docData, setDocData] = useState<DocData | null>(null);
+  const [isDocReady, setIsDocReady] = useState(false);
   const documentRef = useRef<HTMLDivElement | null>(null);
 
   // Compute Full Name
@@ -331,16 +332,24 @@ export const AdminAdmissionActions = ({
     router.push(`${path}?${params.toString()}`);
   };
 
-  const handleDownloadPdf = async () => {
-    if (isGeneratingPdf) return;
-    setIsGeneratingPdf(true);
+  const handleUpdateDocument = async () => {
     try {
       setDocData(buildDocData(admission));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => setTimeout(resolve, 60));
       const node = documentRef.current;
-      if (!node) {
-        toast.error("Could not render the admission form.");
-        return;
-      }
+      if (!node) return;
+      setIsDocReady(true);
+    } catch {
+      // Silent: never surface errors from Update.
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    const node = documentRef.current;
+    if (!node || !isDocReady) return;
+    setIsGeneratingPdf(true);
+    try {
       await renderNodeToPdf(
         node,
         `admission-form-${admission.applicationId ?? "application"}.pdf`
@@ -348,7 +357,6 @@ export const AdminAdmissionActions = ({
       toast.success("Verification PDF downloaded.");
     } catch (error) {
       console.error(error);
-      toast.error("Failed to generate the verification PDF. Please try again.");
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -427,18 +435,31 @@ export const AdminAdmissionActions = ({
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={() => void handleUpdateDocument()}
+                    disabled={isPending}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Update
+                  </Button>
+                  <Button
+                    size="sm"
                     onClick={() => void handleDownloadPdf()}
-                    disabled={isGeneratingPdf || admission.status === "PENDING"}
+                    disabled={isGeneratingPdf || isPending || !isDocReady}
+                    title={
+                      isDocReady
+                        ? "Download the verification PDF"
+                        : "Click Update first to prepare the document"
+                    }
                   >
                     {isGeneratingPdf ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generating...
+                        Downloading...
                       </>
                     ) : (
                       <>
                         <FileDown className="mr-2 h-4 w-4" />
-                        Download Verification PDF
+                        Download
                       </>
                     )}
                   </Button>
