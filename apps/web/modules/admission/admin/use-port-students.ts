@@ -32,7 +32,9 @@ export const usePortStudents = () => {
         { withCredentials: true }
       );
     },
-    onSuccess: (response: AxiosResponse<SuccessResponse<PortStudentsResult>>) => {
+    onSuccess: (
+      response: AxiosResponse<SuccessResponse<PortStudentsResult>>
+    ) => {
       const result = response.data.data;
       if (result) {
         const autoCreated = result.autoCreatedApplicants ?? 0;

@@ -10,7 +10,7 @@ import {
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
 import axios, { AxiosError, AxiosResponse } from "axios";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 
 type CourseCycle = "PHYSICS" | "CHEMISTRY" | "NONE";
@@ -26,7 +26,7 @@ export const useCreateAdminCourseForm = (
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
   const form = useForm<CreateCourseDTO>({
-    resolver: zodResolver(CreateCourseSchema),
+    resolver: zodResolver(CreateCourseSchema) as Resolver<CreateCourseDTO>,
     defaultValues: {
       code: "",
       name: "",
@@ -42,20 +42,24 @@ export const useCreateAdminCourseForm = (
       practicalCredits: 0,
       skillCredits: 0,
       seeMaxMarks: 0,
-      seeMinMarks: 0,
-      seeWeightage: 0,
-      maxNoOfCies: 0,
-      minNoOfCies: 0,
+      seeEligibility: 40,
       cieMaxMarks: 0,
-      cieMinMarks: 0,
-      cieWeightage: 0,
-      noOfAssignments: 0,
-      assignmentMaxMarks: 0,
+      cieEligibility: 40,
+      theoryMaxExams: 0,
+      theoryExamMaxMarks: 0,
+      theoryMinExams: 0,
+      theoryCieContribution: 0,
+      theoryEligibility: 40,
       labMaxMarks: 0,
-      labMinMarks: 0,
-      labWeightage: 0,
-      cumulativeMaxMarks: 0,
-      cumulativeMinMarks: 0,
+      labEligibility: 40,
+      aatMaxMarks: 0,
+      aatEligibility: 40,
+      allowFeedback: true,
+      attendanceRequired: true,
+      numberOfBatches: undefined,
+      studentsPerBatch: undefined,
+      openElectiveEligibility: "ALL",
+      eligibleDepartmentIds: [],
     },
   });
 
@@ -78,6 +82,7 @@ export const useCreateAdminCourseForm = (
       queryClient.invalidateQueries({
         queryKey: ["admin-course-mapping-status"],
       });
+      queryClient.invalidateQueries({ queryKey: ["pe-capacity-summary"] });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(error.response?.data?.error || "Failed to create course");
@@ -87,8 +92,6 @@ export const useCreateAdminCourseForm = (
   const onSubmit = (values: CreateCourseDTO) => {
     mutate({
       ...values,
-      departmentId,
-      departmentName,
       cycle: defaultCycle,
     });
   };

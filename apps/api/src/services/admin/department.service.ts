@@ -1,5 +1,6 @@
 import { IncomingHttpHeaders } from "http";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
+import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import { CreateUserType } from "@webcampus/schemas/admin";
@@ -36,7 +37,20 @@ export class DepartmentService {
         logoFile: Express.Multer.File;
       }
   ): Promise<BaseResponse<DepartmentResponseDTO>> {
+    let createdAuthUserId: string | null = null;
+    let uploadedLogoUrl: string | null = null;
+
     try {
+      const existingDepartment = await db.department.findFirst({
+        where: {
+          OR: [{ code: request.code }, { name: request.name }],
+        },
+        select: { id: true },
+      });
+      if (existingDepartment) {
+        throw new Error("Department with this code or name already exists");
+      }
+
       const userService = new UserService({
         request: {
           email: request.email,
@@ -56,6 +70,8 @@ export class DepartmentService {
         throw new Error("Failed to create department user");
       }
 
+      createdAuthUserId = user.data.id;
+
       const { generateFileName, uploadToS3 } = await import(
         "@webcampus/api/src/utils/s3"
       );
@@ -72,6 +88,8 @@ export class DepartmentService {
       if (!uploadResult.success || !uploadResult.url) {
         throw new Error("Failed to upload department logo");
       }
+
+      uploadedLogoUrl = uploadResult.url;
 
       await db.user.update({
         where: { id: user.data.id },
@@ -101,6 +119,40 @@ export class DepartmentService {
       logger.info(response);
       return response;
     } catch (error) {
+      if (uploadedLogoUrl) {
+        try {
+          const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+          await deleteFromS3(uploadedLogoUrl);
+        } catch (cleanupError) {
+          logger.warn(
+            "Failed to clean up uploaded department logo after create failure",
+            {
+              uploadedLogoUrl,
+              cleanupError,
+            }
+          );
+        }
+      }
+
+      if (createdAuthUserId) {
+        try {
+          await auth.api.removeUser({
+            headers: fromNodeHeaders(request.headers),
+            body: {
+              userId: createdAuthUserId,
+            },
+          });
+        } catch (cleanupError) {
+          logger.warn(
+            "Failed to clean up auth user after department create failure",
+            {
+              createdAuthUserId,
+              cleanupError,
+            }
+          );
+        }
+      }
+
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2002") {
           throw new Error("Department already exists");

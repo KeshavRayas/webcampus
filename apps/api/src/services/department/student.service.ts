@@ -76,7 +76,9 @@ export class DepartmentStudentService {
             ? {
                 admission: {
                   is: {
-                    ...(query.semesterId ? { semesterId: query.semesterId } : {}),
+                    ...(query.semesterId
+                      ? { semesterId: query.semesterId }
+                      : {}),
                     semester: {
                       ...(query.academicTermId
                         ? { academicTermId: query.academicTermId }

@@ -24,6 +24,15 @@ const getStatusCodeForError = (message: string): number => {
   if (message === ERRORS.UNAUTHENTICATED || message === ERRORS.UNAUTHORIZED) {
     return 401;
   }
+  if (message === "Course has not been submitted for approval.") {
+    return 403;
+  }
+  if (
+    message ===
+    "Course must be approved before this operation can be performed."
+  ) {
+    return 403;
+  }
   if (message.toLowerCase().includes("not found")) {
     return 404;
   }

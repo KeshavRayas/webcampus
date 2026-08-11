@@ -32,7 +32,8 @@ export function useCascadingFilterSync<
   options: CascadingFilterOptions
 ) {
   useEffect(() => {
-    const departmentFilterValue = filters.departmentId || filters.departmentName;
+    const departmentFilterValue =
+      filters.departmentId || filters.departmentName;
 
     // Check if selected academic term still exists
     if (
@@ -77,5 +78,11 @@ export function useCascadingFilterSync<
       }));
       return;
     }
-  }, [filters, setFilters, options.academicTerms, options.semesters, options.departments]);
+  }, [
+    filters,
+    setFilters,
+    options.academicTerms,
+    options.semesters,
+    options.departments,
+  ]);
 }

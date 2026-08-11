@@ -2,8 +2,12 @@ import { logger } from "@webcampus/common/logger";
 import { Cycle, db, Prisma } from "@webcampus/db";
 import type { CreateAssessmentType } from "@webcampus/schemas/faculty";
 import type { BaseResponse } from "@webcampus/types/api";
+import {
+  assertFacultyCourseApproved,
+  FACULTY_COURSE_STATUS,
+} from "../shared/course-approval";
 
-interface CoordinatedCourseDTO {
+export interface CoordinatedCourseDTO {
   id: string;
   code: string;
   name: string;
@@ -19,16 +23,31 @@ interface CoordinatedCourseDTO {
   programType: string;
   departmentName: string;
   departmentAbbreviation: string;
+
+  // ─── NEW CONFIGURATION FIELDS ───
+  seeMaxMarks: number;
+  seeEligibility: number;
   cieMaxMarks: number;
-  maxNoOfCies: number;
-  assessments?: { id: string; title: string }[];
+  cieEligibility: number;
+  theoryMaxExams: number;
+  theoryExamMaxMarks: number;
+  theoryMinExams: number;
+  theoryEligibility: number;
+  labMaxMarks: number;
+  labEligibility: number;
+  aatMaxMarks: number;
+  aatEligibility: number;
+
+  assessments?: {
+    id: string;
+    title: string;
+    totalMarks: number;
+    componentType?: string | null;
+    sequence?: number | null;
+  }[];
 }
 
 export class AssessmentService {
-  /**
-   * Fetch all courses where the given faculty member is designated as a coordinator.
-   * Resolves faculty from the userId (session.user.id), not a client-provided facultyId.
-   */
   static async getCoordinatedCourses(
     userId: string,
     semesterId?: string,
@@ -49,70 +68,66 @@ export class AssessmentService {
           coordinators: {
             some: { facultyId: faculty.id },
           },
-          ...(semesterId ? { semesterId } : {}),
-          ...(cycle ? { cycle: cycle as Cycle } : {}),
+          approvalStatus: FACULTY_COURSE_STATUS,
+          ...(semesterId && { semesterId }),
+          ...(cycle && cycle !== "NONE" && { cycle: cycle as Cycle }),
         },
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          courseMode: true,
-          courseType: true,
-          totalCredits: true,
-          lectureCredits: true,
-          tutorialCredits: true,
-          practicalCredits: true,
-          skillCredits: true,
-          semesterId: true,
-          cieMaxMarks: true,
-          maxNoOfCies: true,
+        include: {
+          semester: {
+            include: { academicTerm: true },
+          },
+          department: true,
           assessments: {
             select: {
               id: true,
               title: true,
-            },
-          },
-          semester: {
-            select: {
-              semesterNumber: true,
-              programType: true,
-            },
-          },
-          department: {
-            select: {
-              name: true,
-              abbreviation: true,
+              totalMarks: true,
+              componentType: true,
+              sequence: true,
             },
           },
         },
         orderBy: { code: "asc" },
       });
 
-      const data: CoordinatedCourseDTO[] = courses.map((c) => ({
-        id: c.id,
-        code: c.code,
-        name: c.name,
-        courseMode: c.courseMode,
-        courseType: c.courseType,
-        totalCredits: c.totalCredits,
-        lectureCredits: c.lectureCredits,
-        tutorialCredits: c.tutorialCredits,
-        practicalCredits: c.practicalCredits,
-        skillCredits: c.skillCredits,
-        semesterNumber: c.semester.semesterNumber,
-        semesterId: c.semesterId,
-        programType: c.semester.programType,
-        departmentName: c.department.name,
-        departmentAbbreviation: c.department.abbreviation,
-        cieMaxMarks: c.cieMaxMarks,
-        maxNoOfCies: c.maxNoOfCies,
-        assessments: c.assessments,
+      const mappedCourses: CoordinatedCourseDTO[] = courses.map((course) => ({
+        id: course.id,
+        code: course.code,
+        name: course.name,
+        courseMode: course.courseMode,
+        courseType: course.courseType,
+        totalCredits: course.totalCredits,
+        lectureCredits: course.lectureCredits,
+        tutorialCredits: course.tutorialCredits,
+        practicalCredits: course.practicalCredits,
+        skillCredits: course.skillCredits,
+        semesterNumber: course.semesterNumber,
+        semesterId: course.semesterId,
+        programType: course.semester.academicTerm.type,
+        departmentName: course.department.name,
+        departmentAbbreviation: course.department.abbreviation,
+
+        // Include all the new assessment configuration data
+        seeMaxMarks: course.seeMaxMarks,
+        seeEligibility: course.seeEligibility,
+        cieMaxMarks: course.cieMaxMarks,
+        cieEligibility: course.cieEligibility,
+        theoryMaxExams: course.theoryMaxExams,
+        theoryExamMaxMarks: course.theoryExamMaxMarks,
+        theoryMinExams: course.theoryMinExams,
+        theoryEligibility: course.theoryEligibility,
+        labMaxMarks: course.labMaxMarks,
+        labEligibility: course.labEligibility,
+        aatMaxMarks: course.aatMaxMarks,
+        aatEligibility: course.aatEligibility,
+
+        assessments: course.assessments,
       }));
 
       return {
         status: "success",
-        message: `Found ${data.length} coordinated course(s)`,
-        data,
+        message: "Coordinated courses fetched successfully",
+        data: mappedCourses,
       };
     } catch (error) {
       logger.error("Error fetching coordinated courses", error);
@@ -137,6 +152,15 @@ export class AssessmentService {
       if (!faculty) {
         throw new Error("Faculty profile not found");
       }
+
+      const course = await db.course.findUnique({
+        where: { id: data.courseId },
+        select: { approvalStatus: true },
+      });
+      if (!course) {
+        throw new Error("Course not found");
+      }
+      assertFacultyCourseApproved(course.approvalStatus, true);
 
       const existingAssessment = await db.assessmentTemplate.findFirst({
         where: {
@@ -164,6 +188,9 @@ export class AssessmentService {
             where: { id: existingAssessment.id },
             data: {
               semesterId: data.semesterId,
+              title: data.title,
+              componentType: data.componentType,
+              sequence: data.sequence,
               totalMarks: data.totalMarks,
               questions: {
                 create: formattedQuestions,
@@ -177,6 +204,8 @@ export class AssessmentService {
             courseId: data.courseId,
             semesterId: data.semesterId,
             title: data.title,
+            componentType: data.componentType,
+            sequence: data.sequence,
             totalMarks: data.totalMarks,
             questions: {
               create: formattedQuestions,
@@ -217,12 +246,17 @@ export class AssessmentService {
 
       const assessment = await db.assessmentTemplate.findUnique({
         where: { id: assessmentId },
-        select: { courseId: true },
+        select: {
+          courseId: true,
+          course: { select: { approvalStatus: true } },
+        },
       });
 
       if (!assessment) {
         throw new Error("Assessment not found");
       }
+
+      assertFacultyCourseApproved(assessment.course.approvalStatus, true);
 
       const isCoordinator = await db.courseCoordinator.findFirst({
         where: {
@@ -290,6 +324,7 @@ export class AssessmentService {
             select: {
               name: true,
               code: true,
+              approvalStatus: true,
             },
           },
         },
@@ -298,6 +333,8 @@ export class AssessmentService {
       if (!assessment) {
         throw new Error("Assessment not found");
       }
+
+      assertFacultyCourseApproved(assessment.course.approvalStatus);
 
       // Ensure faculty is actually assigned to this course
       const faculty = await db.faculty.findUnique({

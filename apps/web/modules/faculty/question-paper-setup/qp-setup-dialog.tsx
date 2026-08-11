@@ -5,51 +5,45 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
-import { useState } from "react";
 import { QPSetupForm } from "./qp-setup-form";
-
-interface CoordinatedCourse {
-  id: string;
-  code: string;
-  name: string;
-  semesterNumber: number;
-  semesterId: string;
-}
+import { SetupContext } from "./question-paper-dashboard";
 
 interface QPSetupDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  course: CoordinatedCourse;
+  setupContext: SetupContext;
 }
 
 export const QPSetupDialog = ({
   open,
   onOpenChange,
-  course,
+  setupContext,
 }: QPSetupDialogProps) => {
-  const [totalMarks, setTotalMarks] = useState(0);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] w-[95vw] overflow-y-auto sm:max-w-7xl">
         <DialogHeader className="mb-4">
           <div className="flex items-center justify-between pr-8">
             <div>
-              <DialogTitle>Setup Assessment for {course.name}</DialogTitle>
+              <DialogTitle>
+                Setup {setupContext.assessmentTitle} for{" "}
+                {setupContext.course.name}
+              </DialogTitle>
               <DialogDescription>
-                Configure the question paper template for {course.code}.
+                Configure the question paper template for{" "}
+                {setupContext.course.code}. The maximum marks are locked to the
+                department configuration.
               </DialogDescription>
             </div>
-            <div className="bg-primary/10 text-primary rounded-lg px-4 py-2 text-lg font-semibold">
-              Total Marks: {totalMarks}
+            <div className="bg-primary/10 text-primary border-primary/20 rounded-lg border px-4 py-2 text-lg font-semibold">
+              Required Marks: {setupContext.maxMarks}
             </div>
           </div>
         </DialogHeader>
 
         <QPSetupForm
-          course={course}
+          setupContext={setupContext}
           onSuccess={() => onOpenChange(false)}
-          onMarksChange={setTotalMarks}
         />
       </DialogContent>
     </Dialog>

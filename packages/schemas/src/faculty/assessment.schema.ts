@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export type AssessmentComponentType = "THEORY" | "LAB" | "AAT";
+
 export const CreateAssessmentQuestionSchema = z.object({
   part: z.string().min(1, "Part name is required"),
   qNumber: z.string().min(1, "Question number is required"),
@@ -18,6 +20,10 @@ export const CreateAssessmentSchema = z.object({
   courseId: z.string().uuid("Invalid course ID"),
   semesterId: z.string().uuid("Invalid semester ID"),
   title: z.string().min(1, "Assessment title is required"),
+  componentType: z.enum(["THEORY", "LAB", "AAT"], {
+    message: "Invalid assessment component type",
+  }),
+  sequence: z.number().int().min(1, "Sequence must be at least 1"),
   totalMarks: z.number().min(1, "Total marks must be at least 1"),
   questions: z
     .array(CreateAssessmentQuestionSchema)

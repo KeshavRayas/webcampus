@@ -339,6 +339,8 @@ export const CourseApprovalsTable = ({
             <CourseDetailContent
               courseId={detailCourse.id}
               course={detailCourse}
+              semesterId={detailCourse.semesterId}
+              academicYear={appliedFilters?.academicYear ?? ""}
             />
           )}
         </DialogContent>
@@ -348,26 +350,33 @@ export const CourseApprovalsTable = ({
 };
 
 interface MappingInfo {
-  sectionId: string;
-  sectionName: string;
+  id: string;
+  sectionId: string | null;
+  sectionName: string | null;
   assignmentType: string;
   facultyId: string;
-  facultyName: string;
-  batchName?: string;
+  facultyName: string | null;
+  batchName?: string | null;
+  electiveBatchId?: string | null;
+  electiveBatchName?: string | null;
 }
 
 interface CoordinatorInfo {
   id: string;
   facultyId: string;
-  faculty: { name: string };
+  faculty: { name?: string; user?: { name: string } };
 }
 
 const CourseDetailContent = ({
   courseId,
   course,
+  semesterId,
+  academicYear,
 }: {
   courseId: string;
   course: CourseResponseDTO;
+  semesterId: string;
+  academicYear: string;
 }) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
@@ -376,13 +385,16 @@ const CourseDetailContent = ({
     queryFn: async () => {
       const res = await axios.get<BaseResponse<MappingInfo[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/by-course`,
-        { params: { courseId }, withCredentials: true }
+        {
+          params: { courseId, semesterId, academicYear },
+          withCredentials: true,
+        }
       );
       return res.data.status === "success" && res.data.data
         ? res.data.data
         : [];
     },
-    enabled: !!courseId,
+    enabled: !!courseId && !!semesterId && !!academicYear,
   });
 
   const { data: coordinators, isLoading: loadingCoords } = useQuery({
@@ -486,151 +498,63 @@ const CourseDetailContent = ({
                 </div>
               </div>
 
-              {/* SEE */}
+              {/* NEW ASSESSMENT METRICS GRID */}
               <div>
                 <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-                  SEE (Semester End Exam)
+                  Assessment Metrics
                 </h4>
-                <div className="overflow-hidden rounded-md border">
-                  <Table className="text-xs">
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Max Marks
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.seeMaxMarks}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Min Marks
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.seeMinMarks}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Weightage
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.seeWeightage}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
+                <div className="overflow-hidden rounded-md border p-3">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="text-muted-foreground font-medium">
+                      SEE:
+                    </div>
+                    <div>
+                      {course.seeMaxMarks} (Min: {course.seeEligibility}%)
+                    </div>
 
-              {/* CIE */}
-              <div>
-                <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-                  CIE (Continuous Internal)
-                </h4>
-                <div className="overflow-hidden rounded-md border">
-                  <Table className="text-xs">
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Max / Min CIEs
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.maxNoOfCies} / {course.minNoOfCies}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Max / Min Marks
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.cieMaxMarks} / {course.cieMinMarks}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell className="bg-muted/20 py-2 font-medium">
-                          Weightage
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {course.cieWeightage}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
+                    <div className="text-muted-foreground font-medium">
+                      CIE:
+                    </div>
+                    <div>
+                      {course.theoryMaxExams} Exams | {course.cieMaxMarks} (Min:{" "}
+                      {course.cieEligibility}%)
+                    </div>
 
-              {/* Lab & Assignments combined into one visual column block */}
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-                    Lab & Assignments
-                  </h4>
-                  <div className="overflow-hidden rounded-md border">
-                    <Table className="text-xs">
-                      <TableBody>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 py-2 font-medium">
-                            Lab Max/Min Marks
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {course.labMaxMarks} / {course.labMinMarks}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 py-2 font-medium">
-                            Lab Weightage
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {course.labWeightage}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 border-t py-2 font-medium">
-                            # Assignments
-                          </TableCell>
-                          <TableCell className="border-t py-2">
-                            {course.noOfAssignments}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 py-2 font-medium">
-                            Assignment Max
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {course.assignmentMaxMarks}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
+                    <div className="text-muted-foreground font-medium">
+                      Theory:
+                    </div>
+                    <div>
+                      {course.theoryMinExams} Exams |{" "}
+                      {course.theoryExamMaxMarks} (Min:{" "}
+                      {course.theoryEligibility}%)
+                    </div>
 
-                <div>
-                  <h4 className="text-muted-foreground mb-1 text-xs font-semibold uppercase tracking-wider">
-                    Cumulative (SEE + CIE)
-                  </h4>
-                  <div className="overflow-hidden rounded-md border">
-                    <Table className="text-xs">
-                      <TableBody>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 py-2 font-medium">
-                            Max Marks
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {course.cumulativeMaxMarks}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="bg-muted/20 py-2 font-medium">
-                            Min Marks
-                          </TableCell>
-                          <TableCell className="py-2">
-                            {course.cumulativeMinMarks}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
+                    <div className="text-muted-foreground font-medium">
+                      Theory Contribution to CIE:
+                    </div>
+                    <div>{course.theoryCieContribution}</div>
+
+                    <div className="text-muted-foreground font-medium">
+                      AAT:
+                    </div>
+                    <div>
+                      {course.aatMaxMarks} (Min: {course.aatEligibility}%)
+                    </div>
+
+                    <div className="text-muted-foreground font-medium">
+                      Lab:
+                    </div>
+                    <div>
+                      {course.labMaxMarks > 0 ? 1 : 0} Sessions |{" "}
+                      {course.labMaxMarks} (Min: {course.labEligibility}%)
+                    </div>
+
+                    <div className="text-muted-foreground mt-1 border-t pt-2 font-medium">
+                      Cumulative Max:
+                    </div>
+                    <div className="mt-1 border-t pt-2">
+                      {(course.cieMaxMarks || 0) + (course.seeMaxMarks || 0)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -662,15 +586,18 @@ const CourseDetailContent = ({
                   <Table className="text-sm">
                     <TableBody>
                       {theoryMappings.map((m) => (
-                        <TableRow key={m.sectionId + "-theory"}>
+                        <TableRow key={m.id}>
                           <TableCell className="bg-muted/10 w-1/2 font-medium">
-                            Section {m.sectionName} (Theory)
+                            {m.sectionName
+                              ? `Section ${m.sectionName}`
+                              : `Batch ${m.electiveBatchName}`}{" "}
+                            (Theory)
                           </TableCell>
                           <TableCell>{m.facultyName}</TableCell>
                         </TableRow>
                       ))}
                       {labMappings.map((m) => (
-                        <TableRow key={m.sectionId + m.batchName + "-lab"}>
+                        <TableRow key={m.id}>
                           <TableCell className="bg-muted/10 w-1/2 font-medium">
                             Section {m.sectionName} Lab {m.batchName}
                           </TableCell>
@@ -696,7 +623,7 @@ const CourseDetailContent = ({
                 <div className="flex flex-wrap gap-2">
                   {coordinators.map((c) => (
                     <Badge key={c.id} variant="secondary" className="px-3 py-1">
-                      {c.faculty.name}
+                      {c.faculty?.user?.name ?? c.faculty?.name ?? "Unknown"}
                     </Badge>
                   ))}
                 </div>

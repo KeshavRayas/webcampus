@@ -122,7 +122,7 @@ export const AdminHallTicketView = () => {
     };
   }, [previewData, previewTarget]);
 
-  const { data: termsData } = useAcademicTerms({ status: "ACTIVE" });
+  const { data: termsData } = useAcademicTerms();
   const { data: departmentsData } = useDepartments();
   const terms = termsData ?? [];
   const departments = departmentsData ?? [];
@@ -317,9 +317,13 @@ export const AdminHallTicketView = () => {
           <FilterBuilder
             fields={filterFields}
             draftFilters={draftFilters}
-            onDraftChange={(key, value) =>
-              setDraftFilters((prev) => ({ ...prev, [key]: value }))
-            }
+            onDraftChange={(key, value) => {
+              setDraftFilters((prev) => ({ ...prev, [key]: value }));
+
+              if (key === "search") {
+                setAppliedFilters((prev) => ({ ...prev, search: value }));
+              }
+            }}
           />
           <FilterActions onApply={handleApply} onReset={handleReset} />
         </FilterPanel>
@@ -361,8 +365,10 @@ export const AdminHallTicketView = () => {
               }
               return { ...current, [key]: value };
             });
+            if (key === "search") {
+              setAppliedFilters((prev) => ({ ...prev, search: value }));
+            }
           }}
-          className="md:grid-cols-5"
         />
         <FilterActions onApply={handleApply} onReset={handleReset} />
       </FilterPanel>

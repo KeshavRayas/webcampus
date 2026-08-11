@@ -38,7 +38,10 @@ export const FacultyProfileCard = ({
   return (
     <div className="bg-card flex w-full flex-col items-center gap-4 rounded-xl border p-6 lg:w-[18rem]">
       <Avatar className="h-28 w-28 border">
-        <AvatarImage src={profile.user.image || undefined} alt={profile.user.name} />
+        <AvatarImage
+          src={profile.user.image || undefined}
+          alt={profile.user.name}
+        />
         <AvatarFallback className="text-xl font-semibold">
           {getInitials(profile.user.name)}
         </AvatarFallback>
@@ -46,8 +49,12 @@ export const FacultyProfileCard = ({
 
       <div className="w-full space-y-3 text-center">
         <p className="text-lg font-semibold">{profile.user.name}</p>
-        <p className="text-muted-foreground text-sm break-all">{profile.user.email}</p>
-        <p className="text-muted-foreground text-sm">{profile.employeeId || "-"}</p>
+        <p className="text-muted-foreground break-all text-sm">
+          {profile.user.email}
+        </p>
+        <p className="text-muted-foreground text-sm">
+          {profile.employeeId || "-"}
+        </p>
       </div>
 
       <div className="w-full space-y-3 border-t pt-4">
@@ -59,7 +66,10 @@ export const FacultyProfileCard = ({
             .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
             .join(" ")}
         />
-        <DataField label="Joining Date" value={formatDate(profile.dateOfJoining)} />
+        <DataField
+          label="Joining Date"
+          value={formatDate(profile.dateOfJoining)}
+        />
         <div className="space-y-1">
           <p className="text-muted-foreground text-sm">Status</p>
           <Badge variant="default">Active</Badge>

@@ -88,6 +88,47 @@ export class SectionService {
     return department;
   }
 
+  /**
+   * Builds the eligibility filter for students who belong in this
+   * department's sections for a given semester.
+   *
+   * Basic Sciences owns sections, not students: first-year sections pool
+   * students from every department, so the filter must never restrict by
+   * the student's home department for BASIC_SCIENCES.
+   */
+  private static async getEligibleStudentsForSectionDepartment(input: {
+    departmentId: string;
+    semesterNumber: number;
+    academicYear: string;
+  }): Promise<Prisma.StudentWhereInput> {
+    const department = await db.department.findUnique({
+      where: { id: input.departmentId },
+      select: { type: true },
+    });
+
+    const or: Prisma.StudentWhereInput[] = [
+      {
+        department: { is: { id: input.departmentId } },
+        currentSemester: input.semesterNumber,
+      },
+      {
+        studentSections: {
+          some: {
+            semester: input.semesterNumber,
+            academicYear: input.academicYear,
+            section: { departmentId: input.departmentId },
+          },
+        },
+      },
+    ];
+
+    if (department?.type === "BASIC_SCIENCES") {
+      or.push({ currentSemester: input.semesterNumber });
+    }
+
+    return { OR: or };
+  }
+
   static async assertSemesterWriteAccess(
     semesterId: string,
     requestingUserId: string,
@@ -522,7 +563,11 @@ export class SectionService {
         },
         include: {
           _count: {
-            select: { studentSections: true, courses: true },
+            select: {
+              studentSections: true,
+              courses: true,
+              ClassSession: true,
+            },
           },
         },
       });
@@ -532,18 +577,23 @@ export class SectionService {
       }
 
       // Safe Deletion Validation Rule
-      if (existing._count.studentSections > 0) {
-        throw new Error(
-          "Cannot delete section: Students are already mapped to this section. Remove students first."
-        );
-      }
       if (existing._count.courses > 0) {
         throw new Error(
           "Cannot delete section: Courses are mapped to this section."
         );
       }
+      if (existing._count.ClassSession > 0) {
+        throw new Error(
+          "Cannot delete section: Class sessions have been recorded for this section."
+        );
+      }
 
-      await db.section.delete({ where: { id } });
+      // Unassign all students, remove any linked batches, then delete the section.
+      await db.$transaction(async (tx) => {
+        await tx.studentSection.deleteMany({ where: { sectionId: id } });
+        await tx.batch.deleteMany({ where: { sectionId: id } });
+        await tx.section.delete({ where: { id } });
+      });
 
       return {
         status: "success",
@@ -889,24 +939,32 @@ export class SectionService {
       }
 
       // Fetch unassigned students: must not have SectionAssignment for this term
-      // Students are ordered by USN for consistent "First N" selection
+      // Students are ordered by USN for consistent "First N" selection.
+      // Eligibility uses the same rule as the Assign dialog (see
+      // getEligibleStudentsForSectionDepartment) so generation and manual
+      // assignment agree on who belongs in this department's sections.
+      const eligibleWhere = await this.getEligibleStudentsForSectionDepartment({
+        departmentId: resolvedDepartment.departmentId,
+        semesterNumber,
+        academicYear,
+      });
+
       const unassignedStudents = await db.student.findMany({
         where: {
-          department: {
-            is: {
-              id: resolvedDepartment.departmentId,
-            },
-          },
-          currentSemester: semesterNumber,
-          studentSections: {
-            none: {
-              section: {
-                semester: {
-                  academicTermId: termId,
+          AND: [
+            eligibleWhere,
+            {
+              studentSections: {
+                none: {
+                  section: {
+                    semester: {
+                      academicTermId: termId,
+                    },
+                  },
                 },
               },
             },
-          },
+          ],
         },
         orderBy: { usn: "asc" },
       });
@@ -1092,8 +1150,10 @@ export class SectionService {
   }
 
   /**
-   * Get students not yet assigned to any section for a given semester + department.
-   * Returns full student data with user info for UI display.
+   * Get all eligible students for a given semester + department, annotated
+   * with the section they are currently mapped to (if any). Assigning a
+   * student MOVES them to the target section, so assigned students are
+   * included to allow redistribution.
    */
   static async getUnassignedStudents(
     semesterId: string,
@@ -1133,39 +1193,59 @@ export class SectionService {
 
       const academicYear = semester.academicTerm.year;
 
-      // 2. Fetch unassigned students using a strict filter on StudentSections
-      // We look for students in this department/semester who have NO records
-      // matching this exact semester number AND academic year.
+      // Fetch all eligible students for this department/semester, annotated
+      // with the section they are currently mapped to (if any) for this
+      // semester/year. The assign endpoint MOVES students between sections,
+      // so listing every eligible student (not just unassigned ones) lets
+      // users redistribute.
+      const where = await this.getEligibleStudentsForSectionDepartment({
+        departmentId: resolvedDepartment.departmentId,
+        semesterNumber: semester.semesterNumber,
+        academicYear,
+      });
+
       const students = await db.student.findMany({
-        where: {
-          department: {
-            is: {
-              id: resolvedDepartment.departmentId,
-            },
-          },
-          currentSemester: semester.semesterNumber,
-          studentSections: {
-            none: {
-              semester: semester.semesterNumber,
-              academicYear: academicYear,
-            },
-          },
-        },
+        where,
         include: {
           user: {
             select: { name: true, email: true },
+          },
+          department: {
+            select: { id: true, name: true },
+          },
+          studentSections: {
+            where: {
+              semester: semester.semesterNumber,
+              academicYear: academicYear,
+            },
+            include: {
+              section: { select: { id: true, name: true } },
+            },
           },
         },
         orderBy: { usn: "asc" },
       });
 
+      const data = students.map((student) => {
+        const current = student.studentSections[0]?.section;
+        return {
+          id: student.id,
+          usn: student.usn,
+          user: student.user,
+          department: student.department,
+          currentSection: current
+            ? { id: current.id, name: current.name }
+            : null,
+        };
+      });
+
       return {
         status: "success",
-        message: "Unassigned students fetched successfully",
+        message: "Students fetched successfully",
         data: {
           departmentId: resolvedDepartment.departmentId,
           departmentName: resolvedDepartment.departmentName,
-          students,
+          students: data,
         },
       };
     } catch (error) {

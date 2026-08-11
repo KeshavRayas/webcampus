@@ -15,13 +15,17 @@ const router: ReturnType<typeof Router> = Router();
 
 router.use(
   protect({
-    role: ["faculty", "admin"],
+    role: ["faculty", "admin", "hod"],
     permissions: {},
   })
 );
 
 router.get("/", FacultyController.getMyProfile);
-router.put("/", validateRequest(UpdateFacultyProfileSchema), FacultyController.updateMyProfile);
+router.put(
+  "/",
+  validateRequest(UpdateFacultyProfileSchema),
+  FacultyController.updateMyProfile
+);
 
 router.post(
   "/qualifications",

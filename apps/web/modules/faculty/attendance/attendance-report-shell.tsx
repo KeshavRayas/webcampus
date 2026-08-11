@@ -1,26 +1,21 @@
 "use client";
 
-import { dayjs } from "@webcampus/common/dayjs";
-import { Badge } from "@webcampus/ui/components/badge";
+import {
+  AttendanceDetailedTable,
+  AttendancePercentageTable,
+  AttendanceStatusTable,
+} from "@/components/academics/reports/attendance-tables";
 import { Button } from "@webcampus/ui/components/button";
 import {
   DEFAULT_FILTER_ALL_VALUE,
   FilterActions,
   FilterBuilder,
+  FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@webcampus/ui/components/table";
 import { cn } from "@webcampus/ui/lib/utils";
-import { Download, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import type { DetailedReportData } from "./attendance-report-types";
 
@@ -71,13 +66,14 @@ type AttendanceReportFilters = {
   semesterId: string;
   courseId: string;
   sectionId: string;
+  cycle?: string;
 };
 
 type AttendanceReportShellProps = {
   activeTab: "status" | "detailed" | "percentage";
   onTabChange: (tab: "status" | "detailed" | "percentage") => void;
   draftFilters: AttendanceReportFilters;
-  onDraftChange: (key: keyof AttendanceReportFilters, value: string) => void;
+  onDraftChange: (key: string, value: string) => void;
   academicTerms: AcademicTermOption[];
   semesters: SemesterOption[];
   courses: CourseOption[];
@@ -104,6 +100,8 @@ type AttendanceReportShellProps = {
   ) => void;
   onDownloadPercentagePDF?: () => void;
   onDownloadPercentageExcel?: () => void; // New Prop
+  showCycleFilter?: boolean;
+  cycleOptions?: Array<{ label: string; value: string }>;
 };
 
 export const AttendanceReportShell = ({
@@ -134,6 +132,8 @@ export const AttendanceReportShell = ({
   onPercentageFilterChange,
   onDownloadPercentagePDF,
   onDownloadPercentageExcel,
+  showCycleFilter = false,
+  cycleOptions = [],
 }: AttendanceReportShellProps) => {
   const getStatusEmptyMessage = () => {
     if (!hasRequiredFilters) {
@@ -202,7 +202,7 @@ export const AttendanceReportShell = ({
           allOptionLabel: "All terms",
           placeholder: "Select term...",
           options: academicTerms.map((term) => ({
-            label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+            label: `${term.type.toUpperCase()} ${term.year}`,
             value: term.id,
           })),
         },
@@ -232,6 +232,18 @@ export const AttendanceReportShell = ({
             value: sem.id,
           })),
         },
+        ...(showCycleFilter
+          ? [
+              {
+                key: "cycle" as const,
+                label: "Cycle",
+                type: "select" as const,
+                hideAllOption: true,
+                placeholder: "Select cycle...",
+                options: cycleOptions,
+              } satisfies FilterFieldConfig<AttendanceReportFilters>,
+            ]
+          : []),
         {
           key: "courseId",
           label: "Course",
@@ -257,31 +269,15 @@ export const AttendanceReportShell = ({
           })),
         },
       ];
-    }, [academicTerms, semesters, courses, sections, draftFilters]);
-
-  const getEligibilityStatus = (
-    percentage: number,
-    condonationStatus: string
-  ): "Eligible" | "Not Eligible" => {
-    if (percentage >= 85) return "Eligible";
-    if (percentage >= 75 && condonationStatus === "APPROVED") return "Eligible";
-    return "Not Eligible";
-  };
-
-  const formatCondonationStatus = (status: string): string => {
-    switch (status) {
-      case "NOT_REQUESTED":
-        return "Not Requested";
-      case "PENDING":
-        return "Pending";
-      case "APPROVED":
-        return "Approved";
-      case "REJECTED":
-        return "Rejected";
-      default:
-        return status;
-    }
-  };
+    }, [
+      academicTerms,
+      semesters,
+      courses,
+      sections,
+      draftFilters,
+      showCycleFilter,
+      cycleOptions,
+    ]);
 
   return (
     <div
@@ -323,13 +319,12 @@ export const AttendanceReportShell = ({
       </div>
 
       <main className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-        <div className="rounded-lg border p-4">
+        <FilterPanel>
           <FilterBuilder
             fields={filterFields}
             draftFilters={draftFilters}
             onDraftChange={onDraftChange}
             allValue={DEFAULT_FILTER_ALL_VALUE}
-            className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"
           />
 
           {/* Action Row - Includes Percentage Filters inline if active */}
@@ -384,360 +379,35 @@ export const AttendanceReportShell = ({
               isResetDisabled={!hasRequiredFilters}
             />
           </div>
-        </div>
+        </FilterPanel>
 
         {activeTab === "status" && (
-          <>
-            {isErrorSessions && (
-              <div className="text-destructive border-destructive/20 bg-destructive/5 rounded-lg border p-4 text-sm">
-                {errorSessions instanceof Error
-                  ? errorSessions.message
-                  : "Failed to load attendance sessions"}
-              </div>
-            )}
-
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date of Session</TableHead>
-                  <TableHead>Total Students</TableHead>
-                  <TableHead>Present Students</TableHead>
-                  <TableHead>Absent Students</TableHead>
-                  <TableHead>Class % PER.</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {statusReportData.length > 0 ? (
-                  statusReportData.map((session) => (
-                    <TableRow key={session.id}>
-                      <TableCell>
-                        {session.sessionDate
-                          ? dayjs(session.sessionDate).format("MMM D, YYYY")
-                          : "-"}
-                      </TableCell>
-                      <TableCell>{session.totalStudents}</TableCell>
-                      <TableCell>
-                        <Badge variant="default" className="bg-green-500">
-                          {session.presentCount}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="destructive">
-                          {session.absentCount}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {session.percentage}%
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onSessionSelect(session.id)}
-                        >
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="text-muted-foreground h-24 text-center"
-                    >
-                      {getStatusEmptyMessage()}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </>
+          <AttendanceStatusTable
+            statusReportData={statusReportData}
+            isErrorSessions={isErrorSessions}
+            errorSessions={errorSessions}
+            onSessionSelect={onSessionSelect}
+            emptyMessage={getStatusEmptyMessage()}
+          />
         )}
 
         {activeTab === "detailed" && (
-          <div className="space-y-4">
-            {detailedReportData && detailedReportData.students.length > 0 ? (
-              <>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onDownloadDetailedExcel}
-                    className="gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download Excel
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onDownloadDetailedPDF}
-                    className="gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download PDF
-                  </Button>
-                </div>
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="bg-background min-w-25 sticky left-0 z-10">
-                          USN
-                        </TableHead>
-                        <TableHead className="bg-background left-25 min-w-37.5 sticky z-10">
-                          Student Name
-                        </TableHead>
-                        {detailedReportData.sessions.map((session) => (
-                          <TableHead
-                            key={session.id}
-                            className="min-w-20 whitespace-nowrap text-center"
-                          >
-                            {dayjs(session.sessionDate).format("MMM D")}
-                          </TableHead>
-                        ))}
-                        <TableHead className="min-w-20 text-center">
-                          Total Session
-                        </TableHead>
-                        <TableHead className="min-w-25 text-center">
-                          Condonation
-                        </TableHead>
-                        <TableHead className="min-w-20 text-center">
-                          Present
-                        </TableHead>
-                        <TableHead className="min-w-20 text-center">
-                          Absent
-                        </TableHead>
-                        <TableHead className="min-w-20 text-center">
-                          Percentage %
-                        </TableHead>
-                        <TableHead className="min-w-25 text-center">
-                          Status
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {detailedReportData.students.map((student) => {
-                        const status = getEligibilityStatus(
-                          student.percentage,
-                          student.condonationStatus
-                        );
-                        return (
-                          <TableRow key={student.studentId}>
-                            <TableCell className="bg-background sticky left-0 z-10 font-mono text-sm">
-                              {student.usn}
-                            </TableCell>
-                            <TableCell className="bg-background left-25 sticky z-10 font-medium">
-                              {student.name}
-                            </TableCell>
-                            {student.sessionStatuses.map(
-                              (sessionStatus, idx) => (
-                                <TableCell
-                                  key={idx}
-                                  className={cn(
-                                    "text-center font-medium",
-                                    sessionStatus === "PRESENT"
-                                      ? "text-emerald-600 dark:text-emerald-500"
-                                      : "text-rose-600 dark:text-rose-500"
-                                  )}
-                                >
-                                  {sessionStatus === "PRESENT" ? "P" : "A"}
-                                </TableCell>
-                              )
-                            )}
-                            <TableCell className="text-center font-medium">
-                              {student.totalSessions}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                variant={
-                                  student.condonationStatus === "APPROVED"
-                                    ? "default"
-                                    : student.condonationStatus === "PENDING"
-                                      ? "outline"
-                                      : student.condonationStatus === "REJECTED"
-                                        ? "destructive"
-                                        : "secondary"
-                                }
-                                className="text-xs"
-                              >
-                                {formatCondonationStatus(
-                                  student.condonationStatus
-                                )}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-center font-medium text-emerald-600 dark:text-emerald-500">
-                              {student.presentSessions}
-                            </TableCell>
-                            <TableCell className="text-center font-medium text-rose-600 dark:text-rose-500">
-                              {student.absentSessions}
-                            </TableCell>
-                            <TableCell className="text-center font-medium">
-                              {student.percentage}%
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                variant={
-                                  status === "Eligible"
-                                    ? "default"
-                                    : "destructive"
-                                }
-                                className={cn(
-                                  status === "Eligible" &&
-                                    "border-transparent bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
-                                )}
-                              >
-                                {status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </>
-            ) : isLoadingDetailed ? (
-              <div className="text-muted-foreground min-h-50 flex items-center justify-center gap-2">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Loading detailed report...
-              </div>
-            ) : (
-              <div className="text-muted-foreground min-h-50 flex items-center justify-center">
-                {getDetailedEmptyMessage()}
-              </div>
-            )}
-          </div>
+          <AttendanceDetailedTable
+            detailedReportData={detailedReportData}
+            isLoadingDetailed={isLoadingDetailed}
+            onDownloadDetailedPDF={onDownloadDetailedPDF}
+            onDownloadDetailedExcel={onDownloadDetailedExcel}
+            emptyMessage={getDetailedEmptyMessage()}
+          />
         )}
 
         {activeTab === "percentage" && (
-          <div className="space-y-4">
-            {percentageReportData &&
-            percentageReportData.students.length > 0 ? (
-              <>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onDownloadPercentageExcel}
-                    className="gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download Excel
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onDownloadPercentagePDF}
-                    className="gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download PDF
-                  </Button>
-                </div>
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="bg-background min-w-25 sticky left-0 z-10">
-                          USN
-                        </TableHead>
-                        <TableHead className="bg-background left-25 min-w-37.5 sticky z-10">
-                          Student Name
-                        </TableHead>
-                        <TableHead className="min-w-25 text-center">
-                          Total Sessions
-                        </TableHead>
-                        <TableHead className="min-w-30 text-center">
-                          Condonation
-                        </TableHead>
-                        <TableHead className="min-w-25 text-center">
-                          Present Sessions
-                        </TableHead>
-                        <TableHead className="min-w-25 text-center">
-                          Absent Sessions
-                        </TableHead>
-                        <TableHead className="min-w-25 text-center">
-                          % Percentage
-                        </TableHead>
-                        <TableHead className="min-w-25 text-center">
-                          Status
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {percentageReportData.students.map((student) => {
-                        const status = getEligibilityStatus(
-                          student.percentage,
-                          student.condonationStatus
-                        );
-                        const condonationLabel =
-                          student.condonationStatus === "APPROVED"
-                            ? "Condoned"
-                            : "Not Condoned";
-                        return (
-                          <TableRow key={student.studentId}>
-                            <TableCell className="bg-background sticky left-0 z-10 font-mono text-sm">
-                              {student.usn}
-                            </TableCell>
-                            <TableCell className="bg-background left-25 sticky z-10 font-medium">
-                              {student.name}
-                            </TableCell>
-                            <TableCell className="text-center font-medium">
-                              {student.totalSessions}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                variant={
-                                  student.condonationStatus === "APPROVED"
-                                    ? "default"
-                                    : "secondary"
-                                }
-                                className="text-xs"
-                              >
-                                {condonationLabel}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-center font-medium text-emerald-600 dark:text-emerald-500">
-                              {student.presentSessions}
-                            </TableCell>
-                            <TableCell className="text-center font-medium text-rose-600 dark:text-rose-500">
-                              {student.absentSessions}
-                            </TableCell>
-                            <TableCell className="text-center font-medium">
-                              {student.percentage}%
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge
-                                variant={
-                                  status === "Eligible"
-                                    ? "default"
-                                    : "destructive"
-                                }
-                                className={cn(
-                                  status === "Eligible" &&
-                                    "border-transparent bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
-                                )}
-                              >
-                                {status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </>
-            ) : !percentageReportData ||
-              percentageReportData.students.length === 0 ? (
-              <div className="text-muted-foreground min-h-50 flex items-center justify-center">
-                {getPercentageEmptyMessage()}
-              </div>
-            ) : null}
-          </div>
+          <AttendancePercentageTable
+            percentageReportData={percentageReportData}
+            onDownloadPercentagePDF={onDownloadPercentagePDF}
+            onDownloadPercentageExcel={onDownloadPercentageExcel}
+            emptyMessage={getPercentageEmptyMessage()}
+          />
         )}
       </main>
     </div>

@@ -9,6 +9,7 @@ export type FacultyAttendanceFormState = {
   courseId: string;
   sectionId: string;
   batchId?: string;
+  electiveBatchId?: string;
   timingMode: AttendanceSessionTimingModeType;
   fixedTimingCode: FacultyFixedTimingCodeType | "";
   customStartTime: string;
@@ -20,6 +21,7 @@ export type ListFacultyAttendanceSessionsFilters = {
   courseId?: string;
   sectionId?: string;
   batchId?: string;
+  electiveBatchId?: string;
   page?: number;
   limit?: number;
 };

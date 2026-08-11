@@ -4,6 +4,7 @@ import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
+import { db } from "@webcampus/db";
 import { UUIDType } from "@webcampus/schemas/common";
 import {
   CreateCourseDTO,
@@ -41,7 +42,8 @@ export class CourseController {
       error.message === "Department not found" ||
       error.message === "Ambiguous departmentName mapping" ||
       error.message === "departmentId and departmentName do not match" ||
-      error.message === "departmentId is required"
+      error.message === "departmentId is required" ||
+      error.message === "Course code already exists"
     ) {
       return 400;
     }
@@ -190,10 +192,11 @@ export class CourseController {
       };
       const departmentContext = await getDepartmentRequestContext(req);
 
+      // PERFECTLY ALIGNED SIGNATURE
       const response = await CourseService.getByBranch(
+        semesterId as string,
         departmentContext.departmentId,
         undefined,
-        semesterId,
         cycle,
         departmentContext
       );
@@ -221,6 +224,80 @@ export class CourseController {
     }
   }
 
+  static async getPeCapacitySummary(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { semesterId, cycle } = req.query as {
+        semesterId?: string;
+        cycle?: string;
+      };
+      const departmentContext = await getDepartmentRequestContext(req);
+
+      const response = await CourseService.getPeCapacitySummary(
+        semesterId as string,
+        departmentContext.departmentId,
+        undefined,
+        cycle
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Fetching PE Capacity Summary", error);
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: error instanceof Error ? 400 : 500,
+        error,
+      });
+    }
+  }
+
+  static async getDepartments(req: Request, res: Response): Promise<void> {
+    try {
+      const departments = await db.department.findMany({
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          abbreviation: true,
+        },
+        orderBy: { name: "asc" },
+      });
+
+      sendResponse({
+        res,
+        status: "success",
+        statusCode: 200,
+        message: "Departments fetched successfully",
+        data: departments,
+      });
+    } catch (error) {
+      logger.error("Error fetching departments", error);
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: error instanceof Error ? 400 : 500,
+        error,
+      });
+    }
+  }
+
   static async bulkSubmitForApproval(
     req: Request,
     res: Response
@@ -228,12 +305,12 @@ export class CourseController {
     try {
       const { semesterId, cycle } = req.body;
       const departmentContext = await getDepartmentRequestContext(req);
+
       const response = await CourseService.bulkSubmitForApproval(
         semesterId,
         departmentContext.departmentId,
         undefined,
-        cycle,
-        departmentContext
+        cycle
       );
 
       if (response.status === "success") {
@@ -303,17 +380,17 @@ export class CourseController {
         throw new Error("Unauthorized");
       }
 
-      const role = session.user.role as "admin" | "coe";
-
       const { semesterId, departmentId, departmentName, cycle } = req.body;
+
+      // PERFECTLY ALIGNED SIGNATURE
       const response = await CourseService.approveSemesterCourses(
         semesterId,
         departmentId,
         departmentName,
         cycle,
-        role,
-        session.user.username,
-        session.user.displayUsername
+        session.user.role as "admin" | "coe",
+        session.user.username ?? undefined,
+        session.user.displayUsername ?? undefined
       );
 
       if (response.status === "success") {
@@ -350,17 +427,17 @@ export class CourseController {
         throw new Error("Unauthorized");
       }
 
-      const role = session.user.role as "admin" | "coe";
-
       const { semesterId, departmentId, departmentName, reviewerNotes, cycle } =
         req.body;
+
+      // PERFECTLY ALIGNED SIGNATURE (reviewerNotes is 2nd argument)
       const response = await CourseService.requestRevisionForSemester(
         semesterId,
         departmentId,
         departmentName,
         reviewerNotes,
         cycle,
-        role
+        session.user.role as "admin" | "coe"
       );
 
       if (response.status === "success") {

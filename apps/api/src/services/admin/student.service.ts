@@ -1,13 +1,36 @@
+import { StudentProfileService } from "@webcampus/api/src/services/student/profile.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
   AdminStudentResponseType,
   GetAdminStudentsQueryType,
 } from "@webcampus/schemas/admin";
+import type { UpdateStudentProfileType } from "@webcampus/schemas/student";
 import { BaseResponse } from "@webcampus/types/api";
 import { UserService } from "./user.service";
 
 export class AdminStudentService {
+  static async updateStudentProfile(
+    studentId: string,
+    payload: UpdateStudentProfileType,
+    adminUserId: string
+  ) {
+    const student = await db.student.findUnique({
+      where: { id: studentId },
+      select: { userId: true },
+    });
+
+    if (!student) {
+      throw new Error("Student not found");
+    }
+
+    return StudentProfileService.updateStudentProfile(
+      studentId,
+      payload,
+      adminUserId
+    );
+  }
+
   static async getById(studentId: string): Promise<BaseResponse<unknown>> {
     try {
       await UserService.backfillMissingProfileFields();

@@ -13,8 +13,8 @@
  * bunx tsx apps/api/scripts/backfill-applicant-usernames.ts [--dry-run]
  */
 
-import { db } from "@webcampus/db";
 import { logger } from "@webcampus/common/logger";
+import { db } from "@webcampus/db";
 
 async function backfillApplicantUsernames() {
   const dryRun = process.argv.includes("--dry-run");
@@ -58,7 +58,9 @@ async function backfillApplicantUsernames() {
 
     // Log each user that will be normalized
     for (const user of toNormalize) {
-      logger.info(`  ${user.email}: "${user.username}" → "${user.username?.toLowerCase()}"`);
+      logger.info(
+        `  ${user.email}: "${user.username}" → "${user.username?.toLowerCase()}"`
+      );
     }
 
     if (dryRun) {

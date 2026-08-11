@@ -12,6 +12,7 @@ import {
 } from "@webcampus/schemas/admin";
 import { UUIDType } from "@webcampus/schemas/common";
 import { BaseResponse } from "@webcampus/types/api";
+import { ArchiveService } from "./archive.service";
 
 export class SemesterService {
   private static getSemesterStatus(
@@ -147,11 +148,16 @@ export class SemesterService {
     query: AcademicTermQueryType
   ): Promise<BaseResponse<AcademicTermResponseType[]>> {
     try {
-      const { status, ...whereQuery } = query;
+      const { status, isCurrent, ...whereQuery } = query;
       const now = new Date();
 
       const terms = await db.academicTerm.findMany({
-        where: whereQuery,
+        where: {
+          ...whereQuery,
+          ...(isCurrent !== undefined
+            ? { isCurrent: String(isCurrent) === "true" }
+            : {}),
+        },
         orderBy: { year: "desc" },
         include: { Semester: true },
       });
@@ -183,6 +189,25 @@ export class SemesterService {
           };
         })
         .filter((term) => (status ? term.status === status : true));
+
+      // Auto-archive semesters that have transitioned to ARCHIVED status
+      const archivedSemesterIds = termsWithStatus.flatMap((term) =>
+        (term.Semester || [])
+          .filter((s) => s.status === "ARCHIVED")
+          .map((s) => s.id)
+      );
+
+      if (archivedSemesterIds.length > 0) {
+        // Fire-and-forget: archive in the background without blocking the response
+        ArchiveService.autoArchiveSemesters(archivedSemesterIds).catch(
+          (err) => {
+            logger.error({
+              error: err,
+              message: "Auto-archive background task failed",
+            });
+          }
+        );
+      }
 
       const response: BaseResponse<AcademicTermResponseType[]> = {
         status: "success",

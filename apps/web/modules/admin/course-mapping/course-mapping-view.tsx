@@ -225,7 +225,7 @@ export const AdminCourseMappingView = () => {
       label: "Academic Term",
       type: "select",
       options: terms.map((term) => ({
-        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)}${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
       hideAllOption: true,
@@ -442,7 +442,6 @@ export const AdminCourseMappingView = () => {
               return next;
             });
           }}
-          className="md:grid-cols-2 xl:grid-cols-5"
         />
         <div className="mt-4 flex justify-end">
           <FilterActions
@@ -459,18 +458,17 @@ export const AdminCourseMappingView = () => {
         appliedFilters.semesterId &&
         academicYear && (
           <div className="flex w-full flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <CourseDetailsCard course={selectedCourse} />
+            <CourseDetailsCard course={selectedCourse}>
+              <div className="flex flex-col items-start gap-2 md:items-end">
+                <AuditHistoryDialog courseId={selectedCourse.id} />
                 {selectedCourse.lastOverrideAt && (
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-muted-foreground text-left text-xs md:text-right">
                     Last override:{" "}
                     {new Date(selectedCourse.lastOverrideAt).toLocaleString()}
                   </span>
                 )}
               </div>
-              <AuditHistoryDialog courseId={selectedCourse.id} />
-            </div>
+            </CourseDetailsCard>
 
             <div className="bg-card text-card-foreground w-full overflow-hidden rounded-xl border shadow-sm">
               <div className="p-6">

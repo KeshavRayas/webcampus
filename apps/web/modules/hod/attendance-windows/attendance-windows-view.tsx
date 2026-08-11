@@ -1,6 +1,6 @@
 "use client";
 
-import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
+import { useHODAttendanceFilterOptions } from "@/modules/hod/attendance/use-hod-attendance-report";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -89,11 +89,11 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export const HODAttendanceWindowsView = () => {
   const {
-    data: termsData,
+    data: optionsData,
     isLoading: termsLoading,
     isError: termsError,
-  } = useAcademicTerms({ status: "ACTIVE" });
-  const terms = termsData ?? [];
+  } = useHODAttendanceFilterOptions();
+  const terms = optionsData?.academicTerms ?? [];
 
   const [draftFilters, setDraftFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] =
@@ -103,10 +103,12 @@ export const HODAttendanceWindowsView = () => {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
 
-  const selectedDraftTerm = terms.find(
-    (term) => term.id === draftFilters.academicTermId
-  );
-  const semesterOptions = selectedDraftTerm?.Semester ?? [];
+  const semesterOptions = useMemo(() => {
+    if (!draftFilters.academicTermId) return [];
+    return (optionsData?.semesters ?? []).filter(
+      (semester) => semester.academicTermId === draftFilters.academicTermId
+    );
+  }, [optionsData?.semesters, draftFilters.academicTermId]);
 
   const sectionsEnabled =
     !!draftFilters.academicTermId && !!draftFilters.semesterId;
@@ -365,7 +367,6 @@ export const HODAttendanceWindowsView = () => {
               return { ...current, [key]: value };
             });
           }}
-          className="md:grid-cols-3"
         />
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           <Input

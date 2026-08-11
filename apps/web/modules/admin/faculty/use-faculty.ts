@@ -21,7 +21,9 @@ export const useUpdateFaculty = (departmentId: string) => {
     }) => {
       const formData = new FormData();
       Object.entries(data).forEach(([key, value]) => {
-        formData.append(key, String(value));
+        if (value !== undefined && value !== null) {
+          formData.append(key, String(value));
+        }
       });
 
       if (imageFile) {

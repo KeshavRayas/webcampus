@@ -13,7 +13,7 @@ import {
   Library,
   LifeBuoy,
   Lock,
-  Send,
+  MessageSquareText,
   Settings2,
   Upload,
   User,
@@ -25,14 +25,9 @@ import { NavSecondaryProps, SidebarData } from "./sidebar-types";
 const navSecondary: NavSecondaryProps = {
   items: [
     {
-      title: "Support",
+      title: "Raise an issue",
       url: "/support",
       icon: LifeBuoy,
-    },
-    {
-      title: "Feedback",
-      url: "/feedback",
-      icon: Send,
     },
   ],
 };
@@ -68,6 +63,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Admission Users", url: "/admin/admission-users" },
             { name: "COE Users", url: "/admin/coe" },
+            { name: "Finance Users", url: "/admin/finance" },
           ],
         },
         {
@@ -87,6 +83,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Course Configuration", url: "/admin/courses" },
             { name: "Course Mapping", url: "/admin/course-mapping" },
+            { name: "Elective Mapping", url: "/admin/elective-mapping" },
             { name: "Appoint Coordinators", url: "/admin/course-coordinators" },
             { name: "Course Approvals", url: "/admin/course-approvals" },
             {
@@ -111,19 +108,63 @@ export const sidebarConfig: Record<Role, SidebarData> = {
             {
               name: "Attendance",
               url: "/admin/academics/attendance",
+              children: [
+                {
+                  name: "Attendance Report",
+                  url: "/admin/academics/attendance",
+                },
+                {
+                  name: "Bonus Attendance",
+                  url: "/admin/academics/bonus-attendance",
+                },
+              ],
             },
             {
               name: "Marks",
               url: "/admin/academics/marks",
+              children: [
+                {
+                  name: "Marks Report",
+                  url: "/admin/academics/marks",
+                },
+              ],
             },
             {
               name: "Condonation",
               url: "/admin/academics/condonation",
+              children: [
+                {
+                  name: "Condonation Report",
+                  url: "/admin/academics/condonation",
+                },
+              ],
             },
             {
               name: "Hall Tickets",
               url: "/admin/academics/hall-ticket",
             },
+            {
+              name: "Feedback",
+              url: "/admin/academics/feedback",
+              children: [
+                { name: "Question Presets", url: "/admin/feedback/presets" },
+                { name: "Configure Feedback", url: "/admin/feedback" },
+                {
+                  name: "Feedback Dashboard",
+                  url: "/admin/academics/feedback",
+                },
+              ],
+            },
+          ],
+        },
+        {
+          name: "WhatsApp",
+          url: "/admin/whatsapp/templates",
+          icon: MessageSquareText,
+          children: [
+            { name: "Templates", url: "/admin/whatsapp/templates" },
+            { name: "Send Message", url: "/admin/whatsapp/send" },
+            { name: "Send Reports", url: "/admin/whatsapp/reports" },
           ],
         },
       ],
@@ -149,12 +190,18 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: GraduationCap,
         },
         {
+          name: "Sections",
+          url: "/department/sections",
+          icon: UserSearch,
+        },
+        {
           name: "Courses",
           url: "/department/courses",
           icon: Library,
           children: [
             { name: "Course Configuration", url: "/department/courses" },
             { name: "Course Mapping", url: "/department/course-mapping" },
+            { name: "Elective Mapping", url: "/department/elective-mapping" },
             {
               name: "Appoint Coordinators",
               url: "/department/course-coordinators",
@@ -163,9 +210,13 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           ],
         },
         {
-          name: "Sections",
-          url: "/department/sections",
-          icon: UserSearch,
+          name: "Academics",
+          url: "/department/feedback",
+          icon: GraduationCap,
+          children: [
+            { name: "Feedback", url: "/department/feedback" },
+            { name: "Proctor Mapping", url: "/department/proctor-mapping" },
+          ],
         },
       ],
     },
@@ -186,23 +237,40 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [{ name: "Course Registration", url: "/student/courses" }],
         },
         {
-          name: "Attendance",
+          name: "Academics",
           url: "/student/attendance",
-          icon: Fingerprint,
+          icon: GraduationCap,
           children: [
-            { name: "View Attendance", url: "/student/attendance" },
-            { name: "Attendance Report", url: "/student/attendance/report" },
+            {
+              name: "Attendance",
+              url: "/student/attendance",
+              children: [
+                { name: "View Attendance", url: "/student/attendance" },
+              ],
+            },
+            {
+              name: "Marks",
+              url: "/student/marks",
+              children: [{ name: "View Marks", url: "/student/marks" }],
+            },
+            {
+              name: "Hall Ticket",
+              url: "/student/hall-ticket",
+              children: [
+                { name: "View Hall Ticket", url: "/student/hall-ticket" },
+              ],
+            },
+            {
+              name: "Feedback",
+              url: "/feedback",
+              children: [{ name: "Course/s", url: "/feedback" }],
+            },
+            {
+              name: "Proctor",
+              url: "/student/proctor",
+              children: [{ name: "Proctor Details", url: "/student/proctor" }],
+            },
           ],
-        },
-        {
-          name: "CIE",
-          url: "/student/cie",
-          icon: BookOpenText,
-        },
-        {
-          name: "Hall Ticket",
-          url: "/student/hall-ticket",
-          icon: FileText,
         },
         {
           name: "Profile",
@@ -264,6 +332,15 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/faculty/profile",
           icon: User,
         },
+        {
+          name: "Academics",
+          url: "/faculty/feedback",
+          icon: GraduationCap,
+          children: [
+            { name: "Feedback", url: "/faculty/feedback" },
+            { name: "Proctor", url: "/faculty/proctor" },
+          ],
+        },
       ],
     },
     navSecondary,
@@ -287,37 +364,57 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: GraduationCap,
         },
         {
-          name: "Academics",
-          url: "/hod/academics/freezing",
-          icon: GraduationCap,
+          name: "Freezing",
+          url: "/hod/freezing",
+          icon: Lock,
+        },
+        {
+          name: "Attendance",
+          url: "/hod/attendance/report",
+          icon: Fingerprint,
           children: [
             {
-              name: "Freezing",
-              url: "/hod/academics/freezing",
-            },
-            {
-              name: "Attendance",
-              url: "/hod/academics/attendance",
-            },
-            {
-              name: "Marks",
-              url: "/hod/academics/marks",
-            },
-            {
-              name: "Condonation",
-              url: "/hod/academics/condonation",
+              name: "Attendance Report",
+              url: "/hod/attendance/report",
             },
           ],
         },
         {
-          name: "Reports",
-          url: "/hod/reports",
+          name: "Marks",
+          url: "/hod/marks/report",
           icon: BookOpenText,
+          children: [
+            {
+              name: "Marks Report",
+              url: "/hod/marks/report",
+            },
+          ],
+        },
+        {
+          name: "Condonation",
+          url: "/hod/condonation/approve",
+          icon: FileText,
+          children: [
+            {
+              name: "Approve Condonation",
+              url: "/hod/condonation/approve",
+            },
+            {
+              name: "Condonation Report",
+              url: "/hod/condonation/report",
+            },
+          ],
         },
         {
           name: "Profile",
           url: "/hod/profile",
           icon: User,
+        },
+        {
+          name: "Academics",
+          url: "/hod/feedback",
+          icon: GraduationCap,
+          children: [{ name: "Feedback", url: "/hod/feedback" }],
         },
       ],
     },
@@ -350,6 +447,12 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Profile",
           url: "/coordinator/profile",
           icon: User,
+        },
+        {
+          name: "Academics",
+          url: "/coordinator/feedback",
+          icon: GraduationCap,
+          children: [{ name: "Feedback", url: "/coordinator/feedback" }],
         },
       ],
     },
@@ -387,6 +490,12 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Profile",
           url: "/coe/profile",
           icon: User,
+        },
+        {
+          name: "Academics",
+          url: "/coe/feedback",
+          icon: GraduationCap,
+          children: [{ name: "Feedback", url: "/coe/feedback" }],
         },
       ],
     },

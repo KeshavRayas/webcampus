@@ -12,6 +12,20 @@ ADD COLUMN "lastOverrideById" TEXT,
 ADD COLUMN "overrideCount" INTEGER NOT NULL DEFAULT 0,
 ADD COLUMN "hasPostApprovalEdits" BOOLEAN NOT NULL DEFAULT false;
 
+-- CreateTable: AdminEditLog (pre-ALTER base columns)
+CREATE TABLE "AdminEditLog" (
+    "id" TEXT NOT NULL,
+    "entityId" TEXT NOT NULL,
+    "entityType" "AuditEntityType" NOT NULL,
+    "details" TEXT,
+    "adminUserId" TEXT NOT NULL,
+    "editedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AdminEditLog_pkey" PRIMARY KEY ("id")
+);
+
+ALTER TABLE "AdminEditLog" ADD CONSTRAINT "AdminEditLog_adminUserId_fkey" FOREIGN KEY ("adminUserId") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
 -- AlterTable: AdminEditLog - add structured audit columns (backward-compatible)
 ALTER TABLE "AdminEditLog"
 ADD COLUMN "changeGroupId" TEXT,

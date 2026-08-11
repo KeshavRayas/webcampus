@@ -1,38 +1,48 @@
 import { logger } from "@webcampus/common/logger";
-import { db, EligibilityStatus } from "@webcampus/db";
+import { db, EligibilityStatus, Prisma } from "@webcampus/db";
+import { buildAggregationResultsForStudents } from "./assessment-aggregation.loader";
 
 export async function recomputeStudentMark(
   studentId: string,
-  courseId: string
+  courseId: string,
+  tx?: Prisma.TransactionClient
 ): Promise<void> {
-  const [assessments, course] = await Promise.all([
-    db.studentAssessment.findMany({
-      where: { studentId, courseId },
-      select: { totalMarks: true },
-    }),
-    db.course.findUnique({
-      where: { id: courseId },
-      select: { cumulativeMinMarks: true, code: true },
-    }),
-  ]);
+  const prisma = tx ?? db;
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+    select: { cieEligibility: true, code: true },
+  });
 
   if (!course) {
     logger.warn(`[MarkSync] Course ${courseId} not found — skipping`);
     return;
   }
 
-  const cieTotal = assessments.reduce((sum, a) => sum + a.totalMarks, 0);
-  const status: EligibilityStatus =
-    cieTotal >= course.cumulativeMinMarks ? "ELIGIBLE" : "NOT_ELIGIBLE";
+  const results = await buildAggregationResultsForStudents(
+    courseId,
+    [studentId],
+    tx
+  );
+  const result = results.get(studentId);
 
-  await db.mark.upsert({
+  if (!result) {
+    logger.warn(
+      `[MarkSync] No aggregation result for student=${studentId} course=${course.code} — skipping`
+    );
+    return;
+  }
+
+  const cieTotal = result.cieTotal;
+  const status: EligibilityStatus = result.status;
+
+  await prisma.mark.upsert({
     where: { studentId_courseId: { studentId, courseId } },
     create: { studentId, courseId, cieTotal, status },
     update: { cieTotal, status },
   });
 
   logger.info(
-    `[MarkSync] student=${studentId} course=${course.code} cieTotal=${cieTotal} min=${course.cumulativeMinMarks} status=${status}`
+    `[MarkSync] student=${studentId} course=${course.code} cieTotal=${cieTotal} min=${course.cieEligibility} status=${status}`
   );
 }
 

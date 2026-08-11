@@ -60,6 +60,18 @@ router.get(
 );
 
 router.get(
+  "/pe-capacity-summary",
+  validateRequest(AdminCourseBranchQuerySchema, "query"),
+  protect({
+    role: "admin",
+    permissions: {
+      courses: ["read"],
+    },
+  }),
+  AdminCourseController.getPeCapacitySummary
+);
+
+router.get(
   "/:id",
   validateRequest(AdminCourseByIdQuerySchema, "query"),
   protect({

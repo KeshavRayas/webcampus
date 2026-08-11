@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "@webcampus/ui/lib/utils";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Command,
@@ -15,6 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@webcampus/ui/components/popover";
+import { cn } from "@webcampus/ui/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
 import * as React from "react";
 
@@ -80,7 +80,10 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        align="start"
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -91,9 +94,7 @@ export function Combobox({
                   key={option.value}
                   value={`${option.label} ${option.sublabel ?? ""}`}
                   onSelect={() => {
-                    onValueChange(
-                      option.value === value ? null : option.value
-                    );
+                    onValueChange(option.value === value ? null : option.value);
                     setOpen(false);
                   }}
                 >

@@ -1,31 +1,10 @@
 "use client";
 
-import { Badge } from "@webcampus/ui/components/badge";
-import { Button } from "@webcampus/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@webcampus/ui/components/card";
-import {
-  FilterActions,
-  FilterBuilder,
-  FilterPanel,
-  type FilterFieldConfig,
-} from "@webcampus/ui/components/filter-builder";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@webcampus/ui/components/table";
+import { MarksReportShell } from "@/modules/faculty/marks-report/marks-report-shell";
+import type { MarksReportFilters } from "@/modules/faculty/marks-report/marks-report-types";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Download, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import {
   useHODMarksAssessments,
@@ -33,292 +12,405 @@ import {
   useHODMarksFilterOptions,
   useHODMarksReportData,
   useHODMarksSections,
-  type Assessment,
 } from "./use-hod-marks-report";
 
-type MarksFilterState = {
-  academicTermId: string;
-  semesterId: string;
-  courseId: string;
-  sectionId: string;
+const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
+const BASIC_SCIENCES_CYCLE_OPTIONS = ["PHYSICS", "CHEMISTRY"] as const;
+const ALL_ASSESSMENTS_VALUE = "__all__";
+
+type HODMarksReportFilters = MarksReportFilters & {
   cycle: string;
+  assessmentId: string;
 };
 
-const EMPTY_FILTERS: MarksFilterState = {
+const EMPTY_FILTERS: HODMarksReportFilters = {
   academicTermId: "",
+  programType: "",
   semesterId: "",
   courseId: "",
   sectionId: "",
   cycle: "",
+  assessmentId: ALL_ASSESSMENTS_VALUE,
 };
 
-export const HODMarksReportView = () => {
-  const [draftFilters, setDraftFilters] =
-    useState<MarksFilterState>(EMPTY_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<MarksFilterState | null>(
-    null
+const hasRequiredFilters = (filters: HODMarksReportFilters) =>
+  Boolean(
+    filters.academicTermId &&
+      filters.programType &&
+      filters.semesterId &&
+      filters.courseId &&
+      filters.sectionId
   );
 
-  const [selectedAssessment, setSelectedAssessment] =
-    useState<Assessment | null>(null);
+const downloadCSV = (filename: string, rows: string[][]) => {
+  const csvContent = rows
+    .map((row) => row.map((cell) => `"${cell}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 
-  // Fetch Options
+export const HodMarksReportView = () => {
+  const [draftFilters, setDraftFilters] =
+    useState<HODMarksReportFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] =
+    useState<HODMarksReportFilters>(EMPTY_FILTERS);
+  const [hasRunReport, setHasRunReport] = useState(false);
+  const [filtersChangedAfterRun, setFiltersChangedAfterRun] = useState(false);
+
   const { data: optionsData } = useHODMarksFilterOptions();
   const isBasicSciences = optionsData?.departmentType === "BASIC_SCIENCES";
 
+  const semestersForTerm = useMemo(() => {
+    if (!draftFilters.academicTermId) return [];
+    return (optionsData?.semesters ?? []).filter(
+      (semester) => semester.academicTermId === draftFilters.academicTermId
+    );
+  }, [optionsData?.semesters, draftFilters.academicTermId]);
+
+  const filteredSemesters = useMemo(() => {
+    if (!draftFilters.programType) return semestersForTerm;
+    return semestersForTerm.filter(
+      (semester) => semester.programType === draftFilters.programType
+    );
+  }, [draftFilters.programType, semestersForTerm]);
+
+  const selectedDraftSemester = filteredSemesters.find(
+    (semester) => semester.id === draftFilters.semesterId
+  );
+  const isSemesterOneOrTwo =
+    !!selectedDraftSemester &&
+    FIRST_YEAR_UG_SEMESTERS.has(selectedDraftSemester.semesterNumber);
+
   const { data: courses = [] } = useHODMarksCourses(
     draftFilters.semesterId,
-    draftFilters.cycle
+    isBasicSciences && isSemesterOneOrTwo ? draftFilters.cycle : ""
   );
   const { data: sections = [] } = useHODMarksSections(
     draftFilters.semesterId,
     draftFilters.courseId,
-    draftFilters.cycle
+    isBasicSciences && isSemesterOneOrTwo ? draftFilters.cycle : ""
   );
-  const { data: assessments = [], isLoading: loadingAssessments } =
-    useHODMarksAssessments(appliedFilters?.courseId || "");
-  const { data: reportData = [], isLoading: loadingReport } =
-    useHODMarksReportData(
-      appliedFilters?.sectionId || "",
-      selectedAssessment?.id || ""
+  const { data: assessments = [] } = useHODMarksAssessments(
+    draftFilters.courseId
+  );
+
+  const hasRequiredDraftFilters = useMemo(
+    () => hasRequiredFilters(draftFilters),
+    [draftFilters]
+  );
+  const hasRequiredAppliedFilters = useMemo(
+    () => hasRequiredFilters(appliedFilters),
+    [appliedFilters]
+  );
+
+  const shouldShowReportResults =
+    hasRunReport && !filtersChangedAfterRun && hasRequiredAppliedFilters;
+
+  const {
+    data: reportData,
+    isFetching: isLoadingReport,
+    isError: isErrorReport,
+    error: errorReport,
+  } = useHODMarksReportData(
+    shouldShowReportResults
+      ? {
+          courseId: appliedFilters.courseId,
+          sectionId: appliedFilters.sectionId,
+          assessmentId:
+            appliedFilters.assessmentId &&
+            appliedFilters.assessmentId !== ALL_ASSESSMENTS_VALUE
+              ? appliedFilters.assessmentId
+              : undefined,
+        }
+      : null,
+    shouldShowReportResults
+  );
+
+  useEffect(() => {
+    if (!isErrorReport) return;
+    toast.error(
+      errorReport instanceof Error
+        ? errorReport.message
+        : "Failed to load marks report"
     );
+  }, [isErrorReport, errorReport]);
 
-  const filterFields: FilterFieldConfig<typeof EMPTY_FILTERS>[] = [
-    {
-      key: "academicTermId",
-      label: "Academic Term",
-      type: "select",
-      hideAllOption: true,
-       
-      options:
-        optionsData?.academicTerms.map((t) => ({
-          label: `${t.type.charAt(0).toUpperCase() + t.type.slice(1)} ${t.year}`,
-          value: t.id,
-        })) || [],
-    },
-    {
-      key: "semesterId",
-      label: "Semester",
-      type: "select",
-      hideAllOption: true,
-      options:
-        optionsData?.semesters.map((s) => ({
-          label: `Semester ${s.semesterNumber}`,
-          value: s.id,
-        })) || [],
-    },
-    ...(isBasicSciences
-      ? [
-          {
-            key: "cycle",
-            label: "Cycle",
-            type: "select",
-            hideAllOption: true,
-            options: [
-              { label: "PHYSICS", value: "PHYSICS" },
-              { label: "CHEMISTRY", value: "CHEMISTRY" },
-            ],
-          } as FilterFieldConfig<typeof EMPTY_FILTERS>,
-        ]
-      : []),
-    {
-      key: "courseId",
-      label: "Course",
-      type: "select",
-      hideAllOption: true,
-      options: courses.map((c) => ({
-        label: `${c.code} - ${c.name}`,
-        value: c.id,
+  const academicTerms = useMemo(
+    () =>
+      (optionsData?.academicTerms ?? []).map((term) => ({
+        value: term.id,
+        label: `${term.type.toUpperCase()} ${term.year}`,
       })),
-    },
-    {
-      key: "sectionId",
-      label: "Section",
-      type: "select",
-      hideAllOption: true,
-       
-      options: sections.map((s) => ({ label: s.name, value: s.id })),
-    },
-  ];
+    [optionsData?.academicTerms]
+  );
 
-  const handleApply = () => {
-    setAppliedFilters(draftFilters);
-    setSelectedAssessment(null);
-  };
+  const semesterOptions = useMemo(
+    () =>
+      filteredSemesters.map((semester) => ({
+        value: semester.id,
+        label: `Semester ${semester.semesterNumber} (${semester.programType})`,
+      })),
+    [filteredSemesters]
+  );
 
-  const handleReset = () => {
+  const courseOptions = useMemo(
+    () =>
+      courses.map((course) => ({
+        value: course.id,
+        label: `${course.code} - ${course.name}`,
+      })),
+    [courses]
+  );
+
+  const sectionOptions = useMemo(
+    () =>
+      sections.map((section) => ({
+        value: section.id,
+        label: section.name,
+      })),
+    [sections]
+  );
+
+  const updateDraftFilter = useCallback(
+    (key: string, value: string) => {
+      setDraftFilters((current) => {
+        const updated: HODMarksReportFilters = { ...current, [key]: value };
+        if (key === "academicTermId") {
+          updated.programType = "";
+          updated.semesterId = "";
+          updated.courseId = "";
+          updated.sectionId = "";
+          updated.cycle = "";
+          updated.assessmentId = ALL_ASSESSMENTS_VALUE;
+        } else if (key === "programType") {
+          updated.semesterId = "";
+          updated.courseId = "";
+          updated.sectionId = "";
+          updated.cycle = "";
+          updated.assessmentId = ALL_ASSESSMENTS_VALUE;
+        } else if (key === "semesterId") {
+          updated.courseId = "";
+          updated.sectionId = "";
+          updated.cycle = "";
+          updated.assessmentId = ALL_ASSESSMENTS_VALUE;
+        } else if (key === "cycle") {
+          updated.courseId = "";
+          updated.sectionId = "";
+          updated.assessmentId = ALL_ASSESSMENTS_VALUE;
+        } else if (key === "courseId") {
+          updated.sectionId = "";
+          updated.assessmentId = ALL_ASSESSMENTS_VALUE;
+        }
+        return updated;
+      });
+
+      if (hasRunReport) setFiltersChangedAfterRun(true);
+    },
+    [hasRunReport]
+  );
+
+  const onGetReport = useCallback(() => {
+    if (!hasRequiredDraftFilters) {
+      toast.error("Please select all filters");
+      return;
+    }
+    const nextFilters = {
+      ...draftFilters,
+      cycle:
+        isBasicSciences && isSemesterOneOrTwo
+          ? draftFilters.cycle || BASIC_SCIENCES_CYCLE_OPTIONS[0]
+          : "",
+    };
+    setDraftFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+    setHasRunReport(true);
+    setFiltersChangedAfterRun(false);
+  }, [
+    draftFilters,
+    hasRequiredDraftFilters,
+    isBasicSciences,
+    isSemesterOneOrTwo,
+  ]);
+
+  const onResetFilters = useCallback(() => {
     setDraftFilters(EMPTY_FILTERS);
-    setAppliedFilters(null);
-    setSelectedAssessment(null);
-  };
+    setAppliedFilters(EMPTY_FILTERS);
+    setHasRunReport(false);
+    setFiltersChangedAfterRun(false);
+  }, []);
 
-  const handleDownloadPDF = () => {
-    if (!reportData || !selectedAssessment) return;
-    const doc = new jsPDF("p", "pt", "a4");
+  const getHeaderMetadata = useCallback(() => {
+    if (!reportData) return [];
+    return [
+      `Course: ${reportData.course.code} - ${reportData.course.name}`,
+      `Semester: ${reportData.semester.semesterNumber}`,
+      `Academic Term: ${reportData.semester.academicTerm.type} ${reportData.semester.academicTerm.year}`,
+      `Min Required CIE: ${reportData.course.cieMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
+    ];
+  }, [reportData]);
+
+  const handleDownloadPDF = useCallback(() => {
+    if (!reportData || !reportData.students.length) return;
+    const doc = new jsPDF({ orientation: "landscape" });
+    const metadata = getHeaderMetadata();
 
     doc.setFontSize(16);
-    doc.text(`Marks Report - ${selectedAssessment.title}`, 40, 40);
+    doc.text("Marks Report", 14, 15);
     doc.setFontSize(10);
-    const course = courses.find((c) => c.id === appliedFilters?.courseId);
-    doc.text(
-      `Course: ${course?.code} | Max Marks: ${selectedAssessment.totalMarks}`,
-      40,
-      60
-    );
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 22);
 
-    const body = reportData.map((r) => [
-      r.usn,
-      r.name,
-      r.marksObtained !== null ? r.marksObtained : "-",
-      selectedAssessment.totalMarks,
+    let yPos = 30;
+    metadata.forEach((text) => {
+      doc.text(text, 14, yPos);
+      yPos += 6;
+    });
+
+    const assessmentHeaders = reportData.assessments.map(
+      (assessment) => assessment.title
+    );
+    const headers = [
+      "USN",
+      "Student Name",
+      ...assessmentHeaders,
+      "Total CIE",
+      "Min Required",
+      "Status",
+    ];
+
+    const rows = reportData.students.map((student) => [
+      student.usn,
+      student.name,
+      ...reportData.assessments.map((assessment) => {
+        const score = student.assessments.find(
+          (entry) => entry.assessmentId === assessment.id
+        );
+        return score?.totalMarks != null
+          ? `${score.totalMarks}/${assessment.totalMarks}`
+          : "-";
+      }),
+      student.cieTotal != null ? student.cieTotal.toString() : "-",
+      `${reportData.course.cieMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
+      student.status === "ELIGIBLE" ? "Eligible" : "Not Eligible",
     ]);
 
     autoTable(doc, {
-      head: [["USN", "Name", "Marks Obtained", "Total Marks"]],
-      body,
-      startY: 80,
-      headStyles: { fillColor: [41, 128, 185] },
+      head: [headers],
+      body: rows,
+      startY: yPos + 4,
+      styles: { fontSize: 7, cellPadding: 2 },
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        fontStyle: "bold",
+      },
+      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 35 } },
+      didParseCell(data) {
+        if (
+          data.section === "body" &&
+          data.column.index === headers.length - 1
+        ) {
+          data.cell.styles.textColor =
+            data.cell.raw === "Eligible" ? [39, 174, 96] : [192, 57, 43];
+          if (data.cell.raw === "Eligible") data.cell.styles.fontStyle = "bold";
+        }
+      },
     });
-    doc.save(`Marks_${course?.code}_${selectedAssessment.title}.pdf`);
-    toast.success("PDF downloaded successfully");
-  };
 
-  const handleDownloadExcel = () => {
-    toast.info("Excel download starting...");
-  };
+    doc.save("marks-report.pdf");
+  }, [reportData, getHeaderMetadata]);
+
+  const handleDownloadExcel = useCallback(() => {
+    if (!reportData || !reportData.students.length) return;
+    const metadata = getHeaderMetadata();
+
+    const assessmentHeaders = reportData.assessments.map(
+      (assessment) => `${assessment.title} (/${assessment.totalMarks})`
+    );
+    const headers = [
+      "USN",
+      "Student Name",
+      ...assessmentHeaders,
+      "Total CIE",
+      "Min Required",
+      "Status",
+    ];
+
+    const rows = reportData.students.map((student) => [
+      student.usn,
+      student.name,
+      ...reportData.assessments.map((assessment) => {
+        const score = student.assessments.find(
+          (entry) => entry.assessmentId === assessment.id
+        );
+        return score?.totalMarks != null ? score.totalMarks.toString() : "-";
+      }),
+      student.cieTotal != null ? student.cieTotal.toString() : "-",
+      `${reportData.course.cieMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
+      student.status === "ELIGIBLE" ? "Eligible" : "Not Eligible",
+    ]);
+
+    downloadCSV("marks-report.csv", [
+      ["Marks Report"],
+      [`Generated: ${new Date().toLocaleDateString()}`],
+      [],
+      ...metadata.map((item) => [item]),
+      [],
+      headers,
+      ...rows,
+    ]);
+  }, [reportData, getHeaderMetadata]);
+
+  const cycleOptions = useMemo(
+    () =>
+      BASIC_SCIENCES_CYCLE_OPTIONS.map((cycle) => ({
+        value: cycle,
+        label: cycle,
+      })),
+    []
+  );
+
+  const assessmentOptions = useMemo(
+    () =>
+      assessments.map((assessment) => ({
+        value: assessment.id,
+        label: assessment.title,
+      })),
+    [assessments]
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold tracking-tight">HOD Marks Reports</h2>
-        <p className="text-muted-foreground text-sm">
-          View and download assessment marks across your department.
-        </p>
-      </div>
-
-      <FilterPanel>
-        <FilterBuilder
-          fields={filterFields}
-          draftFilters={draftFilters}
-          onDraftChange={(key, value) => {
-            setDraftFilters((prev) => {
-              const next = { ...prev, [key]: value };
-              if (key === "semesterId" || key === "cycle") {
-                next.courseId = "";
-                next.sectionId = "";
-              } else if (key === "courseId") {
-                next.sectionId = "";
-              }
-              return next;
-            });
-          }}
-          className="md:grid-cols-2 lg:grid-cols-3"
-        />
-        <FilterActions onApply={handleApply} onReset={handleReset} />
-      </FilterPanel>
-
-      {appliedFilters && !selectedAssessment && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Select an Assessment</h3>
-          {loadingAssessments ? (
-            <div className="text-muted-foreground flex items-center gap-2">
-              <Loader2 className="animate-spin" /> Loading assessments...
-            </div>
-          ) : assessments.length === 0 ? (
-            <div className="text-muted-foreground rounded-md border p-8 text-center">
-              No assessments found for this course.
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              { }
-              {assessments.map((a) => (
-                <Card
-                  key={a.id}
-                  className="hover:border-primary cursor-pointer transition-colors"
-                  onClick={() => setSelectedAssessment(a)}
-                >
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">{a.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-muted-foreground text-sm">
-                    Max Marks: {a.totalMarks}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {selectedAssessment && (
-        <div className="space-y-4 rounded-lg border p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold">
-                {selectedAssessment.title} Results
-              </h3>
-              <p className="text-muted-foreground text-sm">
-                Max Marks: {selectedAssessment.totalMarks}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setSelectedAssessment(null)}
-              >
-                Back to Assessments
-              </Button>
-              <Button variant="outline" onClick={handleDownloadPDF}>
-                <Download className="mr-2 h-4 w-4" /> PDF
-              </Button>
-              <Button variant="outline" onClick={handleDownloadExcel}>
-                <Download className="mr-2 h-4 w-4" /> Excel
-              </Button>
-            </div>
-          </div>
-
-          {loadingReport ? (
-            <div className="flex justify-center p-8">
-              <Loader2 className="text-muted-foreground animate-spin" />
-            </div>
-          ) : reportData.length === 0 ? (
-            <div className="text-muted-foreground p-8 text-center">
-              No marks recorded for this section.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>USN</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="text-right">Marks Obtained</TableHead>
-                    <TableHead className="text-right">Max Marks</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reportData.map((r) => (
-                    <TableRow key={r.studentId}>
-                      <TableCell className="font-mono">{r.usn}</TableCell>
-                      <TableCell>{r.name}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {r.marksObtained !== null ? (
-                          r.marksObtained
-                        ) : (
-                          <Badge variant="secondary">N/A</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-right">
-                        {selectedAssessment.totalMarks}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <MarksReportShell
+      draftFilters={draftFilters}
+      onDraftChange={updateDraftFilter}
+      academicTerms={academicTerms}
+      programTypes={[
+        { value: "UG", label: "UG" },
+        { value: "PG", label: "PG" },
+      ]}
+      semesters={semesterOptions}
+      courses={courseOptions}
+      sections={sectionOptions}
+      hasRequiredFilters={hasRequiredDraftFilters}
+      hasRunReport={hasRunReport}
+      filtersChangedAfterRun={filtersChangedAfterRun}
+      reportData={reportData}
+      isLoading={isLoadingReport}
+      onGetReport={onGetReport}
+      onResetFilters={onResetFilters}
+      onDownloadPDF={handleDownloadPDF}
+      onDownloadExcel={handleDownloadExcel}
+      showCycleFilter={isBasicSciences && isSemesterOneOrTwo}
+      cycleOptions={cycleOptions}
+      showAssessmentFilter={assessments.length > 0}
+      assessmentOptions={assessmentOptions}
+    />
   );
 };

@@ -19,14 +19,16 @@ export type AuditLogEntry = {
     | "COURSE_ASSIGNMENT"
     | "COORDINATOR"
     | "BATCH"
-    | "ASSESSMENT";
+    | "ASSESSMENT"
+    | "STUDENT_PROFILE";
   entityId: string;
-  courseId: string;
+  courseId?: string;
   action:
     | "SUPER_EDIT"
     | "UPSERT_MAPPING"
     | "DELETE_MAPPING"
-    | "UPDATE_COORDINATOR";
+    | "UPDATE_COORDINATOR"
+    | "UPDATE_STUDENT_PROFILE";
 };
 
 export type FieldChange = {
@@ -279,4 +281,36 @@ export async function checkAndIncrementOptimisticVersion(
   });
 
   return updated!.version;
+}
+
+export async function checkAndIncrementElectiveMappingVersion(
+  courseId: string,
+  clientVersion: number,
+  tx?: Tx
+): Promise<number> {
+  const client = tx ?? db;
+
+  const result = await client.course.updateMany({
+    where: {
+      id: courseId,
+      electiveMappingVersion: clientVersion,
+    },
+    data: {
+      electiveMappingVersion: { increment: 1 },
+    },
+  });
+
+  if (result.count === 0) {
+    const current = await client.course.findUnique({
+      where: { id: courseId },
+      select: { electiveMappingVersion: true },
+    });
+
+    throw new OptimisticLockError(
+      "Course mapping has been modified by another user. Please refresh.",
+      current?.electiveMappingVersion ?? clientVersion
+    );
+  }
+
+  return clientVersion + 1;
 }

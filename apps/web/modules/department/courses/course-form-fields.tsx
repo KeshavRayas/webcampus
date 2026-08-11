@@ -1,6 +1,13 @@
 "use client";
 
-import { CreateCourseDTO } from "@webcampus/schemas/department";
+import { useQuery } from "@tanstack/react-query";
+import { frontendEnv } from "@webcampus/common/env";
+import {
+  CreateCourseDTO,
+  CreateCourseSchema,
+} from "@webcampus/schemas/department";
+import { BaseResponse } from "@webcampus/types/api";
+import { Checkbox } from "@webcampus/ui/components/checkbox";
 import {
   FormControl,
   FormField,
@@ -9,23 +16,32 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import { Combobox } from "@webcampus/ui/molecules/combobox";
+import { Combobox, ComboboxOption } from "@webcampus/ui/molecules/combobox";
+import { MultiCombobox } from "@webcampus/ui/molecules/multi-combobox";
+import axios from "axios";
 import React, { useEffect, useRef } from "react";
 import { UseFormReturn, useWatch } from "react-hook-form";
+import { z } from "zod";
 
-const COURSE_MODE_OPTIONS = [
+const COURSE_MODE_OPTIONS: ComboboxOption[] = [
   { value: "INTEGRATED", label: "Integrated" },
   { value: "NON_INTEGRATED", label: "Non-Integrated" },
   { value: "FINAL_SUMMARY", label: "Final Summary" },
   { value: "NCMC", label: "NCMC" },
-] as const;
+];
 
-const COURSE_TYPE_OPTIONS = [
+const COURSE_TYPE_OPTIONS: ComboboxOption[] = [
   { value: "PC", label: "Professional Core (PC)" },
   { value: "PE", label: "Professional Elective (PE)" },
   { value: "OE", label: "Open Elective (OE)" },
   { value: "NCMC", label: "Non-Credit Mandatory (NCMC)" },
-] as const;
+];
+
+const OPEN_ELECTIVE_ELIGIBILITY_OPTIONS: ComboboxOption[] = [
+  { value: "ALL", label: "All departments" },
+  { value: "ALL_EXCEPT_OWNER", label: "All except my department" },
+  { value: "CUSTOM", label: "Custom selection" },
+];
 
 type NumericCourseField = Exclude<
   {
@@ -41,113 +57,57 @@ type ModeRule = {
 
 const MODE_RULES: Partial<Record<CreateCourseDTO["courseMode"], ModeRule>> = {
   INTEGRATED: {
-    preset: {
-      tutorialCredits: 0,
-      skillCredits: 0,
-      noOfAssignments: 1,
-      seeMaxMarks: 100,
-      seeMinMarks: 35,
-      seeWeightage: 50,
-      maxNoOfCies: 3,
-      minNoOfCies: 2,
-      cieMaxMarks: 40,
-      cieMinMarks: 0,
-      cieWeightage: 50,
-      assignmentMaxMarks: 5,
-      labMaxMarks: 25,
-      labMinMarks: 10,
-      labWeightage: 0,
-      cumulativeMaxMarks: 100,
-      cumulativeMinMarks: 40,
-    },
-    helperText:
-      "Integrated: Internal 50 (CIE 40×50% avg best 2/3 = 20 + AAT 5 + Lab 25) + SEE 50 (100×50% weightage, min 35). Pass if cumulative ≥ 40.",
+    preset: { tutorialCredits: 0, skillCredits: 0 },
+    helperText: "Integrated Course Configuration.",
   },
   NON_INTEGRATED: {
     preset: {
       tutorialCredits: 0,
       practicalCredits: 0,
       skillCredits: 0,
-      noOfAssignments: 1,
-      seeMaxMarks: 100,
-      seeMinMarks: 35,
-      seeWeightage: 50,
-      maxNoOfCies: 3,
-      minNoOfCies: 2,
-      cieMaxMarks: 40,
-      cieMinMarks: 0,
-      cieWeightage: 100,
-      assignmentMaxMarks: 10,
       labMaxMarks: 0,
-      labMinMarks: 0,
-      labWeightage: 0,
-      cumulativeMaxMarks: 100,
-      cumulativeMinMarks: 40,
+      labEligibility: 0,
     },
-    helperText:
-      "Non-Integrated: Internal 50 (CIE 40×100% avg best 2/3 = 40 + AAT 10) + SEE 50 (100×50% weightage, min 35). Pass if cumulative ≥ 40.",
+    helperText: "Non-Integrated Course Configuration.",
   },
   FINAL_SUMMARY: {
     preset: {
-      tutorialCredits: 0,
-      practicalCredits: 0,
-      skillCredits: 0,
-      seeMaxMarks: 100,
-      seeMinMarks: 35,
-      seeWeightage: 50,
-      maxNoOfCies: 3,
-      minNoOfCies: 2,
-      cieMaxMarks: 50,
-      cieMinMarks: 20,
-      cieWeightage: 100,
-      noOfAssignments: 0,
-      assignmentMaxMarks: 0,
       labMaxMarks: 0,
-      labMinMarks: 0,
-      labWeightage: 0,
-      cumulativeMaxMarks: 100,
-      cumulativeMinMarks: 40,
+      labEligibility: 0,
+      aatMaxMarks: 0,
+      aatEligibility: 0,
     },
-    helperText:
-      "Final Summary: Internal 50 (CIE best 2/3 with max 50, min 20, 100% weightage) + SEE 50 (100×50% weightage, min 35). Pass if cumulative ≥ 40.",
+    helperText: "Final Summary Mode.",
   },
   NCMC: {
     preset: {
+      lectureCredits: 0,
       tutorialCredits: 0,
       practicalCredits: 0,
       skillCredits: 0,
       seeMaxMarks: 0,
-      seeMinMarks: 0,
-      seeWeightage: 0,
-      maxNoOfCies: 0,
-      minNoOfCies: 0,
-      cieMaxMarks: 0,
-      cieMinMarks: 0,
-      cieWeightage: 0,
-      noOfAssignments: 0,
-      assignmentMaxMarks: 0,
+      seeEligibility: 0,
       labMaxMarks: 0,
-      labMinMarks: 0,
-      labWeightage: 0,
-      cumulativeMaxMarks: 100,
-      cumulativeMinMarks: 40,
+      labEligibility: 0,
+      aatMaxMarks: 0,
+      aatEligibility: 0,
     },
-    helperText:
-      "NCMC: Marks are interpreted as PP when score is 40 or above, otherwise NP.",
+    helperText: "Non-Credit Mandatory Course.",
   },
 };
 
-/** Reusable number input form field */
 const NumberField = ({
   form,
   name,
   label,
   disabled = false,
+  placeholder = "0",
 }: {
   form: UseFormReturn<CreateCourseDTO>;
   name: keyof CreateCourseDTO;
   label: string;
   disabled?: boolean;
+  placeholder?: string;
 }) => (
   <FormField
     control={form.control}
@@ -159,12 +119,18 @@ const NumberField = ({
           <Input
             type="number"
             min="0"
-            placeholder="0"
+            placeholder={placeholder}
             disabled={disabled}
             className={disabled ? "bg-muted text-muted-foreground" : undefined}
             {...field}
-            value={field.value as number}
-            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+            value={(field.value as number) ?? ""}
+            onChange={(e) =>
+              field.onChange(
+                e.target.value === ""
+                  ? undefined
+                  : parseInt(e.target.value) || 0
+              )
+            }
           />
         </FormControl>
         <FormMessage />
@@ -173,7 +139,34 @@ const NumberField = ({
   />
 );
 
-/** Outlined section wrapper with a title */
+const CheckboxField = ({
+  form,
+  name,
+  label,
+}: {
+  form: UseFormReturn<CreateCourseDTO>;
+  name: keyof CreateCourseDTO;
+  label: string;
+}) => (
+  <FormField
+    control={form.control}
+    name={name}
+    render={({ field }) => (
+      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+        <FormControl>
+          <Checkbox
+            checked={field.value as boolean}
+            onCheckedChange={field.onChange}
+          />
+        </FormControl>
+        <div className="space-y-1 leading-none">
+          <FormLabel>{label}</FormLabel>
+        </div>
+      </FormItem>
+    )}
+  />
+);
+
 const FormSection = ({
   title,
   children,
@@ -189,78 +182,112 @@ const FormSection = ({
   </fieldset>
 );
 
-interface CourseFormFieldsProps {
-  form: UseFormReturn<CreateCourseDTO>;
-}
-
-/**
- * Shared form field layout for Create and Edit course forms.
- * Renders the 3-section grid: Basic Info, Credits (L-T-P-S), Assessment Rubric.
- */
-export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
-  const courseMode = useWatch({
+export const CourseFormFields = ({
+  form,
+  existingElectiveBatches,
+  apiPath = "department",
+}: {
+  form: UseFormReturn<z.infer<typeof CreateCourseSchema>>;
+  existingElectiveBatches?: {
+    id: string;
+    name: string;
+    studentCount: number;
+  }[];
+  apiPath?: "department" | "admin";
+}) => {
+  const courseMode = useWatch({ control: form.control, name: "courseMode" });
+  const courseType = useWatch({ control: form.control, name: "courseType" });
+  const numberOfBatches = useWatch({
     control: form.control,
-    name: "courseMode",
+    name: "numberOfBatches",
+  });
+  const semesterId = useWatch({ control: form.control, name: "semesterId" });
+  const cycle = useWatch({ control: form.control, name: "cycle" });
+  const departmentId = useWatch({
+    control: form.control,
+    name: "departmentId",
+  });
+  const isPe = courseType === "PE";
+  const isOe = courseType === "OE";
+  const openElectiveEligibility = useWatch({
+    control: form.control,
+    name: "openElectiveEligibility",
   });
 
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const { data: departments = [] } = useQuery({
+    queryKey: ["course-form-departments", apiPath],
+    queryFn: async () => {
+      const res = await axios.get<
+        BaseResponse<{ id: string; name: string; code: string }[]>
+      >(
+        `${NEXT_PUBLIC_API_BASE_URL}/${
+          apiPath === "admin"
+            ? "admin/department"
+            : "department/course/departments"
+        }`,
+        { withCredentials: true }
+      );
+      if (res.data.status === "success") return res.data.data ?? [];
+      return [];
+    },
+    enabled: isOe && openElectiveEligibility === "CUSTOM",
+  });
+  const { data: capacitySummary } = useQuery({
+    queryKey: [
+      "pe-capacity-summary",
+      apiPath,
+      semesterId,
+      cycle || "NONE",
+      departmentId ?? "",
+    ],
+    queryFn: async () => {
+      const res = await axios.get<
+        BaseResponse<{
+          eligibleStudents: number;
+          configuredCapacity: number;
+          remainingSeats: number;
+        }>
+      >(`${NEXT_PUBLIC_API_BASE_URL}/${apiPath}/course/pe-capacity-summary`, {
+        params: {
+          semesterId,
+          ...(cycle && cycle !== "NONE" ? { cycle } : {}),
+          ...(apiPath === "admin" && departmentId ? { departmentId } : {}),
+        },
+        withCredentials: true,
+      });
+      if (res.data.status === "success") return res.data.data;
+      return null;
+    },
+    enabled: isPe && !!semesterId,
+  });
   const isModeInitialMount = useRef(true);
-  const originalFormSnapshot = useRef<Partial<
-    Record<NumericCourseField, number>
-  > | null>(null);
-  const originalCourseMode = useRef<string | null>(null);
+  const existingBatchCount = existingElectiveBatches?.length ?? 0;
+  const isDecreasingBatches =
+    isPe &&
+    existingBatchCount > 0 &&
+    typeof numberOfBatches === "number" &&
+    numberOfBatches < existingBatchCount;
+  const requiredRemovals = isDecreasingBatches
+    ? existingBatchCount - (numberOfBatches as number)
+    : 0;
+
+  useEffect(() => {
+    if (!isDecreasingBatches) {
+      if (form.getValues("electiveBatchesToRemove")?.length) {
+        form.setValue("electiveBatchesToRemove", undefined);
+      }
+    }
+  }, [isDecreasingBatches, form]);
 
   useEffect(() => {
     if (isModeInitialMount.current) {
       isModeInitialMount.current = false;
-      if (courseMode) {
-        originalCourseMode.current = courseMode;
-        const snapshot: Partial<Record<NumericCourseField, number>> = {};
-        const fields: NumericCourseField[] = [
-          "lectureCredits",
-          "tutorialCredits",
-          "practicalCredits",
-          "skillCredits",
-          "seeMaxMarks",
-          "seeMinMarks",
-          "seeWeightage",
-          "maxNoOfCies",
-          "minNoOfCies",
-          "cieMaxMarks",
-          "cieMinMarks",
-          "cieWeightage",
-          "noOfAssignments",
-          "assignmentMaxMarks",
-          "labMaxMarks",
-          "labMinMarks",
-          "labWeightage",
-          "cumulativeMaxMarks",
-          "cumulativeMinMarks",
-        ];
-        fields.forEach((f) => {
-          snapshot[f] = form.getValues(f);
-        });
-        originalFormSnapshot.current = snapshot;
-      }
       return;
     }
-
     if (!courseMode) return;
 
-    if (
-      originalCourseMode.current &&
-      courseMode === originalCourseMode.current &&
-      originalFormSnapshot.current
-    ) {
-      Object.entries(originalFormSnapshot.current).forEach(([field, value]) => {
-        form.setValue(field as NumericCourseField, value ?? 0, {
-          shouldDirty: true,
-          shouldValidate: true,
-        });
-      });
-      return;
-    }
-
-    const modeRule = MODE_RULES[courseMode];
+    const modeRule = MODE_RULES[courseMode as keyof typeof MODE_RULES];
     if (!modeRule) return;
 
     Object.entries(modeRule.preset).forEach(([field, value]) => {
@@ -271,15 +298,18 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
     });
   }, [courseMode, form]);
 
-  const modeHelperText =
-    courseMode && MODE_RULES[courseMode]
-      ? MODE_RULES[courseMode].helperText
-      : "Select a course mode to auto-fill rubric fields.";
+  const modeRule = MODE_RULES[courseMode as keyof typeof MODE_RULES];
+  const isLocked = (field: NumericCourseField) =>
+    modeRule?.preset[field] !== undefined;
+  const modeOptions =
+    isPe || isOe
+      ? COURSE_MODE_OPTIONS.filter((o) => o.value === "NON_INTEGRATED")
+      : COURSE_MODE_OPTIONS;
 
   return (
     <>
-      {/* ── Section 1: Basic Info ── */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        {/* Basic Info Fields (Code, Name, Mode, Type) remain same */}
         <FormField
           control={form.control}
           name="code"
@@ -298,7 +328,6 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
             </FormItem>
           )}
         />
-
         <FormField
           control={form.control}
           name="name"
@@ -312,7 +341,6 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
             </FormItem>
           )}
         />
-
         <FormField
           control={form.control}
           name="courseMode"
@@ -321,21 +349,18 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
               <FormLabel>Course Mode *</FormLabel>
               <FormControl>
                 <Combobox
-                  options={COURSE_MODE_OPTIONS.map((opt) => ({
-                    value: opt.value,
-                    label: opt.label,
-                  }))}
+                  options={modeOptions}
                   value={field.value}
                   onValueChange={field.onChange}
                   placeholder="Select mode"
                   className="w-full"
+                  disabled={isPe || isOe}
                 />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-
         <FormField
           control={form.control}
           name="courseType"
@@ -344,12 +369,17 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
               <FormLabel>Course Type *</FormLabel>
               <FormControl>
                 <Combobox
-                  options={COURSE_TYPE_OPTIONS.map((opt) => ({
-                    value: opt.value,
-                    label: opt.label,
-                  }))}
+                  options={COURSE_TYPE_OPTIONS}
                   value={field.value}
-                  onValueChange={field.onChange}
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    if (value === "PE" || value === "OE") {
+                      form.setValue("courseMode", "NON_INTEGRATED", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }
+                  }}
                   placeholder="Select type"
                   className="w-full"
                 />
@@ -360,120 +390,353 @@ export const CourseFormFields = ({ form }: CourseFormFieldsProps) => {
         />
       </div>
 
-      {/* ── Section 2: Credits (L-T-P-S) ── */}
+      {modeRule && (
+        <p
+          className="text-muted-foreground bg-muted/50 rounded-md px-3 py-2 text-xs"
+          role="status"
+        >
+          {modeRule.helperText} Fields disabled for this mode are fixed at 0.
+        </p>
+      )}
+
       <FormSection title="Credits (L-T-P-S)">
         <div className="grid grid-cols-4 gap-3">
-          <NumberField form={form} name="lectureCredits" label="Lecture (L)" />
+          <NumberField
+            form={form}
+            name="lectureCredits"
+            label="Lecture (L)"
+            disabled={isLocked("lectureCredits")}
+          />
           <NumberField
             form={form}
             name="tutorialCredits"
             label="Tutorial (T)"
+            disabled={isLocked("tutorialCredits")}
           />
           <NumberField
             form={form}
             name="practicalCredits"
             label="Practical (P)"
+            disabled={isLocked("practicalCredits")}
           />
-          <NumberField form={form} name="skillCredits" label="Skill (S)" />
+          <NumberField
+            form={form}
+            name="skillCredits"
+            label="Skill (S)"
+            disabled={isLocked("skillCredits")}
+          />
         </div>
       </FormSection>
 
-      {/* ── Section 3: Assessment Rubric ── */}
-      <FormSection title="Assessment Rubric">
-        <div className="space-y-3">
-          {/* SEE row */}
+      <FormSection title="Assessment Configuration">
+        <div className="space-y-4">
           <div>
             <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
-              SEE (Semester End Exam)
+              SEE
             </p>
-            <div className="grid grid-cols-3 gap-3">
-              <NumberField form={form} name="seeMaxMarks" label="Max Marks" />
-              <NumberField form={form} name="seeMinMarks" label="Min Marks" />
-              <NumberField form={form} name="seeWeightage" label="Weightage" />
-            </div>
-          </div>
-
-          {/* CIE row */}
-          <div>
-            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
-              CIE (Continuous Internal)
-            </p>
-            <div className="mb-3">
-              <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-wider">
-                CIE Counts
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <NumberField form={form} name="maxNoOfCies" label="Max CIEs" />
-                <NumberField form={form} name="minNoOfCies" label="Min CIEs" />
-              </div>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-wider">
-                CIE Marks
-              </p>
-              <div className="grid grid-cols-3 gap-3">
-                <NumberField form={form} name="cieMaxMarks" label="Max Marks" />
-                <NumberField form={form} name="cieMinMarks" label="Min Marks" />
-                <NumberField
-                  form={form}
-                  name="cieWeightage"
-                  label="Weightage"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Lab section */}
-          <div>
-            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
-              Lab
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              <NumberField form={form} name="labMaxMarks" label="Max Marks" />
-              <NumberField form={form} name="labMinMarks" label="Min Marks" />
-              <NumberField form={form} name="labWeightage" label="Weightage" />
-            </div>
-          </div>
-
-          {/* Theory Assignments section */}
-          <div>
-            <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
-              Theory Assignments
-            </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid max-w-[50%] grid-cols-2 gap-3 pr-2">
               <NumberField
                 form={form}
-                name="noOfAssignments"
-                label="# Assign."
-              />
-              <NumberField
-                form={form}
-                name="assignmentMaxMarks"
+                name="seeMaxMarks"
                 label="Max Marks"
+                disabled={isLocked("seeMaxMarks")}
+              />
+              <NumberField
+                form={form}
+                name="seeEligibility"
+                label="Eligibility (%)"
+                placeholder="40"
+                disabled={isLocked("seeEligibility")}
               />
             </div>
           </div>
 
-          {/* Cumulative row */}
           <div>
             <p className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wider">
-              Cumulative (SEE + CIE)
+              CIE
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid max-w-[50%] grid-cols-2 gap-3 pr-2">
               <NumberField
                 form={form}
-                name="cumulativeMaxMarks"
-                label="Max Marks"
+                name="cieMaxMarks"
+                label="CIE Max Marks"
+                disabled={isLocked("cieMaxMarks")}
               />
               <NumberField
                 form={form}
-                name="cumulativeMinMarks"
-                label="Min Marks"
+                name="cieEligibility"
+                label="Eligibility (%)"
+                placeholder="40"
+                disabled={isLocked("cieEligibility")}
               />
             </div>
+
+            <div className="border-muted mt-3 space-y-3 border-l-2 pl-3">
+              <FormSection title="Theory Exam">
+                <div className="grid grid-cols-3 gap-3">
+                  <NumberField
+                    form={form}
+                    name="theoryMaxExams"
+                    label="No. of Exams"
+                    disabled={isLocked("theoryMaxExams")}
+                  />
+                  <NumberField
+                    form={form}
+                    name="theoryExamMaxMarks"
+                    label="Max Marks"
+                    disabled={isLocked("theoryExamMaxMarks")}
+                  />
+                  <NumberField
+                    form={form}
+                    name="theoryMinExams"
+                    label="Min. Exams Required"
+                    disabled={isLocked("theoryMinExams")}
+                  />
+                  <NumberField
+                    form={form}
+                    name="theoryEligibility"
+                    label="Eligibility (%)"
+                    placeholder="40"
+                    disabled={isLocked("theoryEligibility")}
+                  />
+                  <NumberField
+                    form={form}
+                    name="theoryCieContribution"
+                    label="Theory Contribution to CIE"
+                    disabled={isLocked("theoryCieContribution")}
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection title="Lab">
+                <div className="grid grid-cols-2 gap-3">
+                  <NumberField
+                    form={form}
+                    name="labMaxMarks"
+                    label="Max Marks"
+                    disabled={isLocked("labMaxMarks")}
+                  />
+                  <NumberField
+                    form={form}
+                    name="labEligibility"
+                    label="Eligibility (%)"
+                    placeholder="40"
+                    disabled={isLocked("labEligibility")}
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection title="AAT">
+                <div className="grid grid-cols-2 gap-3">
+                  <NumberField
+                    form={form}
+                    name="aatMaxMarks"
+                    label="Max Marks"
+                    disabled={isLocked("aatMaxMarks")}
+                  />
+                  <NumberField
+                    form={form}
+                    name="aatEligibility"
+                    label="Eligibility (%)"
+                    placeholder="40"
+                    disabled={isLocked("aatEligibility")}
+                  />
+                </div>
+              </FormSection>
+            </div>
+          </div>
+        </div>
+      </FormSection>
+
+      {isPe && (
+        <FormSection title="Elective Batches">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField
+              form={form}
+              name="numberOfBatches"
+              label="Number of Batches *"
+              placeholder="1"
+            />
+            <NumberField
+              form={form}
+              name="studentsPerBatch"
+              label="Students Per Batch *"
+              placeholder="30"
+            />
+          </div>
+          {isDecreasingBatches && (
+            <FormField
+              control={form.control}
+              name="electiveBatchesToRemove"
+              rules={{
+                validate: (value?: string[]) => {
+                  const selected = value ?? [];
+                  if (selected.length !== requiredRemovals) {
+                    return `Select exactly ${requiredRemovals} batch${
+                      requiredRemovals === 1 ? "" : "es"
+                    } to remove.`;
+                  }
+                  return true;
+                },
+              }}
+              render={({ field }) => (
+                <FormItem className="mt-3">
+                  <FormLabel className="text-xs">
+                    Select {requiredRemovals} batch
+                    {requiredRemovals === 1 ? "" : "es"} to remove
+                  </FormLabel>
+                  <div className="space-y-1.5">
+                    {existingElectiveBatches?.map((b) => {
+                      const checked = (field.value ?? []).includes(b.id);
+                      return (
+                        <label
+                          key={b.id}
+                          className="text-foreground flex items-center gap-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(state) => {
+                              const current = field.value ?? [];
+                              const next = state
+                                ? [...current, b.id]
+                                : current.filter((id) => id !== b.id);
+                              field.onChange(next);
+                            }}
+                          />
+                          <span>{b.name}</span>
+                          <span className="text-muted-foreground">
+                            ({b.studentCount ?? 0} student
+                            {(b.studentCount ?? 0) === 1 ? "" : "s"})
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+          <p className="text-muted-foreground mt-2 text-xs">
+            Capacity = Number of Batches × Students Per Batch. Batch names
+            default to &quot;{"{code}"} 1&quot;, &quot;{"{code}"} 2&quot;, …
+          </p>
+          {capacitySummary && (
+            <div className="bg-muted/50 mt-2 space-y-0.5 rounded-md px-3 py-2 text-xs">
+              <p className="text-muted-foreground">
+                Eligible students: {capacitySummary.eligibleStudents}
+              </p>
+              <p className="text-muted-foreground">
+                Configured capacity: {capacitySummary.configuredCapacity}
+              </p>
+              {capacitySummary.remainingSeats < 0 ? (
+                <p className="text-destructive font-medium">
+                  Remaining seats required:{" "}
+                  {Math.abs(capacitySummary.remainingSeats)}
+                </p>
+              ) : capacitySummary.remainingSeats === 0 ? (
+                <p className="font-medium text-green-600">
+                  Capacity requirement satisfied.
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  Excess capacity: {capacitySummary.remainingSeats} seats.
+                </p>
+              )}
+            </div>
+          )}
+        </FormSection>
+      )}
+
+      {isOe && (
+        <FormSection title="Eligible Departments">
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField
+              form={form}
+              name="numberOfBatches"
+              label="Number of Batches *"
+              placeholder="1"
+            />
+            <NumberField
+              form={form}
+              name="studentsPerBatch"
+              label="Students Per Batch *"
+              placeholder="30"
+            />
           </div>
 
-          <p className="text-muted-foreground text-xs">{modeHelperText}</p>
+          <FormField
+            control={form.control}
+            name="openElectiveEligibility"
+            render={({ field }) => (
+              <FormItem className="mt-3">
+                <FormLabel>Who can register? *</FormLabel>
+                <FormControl>
+                  <Combobox
+                    options={OPEN_ELECTIVE_ELIGIBILITY_OPTIONS}
+                    value={field.value ?? "ALL"}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      if (value !== "CUSTOM") {
+                        form.setValue("eligibleDepartmentIds", []);
+                      }
+                    }}
+                    placeholder="Select eligibility"
+                    className="w-full"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {openElectiveEligibility === "CUSTOM" && (
+            <FormField
+              control={form.control}
+              name="eligibleDepartmentIds"
+              render={({ field }) => (
+                <FormItem className="mt-3">
+                  <FormLabel>Eligible Departments *</FormLabel>
+                  <FormControl>
+                    <MultiCombobox
+                      options={departments.map((dept) => ({
+                        value: dept.id,
+                        label: dept.name,
+                        sublabel: dept.code,
+                      }))}
+                      value={field.value ?? []}
+                      onValueChange={field.onChange}
+                      placeholder="Select departments"
+                      searchPlaceholder="Search departments..."
+                      emptyMessage="No departments found."
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          <p className="text-muted-foreground mt-2 text-xs">
+            Controls which departments can register for this Open Elective.
+            "Custom" lets you pick specific departments. Students pick their own
+            batch at registration time (first-come, first-served).
+          </p>
+        </FormSection>
+      )}
+
+      <FormSection title="Additional Settings">
+        <div className="grid grid-cols-2 gap-4">
+          <CheckboxField
+            form={form}
+            name="allowFeedback"
+            label="Allow Feedback"
+          />
+          <CheckboxField
+            form={form}
+            name="attendanceRequired"
+            label="Attendance Required"
+          />
         </div>
       </FormSection>
     </>

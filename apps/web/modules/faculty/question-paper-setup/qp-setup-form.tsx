@@ -7,7 +7,6 @@ import {
   CreateAssessmentSchema,
   CreateAssessmentType,
 } from "@webcampus/schemas/faculty";
-import type { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -16,45 +15,68 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@webcampus/ui/components/select";
 import axios, { AxiosError } from "axios";
-import { Loader2, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Copy, Loader2, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
-
-// Types are already imported via schemas/faculty
+import { SetupContext } from "./question-paper-dashboard";
 
 interface QPSetupFormProps {
-  course: {
-    id: string;
-    semesterId: string;
-  };
+  setupContext: SetupContext;
   onSuccess: () => void;
-  onMarksChange: (marks: number) => void;
 }
 
-export const QPSetupForm = ({
-  course,
-  onSuccess,
-  onMarksChange,
-}: QPSetupFormProps) => {
+const inferNumberOfParts = (
+  questions: CreateAssessmentType["questions"]
+): number => {
+  let max = 1;
+  for (const q of questions) {
+    const match = q.part.match(/^Part (\d+)$/);
+    if (match) {
+      max = Math.max(max, parseInt(match[1]!, 10));
+    }
+  }
+  return max;
+};
+
+export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
+  const [isCopying, setIsCopying] = useState(false);
+  const [computedTotal, setComputedTotal] = useState(0);
 
-  // If semesterId wasn't on the course dto, we might need a workaround.
-  // Let's assume we have it or it's fetchable, for now use a blank string if undefined to placate Zod until we see the network payload.
-  // (We added semesterId to the dashboard query, we can pull it from there. Actually I'll use the URL params or context if possible, or just default it)
+  const { course, assessmentTitle, maxMarks, componentType, sequence } =
+    setupContext;
+
+  const baseType = assessmentTitle.split(" ")[0] || "";
+
+  const copyOptions = useMemo(() => {
+    return (
+      course.assessments?.filter(
+        (a) => a.title.startsWith(baseType) && a.title !== assessmentTitle
+      ) || []
+    );
+  }, [course.assessments, assessmentTitle, baseType]);
 
   const form = useForm<CreateAssessmentType>({
     resolver: zodResolver(CreateAssessmentSchema),
     defaultValues: {
       courseId: course.id,
       semesterId: course.semesterId,
-      title: "CIE 1",
-      totalMarks: 0,
+      title: assessmentTitle,
+      componentType,
+      sequence,
+      totalMarks: maxMarks,
       questions: [],
     },
   });
@@ -65,9 +87,22 @@ export const QPSetupForm = ({
   });
 
   const questionsWatch = form.watch("questions");
+  const isValidTotal = computedTotal === maxMarks;
 
-  const createOrGroupId = () =>
-    `group_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const nextFreeOrGroupNumber = (part: string): number => {
+    const used = new Set<number>();
+    getOrGroupOptions(part).forEach((name) => {
+      const match = /^OR Group (\d+)$/.exec(name);
+      const groupNumber = match?.[1];
+      if (groupNumber) used.add(parseInt(groupNumber, 10));
+    });
+    let n = 1;
+    while (used.has(n)) n += 1;
+    return n;
+  };
+
+  const createOrGroupId = (part: string) =>
+    `OR Group ${nextFreeOrGroupNumber(part)}`;
 
   const buildPartQuestions = (
     part: string,
@@ -195,7 +230,7 @@ export const QPSetupForm = ({
         if (totalInGroup > 1) {
           const nextCount = (subCounters.get(logicKey) || 0) + 1;
           subCounters.set(logicKey, nextCount);
-          const letter = String.fromCharCode(96 + nextCount); // 1->a, 2->b...
+          const letter = String.fromCharCode(96 + nextCount);
           updated[index] = {
             ...question,
             qNumber: `${mainNum}${letter}`,
@@ -222,16 +257,10 @@ export const QPSetupForm = ({
     return Array.from(options.values()).sort();
   };
 
-  // Sum marks with OR logic and update total both locally and to parent
   useEffect(() => {
     const computeAndSetTotal = () => {
       const questions = form.getValues("questions");
-      const total = computeTotalMarks(questions);
-
-      if (form.getValues("totalMarks") !== total) {
-        form.setValue("totalMarks", total);
-        onMarksChange(total);
-      }
+      setComputedTotal(computeTotalMarks(questions));
     };
 
     computeAndSetTotal();
@@ -243,9 +272,8 @@ export const QPSetupForm = ({
     });
 
     return () => subscription.unsubscribe();
-  }, [form, onMarksChange]);
+  }, [form]);
 
-  // Dynamic parts state
   const [numberOfParts, setNumberOfParts] = useState(1);
   const parts = Array.from(
     { length: numberOfParts },
@@ -267,10 +295,7 @@ export const QPSetupForm = ({
         filteredQuestions,
         newParts
       );
-      form.setValue("questions", renumbered, { shouldDirty: true });
-    } else {
-      // Even if no questions were removed, adding a part doesn't require renumbering existing ones
-      // because new parts are appended.
+      replace(renumbered);
     }
 
     setNumberOfParts(count);
@@ -324,7 +349,7 @@ export const QPSetupForm = ({
     replace(renumbered);
   };
 
-  const handleRemove = (part: string, index: number) => {
+  const handleRemove = (_part: string, index: number) => {
     const currentQuestions = form.getValues("questions");
     const remaining = currentQuestions.filter((_, i) => i !== index);
     const renumbered = recalculateGlobalNumbering(remaining, parts);
@@ -333,7 +358,8 @@ export const QPSetupForm = ({
 
   const handleOrGroupChange = (index: number, value: string) => {
     if (value === "__new__") {
-      const newGroupId = createOrGroupId();
+      const part = form.getValues(`questions.${index}.part`);
+      const newGroupId = createOrGroupId(part);
       form.setValue(`questions.${index}.orGroupId`, newGroupId, {
         shouldDirty: true,
       });
@@ -345,34 +371,85 @@ export const QPSetupForm = ({
     });
   };
 
+  const handleCopyFrom = async (assessmentId: string) => {
+    if (
+      !window.confirm(
+        "This will overwrite your current questions. Are you sure?"
+      )
+    ) {
+      return;
+    }
+
+    setIsCopying(true);
+    try {
+      const res = await axios.get(
+        `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment/${assessmentId}`,
+        { withCredentials: true }
+      );
+
+      const data = res.data.data;
+      if (data && data.questions) {
+        const clonedQuestions = data.questions.map(
+          (q: Record<string, string | number>) => ({
+            part: q.part,
+            qNumber: q.qNumber,
+            marks: q.marks,
+            co: q.co || undefined,
+            po: q.po || undefined,
+            bl: q.bl || undefined,
+            orGroupId: q.orGroupId || undefined,
+          })
+        );
+
+        const partCount = inferNumberOfParts(clonedQuestions);
+        const newParts = Array.from(
+          { length: partCount },
+          (_, i) => `Part ${i + 1}`
+        );
+        const renumbered = recalculateGlobalNumbering(
+          clonedQuestions,
+          newParts
+        );
+
+        setNumberOfParts(partCount);
+        replace(renumbered);
+        toast.success("Assessment template copied successfully!");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to fetch assessment for copying.");
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
   const mutation = useMutation({
-    mutationFn: async (data: CreateAssessmentType) => {
-      return await axios.post<SuccessResponse<null>>(
+    mutationFn: async (values: CreateAssessmentType) => {
+      return await axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment`,
-        data,
+        values,
         { withCredentials: true }
       );
     },
-    onSuccess: (res) => {
-      toast.success(res.data.message);
+    onSuccess: () => {
+      toast.success(`${assessmentTitle} configured successfully`);
       queryClient.invalidateQueries({ queryKey: ["coordinated-courses"] });
       onSuccess();
     },
-    onError: (error: AxiosError<ErrorResponse>) => {
-      toast.error(
-        error.response?.data?.message || "Failed to create assessment"
-      );
+    onError: (error: unknown) => {
+      const err = error as AxiosError<{ message?: string }>;
+      toast.error(err.response?.data?.message || "Failed to save assessment");
     },
   });
 
-  const onSubmit = (data: CreateAssessmentType) => {
-    const totalMarks = computeTotalMarks(data.questions);
-    form.setValue("totalMarks", totalMarks);
-    onMarksChange(totalMarks);
-    mutation.mutate({
-      ...data,
-      totalMarks,
-    });
+  const onSubmit = (values: CreateAssessmentType) => {
+    if (!isValidTotal) {
+      toast.error(
+        `Calculated marks (${computedTotal}) must exactly match the configured maximum marks (${maxMarks}).`
+      );
+      return;
+    }
+    mutation.mutate(values);
   };
 
   return (
@@ -384,21 +461,35 @@ export const QPSetupForm = ({
             "Please fix validation errors before saving. Check if marks are set for all questions."
           );
         })}
-        className="space-y-8"
+        className="space-y-6"
       >
-        <FormField
-          control={form.control}
-          name="title"
-          render={({ field }) => (
-            <FormItem className="max-w-xs">
-              <FormLabel>Assessment Title</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g. CIE 1" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {copyOptions.length > 0 && (
+          <div className="bg-muted/30 flex items-center gap-4 rounded-lg border p-4">
+            <Copy className="text-muted-foreground h-5 w-5" />
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold">
+                Copy from existing {baseType}?
+              </h4>
+              <p className="text-muted-foreground text-xs">
+                Duplicate an existing paper setup.
+              </p>
+            </div>
+            <Select onValueChange={handleCopyFrom} disabled={isCopying}>
+              <SelectTrigger className="w-50">
+                <SelectValue
+                  placeholder={isCopying ? "Copying..." : "Select to copy"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {copyOptions.map((opt) => (
+                  <SelectItem key={opt.id} value={opt.id}>
+                    {opt.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="flex items-center gap-4 border-b pb-6">
           <div className="flex flex-col gap-2">
@@ -411,7 +502,7 @@ export const QPSetupForm = ({
                 className="w-24"
                 value={numberOfParts}
                 onChange={(e) =>
-                  handlePartsChange(parseInt(e.target.value) || 1)
+                  handlePartsChange(parseInt(e.target.value, 10) || 1)
                 }
               />
               <span className="text-muted-foreground text-sm">
@@ -423,7 +514,6 @@ export const QPSetupForm = ({
 
         <div className="space-y-8">
           {parts.map((part) => {
-            // Filter fields belonging to this part
             const partIndices = fields
               .map((f, i) => (f.part === part ? i : -1))
               .filter((i) => i !== -1);
@@ -443,13 +533,13 @@ export const QPSetupForm = ({
                         updateGenerator(
                           part,
                           "qCount",
-                          parseInt(e.target.value) || 0
+                          parseInt(e.target.value, 10) || 0
                         )
                       }
                       title="Number of main questions"
                     />
                     <span className="text-muted-foreground">Q&apos;s</span>
-                    <span className="text-muted-foreground ml-2 mr-2">/</span>
+                    <span className="text-muted-foreground mx-2">/</span>
                     <Input
                       type="number"
                       min={1}
@@ -459,7 +549,7 @@ export const QPSetupForm = ({
                         updateGenerator(
                           part,
                           "subQCount",
-                          parseInt(e.target.value) || 0
+                          parseInt(e.target.value, 10) || 0
                         )
                       }
                       title="Number of sub-questions per main question"
@@ -513,7 +603,6 @@ export const QPSetupForm = ({
                                           />
                                           {questionsWatch[index]?.orGroupId && (
                                             <Badge variant="secondary">
-                                              OR Group:{" "}
                                               {questionsWatch[index]?.orGroupId}
                                             </Badge>
                                           )}
@@ -537,7 +626,7 @@ export const QPSetupForm = ({
                                           {...field}
                                           onChange={(e) =>
                                             field.onChange(
-                                              parseInt(e.target.value) || 0
+                                              parseInt(e.target.value, 10) || 0
                                             )
                                           }
                                         />
@@ -659,23 +748,28 @@ export const QPSetupForm = ({
           })}
         </div>
 
-        <div className="flex items-center justify-between border-t pb-2 pt-6">
+        <div className="flex items-center justify-between border-t pt-4">
           <div className="text-sm font-medium">
             Total Calculated Marks:{" "}
-            <span className="text-primary ml-2 text-lg">
-              {form.watch("totalMarks")}
+            <span
+              className={`ml-2 text-xl font-bold ${isValidTotal ? "text-green-600" : "text-destructive"}`}
+            >
+              {computedTotal} / {maxMarks}
             </span>
           </div>
           <div className="flex gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => onSuccess()}
+              onClick={onSuccess}
               disabled={mutation.isPending}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button
+              type="submit"
+              disabled={mutation.isPending || !isValidTotal}
+            >
               {mutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}

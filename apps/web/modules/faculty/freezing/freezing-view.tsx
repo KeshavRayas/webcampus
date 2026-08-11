@@ -77,7 +77,7 @@ const formatFrozenAt = (iso: string | null): string => {
 };
 
 export const FreezingView = () => {
-  const { data: termsData } = useAcademicTerms({ status: "ACTIVE" });
+  const { data: termsData } = useAcademicTerms({ isCurrent: true });
   const terms = termsData ?? [];
 
   const [draftFilters, setDraftFilters] = useState<FilterState>(EMPTY_FILTERS);
@@ -248,7 +248,6 @@ export const FreezingView = () => {
               return { ...current, [key]: value };
             });
           }}
-          className="md:grid-cols-3"
         />
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           <Input

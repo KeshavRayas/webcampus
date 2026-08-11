@@ -42,7 +42,7 @@ import {
   TabsTrigger,
 } from "@webcampus/ui/components/tabs";
 import { MoreHorizontal } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
@@ -67,6 +67,7 @@ const editSchema = z.object({
   staffType: StaffTypeEnum.optional(),
   dob: z.coerce.date().optional(),
   dateOfJoining: z.coerce.date().optional(),
+  phoneNumber: z.string().optional(),
 });
 
 const hodCreateSchema = z.object({
@@ -76,6 +77,23 @@ const hodCreateSchema = z.object({
 });
 
 type EditFormOutput = z.output<typeof editSchema>;
+
+const getEditFormDefaults = (
+  faculty: AdminFacultyResponse
+): EditFormOutput => ({
+  name: faculty.user.name || "",
+  email: faculty.user.email || "",
+  designation: faculty.designation as z.infer<typeof DesignationEnum>,
+  username: faculty.user.username || "",
+  displayUsername: faculty.user.displayUsername || faculty.user.name || "",
+  employeeId: faculty.employeeId || "",
+  staffType: faculty.staffType as z.infer<typeof StaffTypeEnum> | undefined,
+  dob: faculty.dob ? new Date(faculty.dob) : undefined,
+  dateOfJoining: faculty.dateOfJoining
+    ? new Date(faculty.dateOfJoining)
+    : undefined,
+  phoneNumber: faculty.phoneNumber || "",
+});
 
 export const AdminFacultyActions = ({
   faculty,
@@ -109,20 +127,14 @@ export const AdminFacultyActions = ({
 
   const editForm = useForm<EditFormOutput>({
     resolver: zodResolver(editSchema) as Resolver<EditFormOutput>,
-    defaultValues: {
-      name: faculty.user.name || "",
-      email: faculty.user.email || "",
-      designation: faculty.designation as z.infer<typeof DesignationEnum>,
-      username: faculty.user.username || "",
-      displayUsername: faculty.user.displayUsername || faculty.user.name || "",
-      employeeId: faculty.employeeId || "",
-      staffType: faculty.staffType as z.infer<typeof StaffTypeEnum> | undefined,
-      dob: faculty.dob ? new Date(faculty.dob) : undefined,
-      dateOfJoining: faculty.dateOfJoining
-        ? new Date(faculty.dateOfJoining)
-        : undefined,
-    },
+    defaultValues: getEditFormDefaults(faculty),
   });
+
+  useEffect(() => {
+    if (isEditOpen) {
+      editForm.reset(getEditFormDefaults(faculty));
+    }
+  }, [isEditOpen, faculty, editForm]);
 
   const hodCreateForm = useForm<z.infer<typeof hodCreateSchema>>({
     resolver: zodResolver(hodCreateSchema),
@@ -364,6 +376,20 @@ export const AdminFacultyActions = ({
                             field.onChange(event.target.value)
                           }
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g., +91 9876543210" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

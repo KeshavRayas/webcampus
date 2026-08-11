@@ -235,7 +235,7 @@ export const CoeForm = () => {
                 onChange={handlePhotoChange}
               />
               {photoError && (
-                <p className="text-destructive text-sm font-medium mt-1">
+                <p className="text-destructive mt-1 text-sm font-medium">
                   {photoError}
                 </p>
               )}
@@ -260,4 +260,3 @@ export const CoeForm = () => {
     </Dialog>
   );
 };
-

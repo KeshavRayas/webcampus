@@ -2,6 +2,15 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
+import {
+  RegistrationWindowCycleSchema,
+  type AcademicTermResponseType,
+} from "@webcampus/schemas/admin";
+import {
+  buildAssessmentSlots,
+  findAssessmentForSlot,
+  type AssessmentSlot,
+} from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
@@ -18,14 +27,13 @@ import {
   FilterPanel,
 } from "@webcampus/ui/components/filter-builder";
 import axios from "axios";
-import { BookOpen, ClipboardList, GraduationCap, Loader2 } from "lucide-react";
+import { ClipboardList, Loader2, PlusCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-// Sheet imports removed as they were not used
 import { QPSetupDialog } from "./qp-setup-dialog";
 import { useFacultyAcademicTerms } from "./use-faculty-terms";
 import { ViewAssessmentDialog } from "./view-assessment-dialog";
 
-interface CoordinatedCourse {
+export interface CoordinatedCourse {
   id: string;
   code: string;
   name: string;
@@ -41,10 +49,38 @@ interface CoordinatedCourse {
   programType: string;
   departmentName: string;
   departmentAbbreviation: string;
+
+  // New Configuration Fields
+  seeMaxMarks: number;
+  seeEligibility: number;
   cieMaxMarks: number;
-  maxNoOfCies: number;
-  assessments?: { id: string; title: string }[];
+  cieEligibility: number;
+  theoryMaxExams: number;
+  theoryExamMaxMarks: number;
+  theoryMinExams: number;
+  theoryCieContribution: number;
+  theoryEligibility: number;
+  labMaxMarks: number;
+  labEligibility: number;
+  aatMaxMarks: number;
+  aatEligibility: number;
+
+  assessments?: {
+    id: string;
+    title: string;
+    totalMarks: number;
+    componentType?: "THEORY" | "LAB" | "AAT" | null;
+    sequence?: number | null;
+  }[];
 }
+
+export type SetupContext = {
+  course: CoordinatedCourse;
+  assessmentTitle: string;
+  maxMarks: number;
+  componentType: "THEORY" | "LAB" | "AAT";
+  sequence: number;
+};
 
 type DashboardFilters = {
   termId: string;
@@ -52,164 +88,221 @@ type DashboardFilters = {
   cycle: string;
 };
 
+const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
+const TEACHING_CYCLE_OPTIONS = RegistrationWindowCycleSchema.options;
+
 const EMPTY_FILTERS: DashboardFilters = {
   termId: "",
   semesterId: "",
   cycle: "",
 };
 
-export const QuestionPaperDashboard = () => {
-  const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+const formatAcademicTerm = (term: AcademicTermResponseType) =>
+  `${term.type.toUpperCase()} ${term.year}`;
 
-  const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<DashboardFilters | null>(
-    null
-  );
-  const [cieSheetCourse, setCieSheetCourse] =
-    useState<CoordinatedCourse | null>(null);
+const isFirstYearUgSemester = (semester?: {
+  programType: string;
+  semesterNumber: number;
+}) =>
+  semester?.programType === "UG" &&
+  FIRST_YEAR_UG_SEMESTERS.has(semester.semesterNumber);
+
+export const QuestionPaperDashboard = () => {
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const queryClient = useQueryClient();
+
+  const [setupContext, setSetupContext] = useState<SetupContext | null>(null);
   const [viewAssessmentId, setViewAssessmentId] = useState<{
     id: string;
     courseName: string;
   } | null>(null);
 
-  // Fetch academic terms
-  const { data: rawTerms } = useFacultyAcademicTerms();
-  const terms = useMemo(() => rawTerms ?? [], [rawTerms]);
+  const { data: terms, isLoading: termsLoading } = useFacultyAcademicTerms();
 
-  const selectedDraftTerm = useMemo(
-    () => terms.find((t) => t.id === draftFilters.termId),
-    [terms, draftFilters.termId]
-  );
-  const nestedSemesters = useMemo(
-    () => selectedDraftTerm?.Semester ?? [],
-    [selectedDraftTerm]
+  const [draftFilters, setDraftFilters] =
+    useState<DashboardFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] =
+    useState<DashboardFilters>(EMPTY_FILTERS);
+
+  const selectedTermSemesters = useMemo(() => {
+    if (!terms || !draftFilters.termId) return [];
+    const term = terms.find((t) => t.id === draftFilters.termId);
+    return term?.Semester || [];
+  }, [terms, draftFilters.termId]);
+
+  const selectedSemester = useMemo(
+    () => selectedTermSemesters.find((s) => s.id === draftFilters.semesterId),
+    [selectedTermSemesters, draftFilters.semesterId]
   );
 
-  // Auto-select current term
+  const isFirstYearUg = isFirstYearUgSemester(selectedSemester);
+
+  const appliedTermSemesters = useMemo(() => {
+    if (!terms || !appliedFilters.termId) return [];
+    const term = terms.find((t) => t.id === appliedFilters.termId);
+    return term?.Semester || [];
+  }, [terms, appliedFilters.termId]);
+
+  const appliedSemester = useMemo(
+    () => appliedTermSemesters.find((s) => s.id === appliedFilters.semesterId),
+    [appliedTermSemesters, appliedFilters.semesterId]
+  );
+
+  const appliedIsFirstYearUg = isFirstYearUgSemester(appliedSemester);
+
+  const appliedCycle =
+    appliedIsFirstYearUg && appliedFilters.cycle ? appliedFilters.cycle : "";
+
   useEffect(() => {
-    if (!draftFilters.termId && terms.length > 0) {
-      const currentTerm = terms.find((t) => t.isCurrent) ?? terms[0];
+    if (terms?.length && !draftFilters.termId) {
+      const currentTerm = terms.find((t) => t.isCurrent) || terms[0];
       if (currentTerm) {
-        setDraftFilters((cur) => ({ ...cur, termId: currentTerm.id }));
+        setDraftFilters((prev) => ({ ...prev, termId: currentTerm.id }));
       }
     }
-  }, [draftFilters.termId, terms]);
+  }, [terms, draftFilters.termId]);
 
-  // Auto-select first semester
   useEffect(() => {
-    if (
-      draftFilters.termId &&
-      !draftFilters.semesterId &&
-      nestedSemesters.length > 0
-    ) {
-      setDraftFilters((cur) => ({
-        ...cur,
-        semesterId: nestedSemesters[0]!.id,
-      }));
+    if (!isFirstYearUg && (draftFilters.cycle || appliedFilters.cycle)) {
+      setDraftFilters((prev) => ({ ...prev, cycle: "" }));
+      setAppliedFilters((prev) => ({ ...prev, cycle: "" }));
     }
-  }, [draftFilters.semesterId, draftFilters.termId, nestedSemesters]);
+  }, [isFirstYearUg, draftFilters.cycle, appliedFilters.cycle]);
 
-  // Fetch coordinated courses
-  const { data: rawCourses, isLoading: loadingCourses } = useQuery({
-    queryKey: [
-      "coordinated-courses",
-      appliedFilters?.semesterId,
-      appliedFilters?.cycle,
+  const filterFields: FilterFieldConfig<DashboardFilters>[] = useMemo(
+    () => [
+      {
+        key: "termId",
+        label: "Academic Term",
+        type: "select",
+        hideAllOption: true,
+        options:
+          terms?.map((t) => ({
+            label: formatAcademicTerm(t),
+            value: t.id,
+          })) || [],
+        placeholder: termsLoading ? "Loading terms..." : "Select term...",
+      },
+      {
+        key: "semesterId",
+        label: "Semester",
+        type: "select",
+        hideAllOption: true,
+        options: selectedTermSemesters.map((s) => ({
+          label: `${s.programType} - Semester ${s.semesterNumber}`,
+          value: s.id,
+        })),
+        placeholder: draftFilters.termId
+          ? "Select semester..."
+          : "Select term first",
+      },
+      ...(isFirstYearUg
+        ? [
+            {
+              key: "cycle",
+              label: "Cycle",
+              type: "select",
+              allOptionLabel: "All cycles",
+              placeholder: "All cycles",
+              options: TEACHING_CYCLE_OPTIONS.map((cycle) => ({
+                label: cycle,
+                value: cycle,
+              })),
+            } as FilterFieldConfig<DashboardFilters>,
+          ]
+        : []),
     ],
-    queryFn: async () => {
-      const params: Record<string, string> = {};
-      if (appliedFilters?.semesterId) {
-        params.semesterId = appliedFilters.semesterId;
-      }
-      if (appliedFilters?.cycle) {
-        params.cycle = appliedFilters.cycle;
-      }
+    [
+      terms,
+      termsLoading,
+      selectedTermSemesters,
+      draftFilters.termId,
+      isFirstYearUg,
+    ]
+  );
 
+  const handleApplyFilters = () => {
+    setAppliedFilters(draftFilters);
+  };
+
+  const handleResetFilters = () => {
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+  };
+
+  const { data: courses, isLoading: coursesLoading } = useQuery({
+    queryKey: ["coordinated-courses", appliedFilters.semesterId, appliedCycle],
+    queryFn: async () => {
       const res = await axios.get<BaseResponse<CoordinatedCourse[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment/coordinated-courses`,
-        { params, withCredentials: true }
+        {
+          params: {
+            semesterId: appliedFilters.semesterId,
+            ...(appliedCycle && { cycle: appliedCycle }),
+          },
+          withCredentials: true,
+        }
       );
-      return res.data.status === "success" && res.data.data
-        ? res.data.data
-        : [];
+      if (res.data.status === "success" && "data" in res.data) {
+        return res.data.data;
+      }
+      return [];
     },
-    enabled: !!appliedFilters?.semesterId,
+    enabled: !!appliedFilters.semesterId,
   });
 
-  const courses = rawCourses ?? [];
+  const creditString = (course: CoordinatedCourse) =>
+    `${course.lectureCredits}-${course.tutorialCredits}-${course.practicalCredits}-${course.skillCredits}`;
 
-  const applyFilters = () => {
-    if (!draftFilters.termId || !draftFilters.semesterId) return;
-    setAppliedFilters({ ...draftFilters });
+  const renderAssessmentButton = (
+    course: CoordinatedCourse,
+    slot: AssessmentSlot
+  ) => {
+    const existing = findAssessmentForSlot(course.assessments, slot);
+
+    if (existing) {
+      return (
+        <Button
+          key={slot.title}
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            setViewAssessmentId({ id: existing.id, courseName: course.name })
+          }
+        >
+          <ClipboardList className="mr-2 h-4 w-4" /> View {slot.title}
+        </Button>
+      );
+    }
+
+    return (
+      <Button
+        key={slot.title}
+        size="sm"
+        onClick={() =>
+          setSetupContext({
+            course,
+            assessmentTitle: slot.title,
+            maxMarks: slot.maxMarks,
+            componentType: slot.componentType,
+            sequence: slot.sequence,
+          })
+        }
+      >
+        <PlusCircle className="mr-2 h-4 w-4" /> Setup {slot.title}
+      </Button>
+    );
   };
-
-  const resetFilters = () => {
-    setDraftFilters({
-      ...EMPTY_FILTERS,
-      termId: draftFilters.termId,
-    });
-    setAppliedFilters(null);
-  };
-
-  const filterFields: FilterFieldConfig<typeof EMPTY_FILTERS>[] = [
-    {
-      key: "termId",
-      label: "Academic Term",
-      type: "select",
-      hideAllOption: true,
-      options: terms.map((t) => ({
-        label: `${t.type.charAt(0).toUpperCase() + t.type.slice(1)} ${t.year}`,
-        value: t.id,
-      })),
-    },
-    {
-      key: "semesterId",
-      label: "Semester",
-      type: "select",
-      hideAllOption: true,
-      options: nestedSemesters.map((s) => ({
-        label: `${s.programType} - Semester ${s.semesterNumber}`,
-        value: s.id,
-      })),
-    },
-  ];
-
-  // Conditional Cycle filter if UG Semester 1 or 2
-  const selectedSemester = nestedSemesters.find(
-    (s) => s.id === draftFilters.semesterId
-  );
-  if (
-    selectedSemester?.programType === "UG" &&
-    (selectedSemester.semesterNumber === 1 ||
-      selectedSemester.semesterNumber === 2)
-  ) {
-    filterFields.push({
-      key: "cycle",
-      label: "Cycle",
-      type: "select",
-      hideAllOption: true,
-      options: [
-        { label: "Physics", value: "PHYSICS" },
-        { label: "Chemistry", value: "CHEMISTRY" },
-      ],
-    });
-  }
-
-  const creditString = (c: CoordinatedCourse) =>
-    `${c.lectureCredits}-${c.tutorialCredits}-${c.practicalCredits}-${c.skillCredits}`;
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center gap-3">
-        <ClipboardList className="text-primary size-7" />
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight">
             Question Paper Setup
           </h1>
-          <p className="text-muted-foreground text-sm">
-            Courses you have been appointed to coordinate. Set up CIE question
-            papers and assessment templates.
+          <p className="text-muted-foreground">
+            Configure assessments for courses where you are a coordinator.
           </p>
         </div>
       </div>
@@ -219,110 +312,78 @@ export const QuestionPaperDashboard = () => {
           fields={filterFields}
           draftFilters={draftFilters}
           onDraftChange={(key, value) => {
-            setDraftFilters((cur) => {
-              const next = { ...cur, [key]: value };
-              if (key === "termId") {
-                next.semesterId = "";
-                next.cycle = "";
-              }
-              if (key === "semesterId") {
-                next.cycle = "";
-              }
-              return next;
-            });
+            if (key === "termId") {
+              setDraftFilters((current) => ({
+                ...current,
+                termId: value,
+                semesterId: "",
+                cycle: "",
+              }));
+              return;
+            }
+            if (key === "semesterId") {
+              const nextSemester = selectedTermSemesters.find(
+                (s) => s.id === value
+              );
+              setDraftFilters((current) => ({
+                ...current,
+                semesterId: value,
+                cycle: isFirstYearUgSemester(nextSemester) ? current.cycle : "",
+              }));
+              return;
+            }
+            setDraftFilters((prev) => ({ ...prev, [key]: value }));
           }}
-          className="md:grid-cols-2"
+          className={isFirstYearUg ? "md:grid-cols-3" : "md:grid-cols-2"}
         />
-        <div className="mt-4 flex justify-end">
-          <FilterActions
-            onApply={applyFilters}
-            onReset={resetFilters}
-            applyLabel="View Courses"
-          />
-        </div>
+        <FilterActions
+          onApply={handleApplyFilters}
+          onReset={handleResetFilters}
+        />
       </FilterPanel>
 
-      {appliedFilters && (
-        <div className="space-y-4">
-          {loadingCourses ? (
-            <div className="flex items-center justify-center p-12">
-              <Loader2 className="text-muted-foreground size-8 animate-spin" />
+      {appliedFilters.semesterId && (
+        <div className="space-y-6">
+          {coursesLoading ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
             </div>
-          ) : courses.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center gap-3 p-12">
-                <GraduationCap className="text-muted-foreground size-12 opacity-40" />
-                <p className="text-muted-foreground text-sm">
-                  You are not appointed as a coordinator for any courses in this
-                  semester.
-                </p>
-              </CardContent>
-            </Card>
+          ) : !courses?.length ? (
+            <div className="bg-muted/20 rounded-lg border p-8 text-center">
+              No courses assigned as coordinator for this semester.
+            </div>
           ) : (
-            <div className="grid gap-4">
-              {courses.map((course) => (
-                <Card
-                  key={course.id}
-                  className="transition-shadow hover:shadow-md"
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-primary/10 flex size-10 items-center justify-center rounded-lg">
-                          <BookOpen className="text-primary size-5" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-base">
-                            {course.code} — {course.name}
-                          </CardTitle>
-                          <p className="text-muted-foreground mt-0.5 text-xs">
-                            {course.departmentName}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {course.assessments?.map((assessment) => (
-                          <Button
-                            key={assessment.id}
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              setViewAssessmentId({
-                                id: assessment.id,
-                                courseName: `${course.code} — ${course.name}`,
-                              })
-                            }
-                          >
-                            {assessment.title}
-                          </Button>
-                        ))}
-                        <Button
-                          size="sm"
-                          variant={
-                            course.assessments?.length ? "secondary" : "default"
-                          }
-                          onClick={() => setCieSheetCourse(course)}
-                        >
-                          {course.assessments?.length
-                            ? "+ New Assessment"
-                            : "Setup CIE"}
-                        </Button>
-                      </div>
-                    </div>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {courses.map((course: CoordinatedCourse) => (
+                <Card key={course.id} className="flex flex-col">
+                  <CardHeader className="bg-muted/10 border-b pb-3">
+                    <CardTitle className="flex items-start justify-between text-lg">
+                      <span className="truncate pr-2" title={course.name}>
+                        {course.name}
+                      </span>
+                      <span className="text-primary bg-primary/10 shrink-0 rounded px-2 py-1 font-mono text-sm">
+                        {course.code}
+                      </span>
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary">{course.courseMode}</Badge>
+                  <CardContent className="flex-1 space-y-4 pt-4">
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <Badge variant="outline">{course.courseMode}</Badge>
                       <Badge variant="outline">{course.courseType}</Badge>
                       <Badge variant="outline">
                         Credits: {creditString(course)} = {course.totalCredits}
                       </Badge>
-                      <Badge variant="outline">
-                        {course.programType} Sem {course.semesterNumber}
-                      </Badge>
-                      <Badge variant="outline">
-                        CIE: {course.maxNoOfCies} × {course.cieMaxMarks} marks
-                      </Badge>
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                      <p className="text-muted-foreground text-sm font-semibold uppercase tracking-wider">
+                        Assessments Configuration
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {buildAssessmentSlots(course).map((slot) =>
+                          renderAssessmentButton(course, slot)
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -332,13 +393,13 @@ export const QuestionPaperDashboard = () => {
         </div>
       )}
 
-      {cieSheetCourse && (
+      {setupContext && (
         <QPSetupDialog
-          open={!!cieSheetCourse}
+          open={!!setupContext}
           onOpenChange={(open: boolean) => {
-            if (!open) setCieSheetCourse(null);
+            if (!open) setSetupContext(null);
           }}
-          course={cieSheetCourse}
+          setupContext={setupContext}
         />
       )}
 

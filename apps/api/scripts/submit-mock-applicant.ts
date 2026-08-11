@@ -100,8 +100,8 @@ const deterministicAadhar = (serial: number): string => {
 };
 
 const deterministicAbcAparId = (serial: number): string => {
-  const tail = String((serial % 1_000_000_000_000) + 1).padStart(12, "0");
-  return tail;
+  const tail = String((serial % 100_000_000_000) + 1).padStart(11, "0");
+  return `8${tail}`;
 };
 
 const cleanupPartialApplicant = async (
@@ -357,7 +357,8 @@ async function main() {
     });
 
     try {
-      const fullName = `${faker.person.firstName()} ${faker.person.lastName()}`;
+      const firstName = faker.person.firstName();
+      const lastName = faker.person.lastName();
 
       const shellResponse = await AdmissionService.createShell(
         {
@@ -396,7 +397,7 @@ async function main() {
         email,
         attempt,
         admission.id,
-        fullName,
+        `${firstName} ${lastName}`,
         context.filledById,
         context.departmentId,
         context.semesterId
@@ -433,6 +434,22 @@ async function main() {
     logger.warn(
       "Porting is semester-wide: all APPROVED admissions in this semester will be ported to students, not only the mock applicants created by this script."
     );
+
+    const approvedInSemester = await db.admission.findMany({
+      where: {
+        semesterId: context.semesterId,
+        status: "APPROVED",
+        studentId: null,
+      },
+      select: { primaryEmail: true },
+    });
+
+    for (const { primaryEmail } of approvedInSemester) {
+      await db.user.updateMany({
+        where: { email: primaryEmail },
+        data: { username: primaryEmail },
+      });
+    }
 
     try {
       const portResponse = await AdmissionService.portStudents(

@@ -9,6 +9,7 @@ export interface RegistrationTrackingStudentItem {
   studentId: string;
   studentName: string;
   usn: string;
+  studentEmail: string;
   isRegistered: boolean;
   registrationDate: string | null;
   registeredCourseCount: number;
@@ -82,7 +83,7 @@ export class RegistrationTrackingService {
           id: true,
           usn: true,
           user: {
-            select: { name: true },
+            select: { name: true, email: true },
           },
           registrations: {
             where: {
@@ -109,6 +110,7 @@ export class RegistrationTrackingService {
             studentId: student.id,
             studentName: student.user.name,
             usn: student.usn,
+            studentEmail: student.user.email,
             isRegistered: hasRegistrations,
             registrationDate: earliestRegistration
               ? earliestRegistration.registrationDate.toISOString()

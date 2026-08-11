@@ -3,8 +3,8 @@ import {
   extractPaginatedData,
   PaginatedPayload,
 } from "@/lib/api-client";
-import { BaseResponse } from "@webcampus/types/api";
 import {
+  BaseResponse,
   FacultyHandlingAssignmentDTO,
   FacultyHandlingFilterOptionsDTO,
   FacultyHandlingStudentDTO,
@@ -105,9 +105,9 @@ export const getFacultyHandlingStudents = async (
 export const getFacultyHandlingFilterOptions = async (
   kind: FacultyHandlingKind
 ): Promise<FacultyHandlingFilterOptionsDTO> => {
-  const response = await apiClient.get<BaseResponse<FacultyHandlingFilterOptionsDTO>>(
-    `/faculty/handling/${kind}/filter-options`
-  );
+  const response = await apiClient.get<
+    BaseResponse<FacultyHandlingFilterOptionsDTO>
+  >(`/faculty/handling/${kind}/filter-options`);
 
   if (response.data.status !== "success" || !response.data.data) {
     throw new Error(response.data.message || "Failed to fetch filter options");

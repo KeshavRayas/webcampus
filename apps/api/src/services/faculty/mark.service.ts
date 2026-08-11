@@ -1,5 +1,6 @@
+import { isBatchManagedCourse } from "@webcampus/api/src/services/shared/course-kind";
 import { logger } from "@webcampus/common/logger";
-import { db } from "@webcampus/db";
+import { db, Prisma } from "@webcampus/db";
 import {
   AssessmentWithStudentsType,
   CreateMarkType,
@@ -10,9 +11,162 @@ import {
   UpdateMarkType,
 } from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
+import ExcelJS from "exceljs";
+import {
+  assertFacultyCourseApproved,
+  FACULTY_COURSE_STATUS,
+} from "../shared/course-approval";
 import { recomputeStudentMark } from "../shared/mark-sync.service";
 
+export interface ExcelImportError {
+  row: number;
+  usn: string;
+  question: string;
+  message: string;
+}
+
+export class MarksExcelValidationError extends Error {
+  constructor(public readonly errors: ExcelImportError[]) {
+    super("Marks upload rejected");
+    this.name = "MarksExcelValidationError";
+  }
+}
+
+type DbLike = Prisma.TransactionClient | typeof db;
+
+const EXCEL_STATUS_LABELS = {
+  PRESENT: "Present",
+  ABSENT: "Absent",
+  MP: "MP",
+} as const;
+
+const EXCEL_STATUS_VALUES = ["Present", "Absent", "MP"] as const;
+
+type ExcelStatusValue = keyof typeof EXCEL_STATUS_LABELS;
+
+export function resolveExcelStatus(
+  raw: unknown
+):
+  | { status: ExcelStatusValue; error?: undefined }
+  | { status: null; error: string } {
+  const value = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (value === "") return { status: "PRESENT" };
+  if (value === "present") return { status: "PRESENT" };
+  if (value === "absent") return { status: "ABSENT" };
+  if (value === "mp") return { status: "MP" };
+  return {
+    status: null,
+    error: `Invalid Status "${String(raw ?? "").trim()}". Allowed values: ${EXCEL_STATUS_VALUES.join(", ")}.`,
+  };
+}
+
 export class Mark {
+  private static async assertFacultyCanManageMark(
+    facultyId: string,
+    courseId: string,
+    prisma: DbLike = db
+  ): Promise<void> {
+    const { PeCapacityService } = await import(
+      "@webcampus/api/src/services/shared/pe-capacity.service"
+    );
+    await PeCapacityService.assertPeDownstreamReady(courseId);
+    const isAssigned =
+      (await prisma.courseAssignment.findFirst({
+        where: { courseId, facultyId },
+      })) ||
+      (await prisma.electiveBatchFaculty.findFirst({
+        where: { courseId, facultyId },
+      }));
+    if (!isAssigned) {
+      throw new Error("Unauthorized to manage marks for this course");
+    }
+  }
+
+  private static async assertFacultyCourseAccess(
+    facultyId: string,
+    course: { id: string; courseType: string | null },
+    prisma: DbLike = db,
+    unauthorizedMessage = "Unauthorized to view this assessment"
+  ): Promise<"PE" | "PC"> {
+    if (isBatchManagedCourse(course.courseType)) {
+      const batchFaculty = await prisma.electiveBatchFaculty.findFirst({
+        where: { courseId: course.id, facultyId },
+      });
+      if (!batchFaculty) throw new Error(unauthorizedMessage);
+      return "PE";
+    }
+    const isAssigned = await prisma.courseAssignment.findFirst({
+      where: { courseId: course.id, facultyId },
+    });
+    if (!isAssigned) throw new Error(unauthorizedMessage);
+    return "PC";
+  }
+
+  private static async getFacultyCourseStudents(
+    facultyId: string,
+    courseId: string,
+    courseType: string | null,
+    semesterId: string,
+    sectionId: string | undefined,
+    prisma: DbLike = db,
+    withEmail = false
+  ): Promise<
+    Array<{
+      student: {
+        id: string;
+        usn: string;
+        user: { name: string; email?: string };
+      };
+    }>
+  > {
+    if (isBatchManagedCourse(courseType)) {
+      const { PeCapacityService } = await import(
+        "@webcampus/api/src/services/shared/pe-capacity.service"
+      );
+      const roster = await PeCapacityService.getFacultyPeRoster(
+        facultyId,
+        courseId,
+        prisma
+      );
+      const studentIds = roster.map((r) => r.studentId);
+      if (studentIds.length === 0) return [];
+      const students = await prisma.student.findMany({
+        where: { id: { in: studentIds } },
+        select: {
+          id: true,
+          usn: true,
+          user: {
+            select: withEmail ? { name: true, email: true } : { name: true },
+          },
+        },
+      });
+      return students.map((s) => ({ student: s }));
+    }
+    return prisma.courseRegistration.findMany({
+      where: {
+        courseId,
+        semesterId,
+        ...(sectionId
+          ? { student: { studentSections: { some: { sectionId } } } }
+          : {}),
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            usn: true,
+            user: {
+              select: withEmail ? { name: true, email: true } : { name: true },
+            },
+          },
+        },
+      },
+      orderBy: { student: { usn: "asc" } },
+    });
+  }
+
   /**
    * Direct Mark creation — bypasses the assessment aggregate pipeline.
    * Does NOT call recomputeStudentMark, so cieTotal/status here will be
@@ -21,9 +175,18 @@ export class Mark {
    * Prefer saveAssessmentMarks + recomputeStudentMark for normal usage.
    */
   static async create(
-    data: CreateMarkType
+    data: CreateMarkType,
+    userId: string
   ): Promise<BaseResponse<MarkResponseType>> {
     try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
       const existingMark = await db.mark.findUnique({
         where: {
           studentId_courseId: {
@@ -41,6 +204,8 @@ export class Mark {
         };
       }
 
+      await this.assertFacultyCanManageMark(faculty.id, data.courseId);
+
       const mark = await db.mark.create({
         data,
       });
@@ -54,6 +219,7 @@ export class Mark {
       };
     } catch (error) {
       logger.error("Error creating mark:", { error });
+      if (error instanceof Error) throw error;
       throw new Error("Failed to create mark");
     }
   }
@@ -141,16 +307,28 @@ export class Mark {
    */
   static async update(
     id: string,
-    data: UpdateMarkType
+    data: UpdateMarkType,
+    userId: string
   ): Promise<BaseResponse<MarkResponseType>> {
     try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
       const existingMark = await db.mark.findUnique({
         where: { id },
-        include: {
+        select: {
+          id: true,
+          courseId: true,
           course: {
-            include: {
+            select: {
+              approvalStatus: true,
               assignments: {
-                include: {
+                select: {
                   freezes: true,
                 },
               },
@@ -167,6 +345,8 @@ export class Mark {
         };
       }
 
+      assertFacultyCourseApproved(existingMark.course.approvalStatus, true);
+
       const courseAssignment = existingMark.course.assignments[0];
       const freeze = courseAssignment?.freezes;
 
@@ -177,6 +357,8 @@ export class Mark {
           error: "Cannot update mark as it has been frozen by HOD or admin",
         };
       }
+
+      await this.assertFacultyCanManageMark(faculty.id, existingMark.courseId);
 
       const mark = await db.mark.update({
         where: { id },
@@ -192,19 +374,31 @@ export class Mark {
       };
     } catch (error) {
       logger.error("Error updating mark:", { error });
+      if (error instanceof Error) throw error;
       throw new Error("Failed to update mark");
     }
   }
 
-  static async delete(id: string): Promise<BaseResponse<void>> {
+  static async delete(id: string, userId: string): Promise<BaseResponse<void>> {
     try {
+      const faculty = await db.faculty.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (!faculty) {
+        throw new Error("Faculty profile not found");
+      }
+
       const existingMark = await db.mark.findUnique({
         where: { id },
-        include: {
+        select: {
+          id: true,
+          courseId: true,
           course: {
-            include: {
+            select: {
+              approvalStatus: true,
               assignments: {
-                include: {
+                select: {
                   freezes: true,
                 },
               },
@@ -221,6 +415,8 @@ export class Mark {
         };
       }
 
+      assertFacultyCourseApproved(existingMark.course.approvalStatus, true);
+
       const courseAssignment = existingMark.course.assignments[0];
       const freeze = courseAssignment?.freezes;
 
@@ -231,6 +427,8 @@ export class Mark {
           error: "Cannot delete mark as it has been frozen by HOD or admin",
         };
       }
+
+      await this.assertFacultyCanManageMark(faculty.id, existingMark.courseId);
 
       await db.mark.delete({
         where: { id },
@@ -245,6 +443,7 @@ export class Mark {
       };
     } catch (error) {
       logger.error("Error deleting mark:", { error });
+      if (error instanceof Error) throw error;
       throw new Error("Failed to delete mark");
     }
   }
@@ -268,6 +467,7 @@ export class Mark {
       const assignments = await db.courseAssignment.findMany({
         where: {
           facultyId: faculty.id,
+          course: { approvalStatus: FACULTY_COURSE_STATUS },
         },
         select: {
           section: {
@@ -300,6 +500,10 @@ export class Mark {
                   id: true,
                   title: true,
                   totalMarks: true,
+                  studentRecords: {
+                    select: { id: true },
+                    take: 1,
+                  },
                 },
               },
             },
@@ -308,10 +512,78 @@ export class Mark {
         orderBy: { course: { code: "asc" } },
       });
 
+      const formattedAssignments = assignments.map((assignment) => ({
+        ...assignment,
+        course: {
+          ...assignment.course,
+          assessments: assignment.course.assessments.map((assessment) => ({
+            id: assessment.id,
+            title: assessment.title,
+            totalMarks: assessment.totalMarks,
+            hasMarks: assessment.studentRecords.length > 0,
+          })),
+        },
+      }));
+
+      const peAssignments = await db.electiveBatchFaculty.findMany({
+        where: {
+          facultyId: faculty.id,
+          course: { approvalStatus: FACULTY_COURSE_STATUS },
+        },
+        select: {
+          course: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              semester: {
+                select: {
+                  id: true,
+                  semesterNumber: true,
+                  academicTerm: {
+                    select: {
+                      id: true,
+                      type: true,
+                      year: true,
+                    },
+                  },
+                },
+              },
+              assessments: {
+                select: {
+                  id: true,
+                  title: true,
+                  totalMarks: true,
+                  studentRecords: {
+                    select: { id: true },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const formattedPeAssignments = peAssignments.map((assignment) => ({
+        section: null,
+        course: {
+          ...assignment.course,
+          assessments: assignment.course.assessments.map((assessment) => ({
+            id: assessment.id,
+            title: assessment.title,
+            totalMarks: assessment.totalMarks,
+            hasMarks: assessment.studentRecords.length > 0,
+          })),
+        },
+      }));
+
       return {
         status: "success",
         message: "Marks dashboard data retrieved successfully",
-        data: assignments,
+        data: [...formattedAssignments, ...formattedPeAssignments].sort(
+          (a, b) => a.course.code.localeCompare(b.course.code)
+        ),
       };
     } catch (error) {
       logger.error("Error fetching marks dashboard", error);
@@ -349,6 +621,8 @@ export class Mark {
               id: true,
               name: true,
               code: true,
+              courseType: true,
+              approvalStatus: true,
             },
           },
         },
@@ -358,47 +632,21 @@ export class Mark {
         throw new Error("Assessment not found");
       }
 
-      // Verify faculty is assigned to this course
-      const isAssigned = await db.courseAssignment.findFirst({
-        where: {
-          courseId: assessment.courseId,
-          facultyId: faculty.id,
-        },
-      });
+      assertFacultyCourseApproved(assessment.course.approvalStatus);
 
-      if (!isAssigned) {
-        throw new Error("Unauthorized to view this assessment");
-      }
+      // Verify faculty is assigned to this course (PC section mapping or PE elective batch)
+      await this.assertFacultyCourseAccess(faculty.id, assessment.course, db);
 
-      // Get students registered for this course, optionally filtered by section
-      const courseRegistrations = await db.courseRegistration.findMany({
-        where: {
-          courseId: assessment.courseId,
-          semesterId: assessment.semesterId,
-          ...(sectionId
-            ? {
-                student: {
-                  studentSections: {
-                    some: { sectionId },
-                  },
-                },
-              }
-            : {}),
-        },
-        include: {
-          student: {
-            select: {
-              id: true,
-              usn: true,
-              user: {
-                select: {
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-      });
+      // Get students for this course, scoped to the faculty (PC section or PE batch roster)
+      const courseStudents = await this.getFacultyCourseStudents(
+        faculty.id,
+        assessment.courseId,
+        assessment.course.courseType,
+        assessment.semesterId,
+        sectionId,
+        db,
+        false
+      );
 
       // Get existing student assessments and marks
       const existingAssessments = await db.studentAssessment.findMany({
@@ -419,7 +667,7 @@ export class Mark {
         existingAssessments.map((a) => [a.studentId, a])
       );
 
-      const students = courseRegistrations.map((reg) => {
+      const students = courseStudents.map((reg) => {
         const studentAssess = assessmentMap.get(reg.student.id);
         const questionMarks: Record<string, number> = {};
         if (studentAssess?.questionMarks) {
@@ -471,10 +719,12 @@ export class Mark {
    */
   static async saveAssessmentMarks(
     userId: string,
-    data: SaveAssessmentMarksType
+    data: SaveAssessmentMarksType,
+    tx?: Prisma.TransactionClient
   ): Promise<BaseResponse<null>> {
+    const prisma: DbLike = tx ?? db;
     try {
-      const faculty = await db.faculty.findUnique({
+      const faculty = await prisma.faculty.findUnique({
         where: { userId },
         select: { id: true },
       });
@@ -483,10 +733,11 @@ export class Mark {
         throw new Error("Faculty profile not found");
       }
 
-      const assessment = await db.assessmentTemplate.findUnique({
+      const assessment = await prisma.assessmentTemplate.findUnique({
         where: { id: data.assessmentId },
         include: {
           questions: true,
+          course: { select: { approvalStatus: true, courseType: true } },
         },
       });
 
@@ -494,20 +745,37 @@ export class Mark {
         throw new Error("Assessment not found");
       }
 
-      // Verify faculty is assigned to this course
-      const isAssigned = await db.courseAssignment.findFirst({
-        where: {
-          courseId: assessment.courseId,
-          facultyId: faculty.id,
-        },
-      });
+      assertFacultyCourseApproved(assessment.course.approvalStatus, true);
 
-      if (!isAssigned) {
-        throw new Error("Unauthorized to save marks for this assessment");
-      }
+      const { PeCapacityService } = await import(
+        "@webcampus/api/src/services/shared/pe-capacity.service"
+      );
+      await PeCapacityService.assertPeDownstreamReady(assessment.courseId);
+
+      // Verify faculty is assigned to this course (PC section mapping or PE elective batch)
+      await this.assertFacultyCourseAccess(
+        faculty.id,
+        { id: assessment.courseId, courseType: assessment.course.courseType },
+        prisma,
+        "Unauthorized to save marks for this assessment"
+      );
+
+      // PE/OE faculty may only save marks for students in their own elective batches
+      const isBatchManaged = isBatchManagedCourse(assessment.course.courseType);
+      const allowedPeStudentIds = isBatchManaged
+        ? new Set(
+            (
+              await PeCapacityService.getFacultyPeRoster(
+                faculty.id,
+                assessment.courseId,
+                prisma
+              )
+            ).map((r) => r.studentId)
+          )
+        : null;
 
       // Check freeze state before allowing marks to be saved
-      const freezeRecord = await db.courseAssignment.findFirst({
+      const freezeRecord = await prisma.courseAssignment.findFirst({
         where: {
           courseId: assessment.courseId,
           facultyId: faculty.id,
@@ -548,24 +816,33 @@ export class Mark {
 
       // Process each student's totals
       for (const [studentId, totalEntry] of totalsByStudent.entries()) {
-        // Verify student is registered for this course
-        const registration = await db.courseRegistration.findFirst({
-          where: {
-            studentId,
-            courseId: assessment.courseId,
-            semesterId: assessment.semesterId,
-          },
-        });
-
-        if (!registration) {
-          logger.warn(`Student ${studentId} not registered for course`, {
-            courseId: assessment.courseId,
+        // PE/OE faculty may only mark students within their elective batches
+        if (isBatchManaged) {
+          if (!allowedPeStudentIds?.has(studentId)) {
+            throw new Error(
+              `Student ${studentId} is not in any of your elective batches for this course`
+            );
+          }
+        } else {
+          // Verify student is registered for this course
+          const registration = await prisma.courseRegistration.findFirst({
+            where: {
+              studentId,
+              courseId: assessment.courseId,
+              semesterId: assessment.semesterId,
+            },
           });
-          continue;
+
+          if (!registration) {
+            logger.warn(`Student ${studentId} not registered for course`, {
+              courseId: assessment.courseId,
+            });
+            continue;
+          }
         }
 
         // Create or update StudentAssessment record
-        const studentAssess = await db.studentAssessment.upsert({
+        const studentAssess = await prisma.studentAssessment.upsert({
           where: {
             studentId_assessmentId: {
               studentId,
@@ -589,7 +866,7 @@ export class Mark {
         if (hasQuestions) {
           const studentMarks = marksByStudent.get(studentId) ?? [];
           for (const mark of studentMarks) {
-            await db.studentQuestionMark.upsert({
+            await prisma.studentQuestionMark.upsert({
               where: {
                 recordId_questionId: {
                   recordId: studentAssess.id,
@@ -610,7 +887,7 @@ export class Mark {
       }
 
       for (const studentId of totalsByStudent.keys()) {
-        await recomputeStudentMark(studentId, data.courseId);
+        await recomputeStudentMark(studentId, data.courseId, tx);
       }
 
       logger.info("Assessment marks saved successfully", {
@@ -629,10 +906,395 @@ export class Mark {
     }
   }
 
+  static async generateMarksTemplate(
+    userId: string,
+    assessmentId: string,
+    sectionId?: string
+  ): Promise<Buffer> {
+    const faculty = await db.faculty.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!faculty) throw new Error("Faculty profile not found");
+
+    const assessment = await db.assessmentTemplate.findUnique({
+      where: { id: assessmentId },
+      include: {
+        questions: { orderBy: [{ part: "asc" }, { qNumber: "asc" }] },
+        course: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            courseType: true,
+            approvalStatus: true,
+            semester: {
+              select: {
+                id: true,
+                semesterNumber: true,
+                academicTerm: { select: { type: true, year: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!assessment) throw new Error("Assessment not found");
+
+    assertFacultyCourseApproved(assessment.course.approvalStatus);
+
+    await this.assertFacultyCourseAccess(faculty.id, assessment.course, db);
+
+    const roster = await this.getFacultyCourseStudents(
+      faculty.id,
+      assessment.courseId,
+      assessment.course.courseType,
+      assessment.semesterId,
+      sectionId,
+      db,
+      true
+    );
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Marks Entry");
+
+    worksheet.addRow([
+      "Academic Term",
+      `${assessment.course.semester.academicTerm.type} ${assessment.course.semester.academicTerm.year}`,
+    ]);
+    worksheet.addRow(["Semester", assessment.course.semester.semesterNumber]);
+    worksheet.addRow(["Course", assessment.course.name]);
+    worksheet.addRow(["Course Code", assessment.course.code]);
+    worksheet.addRow(["Assessment", assessment.title]);
+    worksheet.addRow(["Max Marks", assessment.totalMarks]);
+    worksheet.addRow([]);
+
+    const headerRow = worksheet.addRow([
+      "USN",
+      "Student Name",
+      "Student Email",
+      "Status",
+      ...assessment.questions.map((q) => q.qNumber),
+    ]);
+    headerRow.font = { bold: true };
+
+    roster.forEach((reg) => {
+      const rosterRow = worksheet.addRow([
+        reg.student.usn,
+        reg.student.user.name,
+        reg.student.user.email,
+        EXCEL_STATUS_LABELS.PRESENT,
+        ...assessment.questions.map(() => ""),
+      ]);
+      rosterRow.getCell(4).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [`"${EXCEL_STATUS_VALUES.join(",")}"`],
+      };
+    });
+
+    worksheet.getColumn(1).width = 18;
+    worksheet.getColumn(2).width = 30;
+    worksheet.getColumn(3).width = 30;
+    worksheet.getColumn(4).width = 12;
+    assessment.questions.forEach((_, index) => {
+      worksheet.getColumn(index + 5).width = 10;
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return buffer as unknown as Buffer;
+  }
+
+  private static computeTotalWithOrLogic(
+    questions: Array<{
+      id: string;
+      part: string;
+      marks: number;
+      orGroupId: string | null;
+    }>,
+    marks: Record<string, number>
+  ): number {
+    const byPart = new Map<string, typeof questions>();
+    questions.forEach((q) => {
+      const list = byPart.get(q.part) ?? [];
+      list.push(q);
+      byPart.set(q.part, list);
+    });
+
+    let total = 0;
+    byPart.forEach((partQuestions) => {
+      const orMaxes = new Map<string, number>();
+      let standalone = 0;
+      partQuestions.forEach((q) => {
+        const obtained = marks[q.id] ?? 0;
+        if (q.orGroupId) {
+          orMaxes.set(
+            q.orGroupId,
+            Math.max(orMaxes.get(q.orGroupId) ?? 0, obtained)
+          );
+        } else {
+          standalone += obtained;
+        }
+      });
+
+      let orSum = 0;
+      orMaxes.forEach((max) => {
+        orSum += max;
+      });
+      total += standalone + orSum;
+    });
+
+    return total;
+  }
+
+  static async uploadMarksFromExcel(
+    userId: string,
+    assessmentId: string,
+    sectionId: string | undefined,
+    fileBuffer: Buffer
+  ): Promise<BaseResponse<null>> {
+    const faculty = await db.faculty.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!faculty) throw new Error("Faculty profile not found");
+
+    const assessment = await db.assessmentTemplate.findUnique({
+      where: { id: assessmentId },
+      include: {
+        questions: { orderBy: [{ part: "asc" }, { qNumber: "asc" }] },
+        course: { select: { id: true, courseType: true } },
+      },
+    });
+    if (!assessment) throw new Error("Assessment not found");
+
+    await this.assertFacultyCourseAccess(
+      faculty.id,
+      assessment.course,
+      db,
+      "Unauthorized to upload marks for this assessment"
+    );
+
+    const isBatchManaged = isBatchManagedCourse(assessment.course.courseType);
+    const roster = await this.getFacultyCourseStudents(
+      faculty.id,
+      assessment.courseId,
+      assessment.course.courseType,
+      assessment.semesterId,
+      sectionId,
+      db,
+      false
+    );
+    const studentIdByUsn = new Map(
+      roster.map((r) => [r.student.usn, r.student.id])
+    );
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(fileBuffer as unknown as ArrayBuffer);
+    const worksheet = workbook.getWorksheet(1);
+    if (!worksheet) throw new Error("Invalid Excel file format");
+
+    let headerRowNumber = -1;
+    worksheet.eachRow((row, rowNumber) => {
+      if (
+        headerRowNumber === -1 &&
+        row.getCell(1).text.trim().toUpperCase() === "USN"
+      ) {
+        headerRowNumber = rowNumber;
+      }
+    });
+    if (headerRowNumber === -1) {
+      throw new Error(
+        "Template header row (USN) not found in the uploaded file"
+      );
+    }
+
+    const headerRow = worksheet.getRow(headerRowNumber);
+    const columnByHeader = new Map<string, number>();
+    headerRow.eachCell((cell, colNumber) => {
+      const header = cell.text.trim();
+      if (header) columnByHeader.set(header, colNumber);
+    });
+
+    const statusColumns = [...columnByHeader.entries()].filter(
+      ([header]) => header.trim().toLowerCase() === "status"
+    );
+    if (statusColumns.length > 1) {
+      throw new MarksExcelValidationError([
+        {
+          row: headerRowNumber,
+          usn: "-",
+          question: "Status",
+          message: `Invalid template: found ${statusColumns.length} Status columns. Keep exactly one "Status" column.`,
+        },
+      ]);
+    }
+    const statusColumnIndex: number | undefined = statusColumns[0]?.[1];
+
+    const missingColumns = assessment.questions.filter(
+      (q) => !columnByHeader.has(q.qNumber)
+    );
+    if (missingColumns.length > 0) {
+      throw new MarksExcelValidationError(
+        missingColumns.map((q) => ({
+          row: headerRowNumber,
+          usn: "-",
+          question: q.qNumber,
+          message: "Missing question column in template",
+        }))
+      );
+    }
+
+    const errors: ExcelImportError[] = [];
+    const seenUsns = new Set<string>();
+    const parsed: Array<{
+      studentId: string;
+      status: "PRESENT" | "ABSENT" | "MP";
+      marks: Array<{ questionId: string; marksObtained: number }>;
+    }> = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber <= headerRowNumber) return;
+      const usn = row.getCell(1).text.trim();
+      if (!usn) return;
+
+      const studentId = studentIdByUsn.get(usn);
+      if (!studentId) {
+        errors.push({
+          row: rowNumber,
+          usn,
+          question: "-",
+          message: isBatchManaged
+            ? "Student not found in your elective batches"
+            : "Student not found in the selected section",
+        });
+        return;
+      }
+      if (seenUsns.has(usn)) {
+        errors.push({
+          row: rowNumber,
+          usn,
+          question: "-",
+          message: "Duplicate USN in file",
+        });
+        return;
+      }
+      seenUsns.add(usn);
+
+      const rawStatus =
+        statusColumnIndex != null ? row.getCell(statusColumnIndex).text : "";
+      const resolved = resolveExcelStatus(rawStatus);
+      if (resolved.status === null) {
+        errors.push({
+          row: rowNumber,
+          usn,
+          question: "Status",
+          message: `Row ${rowNumber}: ${resolved.error}`,
+        });
+        return;
+      }
+      const status = resolved.status;
+
+      const marks: Array<{ questionId: string; marksObtained: number }> = [];
+      if (status === "PRESENT") {
+        assessment.questions.forEach((q) => {
+          const colNumber = columnByHeader.get(q.qNumber);
+          const raw = colNumber ? row.getCell(colNumber).text.trim() : "";
+          if (raw === "") {
+            marks.push({ questionId: q.id, marksObtained: 0 });
+            return;
+          }
+
+          const num = Number(raw);
+          if (Number.isNaN(num) || !Number.isFinite(num)) {
+            errors.push({
+              row: rowNumber,
+              usn,
+              question: q.qNumber,
+              message: "Marks must be numeric",
+            });
+            return;
+          }
+          if (num < 0 || num > q.marks) {
+            errors.push({
+              row: rowNumber,
+              usn,
+              question: q.qNumber,
+              message: `Marks ${num} exceed maximum ${q.marks}`,
+            });
+            return;
+          }
+          marks.push({ questionId: q.id, marksObtained: num });
+        });
+      }
+
+      parsed.push({ studentId, status, marks });
+    });
+
+    if (errors.length > 0) {
+      throw new MarksExcelValidationError(errors);
+    }
+
+    const studentTotals = parsed.map((entry) => {
+      const marksRecord: Record<string, number> = {};
+      entry.marks.forEach((mark) => {
+        marksRecord[mark.questionId] = mark.marksObtained;
+      });
+      return {
+        studentId: entry.studentId,
+        totalMarks:
+          entry.status === "PRESENT"
+            ? Mark.computeTotalWithOrLogic(assessment.questions, marksRecord)
+            : 0,
+        status: entry.status,
+      };
+    });
+
+    const marks = parsed.flatMap((entry) =>
+      entry.status === "PRESENT"
+        ? entry.marks.map((mark) => ({
+            studentId: entry.studentId,
+            questionId: mark.questionId,
+            marksObtained: mark.marksObtained,
+          }))
+        : []
+    );
+
+    const absentMpStudentIds = parsed
+      .filter((entry) => entry.status !== "PRESENT")
+      .map((entry) => entry.studentId);
+
+    return db.$transaction(async (tx) => {
+      if (absentMpStudentIds.length > 0) {
+        const records = await tx.studentAssessment.findMany({
+          where: { assessmentId, studentId: { in: absentMpStudentIds } },
+          select: { id: true },
+        });
+        if (records.length > 0) {
+          await tx.studentQuestionMark.deleteMany({
+            where: { recordId: { in: records.map((r) => r.id) } },
+          });
+        }
+      }
+      return Mark.saveAssessmentMarks(
+        userId,
+        {
+          assessmentId,
+          courseId: assessment.courseId,
+          marks,
+          studentTotals,
+        },
+        tx
+      );
+    });
+  }
+
   static async getMarksReport(
     userId: string,
     courseId: string,
-    sectionId?: string
+    sectionId?: string,
+    assessmentId?: string,
+    detailed?: boolean
   ): Promise<BaseResponse<MarksReportDTO>> {
     try {
       const faculty = await db.faculty.findUnique({
@@ -644,23 +1306,49 @@ export class Mark {
         throw new Error("Faculty profile not found");
       }
 
-      const assignment = await db.courseAssignment.findFirst({
-        where: {
-          courseId,
-          facultyId: faculty.id,
-        },
-        include: {
-          course: {
-            include: {
-              semester: {
-                include: {
-                  academicTerm: true,
-                },
+      const courseTypeRow = await db.course.findUnique({
+        where: { id: courseId },
+        select: { courseType: true },
+      });
+
+      const isBatchManaged = isBatchManagedCourse(courseTypeRow?.courseType);
+
+      const courseInclude = {
+        course: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            semesterId: true,
+            cieEligibility: true,
+            cieMaxMarks: true,
+            approvalStatus: true,
+            semester: {
+              include: {
+                academicTerm: true,
               },
             },
           },
         },
-      });
+      } as const;
+
+      const assignment = isBatchManaged
+        ? await db.electiveBatchFaculty.findFirst({
+            where: {
+              courseId,
+              facultyId: faculty.id,
+              course: { approvalStatus: FACULTY_COURSE_STATUS },
+            },
+            include: courseInclude,
+          })
+        : await db.courseAssignment.findFirst({
+            where: {
+              courseId,
+              facultyId: faculty.id,
+              course: { approvalStatus: FACULTY_COURSE_STATUS },
+            },
+            include: courseInclude,
+          });
 
       if (!assignment) {
         throw new Error("Unauthorized to view this course");
@@ -668,37 +1356,32 @@ export class Mark {
 
       const course = assignment.course;
 
+      assertFacultyCourseApproved(course.approvalStatus);
+
       const assessments = await db.assessmentTemplate.findMany({
-        where: { courseId },
+        where: {
+          courseId,
+          ...(assessmentId ? { id: assessmentId } : {}),
+        },
+        include: detailed
+          ? {
+              questions: {
+                orderBy: [{ part: "asc" }, { qNumber: "asc" }],
+              },
+            }
+          : undefined,
         orderBy: { title: "asc" },
       });
 
-      const registrations = await db.courseRegistration.findMany({
-        where: {
-          courseId,
-          semesterId: course.semesterId,
-          ...(sectionId
-            ? {
-                student: {
-                  studentSections: {
-                    some: { sectionId },
-                  },
-                },
-              }
-            : {}),
-        },
-        include: {
-          student: {
-            select: {
-              id: true,
-              usn: true,
-              user: {
-                select: { name: true },
-              },
-            },
-          },
-        },
-      });
+      const registrations = await this.getFacultyCourseStudents(
+        faculty.id,
+        courseId,
+        isBatchManaged ? "PE" : null,
+        course.semesterId,
+        sectionId,
+        db,
+        false
+      );
 
       const studentIds = registrations.map((r) => r.student.id);
 
@@ -707,6 +1390,11 @@ export class Mark {
           studentId: { in: studentIds },
           courseId,
         },
+        include: detailed
+          ? {
+              questionMarks: true,
+            }
+          : undefined,
       });
 
       const marksMap = new Map<
@@ -745,11 +1433,25 @@ export class Mark {
 
         const assessmentScores = assessments.map((a) => {
           const sa = assessmentMap.get(`${reg.student.id}_${a.id}`);
+          let questionMarks: Record<string, number> | undefined;
+
+          if (detailed && sa && "questionMarks" in sa) {
+            questionMarks = {};
+            const qms = sa.questionMarks as {
+              questionId: string;
+              marksObtained: number;
+            }[];
+            for (const qm of qms) {
+              questionMarks[qm.questionId] = qm.marksObtained;
+            }
+          }
+
           return {
             assessmentId: a.id,
             assessmentTitle: a.title,
             totalMarks: sa?.totalMarks ?? null,
             maxMarks: a.totalMarks,
+            questionMarks,
           };
         });
 
@@ -767,12 +1469,30 @@ export class Mark {
           id: course.id,
           code: course.code,
           name: course.name,
-          cumulativeMinMarks: course.cumulativeMinMarks,
+          cieMinMarks: (course.cieEligibility / 100) * course.cieMaxMarks,
+          cieEligibilityPercent: course.cieEligibility,
         },
         assessments: assessments.map((a) => ({
           id: a.id,
           title: a.title,
           totalMarks: a.totalMarks,
+          componentType: a.componentType,
+          questions:
+            detailed && "questions" in a
+              ? (
+                  a.questions as {
+                    id: string;
+                    part: string | null;
+                    qNumber: number;
+                    marks: number;
+                  }[]
+                ).map((q) => ({
+                  id: q.id,
+                  part: q.part ?? "",
+                  qNumber: String(q.qNumber),
+                  marks: q.marks,
+                }))
+              : undefined,
         })),
         semester: {
           id: course.semester.id,
@@ -812,7 +1532,10 @@ export class Mark {
       }
 
       const assignments = await db.courseAssignment.findMany({
-        where: { facultyId: faculty.id },
+        where: {
+          facultyId: faculty.id,
+          course: { approvalStatus: FACULTY_COURSE_STATUS },
+        },
         select: {
           course: {
             select: {
@@ -841,10 +1564,44 @@ export class Mark {
         semesterId: a.course.semesterId,
       }));
 
+      const peAssignments = await db.electiveBatchFaculty.findMany({
+        where: {
+          facultyId: faculty.id,
+          course: { approvalStatus: FACULTY_COURSE_STATUS },
+        },
+        select: {
+          course: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              semesterId: true,
+            },
+          },
+        },
+      });
+
+      const peCourses = peAssignments.map((a) => ({
+        id: a.course.id,
+        code: a.course.code,
+        name: a.course.name,
+        sectionId: "",
+        sectionName: "",
+        semesterId: a.course.semesterId,
+      }));
+
+      const allCourses = [...courses, ...peCourses];
+      const courseIds = [...new Set(allCourses.map((c) => c.id))];
+      const assessmentsRaw = await db.assessmentTemplate.findMany({
+        where: { courseId: { in: courseIds } },
+        select: { id: true, title: true, courseId: true },
+        orderBy: { title: "asc" },
+      });
+
       return {
         status: "success",
         message: "Filter options retrieved successfully",
-        data: { courses },
+        data: { courses: allCourses, assessments: assessmentsRaw },
       };
     } catch (error) {
       logger.error("Error fetching marks report filter options", error);

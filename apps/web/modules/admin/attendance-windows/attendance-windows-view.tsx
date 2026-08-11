@@ -77,7 +77,7 @@ const getStatusBadge = (row: AttendanceWindowRow) => {
 };
 
 export const AttendanceWindowsView = () => {
-  const { data: termsData } = useAcademicTerms({ status: "ACTIVE" });
+  const { data: termsData } = useAcademicTerms({ isCurrent: true });
   const { data: departmentsData } = useDepartments();
   const terms = termsData ?? [];
   const departments = departmentsData ?? [];
@@ -300,7 +300,6 @@ export const AttendanceWindowsView = () => {
               return { ...current, [key]: value };
             });
           }}
-          className="md:grid-cols-2 xl:grid-cols-3"
         />
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Input

@@ -3,6 +3,7 @@
   "type": "module",
   "private": true,
   "exports": {
+    "./feedback": "./src/feedback/index.ts",
     "./admin": "./src/admin/index.ts",
     "./admission": "./src/admission/index.ts",
     "./department": "./src/department/index.ts",
@@ -11,6 +12,7 @@
     "./student": "./src/student/index.ts",
     "./coe": "./src/coe/index.ts",
     "./finance": "./src/finance/index.ts",
+    "./support": "./src/support/index.ts",
     "./common": "./src/common.schemas.ts",
     "./constants": "./src/constants/index.ts"
   },
@@ -25,7 +27,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "zod": "^4.0.5",
+    "zod": "^4.3.6",
     "@webcampus/types": "*"
   }
 }

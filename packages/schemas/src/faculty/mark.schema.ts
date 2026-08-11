@@ -106,6 +106,7 @@ export interface MarksReportAssessmentScore {
   assessmentTitle: string;
   totalMarks: number | null;
   maxMarks: number;
+  questionMarks?: Record<string, number>;
 }
 
 export interface MarksReportStudent {
@@ -121,12 +122,20 @@ export interface MarksReportDTO {
     id: string;
     code: string;
     name: string;
-    cumulativeMinMarks: number;
+    cieMinMarks: number;
+    cieEligibilityPercent: number;
   };
   assessments: Array<{
     id: string;
     title: string;
     totalMarks: number;
+    componentType?: string;
+    questions?: Array<{
+      id: string;
+      part: string;
+      qNumber: string;
+      marks: number;
+    }>;
   }>;
   semester: {
     id: string;
@@ -148,5 +157,10 @@ export interface MarksReportFilterOptionsDTO {
     sectionId: string;
     sectionName: string;
     semesterId: string;
+  }>;
+  assessments: Array<{
+    id: string;
+    title: string;
+    courseId: string;
   }>;
 }

@@ -31,7 +31,7 @@ import { Form } from "@webcampus/ui/components/form";
 import axios, { AxiosError, AxiosResponse } from "axios";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { CourseFormFields } from "./course-form-fields";
 
@@ -64,7 +64,7 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
 
   // ── Edit Form ──
   const form = useForm<CreateCourseDTO>({
-    resolver: zodResolver(CreateCourseSchema),
+    resolver: zodResolver(CreateCourseSchema) as Resolver<CreateCourseDTO>,
     defaultValues: {
       code: course.code,
       name: course.name,
@@ -78,21 +78,25 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
       tutorialCredits: course.tutorialCredits,
       practicalCredits: course.practicalCredits,
       skillCredits: course.skillCredits,
-      seeMaxMarks: course.seeMaxMarks,
-      seeMinMarks: course.seeMinMarks,
-      seeWeightage: course.seeWeightage,
-      maxNoOfCies: course.maxNoOfCies,
-      minNoOfCies: course.minNoOfCies,
-      cieMaxMarks: course.cieMaxMarks,
-      cieMinMarks: course.cieMinMarks,
-      cieWeightage: course.cieWeightage,
-      noOfAssignments: course.noOfAssignments,
-      assignmentMaxMarks: course.assignmentMaxMarks,
-      labMaxMarks: course.labMaxMarks,
-      labMinMarks: course.labMinMarks,
-      labWeightage: course.labWeightage,
-      cumulativeMaxMarks: course.cumulativeMaxMarks,
-      cumulativeMinMarks: course.cumulativeMinMarks,
+      seeMaxMarks: course.seeMaxMarks ?? 0,
+      seeEligibility: course.seeEligibility ?? 40,
+      cieMaxMarks: course.cieMaxMarks ?? 0,
+      cieEligibility: course.cieEligibility ?? 40,
+      theoryMaxExams: course.theoryMaxExams ?? 0,
+      theoryExamMaxMarks: course.theoryExamMaxMarks ?? 0,
+      theoryMinExams: course.theoryMinExams ?? 0,
+      theoryCieContribution: course.theoryCieContribution ?? 0,
+      theoryEligibility: course.theoryEligibility ?? 40,
+      labMaxMarks: course.labMaxMarks ?? 0,
+      labEligibility: course.labEligibility ?? 40,
+      aatMaxMarks: course.aatMaxMarks ?? 0,
+      aatEligibility: course.aatEligibility ?? 40,
+      allowFeedback: course.allowFeedback ?? false,
+      attendanceRequired: course.attendanceRequired ?? true,
+      numberOfBatches: course.numberOfBatches ?? undefined,
+      studentsPerBatch: course.studentsPerBatch ?? undefined,
+      openElectiveEligibility: course.openElectiveEligibility ?? "ALL",
+      eligibleDepartmentIds: course.eligibleDepartmentIds ?? [],
     },
   });
 
@@ -107,6 +111,7 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);
       queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["pe-capacity-summary"] });
       setEditOpen(false);
     },
     onError: (error: AxiosError<ErrorResponse>) => {
@@ -127,6 +132,7 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);
       queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["pe-capacity-summary"] });
       setDeleteOpen(false);
     },
     onError: (error: AxiosError<ErrorResponse>) => {
@@ -175,7 +181,14 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
               <DialogHeader>
                 <DialogTitle>Edit Course: {course.code}</DialogTitle>
               </DialogHeader>
-              <CourseFormFields form={form} />
+              <CourseFormFields
+                form={form}
+                existingElectiveBatches={course.electiveBatches?.map((b) => ({
+                  id: b.id,
+                  name: b.name,
+                  studentCount: b.studentCount ?? 0,
+                }))}
+              />
               <DialogFooter>
                 <DialogClose asChild>
                   <Button type="button" variant="outline">

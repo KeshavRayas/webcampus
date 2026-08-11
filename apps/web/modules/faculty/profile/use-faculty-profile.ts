@@ -1,7 +1,7 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, getApiErrorMessage } from "@/lib/api-client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CreateFacultyExperienceSchema,
   CreateFacultyPublicationSchema,
@@ -19,15 +19,21 @@ import { z } from "zod";
 
 const profileQueryKey = ["faculty-profile"] as const;
 
-export type FacultyQualification = z.infer<typeof CreateFacultyQualificationSchema> & {
+export type FacultyQualification = z.infer<
+  typeof CreateFacultyQualificationSchema
+> & {
   id: string;
 };
 
-export type FacultyPublication = z.infer<typeof CreateFacultyPublicationSchema> & {
+export type FacultyPublication = z.infer<
+  typeof CreateFacultyPublicationSchema
+> & {
   id: string;
 };
 
-export type FacultyExperience = z.infer<typeof CreateFacultyExperienceSchema> & {
+export type FacultyExperience = z.infer<
+  typeof CreateFacultyExperienceSchema
+> & {
   id: string;
   durationLabel?: string;
 };
@@ -91,13 +97,15 @@ const invalidateProfile = (queryClient: ReturnType<typeof useQueryClient>) => {
   queryClient.invalidateQueries({ queryKey: profileQueryKey });
 };
 
-export const useFacultyProfile = () => {
+export const useFacultyProfile = (facultyId?: string) => {
   return useQuery({
-    queryKey: profileQueryKey,
+    queryKey: facultyId ? ["faculty-profile", facultyId] : profileQueryKey,
     queryFn: async () => {
-      const response = await apiClient.get<BaseResponse<FacultyProfilePayload>>(
-        "/faculty/profile"
-      );
+      const endpoint = facultyId
+        ? `/hod/faculty/${facultyId}`
+        : "/faculty/profile";
+      const response =
+        await apiClient.get<BaseResponse<FacultyProfilePayload>>(endpoint);
       return unwrapSuccess(response.data);
     },
   });
@@ -129,7 +137,9 @@ export const useCreateQualification = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: z.input<typeof CreateFacultyQualificationSchema>) => {
+    mutationFn: async (
+      payload: z.input<typeof CreateFacultyQualificationSchema>
+    ) => {
       const validated = CreateFacultyQualificationSchema.parse(payload);
       const response = await apiClient.post<BaseResponse<FacultyQualification>>(
         "/faculty/profile/qualifications",
@@ -199,7 +209,9 @@ export const useCreatePublication = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: z.input<typeof CreateFacultyPublicationSchema>) => {
+    mutationFn: async (
+      payload: z.input<typeof CreateFacultyPublicationSchema>
+    ) => {
       const validated = CreateFacultyPublicationSchema.parse(payload);
       const response = await apiClient.post<BaseResponse<FacultyPublication>>(
         "/faculty/profile/publications",
@@ -269,7 +281,9 @@ export const useCreateExperience = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: z.input<typeof CreateFacultyExperienceSchema>) => {
+    mutationFn: async (
+      payload: z.input<typeof CreateFacultyExperienceSchema>
+    ) => {
       const validated = CreateFacultyExperienceSchema.parse(payload);
       const response = await apiClient.post<BaseResponse<FacultyExperience>>(
         "/faculty/profile/experiences",
@@ -335,5 +349,6 @@ export const useDeleteExperience = () => {
   });
 };
 
-export const qualificationProgramTypeOptions = QualificationProgramTypeEnum.options;
+export const qualificationProgramTypeOptions =
+  QualificationProgramTypeEnum.options;
 export const publicationCategoryOptions = PublicationCategoryEnum.options;

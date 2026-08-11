@@ -1,57 +1,35 @@
 import { z } from "zod";
 
-/**
- * Enum values matching Prisma CourseMode
- */
 const COURSE_MODES = [
   "INTEGRATED",
   "NON_INTEGRATED",
   "FINAL_SUMMARY",
   "NCMC",
 ] as const;
-
-/**
- * Enum values matching Prisma CourseType
- */
 const COURSE_TYPES = ["PC", "PE", "OE", "NCMC"] as const;
-
-/**
- * Enum values matching Prisma Cycle
- */
 const COURSE_CYCLES = ["PHYSICS", "CHEMISTRY", "NONE"] as const;
+const OPEN_ELECTIVE_ELIGIBILITIES = [
+  "ALL",
+  "ALL_EXCEPT_OWNER",
+  "CUSTOM",
+] as const;
 
-/**
- * Base course schema with all user-provided fields.
- * Excludes backend-computed fields: totalCredits, hasLaboratoryComponent
- */
 const BaseCourseSchema = z.object({
   code: z
     .string()
     .min(1, "Course code is required")
     .max(20, "Course code must be less than 20 characters"),
-
   name: z
     .string()
     .min(1, "Course name is required")
     .max(200, "Course name must be less than 200 characters")
     .trim(),
-
-  courseMode: z.enum(COURSE_MODES, {
-    message: "Course mode is required",
-  }),
-
-  courseType: z.enum(COURSE_TYPES, {
-    message: "Course type is required",
-  }),
-
+  courseMode: z.enum(COURSE_MODES, { message: "Course mode is required" }),
+  courseType: z.enum(COURSE_TYPES, { message: "Course type is required" }),
   cycle: z.enum(COURSE_CYCLES).optional(),
-
   departmentId: z.string().uuid("Invalid department ID").optional(),
-
   departmentName: z.string().min(1, "Department is required").optional(),
-
   semesterId: z.string().min(1, "Semester is required"),
-
   semesterNumber: z
     .number()
     .int()
@@ -64,96 +42,66 @@ const BaseCourseSchema = z.object({
   practicalCredits: z.number().int().min(0).max(10),
   skillCredits: z.number().int().min(0).max(10),
 
-  // SEE Assessment
+  // New Assessment Configuration
   seeMaxMarks: z.number().int().min(0),
-  seeMinMarks: z.number().int().min(0),
-  seeWeightage: z.number().int().min(0),
+  seeEligibility: z.number().int().min(0).max(100).default(40),
 
-  // CIE Assessment
-  maxNoOfCies: z.number().int().min(0),
-  minNoOfCies: z.number().int().min(0),
   cieMaxMarks: z.number().int().min(0),
-  cieMinMarks: z.number().int().min(0),
-  cieWeightage: z.number().int().min(0),
+  cieEligibility: z.number().int().min(0).max(100).default(40),
 
-  // Other Assessment
-  noOfAssignments: z.number().int().min(0),
-  assignmentMaxMarks: z.number().int().min(0),
+  theoryMaxExams: z.number().int().min(0),
+  theoryExamMaxMarks: z.number().int().min(0),
+  theoryMinExams: z.number().int().min(0),
+  theoryCieContribution: z.number().int().min(0),
+  theoryEligibility: z.number().int().min(0).max(100).default(40),
+
   labMaxMarks: z.number().int().min(0),
-  labMinMarks: z.number().int().min(0),
-  labWeightage: z.number().int().min(0),
-  cumulativeMaxMarks: z.number().int().min(0),
-  cumulativeMinMarks: z.number().int().min(0),
+  labEligibility: z.number().int().min(0).max(100).default(40),
+
+  aatMaxMarks: z.number().int().min(0),
+  aatEligibility: z.number().int().min(0).max(100).default(40),
+
+  allowFeedback: z.boolean().default(true),
+  attendanceRequired: z.boolean().default(true),
+
+  // Program Elective (PE) batch configuration
+  numberOfBatches: z.number().int().min(1).optional(),
+  studentsPerBatch: z.number().int().min(1).optional(),
+  /** When decreasing numberOfBatches, caller must pick which batch IDs to remove */
+  electiveBatchesToRemove: z.array(z.string().uuid()).optional(),
+
+  // Open Elective (OE) visibility configuration
+  openElectiveEligibility: z.enum(OPEN_ELECTIVE_ELIGIBILITIES).optional(),
+  /** Departments allowed to register when openElectiveEligibility === "CUSTOM" */
+  eligibleDepartmentIds: z.array(z.string().uuid()).optional(),
 });
 
 const MODE_LOCKED_VALUES = {
-  INTEGRATED: {
-    tutorialCredits: 0,
-    skillCredits: 0,
-    maxNoOfCies: 3,
-    minNoOfCies: 2,
-    cieMaxMarks: 40,
-    cieMinMarks: 0,
-    cieWeightage: 50,
-    assignmentMaxMarks: 5,
-    labMaxMarks: 25,
-    labMinMarks: 10,
-    labWeightage: 0,
-    cumulativeMaxMarks: 100,
-    cumulativeMinMarks: 40,
-  },
+  INTEGRATED: { tutorialCredits: 0, skillCredits: 0 },
   NON_INTEGRATED: {
     tutorialCredits: 0,
     practicalCredits: 0,
     skillCredits: 0,
-    maxNoOfCies: 3,
-    minNoOfCies: 2,
-    cieMaxMarks: 40,
-    cieMinMarks: 0,
-    cieWeightage: 100,
-    assignmentMaxMarks: 10,
     labMaxMarks: 0,
-    labMinMarks: 0,
-    labWeightage: 0,
-    cumulativeMaxMarks: 100,
-    cumulativeMinMarks: 40,
+    labEligibility: 0,
   },
   FINAL_SUMMARY: {
-    tutorialCredits: 0,
-    practicalCredits: 0,
-    skillCredits: 0,
-    maxNoOfCies: 3,
-    minNoOfCies: 2,
-    cieMaxMarks: 50,
-    cieMinMarks: 20,
-    cieWeightage: 100,
-    noOfAssignments: 0,
-    assignmentMaxMarks: 0,
     labMaxMarks: 0,
-    labMinMarks: 0,
-    labWeightage: 0,
-    cumulativeMaxMarks: 100,
-    cumulativeMinMarks: 40,
+    labEligibility: 0,
+    aatMaxMarks: 0,
+    aatEligibility: 0,
   },
   NCMC: {
+    lectureCredits: 0,
     tutorialCredits: 0,
     practicalCredits: 0,
     skillCredits: 0,
     seeMaxMarks: 0,
-    seeMinMarks: 0,
-    seeWeightage: 0,
-    maxNoOfCies: 0,
-    minNoOfCies: 0,
-    cieMaxMarks: 0,
-    cieMinMarks: 0,
-    cieWeightage: 0,
-    noOfAssignments: 0,
-    assignmentMaxMarks: 0,
+    seeEligibility: 0,
     labMaxMarks: 0,
-    labMinMarks: 0,
-    labWeightage: 0,
-    cumulativeMaxMarks: 100,
-    cumulativeMinMarks: 40,
+    labEligibility: 0,
+    aatMaxMarks: 0,
+    aatEligibility: 0,
   },
 } as const;
 
@@ -183,24 +131,191 @@ const validateModeLockedValues = (
   (Object.entries(lockedValues) as Array<[ModeLockedField, number]>).forEach(
     ([field, expected]) => {
       const provided = value[field as string];
-
       if (provided === undefined) {
-        if (strictMissing) {
-          addLockedFieldIssue(ctx, field, expected, mode);
-        }
+        if (strictMissing) addLockedFieldIssue(ctx, field, expected, mode);
         return;
       }
-
-      if (typeof provided !== "number" || provided !== expected) {
+      if (typeof provided !== "number" || provided !== expected)
         addLockedFieldIssue(ctx, field, expected, mode);
-      }
     }
   );
 };
 
-/**
- * Schema for creating a new course
- */
+const validateAssessmentBounds = (
+  value: Record<string, unknown>,
+  ctx: z.RefinementCtx
+) => {
+  const cieMaxMarks = value.cieMaxMarks as number | undefined;
+  const theoryCieContribution = value.theoryCieContribution as
+    | number
+    | undefined;
+  const labMaxMarks = value.labMaxMarks as number | undefined;
+  const aatMaxMarks = value.aatMaxMarks as number | undefined;
+  const theoryExamMaxMarks = value.theoryExamMaxMarks as number | undefined;
+  const theoryMinExams = value.theoryMinExams as number | undefined;
+  const theoryMaxExams = value.theoryMaxExams as number | undefined;
+
+  if (
+    cieMaxMarks !== undefined &&
+    theoryCieContribution !== undefined &&
+    labMaxMarks !== undefined &&
+    aatMaxMarks !== undefined &&
+    theoryCieContribution + labMaxMarks + aatMaxMarks > cieMaxMarks
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["theoryCieContribution"],
+      message: "Theory, Lab, and AAT contributions cannot exceed CIE max marks",
+    });
+  }
+
+  if (
+    theoryCieContribution !== undefined &&
+    theoryExamMaxMarks !== undefined &&
+    theoryMinExams !== undefined &&
+    theoryCieContribution > theoryExamMaxMarks * theoryMinExams
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["theoryCieContribution"],
+      message:
+        "Theory contribution cannot exceed selected Theory exam capacity",
+    });
+  }
+
+  if (
+    theoryMinExams !== undefined &&
+    theoryMaxExams !== undefined &&
+    theoryMinExams > theoryMaxExams
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["theoryMinExams"],
+      message: "Minimum Theory exams cannot exceed the number of Theory exams",
+    });
+  }
+};
+
+const validatePeConfig = (
+  value: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+  strict = true
+) => {
+  const courseType = value.courseType as string | undefined;
+  if (courseType !== "PE") {
+    return;
+  }
+
+  const courseMode = value.courseMode as string | undefined;
+  if (courseMode !== undefined && courseMode !== "NON_INTEGRATED") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["courseMode"],
+      message: "Program Elective (PE) courses must use NON_INTEGRATED mode",
+    });
+  }
+
+  const numberOfBatches = value.numberOfBatches as number | undefined;
+  const studentsPerBatch = value.studentsPerBatch as number | undefined;
+
+  if (strict || numberOfBatches !== undefined) {
+    if (
+      numberOfBatches === undefined ||
+      !Number.isInteger(numberOfBatches) ||
+      numberOfBatches < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["numberOfBatches"],
+        message: "Number of batches is required for PE and must be at least 1",
+      });
+    }
+  }
+
+  if (strict || studentsPerBatch !== undefined) {
+    if (
+      studentsPerBatch === undefined ||
+      !Number.isInteger(studentsPerBatch) ||
+      studentsPerBatch < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["studentsPerBatch"],
+        message: "Students per batch is required for PE and must be at least 1",
+      });
+    }
+  }
+};
+
+const validateOeConfig = (
+  value: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+  strict = true
+) => {
+  const courseType = value.courseType as string | undefined;
+  if (courseType !== "OE") {
+    return;
+  }
+
+  const courseMode = value.courseMode as string | undefined;
+  if (courseMode !== undefined && courseMode !== "NON_INTEGRATED") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["courseMode"],
+      message: "Open Elective (OE) courses must use NON_INTEGRATED mode",
+    });
+  }
+
+  const numberOfBatches = value.numberOfBatches as number | undefined;
+  const studentsPerBatch = value.studentsPerBatch as number | undefined;
+
+  if (strict || numberOfBatches !== undefined) {
+    if (
+      numberOfBatches === undefined ||
+      !Number.isInteger(numberOfBatches) ||
+      numberOfBatches < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["numberOfBatches"],
+        message: "Number of batches is required for OE and must be at least 1",
+      });
+    }
+  }
+
+  if (strict || studentsPerBatch !== undefined) {
+    if (
+      studentsPerBatch === undefined ||
+      !Number.isInteger(studentsPerBatch) ||
+      studentsPerBatch < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["studentsPerBatch"],
+        message: "Students per batch is required for OE and must be at least 1",
+      });
+    }
+  }
+
+  const eligibility = value.openElectiveEligibility as string | undefined;
+  const eligibleDepartmentIds = value.eligibleDepartmentIds as
+    | string[]
+    | undefined;
+  if (eligibility === "CUSTOM") {
+    if (
+      !Array.isArray(eligibleDepartmentIds) ||
+      eligibleDepartmentIds.length === 0
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["eligibleDepartmentIds"],
+        message:
+          "At least one department is required when eligibility is CUSTOM",
+      });
+    }
+  }
+};
+
 export const CreateCourseSchema = BaseCourseSchema.superRefine((value, ctx) => {
   if (!value.departmentId && !value.departmentName) {
     ctx.addIssue({
@@ -209,36 +324,39 @@ export const CreateCourseSchema = BaseCourseSchema.superRefine((value, ctx) => {
       message: "departmentId or departmentName is required",
     });
   }
-
   validateModeLockedValues(
     value as unknown as Record<string, unknown>,
     value.courseMode,
     ctx,
     true
   );
+  validateAssessmentBounds(value as unknown as Record<string, unknown>, ctx);
+  validatePeConfig(value as unknown as Record<string, unknown>, ctx, true);
+  validateOeConfig(value as unknown as Record<string, unknown>, ctx, true);
 });
 
-/**
- * Schema for updating an existing course.
- * Requires `id`; all other fields are optional for partial updates.
- */
 export const UpdateCourseSchema = BaseCourseSchema.partial()
   .extend({
     id: z.string().uuid("Course ID is required for updates"),
   })
   .superRefine((value, ctx) => {
-    if (!value.courseMode) return;
-    validateModeLockedValues(
-      value as unknown as Record<string, unknown>,
-      value.courseMode,
-      ctx,
-      false
-    );
+    if (value.courseMode) {
+      validateModeLockedValues(
+        value as unknown as Record<string, unknown>,
+        value.courseMode,
+        ctx,
+        false
+      );
+    }
+    validateAssessmentBounds(value as unknown as Record<string, unknown>, ctx);
+    if (value.courseType === "PE" || value.numberOfBatches !== undefined) {
+      validatePeConfig(value as unknown as Record<string, unknown>, ctx, false);
+    }
+    if (value.courseType === "OE" || value.numberOfBatches !== undefined) {
+      validateOeConfig(value as unknown as Record<string, unknown>, ctx, false);
+    }
   });
 
-/**
- * Schema for deleting a course
- */
 export const DeleteCourseSchema = z.object({
   id: z.string().uuid("Course ID is required"),
 });
@@ -255,10 +373,7 @@ const ApprovalScopeSchema = z.object({
 });
 
 const requireDepartmentScope = <
-  T extends {
-    departmentId?: string;
-    departmentName?: string;
-  },
+  T extends { departmentId?: string; departmentName?: string },
 >(
   value: T,
   ctx: z.RefinementCtx
@@ -277,13 +392,11 @@ export const ApproveSemesterCoursesSchema = ApprovalScopeSchema.superRefine(
     requireDepartmentScope(value, ctx);
   }
 );
-
 export const RequestRevisionForSemesterSchema = ApprovalScopeSchema.extend({
   reviewerNotes: z.string().trim().min(1, "Revision notes are required"),
 }).superRefine((value, ctx) => {
   requireDepartmentScope(value, ctx);
 });
-
 export const CourseBranchQuerySchema = z.object({
   semesterId: z.string().uuid("Invalid semester ID").optional(),
   cycle: z
@@ -293,6 +406,20 @@ export const CourseBranchQuerySchema = z.object({
     .optional(),
 });
 
+export const PeCapacitySummaryQuerySchema = z.object({
+  semesterId: z.string().uuid("Invalid semester ID"),
+  cycle: z
+    .enum(COURSE_CYCLES)
+    .or(z.literal(""))
+    .transform((value) => (value === "" ? undefined : value))
+    .optional(),
+});
+
+export const PeCapacitySummaryResponseSchema = z.object({
+  eligibleStudents: z.number().int(),
+  configuredCapacity: z.number().int(),
+  remainingSeats: z.number().int(),
+});
 /**
  * Response schema for a single course (includes backend-computed fields)
  */
@@ -331,10 +458,38 @@ export const CourseResponseSchema = BaseCourseSchema.extend({
   lastOverrideById: z.string().nullable().optional(),
   overrideCount: z.number().int().optional(),
   hasPostApprovalEdits: z.boolean().optional(),
+  numberOfBatches: z.number().int().nullable().optional(),
+  studentsPerBatch: z.number().int().nullable().optional(),
+  electiveMappingVersion: z.number().int().optional(),
+  openElectiveEligibility: z.enum(OPEN_ELECTIVE_ELIGIBILITIES).optional(),
+  eligibleDepartmentIds: z.array(z.string().uuid()).optional(),
+  eligibleDepartments: z
+    .array(z.object({ id: z.string().uuid(), name: z.string() }))
+    .optional(),
+  facultyMappingComplete: z.boolean().optional(),
+  electiveMappingComplete: z.boolean().optional(),
+  electiveBatches: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string(),
+        sortOrder: z.number().int(),
+        facultyId: z.string().uuid().nullable().optional(),
+        facultyName: z.string().nullable().optional(),
+        studentCount: z.number().int().optional(),
+      })
+    )
+    .optional(),
 });
 
 export type CreateCourseDTO = z.infer<typeof CreateCourseSchema>;
 export type UpdateCourseDTO = z.infer<typeof UpdateCourseSchema>;
 export type DeleteCourseDTO = z.infer<typeof DeleteCourseSchema>;
 export type CourseBranchQueryType = z.infer<typeof CourseBranchQuerySchema>;
+export type PeCapacitySummaryQueryType = z.infer<
+  typeof PeCapacitySummaryQuerySchema
+>;
+export type PeCapacitySummaryResponseDTO = z.infer<
+  typeof PeCapacitySummaryResponseSchema
+>;
 export type CourseResponseDTO = z.infer<typeof CourseResponseSchema>;

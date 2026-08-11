@@ -8,7 +8,15 @@ import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
-import { CreateUserType } from "@webcampus/schemas/admin";
+
+type MockUserInput = {
+  email: string;
+  username: string;
+  password: string;
+  name: string;
+  role: string;
+  image?: string;
+};
 
 type DepartmentSeed = {
   name: string;
@@ -31,6 +39,15 @@ type FacultySeed = {
 };
 
 const DEFAULT_PASSWORD = "password";
+
+const MOCK_FINANCE_USER: MockUserInput = {
+  email: "finance@webcampus.com",
+  username: "finance",
+  password: DEFAULT_PASSWORD,
+  name: "Finance",
+  role: "finance" as const,
+};
+
 const IMAGE_URL =
   "https://adminportal-fileupload.s3.ap-southeast-2.amazonaws.com/department_logo_39bc77d3-dc17-4679-952e-2bab6d716229.jpg";
 
@@ -562,7 +579,7 @@ class MockStarter {
     );
   }
 
-  private async ensureUser(userData: CreateUserType & { image?: string }) {
+  private async ensureUser(userData: MockUserInput) {
     const normalizedUsername = userData.username.toLowerCase();
 
     const existing = await db.user.findFirst({
@@ -887,6 +904,16 @@ class MockStarter {
     }
   }
 
+  public async seedFinanceUser(): Promise<void> {
+    const financeUser = await this.ensureUser(MOCK_FINANCE_USER);
+
+    logger.info(
+      financeUser.created
+        ? `Created finance user ${MOCK_FINANCE_USER.email}`
+        : `Updated finance user ${MOCK_FINANCE_USER.email}`
+    );
+  }
+
   public async seedCoeUser(): Promise<void> {
     const coeData = {
       name: "COE User",
@@ -944,6 +971,7 @@ class MockStarter {
     await this.seedAcademicTermAndSemesters();
     await this.seedFaculty(departmentIdByCode);
     await this.seedAdmissionUsers();
+    await this.seedFinanceUser();
     await this.seedCoeUser();
     logger.info("mock_start script completed successfully.");
   }

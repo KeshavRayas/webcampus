@@ -1,9 +1,15 @@
-const Page = () => {
-  return (
-    <div className="flex h-96 items-center justify-center">
-      <p className="text-muted-foreground text-sm">Marks</p>
-    </div>
-  );
+import { AdminMarksReportView } from "@/modules/admin/academics/reports/admin-marks-report-view";
+import { Metadata } from "next";
+import { Suspense } from "react";
+
+export const metadata: Metadata = {
+  title: "Admin - Marks Report | WebCampus",
 };
 
-export default Page;
+export default function AdminMarksReportPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AdminMarksReportView />
+    </Suspense>
+  );
+}

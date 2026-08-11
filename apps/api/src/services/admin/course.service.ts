@@ -5,7 +5,6 @@ import {
   UpdateCourseDTO,
 } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
-import type { DepartmentRequestContext } from "@webcampus/types/request-context";
 
 export class AdminCourseService {
   static create(data: CreateCourseDTO) {
@@ -30,11 +29,13 @@ export class AdminCourseService {
     return CourseService.delete(id);
   }
 
+  // Updated to accept optional department filters as passed by the controller
   static getById(id: string, departmentId?: string, departmentName?: string) {
     return CourseService.getById(id, {
       departmentId,
       departmentName,
-    } as DepartmentRequestContext);
+      adminView: true,
+    });
   }
 
   static getByDepartment(
@@ -55,12 +56,26 @@ export class AdminCourseService {
       >
     >
   > {
+    // CourseService.getByBranch expects (semesterId, departmentId, departmentName, cycle)
     return CourseService.getByBranch(
+      semesterId as string,
       departmentId,
       departmentName,
-      semesterId,
-      cycle
-    );
+      cycle,
+      { adminView: true }
+    ) as unknown as Promise<
+      BaseResponse<
+        Array<
+          Course & {
+            departmentId: string;
+            departmentName: string;
+            isFullyMapped: boolean;
+            isPartiallyMapped: boolean;
+            isUnmapped: boolean;
+          }
+        >
+      >
+    >;
   }
 
   static getCoordinators(courseId: string) {
@@ -70,7 +85,7 @@ export class AdminCourseService {
   static updateCoordinators(
     courseId: string,
     facultyIds: string[],
-    adminContext: {
+    adminContext?: {
       isAdmin: boolean;
       adminUserId: string;
       clientVersion?: number;
@@ -88,6 +103,6 @@ export class AdminCourseService {
   }
 
   static getMappedFacultyForCourse(courseId: string) {
-    return CourseService.getMappedFacultyForCourse(courseId, undefined, true);
+    return CourseService.getMappedFacultyForCourse(courseId);
   }
 }

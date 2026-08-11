@@ -12,6 +12,7 @@ export const CourseEligibilitySchema = z.object({
   markEligible: z.boolean(),
   attendanceEligible: z.boolean(),
   eligible: z.boolean(),
+  reason: z.string().nullable().optional(),
 });
 
 export const StudentInfoSchema = z.object({

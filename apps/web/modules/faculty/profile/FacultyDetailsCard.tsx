@@ -1,8 +1,5 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { DataField } from "./data-field";
-import { FacultyProfilePayload } from "./use-faculty-profile";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -21,6 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
+import { useMemo, useState } from "react";
+import { DataField } from "./data-field";
+import { FacultyProfilePayload } from "./use-faculty-profile";
 
 const bloodGroupOptions = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -42,19 +42,31 @@ export const FacultyDetailsCard = ({
   profile,
   onSave,
   isSaving,
+  isReadOnly,
 }: {
   profile: FacultyProfilePayload;
   onSave: (payload: Record<string, unknown>) => void;
   isSaving: boolean;
+  isReadOnly?: boolean;
 }) => {
   const [open, setOpen] = useState(false);
-  const [qualification, setQualification] = useState(profile.qualification || "");
+  const [qualification, setQualification] = useState(
+    profile.qualification || ""
+  );
   const [gender, setGender] = useState(profile.gender || "");
   const [bloodGroup, setBloodGroup] = useState(profile.bloodGroup || "");
-  const [maritalStatus, setMaritalStatus] = useState(profile.maritalStatus || "");
-  const [aboutYourself, setAboutYourself] = useState(profile.aboutYourself || "");
-  const [researchInterests, setResearchInterests] = useState(profile.researchInterests || "");
-  const [otherInformation, setOtherInformation] = useState(profile.otherInformation || "");
+  const [maritalStatus, setMaritalStatus] = useState(
+    profile.maritalStatus || ""
+  );
+  const [aboutYourself, setAboutYourself] = useState(
+    profile.aboutYourself || ""
+  );
+  const [researchInterests, setResearchInterests] = useState(
+    profile.researchInterests || ""
+  );
+  const [otherInformation, setOtherInformation] = useState(
+    profile.otherInformation || ""
+  );
 
   const designationText = useMemo(() => {
     return profile.designation
@@ -66,14 +78,18 @@ export const FacultyDetailsCard = ({
   return (
     <section className="bg-card rounded-xl border p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h4 className="border-b pb-2 text-lg font-semibold">Personal Details</h4>
+        <h4 className="border-b pb-2 text-lg font-semibold">
+          Personal Details
+        </h4>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              Update
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[85vh] w-[95vw] sm:max-w-xl md:max-w-2xl lg:max-w-4xl xl:max-w-6xl overflow-y-auto">
+          {!isReadOnly && (
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                Update
+              </Button>
+            </DialogTrigger>
+          )}
+          <DialogContent className="max-h-[85vh] w-[95vw] overflow-y-auto sm:max-w-xl md:max-w-2xl lg:max-w-4xl xl:max-w-6xl">
             <DialogHeader>
               <DialogTitle>Update Personal Details</DialogTitle>
             </DialogHeader>
@@ -97,7 +113,11 @@ export const FacultyDetailsCard = ({
                 </div>
                 <div className="space-y-2">
                   <Label>Date of Birth</Label>
-                  <Input value={formatDateInput(profile.dob)} readOnly disabled />
+                  <Input
+                    value={formatDateInput(profile.dob)}
+                    readOnly
+                    disabled
+                  />
                 </div>
               </div>
 
@@ -117,7 +137,10 @@ export const FacultyDetailsCard = ({
                 </div>
                 <div className="space-y-2">
                   <Label>Blood Group</Label>
-                  <Select value={bloodGroup || undefined} onValueChange={setBloodGroup}>
+                  <Select
+                    value={bloodGroup || undefined}
+                    onValueChange={setBloodGroup}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
@@ -140,7 +163,11 @@ export const FacultyDetailsCard = ({
                 </div>
                 <div className="space-y-2">
                   <Label>Date of Joining</Label>
-                  <Input value={formatDateInput(profile.dateOfJoining)} readOnly disabled />
+                  <Input
+                    value={formatDateInput(profile.dateOfJoining)}
+                    readOnly
+                    disabled
+                  />
                 </div>
               </div>
 
@@ -151,7 +178,7 @@ export const FacultyDetailsCard = ({
                   value={aboutYourself}
                   onChange={(event) => setAboutYourself(event.target.value)}
                   rows={4}
-                  className="placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input w-full min-w-0 rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
+                  className="placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive w-full min-w-0 rounded-md border bg-transparent px-3 py-2 text-base outline-none transition-[color,box-shadow] focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
                 />
               </div>
 
@@ -162,7 +189,7 @@ export const FacultyDetailsCard = ({
                   value={researchInterests}
                   onChange={(event) => setResearchInterests(event.target.value)}
                   rows={4}
-                  className="placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input w-full min-w-0 rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
+                  className="placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive w-full min-w-0 rounded-md border bg-transparent px-3 py-2 text-base outline-none transition-[color,box-shadow] focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
                 />
               </div>
 
@@ -173,7 +200,7 @@ export const FacultyDetailsCard = ({
                   value={otherInformation}
                   onChange={(event) => setOtherInformation(event.target.value)}
                   rows={4}
-                  className="placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input w-full min-w-0 rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
+                  className="placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive w-full min-w-0 rounded-md border bg-transparent px-3 py-2 text-base outline-none transition-[color,box-shadow] focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
                 />
               </div>
 
@@ -217,7 +244,10 @@ export const FacultyDetailsCard = ({
         <DataField label="Gender" value={profile.gender} />
         <DataField label="Date of Birth" value={formatDate(profile.dob)} />
         <DataField label="Marital Status" value={profile.maritalStatus} />
-        <DataField label="Date of Joining" value={formatDate(profile.dateOfJoining)} />
+        <DataField
+          label="Date of Joining"
+          value={formatDate(profile.dateOfJoining)}
+        />
         <DataField label="Blood Group" value={profile.bloodGroup} />
         <DataField label="Staff Type" value={profile.staffType || "-"} />
         <DataField label="Department" value={profile.department.name} />
@@ -229,15 +259,21 @@ export const FacultyDetailsCard = ({
       <div className="mt-4 space-y-4 border-t pt-4">
         <div className="space-y-1">
           <p className="text-muted-foreground text-sm">About Yourself</p>
-          <p className="font-medium break-words">{profile.aboutYourself || "-"}</p>
+          <p className="break-words font-medium">
+            {profile.aboutYourself || "-"}
+          </p>
         </div>
         <div className="space-y-1">
           <p className="text-muted-foreground text-sm">Research Interests</p>
-          <p className="font-medium break-words">{profile.researchInterests || "-"}</p>
+          <p className="break-words font-medium">
+            {profile.researchInterests || "-"}
+          </p>
         </div>
         <div className="space-y-1">
           <p className="text-muted-foreground text-sm">Other Information</p>
-          <p className="font-medium break-words">{profile.otherInformation || "-"}</p>
+          <p className="break-words font-medium">
+            {profile.otherInformation || "-"}
+          </p>
         </div>
       </div>
     </section>
