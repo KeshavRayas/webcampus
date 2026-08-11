@@ -119,6 +119,9 @@ export const AdminHallTicketView = () => {
         eligible: c.eligible,
         status: c.eligible ? ("ELIGIBLE" as const) : ("NOT_ELIGIBLE" as const),
       })),
+      qrPayload: previewData.verificationToken
+        ? `WCHT_VERIFY:${previewData.verificationToken}`
+        : undefined,
     };
   }, [previewData, previewTarget]);
 
