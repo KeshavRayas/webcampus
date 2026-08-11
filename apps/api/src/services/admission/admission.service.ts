@@ -91,6 +91,12 @@ export class AdmissionService {
               mode: "insensitive" as const,
             },
           })),
+          ...normalizedApplicationIds.map((applicationId) => ({
+            email: {
+              equals: applicationId,
+              mode: "insensitive" as const,
+            },
+          })),
           {
             email: {
               in: normalizedApplicationIds.map((applicationId) =>
@@ -120,6 +126,11 @@ export class AdmissionService {
       }
 
       const normalizedEmail = user.email.trim().toLowerCase();
+      if (normalizedApplicationIds.includes(normalizedEmail)) {
+        userIdByApplicationId.set(normalizedEmail, user.id);
+        continue;
+      }
+
       if (!normalizedEmail.endsWith("@applicant.local")) {
         continue;
       }
