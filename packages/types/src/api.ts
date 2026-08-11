@@ -104,9 +104,16 @@ export type FacultyAttendanceSectionOptionDTO = {
   labBatchNumber?: number;
 };
 
+export type FacultyAttendanceElectiveBatchOptionDTO = {
+  id: string;
+  name: string;
+  courseId: string;
+};
+
 export type FacultyAttendanceFilterOptionsDTO = {
   courses: FacultyAttendanceCourseOptionDTO[];
   sections: FacultyAttendanceSectionOptionDTO[];
+  electiveBatches: FacultyAttendanceElectiveBatchOptionDTO[];
 };
 
 export type FacultyAttendanceSessionDTO = {
@@ -114,6 +121,8 @@ export type FacultyAttendanceSessionDTO = {
   courseId: string;
   sectionId: string;
   batchId?: string;
+  electiveBatchId?: string;
+  electiveBatchName?: string;
   labBatchNumber?: number;
   sessionDate: string;
   timingCode: string;
@@ -154,8 +163,9 @@ export type FacultyAttendanceStudentStatusInputDTO = {
 
 export type CreateOrOpenFacultyAttendanceSessionPayloadDTO = {
   courseId: string;
-  sectionId: string;
+  sectionId?: string;
   batchId?: string;
+  electiveBatchId?: string;
   sessionDate: string;
   timingMode: "FIXED" | "CUSTOM";
   timingCode?: string;
@@ -202,3 +212,29 @@ export type DeleteFacultyAttendanceSessionDTO = {
   courseId: string;
   affectedStudentCount: number;
 };
+
+export type AdmissionConstantRecordDTO = {
+  id: string;
+  modeOfAdmission: string;
+  quota: string | null;
+  categoryClaimed: string;
+  categoryAllotted: string;
+};
+
+export type AdmissionConstantsOptionsDTO = {
+  modes: string[];
+  categoriesClaimed: Record<string, string[]>;
+  categoriesAllotted: Record<string, string[]>;
+  quotas: Record<string, string[]>;
+};
+
+export type AdmissionReferenceListsPayloadDTO = {
+  quotas: string[];
+  categoriesClaimed: string[];
+  categoriesAllotted: string[];
+};
+
+export type AdmissionReferenceCreatePayloadDTO =
+  AdmissionReferenceListsPayloadDTO & {
+    modeOfAdmission: string;
+  };

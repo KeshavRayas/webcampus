@@ -1,8 +1,5 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FacultyProfilePayload } from "./use-faculty-profile";
-import { DataField } from "./data-field";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -13,6 +10,9 @@ import {
 } from "@webcampus/ui/components/dialog";
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
+import { useMemo, useState } from "react";
+import { DataField } from "./data-field";
+import { FacultyProfilePayload } from "./use-faculty-profile";
 
 type ExperiencePayload = {
   designation: string;
@@ -34,16 +34,19 @@ export const ExperienceSection = ({
   onUpdate,
   onDelete,
   isWorking,
+  isReadOnly,
 }: {
   profile: FacultyProfilePayload;
   onCreate: (payload: ExperiencePayload) => void;
   onUpdate: (id: string, payload: ExperiencePayload) => void;
   onDelete: (id: string) => void;
   isWorking: boolean;
+  isReadOnly?: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<ExperiencePayload>(initialExperience);
+  const [formData, setFormData] =
+    useState<ExperiencePayload>(initialExperience);
 
   const title = useMemo(
     () => (editingId ? "Update Experience" : "Add Experience"),
@@ -58,18 +61,22 @@ export const ExperienceSection = ({
   return (
     <section className="bg-card rounded-xl border p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h4 className="border-b pb-2 text-lg font-semibold">Working Experience</h4>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            resetForm();
-            setOpen(true);
-          }}
-          disabled={isWorking}
-        >
-          Update
-        </Button>
+        <h4 className="border-b pb-2 text-lg font-semibold">
+          Working Experience
+        </h4>
+        {!isReadOnly && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              resetForm();
+              setOpen(true);
+            }}
+            disabled={isWorking}
+          >
+            Add Experience
+          </Button>
+        )}
       </div>
 
       <Dialog
@@ -81,7 +88,7 @@ export const ExperienceSection = ({
           }
         }}
       >
-        <DialogContent className="max-h-[85vh] w-[95vw] sm:max-w-xl md:max-w-2xl lg:max-w-4xl overflow-y-auto">
+        <DialogContent className="max-h-[85vh] w-[95vw] overflow-y-auto sm:max-w-xl md:max-w-2xl lg:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
@@ -92,7 +99,10 @@ export const ExperienceSection = ({
                 <Input
                   value={formData.designation}
                   onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, designation: event.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      designation: event.target.value,
+                    }))
                   }
                 />
               </div>
@@ -117,7 +127,10 @@ export const ExperienceSection = ({
                   type="date"
                   value={formData.startDate}
                   onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, startDate: event.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      startDate: event.target.value,
+                    }))
                   }
                 />
               </div>
@@ -127,7 +140,10 @@ export const ExperienceSection = ({
                   type="date"
                   value={formData.endDate || ""}
                   onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, endDate: event.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      endDate: event.target.value,
+                    }))
                   }
                 />
               </div>
@@ -152,7 +168,11 @@ export const ExperienceSection = ({
             >
               {isWorking ? "Saving..." : editingId ? "Update" : "Add"}
             </Button>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
               Cancel
             </Button>
           </DialogFooter>
@@ -166,40 +186,46 @@ export const ExperienceSection = ({
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
                   <p className="font-semibold">{experience.designation}</p>
-                  <p className="text-muted-foreground text-sm">{experience.institutionName}</p>
+                  <p className="text-muted-foreground text-sm">
+                    {experience.institutionName}
+                  </p>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setEditingId(experience.id);
-                      setFormData({
-                        designation: experience.designation,
-                        institutionName: experience.institutionName,
-                        startDate: new Date(experience.startDate)
-                          .toISOString()
-                          .slice(0, 10),
-                        endDate: experience.endDate
-                          ? new Date(experience.endDate).toISOString().slice(0, 10)
-                          : "",
-                      });
-                      setOpen(true);
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => onDelete(experience.id)}
-                    disabled={isWorking}
-                  >
-                    Delete
-                  </Button>
-                </div>
+                {!isReadOnly && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setEditingId(experience.id);
+                        setFormData({
+                          designation: experience.designation,
+                          institutionName: experience.institutionName,
+                          startDate: new Date(experience.startDate)
+                            .toISOString()
+                            .slice(0, 10),
+                          endDate: experience.endDate
+                            ? new Date(experience.endDate)
+                                .toISOString()
+                                .slice(0, 10)
+                            : "",
+                        });
+                        setOpen(true);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => onDelete(experience.id)}
+                      disabled={isWorking}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -215,13 +241,18 @@ export const ExperienceSection = ({
                       : "Present"
                   }
                 />
-                <DataField label="Duration" value={experience.durationLabel || "-"} />
+                <DataField
+                  label="Duration"
+                  value={experience.durationLabel || "-"}
+                />
               </div>
             </div>
           ))
         ) : (
           <div className="bg-secondary/20 rounded-xl border p-6 text-center">
-            <p className="text-muted-foreground text-sm">No experience records added yet.</p>
+            <p className="text-muted-foreground text-sm">
+              No experience records added yet.
+            </p>
           </div>
         )}
       </div>

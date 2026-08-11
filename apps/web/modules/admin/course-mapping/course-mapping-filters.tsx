@@ -31,7 +31,6 @@ export const AdminCourseMappingFilters = ({
         fields={filterFields}
         draftFilters={draftFilters}
         onDraftChange={onDraftChange}
-        className="md:grid-cols-2 xl:grid-cols-5"
       />
       <div className="mt-4 flex justify-end">
         <FilterActions

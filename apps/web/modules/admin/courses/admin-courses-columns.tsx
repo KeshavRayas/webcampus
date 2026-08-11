@@ -92,6 +92,7 @@ const CourseRowActions = ({
       theoryMaxExams: course.theoryMaxExams ?? 0,
       theoryExamMaxMarks: course.theoryExamMaxMarks ?? 0,
       theoryMinExams: course.theoryMinExams ?? 0,
+      theoryCieContribution: course.theoryCieContribution ?? 0,
       theoryEligibility: course.theoryEligibility ?? 40,
       labMaxMarks: course.labMaxMarks ?? 0,
       labEligibility: course.labEligibility ?? 40,
@@ -99,6 +100,10 @@ const CourseRowActions = ({
       aatEligibility: course.aatEligibility ?? 40,
       allowFeedback: course.allowFeedback ?? false,
       attendanceRequired: course.attendanceRequired ?? true,
+      numberOfBatches: course.numberOfBatches ?? undefined,
+      studentsPerBatch: course.studentsPerBatch ?? undefined,
+      openElectiveEligibility: course.openElectiveEligibility ?? "ALL",
+      eligibleDepartmentIds: course.eligibleDepartmentIds ?? [],
     },
   });
 
@@ -122,6 +127,7 @@ const CourseRowActions = ({
       queryClient.invalidateQueries({
         queryKey: ["admin-course-mapping-status"],
       });
+      queryClient.invalidateQueries({ queryKey: ["pe-capacity-summary"] });
       setEditOpen(false);
     },
     onError: (
@@ -151,6 +157,7 @@ const CourseRowActions = ({
       queryClient.invalidateQueries({
         queryKey: ["admin-course-mapping-status"],
       });
+      queryClient.invalidateQueries({ queryKey: ["pe-capacity-summary"] });
       setDeleteOpen(false);
     },
     onError: (error: AxiosError<ErrorResponse>) => {
@@ -202,7 +209,15 @@ const CourseRowActions = ({
               <DialogHeader>
                 <DialogTitle>Edit Course: {course.code}</DialogTitle>
               </DialogHeader>
-              <CourseFormFields form={form} />
+              <CourseFormFields
+                form={form}
+                apiPath="admin"
+                existingElectiveBatches={course.electiveBatches?.map((b) => ({
+                  id: b.id,
+                  name: b.name,
+                  studentCount: b.studentCount ?? 0,
+                }))}
+              />
               <DialogFooter>
                 <DialogClose asChild>
                   <Button type="button" variant="outline">

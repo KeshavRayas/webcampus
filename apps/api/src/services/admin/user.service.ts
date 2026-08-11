@@ -84,7 +84,9 @@ export class UserService {
         user.displayUsername || UserService.getDisplayUsername(user.name);
 
       const shouldUpdate =
-        force || !user.username || !user.displayUsername ||
+        force ||
+        !user.username ||
+        !user.displayUsername ||
         user.username !== nextUsername ||
         user.displayUsername !== nextDisplayUsername;
 
@@ -295,6 +297,7 @@ export class UserService {
    * @throws {Error} if creation fails
    */
   private async createUserWithAdminAPI(): Promise<BaseResponse<Partial<User>>> {
+    let createdUserId: string | null = null;
     try {
       const { user } = await auth.api.createUser({
         body: {
@@ -304,6 +307,8 @@ export class UserService {
           role: this.body.role as Role,
         },
       });
+
+      createdUserId = user.id;
 
       await this.ensureUserProfileFields(user.id);
 
@@ -318,6 +323,24 @@ export class UserService {
         data: hydratedUser ?? user,
       };
     } catch (error) {
+      if (createdUserId) {
+        try {
+          await auth.api.removeUser({
+            headers: fromNodeHeaders(this.headers),
+            body: {
+              userId: createdUserId,
+            },
+          });
+        } catch (cleanupError) {
+          logger.warn(
+            "Failed to clean up auth user after admin API user creation failure",
+            {
+              createdUserId,
+              cleanupError,
+            }
+          );
+        }
+      }
       logger.error("createUser via admin API failed:", error);
       throw new Error("Failed to create user via admin API.");
     }

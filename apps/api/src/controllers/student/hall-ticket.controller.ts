@@ -123,6 +123,10 @@ export const getMyHallTicketData = async (req: Request, res: Response) => {
     }
 
     if (!data.allCoursesFrozen) {
+      const blocking = data.courses
+        .filter((c) => !c.isFrozen)
+        .map((c) => `${c.courseCode} (${c.reason ?? "not frozen"})`);
+      const detail = blocking.length > 0 ? `: ${blocking.join(", ")}` : "";
       sendResponse({
         res,
         statusCode: 200,
@@ -130,8 +134,7 @@ export const getMyHallTicketData = async (req: Request, res: Response) => {
         message: "Hall ticket data retrieved",
         data: {
           notAvailable: true,
-          reason:
-            "Courses are not yet fully frozen. Please check back after faculty finalizes marks and attendance.",
+          reason: `Courses are not yet fully frozen${detail}. Please check back after faculty finalizes marks and attendance.`,
         },
       });
       return;

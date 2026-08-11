@@ -456,9 +456,16 @@ export const FacultyHandlingView = ({
             }
 
             updateDraftFilter(key, value);
+
+            if (key === "search") {
+              setAppliedFilters((current) => ({
+                ...current,
+                search: value,
+                page: "1",
+              }));
+            }
           }}
           allValue={DEFAULT_FILTER_ALL_VALUE}
-          className="md:grid-cols-2 xl:grid-cols-5"
         />
         <FilterActions onApply={applyFilters} onReset={resetFilters} />
       </FilterPanel>

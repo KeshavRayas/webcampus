@@ -8,7 +8,10 @@ import { Page, PageContent, PageHeader } from "@webcampus/ui/components/page";
 import { Skeleton } from "@webcampus/ui/components/skeleton";
 import axios from "axios";
 import React from "react";
-import { DepartmentTableItem, adminDepartmentColumns } from "./admin-department-columns";
+import {
+  adminDepartmentColumns,
+  DepartmentTableItem,
+} from "./admin-department-columns";
 import { CreateDepartmentView } from "./create-department-view";
 
 export const AdminDepartmentView = () => {

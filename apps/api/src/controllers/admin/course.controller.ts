@@ -1,4 +1,5 @@
 import { AdminCourseService } from "@webcampus/api/src/services/admin/course.service";
+import { CourseService } from "@webcampus/api/src/services/department/course.service";
 import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
@@ -15,6 +16,7 @@ import type {
   UpdateCourseDTO,
 } from "@webcampus/schemas/department";
 import type { Request, Response } from "express";
+import { CourseApprovalError } from "../../services/shared/course-approval";
 
 // import { GetBucketEncryptionRequest$ } from "@aws-sdk/client-s3";
 
@@ -155,7 +157,12 @@ export class AdminCourseController {
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: error instanceof Error ? 404 : 500,
+        statusCode:
+          error instanceof CourseApprovalError
+            ? error.statusCode
+            : error instanceof Error
+              ? 404
+              : 500,
         error,
       });
     }
@@ -216,8 +223,75 @@ export class AdminCourseController {
       sendResponse({
         res,
         status: "error",
-        message: ERRORS.INTERNAL_SERVER_ERROR,
-        statusCode: 500,
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: error instanceof CourseApprovalError ? 403 : 500,
+        error,
+      });
+    }
+  }
+
+  static async getPeCapacitySummary(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { departmentId, departmentName, semesterId, cycle } =
+        req.query as AdminCourseBranchQueryType;
+
+      let resolvedDepartmentId = departmentId;
+      let resolvedDepartmentName = departmentName;
+
+      if (!resolvedDepartmentId && resolvedDepartmentName) {
+        let department = await db.department.findFirst({
+          where: {
+            name: { equals: resolvedDepartmentName, mode: "insensitive" },
+          },
+          select: { id: true, name: true },
+        });
+
+        if (!department) {
+          const normalise = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+          const target = normalise(resolvedDepartmentName);
+          const allDepartments = await db.department.findMany({
+            select: { id: true, name: true },
+          });
+          department =
+            allDepartments.find((d) => normalise(d.name) === target) ?? null;
+        }
+
+        if (department) {
+          resolvedDepartmentId = department.id;
+          resolvedDepartmentName = department.name;
+        }
+      }
+
+      const response = await CourseService.getPeCapacitySummary(
+        semesterId as string,
+        resolvedDepartmentId,
+        resolvedDepartmentId ? undefined : resolvedDepartmentName,
+        cycle
+      );
+
+      if (response.status !== "success") {
+        throw new Error(response.message);
+      }
+
+      sendResponse({
+        res,
+        status: "success",
+        statusCode: 200,
+        message: response.message,
+        data: response.data,
+      });
+    } catch (error) {
+      logger.error("Error fetching admin PE capacity summary", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: error instanceof CourseApprovalError ? 403 : 500,
         error,
       });
     }

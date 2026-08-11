@@ -4,6 +4,7 @@ import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
+import { db } from "@webcampus/db";
 import { UUIDType } from "@webcampus/schemas/common";
 import {
   CreateCourseDTO,
@@ -41,7 +42,8 @@ export class CourseController {
       error.message === "Department not found" ||
       error.message === "Ambiguous departmentName mapping" ||
       error.message === "departmentId and departmentName do not match" ||
-      error.message === "departmentId is required"
+      error.message === "departmentId is required" ||
+      error.message === "Course code already exists"
     ) {
       return 400;
     }
@@ -210,6 +212,80 @@ export class CourseController {
       }
     } catch (error) {
       logger.error("Error Fetching Courses by Branch", error);
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: error instanceof Error ? 400 : 500,
+        error,
+      });
+    }
+  }
+
+  static async getPeCapacitySummary(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { semesterId, cycle } = req.query as {
+        semesterId?: string;
+        cycle?: string;
+      };
+      const departmentContext = await getDepartmentRequestContext(req);
+
+      const response = await CourseService.getPeCapacitySummary(
+        semesterId as string,
+        departmentContext.departmentId,
+        undefined,
+        cycle
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error Fetching PE Capacity Summary", error);
+      const message =
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
+      sendResponse({
+        res,
+        status: "error",
+        message,
+        statusCode: error instanceof Error ? 400 : 500,
+        error,
+      });
+    }
+  }
+
+  static async getDepartments(req: Request, res: Response): Promise<void> {
+    try {
+      const departments = await db.department.findMany({
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          abbreviation: true,
+        },
+        orderBy: { name: "asc" },
+      });
+
+      sendResponse({
+        res,
+        status: "success",
+        statusCode: 200,
+        message: "Departments fetched successfully",
+        data: departments,
+      });
+    } catch (error) {
+      logger.error("Error fetching departments", error);
       const message =
         error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR;
       sendResponse({

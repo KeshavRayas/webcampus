@@ -36,6 +36,7 @@ export interface HallTicketTemplateData {
   generatedAt: string;
   student: StudentInfo;
   courses: CourseEligibility[];
+  qrPayload?: string;
 }
 
 function R(s: string): Record<string, string> {
@@ -72,7 +73,7 @@ export function HallTicketTemplate({
   logoUrl?: string;
   qrDataUrl?: string;
 }) {
-  const { student, courses, generatedAt } = data;
+  const { student, courses, generatedAt, qrPayload } = data;
   const [qrUrl, setQrUrl] = useState<string>(externalQrUrl ?? "");
 
   useEffect(() => {
@@ -80,10 +81,14 @@ export function HallTicketTemplate({
       setQrUrl(externalQrUrl);
       return;
     }
-    QRCode.toDataURL(student.usn, { width: 130, margin: 1 })
+    if (!qrPayload) {
+      setQrUrl("");
+      return;
+    }
+    QRCode.toDataURL(qrPayload, { width: 130, margin: 1 })
       .then(setQrUrl)
       .catch(() => {});
-  }, [student.usn, externalQrUrl]);
+  }, [qrPayload, externalQrUrl]);
 
   const generatedDate = new Date(generatedAt).toLocaleDateString("en-IN", {
     day: "2-digit",

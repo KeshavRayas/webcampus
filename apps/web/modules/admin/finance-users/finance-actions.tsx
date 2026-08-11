@@ -31,8 +31,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
-import { useFinanceUserDelete, useFinanceUserEdit } from "./use-finance-users";
 import { FinanceUser } from "./finance-types";
+import { useFinanceUserDelete, useFinanceUserEdit } from "./use-finance-users";
 
 const editFinanceUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -42,11 +42,7 @@ const editFinanceUserSchema = z.object({
 
 type UpdateFinanceUserFormValues = z.infer<typeof editFinanceUserSchema>;
 
-export const FinanceActions = ({
-  user,
-}: {
-  user: FinanceUser;
-}) => {
+export const FinanceActions = ({ user }: { user: FinanceUser }) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
@@ -224,7 +220,7 @@ export const FinanceActions = ({
               <div className="space-y-4">
                 <div>
                   <p className="text-sm font-medium">Role</p>
-                  <p className="text-sm text-muted-foreground">Finance</p>
+                  <p className="text-muted-foreground text-sm">Finance</p>
                 </div>
 
                 <UserPhotoUpload

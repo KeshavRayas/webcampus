@@ -3,6 +3,7 @@
   "type": "module",
   "private": true,
   "exports": {
+    "./feedback": "./src/feedback/index.ts",
     "./admin": "./src/admin/index.ts",
     "./admission": "./src/admission/index.ts",
     "./department": "./src/department/index.ts",

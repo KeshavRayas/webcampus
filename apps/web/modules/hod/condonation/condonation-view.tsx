@@ -280,7 +280,7 @@ export const CondonationView = () => {
         type: "select",
         hideAllOption: true,
         options: terms.map((term) => ({
-          label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+          label: `${term.type.toUpperCase()} ${term.year}`,
           value: term.id,
         })),
       },
@@ -435,7 +435,6 @@ export const CondonationView = () => {
               return { ...current, [key]: value };
             });
           }}
-          className="md:grid-cols-4"
         />
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           <Input

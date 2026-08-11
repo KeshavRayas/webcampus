@@ -67,8 +67,9 @@ export const FacultyAttendanceStudentStatusInputSchema = z.object({
 export const CreateOrOpenFacultyAttendanceSessionSchema = z
   .object({
     courseId: z.uuid("Invalid course ID"),
-    sectionId: z.uuid("Invalid section ID"),
+    sectionId: z.uuid("Invalid section ID").optional(),
     batchId: z.uuid("Invalid batch ID").optional(),
+    electiveBatchId: z.uuid("Invalid elective batch ID").optional(),
     sessionDate: z.coerce.date({
       error: "Invalid session date",
     }),
@@ -81,6 +82,27 @@ export const CreateOrOpenFacultyAttendanceSessionSchema = z
       .optional(),
   })
   .superRefine((value, ctx) => {
+    const hasSection = Boolean(value.sectionId);
+    const hasElectiveBatch = Boolean(value.electiveBatchId);
+
+    if (hasSection && hasElectiveBatch) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Provide either sectionId (for section-based courses) or electiveBatchId (for Professional Electives), not both",
+        path: ["electiveBatchId"],
+      });
+    }
+
+    if (!hasSection && !hasElectiveBatch) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Either sectionId or electiveBatchId is required to open an attendance session",
+        path: ["sectionId"],
+      });
+    }
+
     if (value.timingMode === "FIXED") {
       if (!value.timingCode) {
         ctx.addIssue({
@@ -159,8 +181,9 @@ export const CreateOrOpenFacultyAttendanceSessionSchema = z
 
 export const FacultyAttendanceSessionStudentsQuerySchema = z.object({
   courseId: z.uuid("Invalid course ID"),
-  sectionId: z.uuid("Invalid section ID"),
+  sectionId: z.uuid("Invalid section ID").optional(),
   batchId: z.uuid("Invalid batch ID").optional(),
+  electiveBatchId: z.uuid("Invalid elective batch ID").optional(),
 });
 
 export const FacultyAttendanceSessionDetailQuerySchema = z.object({
@@ -190,6 +213,7 @@ export const ListFacultyAttendanceSessionsQuerySchema = z.object({
   courseId: z.uuid("Invalid course ID").optional(),
   sectionId: z.uuid("Invalid section ID").optional(),
   batchId: z.uuid("Invalid batch ID").optional(),
+  electiveBatchId: z.uuid("Invalid elective batch ID").optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
@@ -212,6 +236,13 @@ export const FacultyAttendanceFilterOptionsResponseSchema = z.object({
       labBatchNumber: z.number().int().positive().optional(),
     })
   ),
+  electiveBatches: z.array(
+    z.object({
+      id: z.uuid("Invalid elective batch ID"),
+      name: z.string(),
+      courseId: z.uuid("Invalid course ID"),
+    })
+  ),
 });
 
 export const FacultyAttendanceDetailedReportQuerySchema = z.object({
@@ -223,8 +254,10 @@ export const FacultyAttendanceDetailedReportQuerySchema = z.object({
 export const FacultyAttendanceSessionResponseSchema = z.object({
   id: z.string(),
   courseId: z.uuid("Invalid course ID"),
-  sectionId: z.uuid("Invalid section ID"),
+  sectionId: z.uuid("Invalid section ID").nullable().optional(),
   batchId: z.uuid("Invalid batch ID").optional(),
+  electiveBatchId: z.uuid("Invalid elective batch ID").optional(),
+  electiveBatchName: z.string().optional(),
   labBatchNumber: z.number().int().positive().optional(),
   sessionDate: z.date(),
   timingCode: z.string(),

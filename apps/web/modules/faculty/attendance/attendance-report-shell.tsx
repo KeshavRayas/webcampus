@@ -10,6 +10,7 @@ import {
   DEFAULT_FILTER_ALL_VALUE,
   FilterActions,
   FilterBuilder,
+  FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import { Input } from "@webcampus/ui/components/input";
@@ -201,7 +202,7 @@ export const AttendanceReportShell = ({
           allOptionLabel: "All terms",
           placeholder: "Select term...",
           options: academicTerms.map((term) => ({
-            label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+            label: `${term.type.toUpperCase()} ${term.year}`,
             value: term.id,
           })),
         },
@@ -318,13 +319,12 @@ export const AttendanceReportShell = ({
       </div>
 
       <main className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-        <div className="rounded-lg border p-4">
+        <FilterPanel>
           <FilterBuilder
             fields={filterFields}
             draftFilters={draftFilters}
             onDraftChange={onDraftChange}
             allValue={DEFAULT_FILTER_ALL_VALUE}
-            className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5"
           />
 
           {/* Action Row - Includes Percentage Filters inline if active */}
@@ -379,7 +379,7 @@ export const AttendanceReportShell = ({
               isResetDisabled={!hasRequiredFilters}
             />
           </div>
-        </div>
+        </FilterPanel>
 
         {activeTab === "status" && (
           <AttendanceStatusTable

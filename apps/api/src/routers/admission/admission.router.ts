@@ -1,25 +1,48 @@
 import { DepartmentController } from "@webcampus/api/src/controllers/admin/department.controller";
+import { AdmissionConstantsController } from "@webcampus/api/src/controllers/admission/admission-constants.controller";
 import { AdmissionController } from "@webcampus/api/src/controllers/admission/admission.controller";
+import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   AdmissionActionParamSchema,
-  ChangeAdmissionModeSchema,
+  AdmissionReferenceCreateSchema,
+  AdmissionReferenceListsSchema,
+  AdmissionReferenceModeParamSchema,
+  CancelAdmissionSchema,
   CreateAdmissionShellSchema,
-  ExitAdmissionSchema,
   GetAdmissionsQuerySchema,
   PortStudentsSchema,
 } from "@webcampus/schemas/admission";
-import { Router } from "express";
+import { ErrorRequestHandler, Router } from "express";
 import multer from "multer";
+import admissionUploadRouter from "./admission.upload.router";
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+});
+const applicationUploadFields = [
+  { name: "class10thMarksPdf", maxCount: 1 },
+  { name: "class12thMarksPdf", maxCount: 1 },
+  { name: "diplomaMarksPdf", maxCount: 1 },
+  { name: "casteCertificate", maxCount: 1 },
+  { name: "photo", maxCount: 1 },
+  { name: "disabilityCertificate", maxCount: 1 },
+  { name: "economicallyBackwardCertificate", maxCount: 1 },
+  { name: "aadharCard", maxCount: 1 },
+  { name: "transferCertificate", maxCount: 1 },
+  { name: "studyCertificate", maxCount: 1 },
+  { name: "embassyPermissionLetter", maxCount: 1 },
+];
 const router: Router = Router();
 
 router.get(
   "/",
   validateRequest(GetAdmissionsQuerySchema, "query"),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission", "admission-instructor"],
     permissions: {
       admission: ["read"],
     },
@@ -32,7 +55,7 @@ router.post(
   "/shell",
   validateRequest(CreateAdmissionShellSchema),
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission", "admission-instructor"],
     permissions: {
       admission: ["create"],
       user: ["set-role"], // Needed to create the applicant user
@@ -45,7 +68,7 @@ router.post(
 router.get(
   "/semester/:semesterId",
   protect({
-    role: ["admin", "admission"],
+    role: ["admin", "admission", "admission-instructor"],
     permissions: {
       admission: ["read"],
     },
@@ -66,10 +89,63 @@ router.get(
 router.get(
   "/departments",
   protect({
-    role: ["applicant", "admin", "admission"],
+    role: ["applicant", "admin", "admission", "admission-instructor"],
     permissions: { department: ["read"] },
   }),
   DepartmentController.getPublicDepartments
+);
+
+router.use(admissionUploadRouter);
+
+// Admission constants reference data (modes, quotas, categories) used for dropdowns
+router.get(
+  "/constants",
+  protect({
+    role: ["applicant", "admin", "admission", "admission-instructor"],
+    permissions: { admission: ["read"] },
+  }),
+  AdmissionConstantsController.getAll
+);
+
+router.get(
+  "/constants/options",
+  protect({
+    role: ["applicant", "admin", "admission", "admission-instructor"],
+    permissions: { admission: ["read"] },
+  }),
+  AdmissionConstantsController.getOptions
+);
+
+// Management of admission reference data (modes, quotas, categories) by admin/admission
+router.post(
+  "/constants/modes",
+  validateRequest(AdmissionReferenceCreateSchema),
+  protect({
+    role: ["admin", "admission"],
+    permissions: { admission: ["create"] },
+  }),
+  AdmissionConstantsController.createMode
+);
+
+router.put(
+  "/constants/modes/:mode",
+  validateRequest(AdmissionReferenceModeParamSchema, "params"),
+  validateRequest(AdmissionReferenceListsSchema),
+  protect({
+    role: ["admin", "admission"],
+    permissions: { admission: ["update"] },
+  }),
+  AdmissionConstantsController.updateMode
+);
+
+router.delete(
+  "/constants/modes/:mode",
+  validateRequest(AdmissionReferenceModeParamSchema, "params"),
+  protect({
+    role: ["admin", "admission"],
+    permissions: { admission: ["delete"] },
+  }),
+  AdmissionConstantsController.deleteMode
 );
 
 // Endpoint for admin to delete an admission record (and its S3 files)
@@ -108,28 +184,16 @@ router.patch(
   AdmissionController.reject
 );
 router.patch(
-  "/:id/change-mode",
+  "/:id/cancel",
   validateRequest(AdmissionActionParamSchema, "params"),
-  validateRequest(ChangeAdmissionModeSchema),
+  validateRequest(CancelAdmissionSchema),
   protect({
     role: ["admin", "admission"],
     permissions: {
       admission: ["update"],
     },
   }),
-  AdmissionController.changeAdmissionMode
-);
-router.patch(
-  "/:id/exit",
-  validateRequest(AdmissionActionParamSchema, "params"),
-  validateRequest(ExitAdmissionSchema),
-  protect({
-    role: ["admin", "admission"],
-    permissions: {
-      admission: ["update"],
-    },
-  }),
-  AdmissionController.exitAdmission
+  AdmissionController.cancelAdmission
 );
 router.post(
   "/port",
@@ -150,19 +214,43 @@ router.put(
     role: "applicant",
     permissions: { admission: ["update"] },
   }),
-  upload.fields([
-    { name: "class10thMarksPdf", maxCount: 1 },
-    { name: "class12thMarksPdf", maxCount: 1 },
-    { name: "diplomaMarksPdf", maxCount: 1 },
-    { name: "casteCertificate", maxCount: 1 },
-    { name: "photo", maxCount: 1 },
-    { name: "disabilityCertificate", maxCount: 1 },
-    { name: "economicallyBackwardCertificate", maxCount: 1 },
-    { name: "aadharCard", maxCount: 1 },
-    { name: "transferCertificate", maxCount: 1 },
-    { name: "studyCertificate", maxCount: 1 },
-  ]),
+  upload.fields(applicationUploadFields),
   AdmissionController.submit
 );
+
+router.post(
+  "/admission-submit",
+  protect({
+    role: ["admin", "admission", "admission-instructor"],
+    permissions: { admission: ["create"] },
+  }),
+  upload.fields(applicationUploadFields),
+  AdmissionController.staffSubmit
+);
+
+const uploadErrorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+  void _next;
+
+  if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+    sendResponse({
+      res,
+      status: "error",
+      statusCode: 413,
+      message: "Each uploaded document must be less than 2 MB.",
+      error,
+    });
+    return;
+  }
+
+  sendResponse({
+    res,
+    status: "error",
+    statusCode: 400,
+    message: error instanceof Error ? error.message : "Upload failed",
+    error,
+  });
+};
+
+router.use(uploadErrorHandler);
 
 export default router;

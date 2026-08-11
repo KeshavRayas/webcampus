@@ -1,6 +1,6 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { FinanceUser } from "./finance-types";
 import { FinanceActions } from "./finance-actions";
+import { FinanceUser } from "./finance-types";
 
 export const FinanceUserColumns: ColumnDef<FinanceUser>[] = [
   {

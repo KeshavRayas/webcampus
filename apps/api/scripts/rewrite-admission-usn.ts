@@ -5,9 +5,7 @@ import { db } from "@webcampus/db";
 type AdmissionForRewrite = {
   id: string;
   applicationId: string;
-  firstName: string | null;
-  middleName: string | null;
-  lastName: string | null;
+  nameAsPer10th: string | null;
   tempUsn: string | null;
   studentId: string | null;
   semester: {
@@ -21,7 +19,10 @@ type AdmissionForRewrite = {
 };
 
 const getNormalizedBranchCode = (code: string): string => {
-  const normalized = code.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 4);
+  const normalized = code
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .substring(0, 4);
   if (!normalized) {
     throw new Error(`Invalid department code for USN generation: ${code}`);
   }
@@ -39,14 +40,14 @@ const getYearSuffix = (year: string): string => {
 };
 
 const getSortableName = (admission: AdmissionForRewrite): string => {
-  return [admission.firstName, admission.middleName, admission.lastName]
-    .map((value) => value?.trim())
-    .filter((value): value is string => Boolean(value))
-    .join(" ")
-    .toLocaleLowerCase();
+  return admission.nameAsPer10th?.trim().toLocaleLowerCase() ?? "";
 };
 
-const buildTempUsn = (yearSuffix: string, branchCode: string, serial: number): string => {
+const buildTempUsn = (
+  yearSuffix: string,
+  branchCode: string,
+  serial: number
+): string => {
   return `TBM${yearSuffix}${branchCode}${serial.toString().padStart(4, "0")}`;
 };
 
@@ -58,9 +59,7 @@ async function rewriteAdmissionAndStudentUsn(): Promise<void> {
     select: {
       id: true,
       applicationId: true,
-      firstName: true,
-      middleName: true,
-      lastName: true,
+      nameAsPer10th: true,
       tempUsn: true,
       studentId: true,
       semester: {
@@ -96,7 +95,10 @@ async function rewriteAdmissionAndStudentUsn(): Promise<void> {
     groupedAdmissions.set(key, current);
   }
 
-  const admissionTempUsnUpdates: Array<{ admissionId: string; tempUsn: string }> = [];
+  const admissionTempUsnUpdates: Array<{
+    admissionId: string;
+    tempUsn: string;
+  }> = [];
   const studentUsnByStudentId = new Map<string, string>();
 
   for (const [key, group] of groupedAdmissions.entries()) {

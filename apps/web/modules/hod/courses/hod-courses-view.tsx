@@ -234,11 +234,11 @@ export const HodCoursesView = () => {
       label: "Academic Term",
       type: "select",
       options: terms.map((term) => ({
-        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)}${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
       hideAllOption: false,
-      placeholder: "All Terms",
+      placeholder: "All terms",
     },
     {
       key: "semesterId",
@@ -248,7 +248,7 @@ export const HodCoursesView = () => {
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
-      placeholder: draftFilters.termId ? "All Semesters" : "Select term first",
+      placeholder: draftFilters.termId ? "All semesters" : "Select term first",
       hideAllOption: false,
     },
     ...(isSemesterOneOrTwo && isFirstYearDepartment
@@ -262,7 +262,7 @@ export const HodCoursesView = () => {
               value: cycle,
             })),
             hideAllOption: false,
-            placeholder: "All Cycles",
+            placeholder: "All cycles",
           } as FilterFieldConfig<HodCoursesFiltersState>,
         ]
       : []),
@@ -270,7 +270,7 @@ export const HodCoursesView = () => {
       key: "sectionId",
       label: "Section",
       type: "select",
-      placeholder: loadingSections ? "Loading sections..." : "All Sections",
+      placeholder: loadingSections ? "Loading sections..." : "All sections",
       options: sections.map((sec) => ({
         label: sec.name,
         value: sec.id,
@@ -308,7 +308,6 @@ export const HodCoursesView = () => {
                   return next;
                 });
               }}
-              className="md:grid-cols-2 xl:grid-cols-4"
             />
             <div className="mt-4 flex justify-end">
               <FilterActions

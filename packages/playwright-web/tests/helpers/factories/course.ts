@@ -13,20 +13,18 @@ export type MakeCourseInput = {
   practicalCredits?: number;
   skillCredits?: number;
   seeMaxMarks?: number;
-  seeMinMarks?: number;
-  seeWeightage?: number;
-  maxNoOfCies?: number;
-  minNoOfCies?: number;
+  seeEligibility?: number;
   cieMaxMarks?: number;
-  cieMinMarks?: number;
-  cieWeightage?: number;
-  noOfAssignments?: number;
-  assignmentMaxMarks?: number;
+  cieEligibility?: number;
+  theoryMaxExams?: number;
+  theoryMinExams?: number;
+  theoryExamMaxMarks?: number;
+  theoryCieContribution?: number;
+  theoryEligibility?: number;
   labMaxMarks?: number;
-  labMinMarks?: number;
-  labWeightage?: number;
-  cumulativeMaxMarks?: number;
-  cumulativeMinMarks?: number;
+  labEligibility?: number;
+  aatMaxMarks?: number;
+  aatEligibility?: number;
 };
 
 export function makeCourse(
@@ -51,19 +49,17 @@ export function makeCourse(
     practicalCredits: overrides.practicalCredits ?? 0,
     skillCredits: overrides.skillCredits ?? 0,
     seeMaxMarks: overrides.seeMaxMarks ?? 100,
-    seeMinMarks: overrides.seeMinMarks ?? 40,
-    seeWeightage: overrides.seeWeightage ?? 100,
-    maxNoOfCies: overrides.maxNoOfCies ?? 3,
-    minNoOfCies: overrides.minNoOfCies ?? 2,
+    seeEligibility: overrides.seeEligibility ?? 40,
     cieMaxMarks: overrides.cieMaxMarks ?? 40,
-    cieMinMarks: overrides.cieMinMarks ?? 0,
-    cieWeightage: overrides.cieWeightage ?? 100,
-    noOfAssignments: overrides.noOfAssignments ?? 2,
-    assignmentMaxMarks: overrides.assignmentMaxMarks ?? 10,
+    cieEligibility: overrides.cieEligibility ?? 40,
+    theoryMaxExams: overrides.theoryMaxExams ?? 3,
+    theoryMinExams: overrides.theoryMinExams ?? 2,
+    theoryExamMaxMarks: overrides.theoryExamMaxMarks ?? 20,
+    theoryCieContribution: overrides.theoryCieContribution ?? 30,
+    theoryEligibility: overrides.theoryEligibility ?? 40,
     labMaxMarks: overrides.labMaxMarks ?? 0,
-    labMinMarks: overrides.labMinMarks ?? 0,
-    labWeightage: overrides.labWeightage ?? 0,
-    cumulativeMaxMarks: overrides.cumulativeMaxMarks ?? 100,
-    cumulativeMinMarks: overrides.cumulativeMinMarks ?? 40,
+    labEligibility: overrides.labEligibility ?? 0,
+    aatMaxMarks: overrides.aatMaxMarks ?? 10,
+    aatEligibility: overrides.aatEligibility ?? 40,
   };
 }

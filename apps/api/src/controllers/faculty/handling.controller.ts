@@ -2,8 +2,8 @@ import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
-import { FacultyHandlingService } from "../../services/faculty/handling.service";
 import type { Request, Response } from "express";
+import { FacultyHandlingService } from "../../services/faculty/handling.service";
 
 type FacultyHandlingQueryType = {
   search?: string;
@@ -50,10 +50,16 @@ const getStatusCodeForError = (message: string): number => {
 };
 
 export class FacultyHandlingController {
-  static async getCourseFilterOptions(req: Request, res: Response): Promise<void> {
+  static async getCourseFilterOptions(
+    req: Request,
+    res: Response
+  ): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
-      const response = await FacultyHandlingService.getFilterOptions(user.id, "THEORY");
+      const response = await FacultyHandlingService.getFilterOptions(
+        user.id,
+        "THEORY"
+      );
 
       if (response.status !== "success") {
         throw new Error(response.message);
@@ -88,7 +94,10 @@ export class FacultyHandlingController {
   static async getLabFilterOptions(req: Request, res: Response): Promise<void> {
     try {
       const user = await resolveSessionUser(req);
-      const response = await FacultyHandlingService.getFilterOptions(user.id, "LAB");
+      const response = await FacultyHandlingService.getFilterOptions(
+        user.id,
+        "LAB"
+      );
 
       if (response.status !== "success") {
         throw new Error(response.message);

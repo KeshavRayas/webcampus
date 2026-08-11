@@ -406,6 +406,16 @@ const dbMock = {
         )
       ).length;
     },
+    findMany: async () => {
+      return students.flatMap((student) =>
+        student.studentSections.map((entry) => ({
+          studentId: student.id,
+          sectionId: entry.sectionId,
+          semester: entry.semester,
+          academicYear: entry.academicYear,
+        }))
+      );
+    },
   },
   section: {
     findUnique: async ({ where }: DbFindUniqueArgs) => {
@@ -442,6 +452,17 @@ const dbMock = {
         batches: student.batches,
       }));
     },
+  },
+  electiveBatchFaculty: {
+    findMany: async () => [],
+    findUnique: async () => null,
+  },
+  courseRegistration: {
+    findMany: async () =>
+      students.map((student) => ({
+        courseId: "course-1",
+        studentId: student.id,
+      })),
   },
 };
 

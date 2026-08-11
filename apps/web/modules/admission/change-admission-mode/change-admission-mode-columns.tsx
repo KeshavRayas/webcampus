@@ -20,14 +20,7 @@ const baseColumns: ColumnDef<AdmissionResponse>[] = [
     cell: ({ row }) => {
       const studentName = row.original.student?.user?.name?.trim();
 
-      const admissionName = [
-        row.original.firstName?.trim(),
-        row.original.middleName?.trim(),
-        row.original.lastName?.trim(),
-      ]
-        .filter((v): v is string => Boolean(v))
-        .join(" ")
-        .trim();
+      const admissionName = row.original.nameAsPer10th?.trim();
 
       return <div>{studentName || admissionName || "-"}</div>;
     },

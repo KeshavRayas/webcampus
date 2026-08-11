@@ -282,7 +282,7 @@ export const AdminMarksReportView = ({
     const dept = appliedFilters.departmentName || "N/A";
     const section =
       sections.find((s) => s.id === appliedFilters.sectionId)?.name ||
-      "All Sections";
+      "All sections";
 
     return [
       `Department: ${dept}`,
@@ -290,7 +290,7 @@ export const AdminMarksReportView = ({
       `Semester: ${reportData.semester.semesterNumber}`,
       `Section: ${section}`,
       `Academic Term: ${reportData.semester.academicTerm.type} ${reportData.semester.academicTerm.year}`,
-      `Min Required CIE: ${reportData.course.cumulativeMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
+      `Min Required CIE: ${reportData.course.cieMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
     ];
   }, [reportData, appliedFilters, sections]);
 
@@ -330,7 +330,7 @@ export const AdminMarksReportView = ({
           : "-";
       }),
       student.cieTotal != null ? student.cieTotal.toString() : "-",
-      `${reportData.course.cumulativeMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
+      `${reportData.course.cieMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
       student.status === "ELIGIBLE" ? "Eligible" : "Not Eligible",
     ]);
 
@@ -384,7 +384,7 @@ export const AdminMarksReportView = ({
         return score?.totalMarks != null ? score.totalMarks.toString() : "-";
       }),
       student.cieTotal != null ? student.cieTotal.toString() : "-",
-      `${reportData.course.cumulativeMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
+      `${reportData.course.cieMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
       student.status === "ELIGIBLE" ? "Eligible" : "Not Eligible",
     ]);
 
@@ -407,7 +407,7 @@ export const AdminMarksReportView = ({
       label: "Academic Term",
       type: "select" as const,
       options: terms.map((term) => ({
-        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)}${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
       hideAllOption: true,
@@ -523,7 +523,6 @@ export const AdminMarksReportView = ({
               return next;
             });
           }}
-          className="md:grid-cols-2 xl:grid-cols-5"
         />
         <div className="mt-4 flex justify-end">
           <FilterActions

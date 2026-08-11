@@ -4,6 +4,7 @@ import {
   diffLists,
   logChanges,
 } from "@webcampus/api/src/services/shared/audit.service";
+import { isBatchManagedCourse } from "@webcampus/api/src/services/shared/course-kind";
 import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
@@ -192,6 +193,11 @@ export class CourseAssignmentService {
         context
       );
 
+      const semester = await db.semester.findUnique({
+        where: { id: semesterId },
+      });
+      const semesterNumber = semester?.semesterNumber;
+
       const courses = await db.course.findMany({
         where: {
           semesterId,
@@ -217,31 +223,75 @@ export class CourseAssignmentService {
           assignments: {
             where: {
               semester: {
-                in: await db.semester
-                  .findUnique({ where: { id: semesterId } })
-                  .then((s) => (s ? [s.semesterNumber] : [])),
+                in: semesterNumber != null ? [semesterNumber] : [],
               },
               academicYear,
             },
             select: { id: true },
           },
+          electiveBatches: {
+            select: {
+              id: true,
+              facultyAssignment: {
+                select: { id: true, semester: true, academicYear: true },
+              },
+            },
+          },
         },
         orderBy: { code: "asc" },
       });
 
-      const data = courses.map((course) => ({
-        courseId: course.id,
-        code: course.code,
-        name: course.name,
-        courseMode: course.courseMode,
-        courseType: course.courseType,
-        cycle: course.cycle,
-        lectureCredits: course.lectureCredits,
-        tutorialCredits: course.tutorialCredits,
-        practicalCredits: course.practicalCredits,
-        assignments: course.assignments,
-        status: getCourseMappingStatus(course.assignments.length),
-      })) satisfies CourseMappingStatusResponseType["courses"];
+      const data = courses.map((course) => {
+        if (isBatchManagedCourse(course.courseType)) {
+          const relevant = course.electiveBatches.filter(
+            (b) =>
+              b.facultyAssignment &&
+              (semesterNumber == null ||
+                (b.facultyAssignment.semester === semesterNumber &&
+                  b.facultyAssignment.academicYear === academicYear))
+          );
+          const complete =
+            course.electiveBatches.length > 0 &&
+            course.electiveBatches.every((b) => {
+              const fa = b.facultyAssignment;
+              return (
+                fa &&
+                (semesterNumber == null ||
+                  (fa.semester === semesterNumber &&
+                    fa.academicYear === academicYear))
+              );
+            });
+          return {
+            courseId: course.id,
+            code: course.code,
+            name: course.name,
+            courseMode: course.courseMode,
+            courseType: course.courseType,
+            cycle: course.cycle,
+            lectureCredits: course.lectureCredits,
+            tutorialCredits: course.tutorialCredits,
+            practicalCredits: course.practicalCredits,
+            assignments: relevant.map((b) => ({
+              id: b.facultyAssignment!.id,
+            })),
+            status: (complete ? "Mapped" : "Unmapped") as "Mapped" | "Unmapped",
+          };
+        }
+
+        return {
+          courseId: course.id,
+          code: course.code,
+          name: course.name,
+          courseMode: course.courseMode,
+          courseType: course.courseType,
+          cycle: course.cycle,
+          lectureCredits: course.lectureCredits,
+          tutorialCredits: course.tutorialCredits,
+          practicalCredits: course.practicalCredits,
+          assignments: course.assignments,
+          status: getCourseMappingStatus(course.assignments.length),
+        };
+      }) satisfies CourseMappingStatusResponseType["courses"];
 
       return {
         status: "success",
@@ -290,11 +340,76 @@ export class CourseAssignmentService {
             },
           },
         },
-        select: { id: true },
+        select: { id: true, courseType: true },
       });
 
       if (!course) {
         throw new Error("Course not found");
+      }
+
+      if (isBatchManagedCourse(course.courseType)) {
+        const batches = await db.electiveBatch.findMany({
+          where: { courseId },
+          orderBy: { sortOrder: "asc" },
+          include: {
+            facultyAssignment: {
+              include: {
+                faculty: {
+                  select: {
+                    shortName: true,
+                    user: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        const data = batches.map((b) => ({
+          id: b.facultyAssignment?.id ?? b.id,
+          sectionId: null as string | null,
+          facultyId: b.facultyAssignment?.facultyId ?? ("" as string),
+          assignmentType: "THEORY" as const,
+          batchId: null as string | null,
+          batchName: null as string | null,
+          facultyName: b.facultyAssignment
+            ? (b.facultyAssignment.faculty.user?.name ??
+              b.facultyAssignment.faculty.shortName ??
+              null)
+            : null,
+          sectionName: null as string | null,
+          electiveBatchId: b.id,
+          electiveBatchName: b.name,
+          hasFaculty: Boolean(
+            b.facultyAssignment &&
+              b.facultyAssignment.semester === semester.semesterNumber &&
+              b.facultyAssignment.academicYear === academicYear
+          ),
+        }));
+
+        // Only include faculty info when semester/year matches
+        const filtered = data.map((row) => {
+          const batch = batches.find((b) => b.id === row.electiveBatchId);
+          const fa = batch?.facultyAssignment;
+          const matches =
+            fa &&
+            fa.semester === semester.semesterNumber &&
+            fa.academicYear === academicYear;
+          return {
+            ...row,
+            id: matches ? fa!.id : row.electiveBatchId,
+            facultyId: matches ? fa!.facultyId : "",
+            facultyName: matches
+              ? (fa!.faculty.user?.name ?? fa!.faculty.shortName ?? null)
+              : null,
+          };
+        });
+
+        return {
+          status: "success",
+          message: "Course mappings fetched",
+          data: filtered,
+        };
       }
 
       const assignments = await db.courseAssignment.findMany({
@@ -313,6 +428,15 @@ export class CourseAssignmentService {
           batch: {
             select: { name: true },
           },
+          faculty: {
+            select: {
+              shortName: true,
+              user: { select: { name: true } },
+            },
+          },
+          section: {
+            select: { name: true },
+          },
         },
       });
 
@@ -323,6 +447,10 @@ export class CourseAssignmentService {
         assignmentType: a.assignmentType,
         batchId: a.batchId,
         batchName: a.batch?.name ?? null,
+        facultyName: a.faculty?.user?.name ?? a.faculty?.shortName ?? null,
+        sectionName: a.section?.name ?? null,
+        electiveBatchId: null as string | null,
+        electiveBatchName: null as string | null,
       }));
 
       return {
@@ -381,6 +509,102 @@ export class CourseAssignmentService {
         }
       }
 
+      // PE/OE: map faculty to elective batches (no sections)
+      if (isBatchManagedCourse(course.courseType)) {
+        if (
+          !data.electiveBatchMappings ||
+          data.electiveBatchMappings.length === 0
+        ) {
+          throw new Error(
+            "electiveBatchMappings is required for batch-managed courses"
+          );
+        }
+
+        const batches = await db.electiveBatch.findMany({
+          where: { courseId: course.id },
+          select: { id: true },
+        });
+        const batchIds = new Set(batches.map((b) => b.id));
+        for (const mapping of data.electiveBatchMappings) {
+          if (!batchIds.has(mapping.electiveBatchId)) {
+            throw new Error("Invalid elective batch for this course");
+          }
+        }
+
+        const facultyIds = Array.from(
+          new Set(
+            data.electiveBatchMappings
+              .map((m) => m.facultyId)
+              .filter((id): id is string => Boolean(id))
+          )
+        );
+        if (facultyIds.length > 0) {
+          const facultyRecords = await db.faculty.findMany({
+            where: { id: { in: facultyIds } },
+            select: { id: true },
+          });
+          if (facultyRecords.length !== facultyIds.length) {
+            throw new Error("One or more faculty records are invalid");
+          }
+        }
+
+        let created = 0;
+        await db.$transaction(async (tx) => {
+          await tx.electiveBatchFaculty.deleteMany({
+            where: {
+              courseId: course.id,
+              semester: semester.semesterNumber,
+              academicYear: data.academicYear,
+            },
+          });
+
+          for (const mapping of data.electiveBatchMappings!) {
+            if (!mapping.facultyId) continue;
+            await tx.electiveBatchFaculty.create({
+              data: {
+                courseId: course.id,
+                electiveBatchId: mapping.electiveBatchId,
+                facultyId: mapping.facultyId,
+                semester: semester.semesterNumber,
+                academicYear: data.academicYear,
+              },
+            });
+            created += 1;
+          }
+
+          if (context?.requesterRole === "admin") {
+            await logChanges({
+              entityType: "COURSE",
+              entityId: course.id,
+              courseId: course.id,
+              action: "SUPER_EDIT",
+              changes: [
+                {
+                  fieldName: "electiveBatchFaculty",
+                  oldValue: null,
+                  newValue: `${created} assignments`,
+                },
+              ],
+              adminUserId: context.adminUserId ?? requestingUserId,
+              reason: context.reason,
+              ipAddress: context.ipAddress,
+              userAgent: context.userAgent,
+            });
+          }
+        });
+
+        return {
+          status: "success",
+          message: "Batch faculty mapping saved",
+          data: { created },
+        };
+      }
+
+      if (!data.sectionMappings || data.sectionMappings.length === 0) {
+        throw new Error("sectionMappings is required for non-PE courses");
+      }
+      const sectionMappings = data.sectionMappings;
+
       // Capture existing mappings before changes for audit diff
       const existingAssignments =
         context?.requesterRole === "admin"
@@ -414,7 +638,7 @@ export class CourseAssignmentService {
 
       // Validate faculty ownership for all departments.
       const allFacultyIds = new Set<string>();
-      for (const mapping of data.sectionMappings) {
+      for (const mapping of sectionMappings) {
         if (mapping.theoryFacultyId) {
           allFacultyIds.add(mapping.theoryFacultyId);
         }
@@ -449,9 +673,7 @@ export class CourseAssignmentService {
       }
 
       // Validate section ownership and semester invariants for every mapping row.
-      const sectionIds = [
-        ...new Set(data.sectionMappings.map((m) => m.sectionId)),
-      ];
+      const sectionIds = [...new Set(sectionMappings.map((m) => m.sectionId))];
       if (sectionIds.length > 0) {
         const sectionRecords = await db.section.findMany({
           where: {
@@ -488,7 +710,7 @@ export class CourseAssignmentService {
         let createdCount = 0;
         const labSectionIds = new Set<string>();
 
-        for (const mapping of data.sectionMappings) {
+        for (const mapping of sectionMappings) {
           // Create THEORY assignment
           if (mapping.theoryFacultyId) {
             const created = await tx.courseAssignment.create({
@@ -564,7 +786,7 @@ export class CourseAssignmentService {
               courseId: data.courseId,
               adminId: requestingUserId,
               action: "SUPER_EDIT_MAPPING",
-              details: JSON.stringify(data.sectionMappings),
+              details: JSON.stringify(sectionMappings),
             },
           });
         }

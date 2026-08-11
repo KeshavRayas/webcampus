@@ -46,13 +46,18 @@ export const useCreateCourseForm = (
       theoryMaxExams: 0,
       theoryExamMaxMarks: 0,
       theoryMinExams: 0,
+      theoryCieContribution: 0,
       theoryEligibility: 40,
       labMaxMarks: 0,
       labEligibility: 40,
       aatMaxMarks: 0,
       aatEligibility: 40,
-      allowFeedback: false,
+      allowFeedback: true,
       attendanceRequired: true,
+      numberOfBatches: undefined,
+      studentsPerBatch: undefined,
+      openElectiveEligibility: "ALL",
+      eligibleDepartmentIds: [],
     },
   });
 
@@ -75,6 +80,7 @@ export const useCreateCourseForm = (
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);
       queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["pe-capacity-summary"] });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(error.response?.data?.error || "Failed to create course");

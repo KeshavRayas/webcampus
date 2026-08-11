@@ -1,16 +1,23 @@
 import "dotenv/config";
 import { faker } from "@faker-js/faker";
+import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { AdmissionService } from "@webcampus/api/src/services/admission/admission.service";
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 
-const IMAGE_URL =
-  "https://adminportal-fileupload.s3.ap-southeast-2.amazonaws.com/department_logo_39bc77d3-dc17-4679-952e-2bab6d716229.jpg";
+let IMAGE_URL = "";
+let PDF_URL = "";
 
-const PDF_URL =
-  "https://adminportal-fileupload.s3.ap-southeast-2.amazonaws.com/aadhar_card_0be79490-379c-4895-ae90-ab574a47b685.pdf";
+const imgBuffer = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64"
+);
+const pdfBuffer = Buffer.from(
+  "JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDMgMCBSL0ZpbHRlci9GbGF0ZURlY29kZT4+CnN0cmVhbQp4nDPQM1Qo5ypUMFAwALJMLU31jBQsTAz1LBSK0osSQTz9xJLMYqXExOJUvdTEvNSC1JxUveQUKwOulPziVA2E1Pwi/dwUVw2E4HIFwygFo8KMAgYA+8ccKAplbmRzdHJlYW0KZW5kb2JqCgozIDAgb2JqCjc3CmVuZG9iagoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDIwMCAyMDBdL1BhcmVudCA0IDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNSAwIFI+Pj4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCgo0IDAgb2JqCjw8L1R5cGUvUGFnZXMvQ291bnQgMS9LaWRzWzEgMCBSXT4+CmVuZG9iagoKNSAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9UaW1lcy1Sb21hbj4+CmVuZG9iagoKNiAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgNCAwIFI+PgplbmRvYmoKCjcgMCBvYmoKPDwvUHJvZHVjZXIoR2hvc3RzY3JpcHQgMTAuMDQuMCkKMTw8L0NyZWF0aW9uRGF0ZShEOjIwMjQxMDIyMDQzMDIxKzA1JzMwJyk+PgplbmRvYmoKCnhyZWYKMCA4CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDE2NCAwMDAwMCBuIAowMDAwMDAwMDE1IDAwMDAwIG4gCjAwMDAwMDAxNDMgMDAwMDAgbiAKMDAwMDAwMDI2MiAwMDAwMCBuIAowMDAwMDAwMzE5IDAwMDAwIG4gCjAwMDAwMDA0MDcgMDAwMDAgbiAKMDAwMDAwMDQ1NiAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgOC9Sb290IDYgMCBSL0luZm8gNyAwIFI+PgpzdGFydHhyZWYKNTcyCiUlRU9GCg==",
+  "base64"
+);
 
 interface ParsedArgs {
   count: number;
@@ -27,7 +34,7 @@ const parseCliArguments = (): ParsedArgs => {
       const countValue = args[i + 1];
       if (typeof countValue !== "string") {
         throw new Error(
-          "Missing value for --count. Usage: npm run submit-mock-applicant --count <number> --dept <code>"
+          "Missing value for --count. Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]"
         );
       }
 
@@ -44,7 +51,7 @@ const parseCliArguments = (): ParsedArgs => {
       const departmentValue = args[i + 1];
       if (typeof departmentValue !== "string") {
         throw new Error(
-          "Missing value for --dept. Usage: npm run submit-mock-applicant --count <number> --dept <code>"
+          "Missing value for --dept. Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]"
         );
       }
 
@@ -70,16 +77,18 @@ const parseCliArguments = (): ParsedArgs => {
   if (result.count === undefined) {
     throw new Error(
       "Missing required parameter --count.\n" +
-        "Usage: npm run submit-mock-applicant --count <number> --dept <code>\n" +
-        "Example: npm run submit-mock-applicant --count 500 --dept CS"
+        "Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]\n" +
+        "Example: npm run submit-mock-applicant --count 500 --dept CS\n" +
+        "Example: npm run submit-mock-applicant --count 100 --dept CS --port"
     );
   }
 
   if (!result.departmentCode) {
     throw new Error(
       "Missing required parameter --dept.\n" +
-        "Usage: npm run submit-mock-applicant --count <number> --dept <code>\n" +
-        "Example: npm run submit-mock-applicant --count 500 --dept CS"
+        "Usage: npm run submit-mock-applicant --count <number> --dept <code> [--port]\n" +
+        "Example: npm run submit-mock-applicant --count 500 --dept CS\n" +
+        "Example: npm run submit-mock-applicant --count 100 --dept CS --port"
     );
   }
 
@@ -96,44 +105,94 @@ const deterministicAadhar = (serial: number): string => {
   return `9${tail}`;
 };
 
-// const getNextApplicationNumber = async (): Promise<number> => {
-//   const rows = await db.admission.findMany({
-//     select: { applicationId: true },
-//     where: {
-//       applicationId: {
-//         startsWith: "APP",
-//       },
-//     },
-//     orderBy: {
-//       createdAt: "desc",
-//     },
-//     take: 500,
-//   });
+const deterministicAbcAparId = (serial: number): string => {
+  const tail = String((serial % 100_000_000_000) + 1).padStart(11, "0");
+  return `8${tail}`;
+};
 
-//   let maxNumber = 2026000;
-//   for (const row of rows) {
-//     const parsed = extractNumericId(row.applicationId);
-//     if (parsed && parsed > maxNumber) {
-//       maxNumber = parsed;
-//     }
-//   }
+const cleanupPartialApplicant = async (
+  email: string,
+  removeApplicantUser: boolean
+): Promise<void> => {
+  try {
+    await db.admission.deleteMany({
+      where: { primaryEmail: email },
+    });
 
-//   return maxNumber + 1;
-// };
+    if (removeApplicantUser) {
+      const applicant = await db.user.findFirst({
+        where: { email, role: "applicant" },
+        select: { id: true },
+      });
+
+      if (applicant) {
+        await db.user.delete({ where: { id: applicant.id } });
+      }
+    }
+  } catch (cleanupError) {
+    logger.error("Failed to clean up partial mock applicant", {
+      email,
+      cleanupError,
+    });
+  }
+};
+
+const ADMISSION_INSTRUCTOR = {
+  name: "admission-instructor",
+  email: "admission-instructor@webcampus.com",
+  username: "admission-instructor",
+  password: "password",
+} as const;
+
+const ensureInstructorUser = async (adminHeaders: {
+  Authorization: string;
+}): Promise<string> => {
+  const existing = await db.user.findUnique({
+    where: { email: ADMISSION_INSTRUCTOR.email },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return existing.id;
+  }
+
+  const userService = new UserService({
+    request: {
+      ...ADMISSION_INSTRUCTOR,
+      role: "admission-instructor",
+    },
+    headers: adminHeaders,
+  });
+
+  const response = await userService.create();
+  if (response.status === "error" || !response.data?.id) {
+    throw new Error(
+      response.message || "Failed to create admission-instructor user"
+    );
+  }
+
+  logger.info("Admission instructor user created by mock script", {
+    id: response.data.id,
+  });
+  return response.data.id;
+};
 
 const resolveContext = async (departmentCode: string) => {
   const { ADMIN_USER_EMAIL, ADMIN_USER_PASSWORD } = backendEnv();
 
-  const signInResponse = await auth.api.signInEmail({
+  const adminSignIn = await auth.api.signInEmail({
     body: {
       email: ADMIN_USER_EMAIL,
       password: ADMIN_USER_PASSWORD,
     },
   });
 
-  if (!signInResponse.token) {
+  if (!adminSignIn.token) {
     throw new Error("Admin sign-in failed: token missing");
   }
+
+  const adminHeaders = { Authorization: `Bearer ${adminSignIn.token}` };
+  const filledById = await ensureInstructorUser(adminHeaders);
 
   const department = await db.department.findFirst({
     where: { code: departmentCode },
@@ -183,8 +242,10 @@ const resolveContext = async (departmentCode: string) => {
   }
 
   return {
-    headers: { Authorization: `Bearer ${signInResponse.token}` },
+    headers: adminHeaders,
+    filledById,
     departmentId: department.id,
+    departmentName: department.name,
     semesterId: semester.id,
   };
 };
@@ -193,16 +254,13 @@ const submitAndApprove = async (
   email: string,
   serial: number,
   admissionId: string,
-  firstName: string,
-  lastName: string,
+  fullName: string,
+  filledById: string,
   departmentId: string,
+  departmentName: string,
   semesterId: string
 ): Promise<void> => {
-  const fullName = `${firstName} ${lastName}`;
-
   const data: Record<string, string> = {
-    firstName,
-    lastName,
     nameAsPer10th: fullName,
     modeOfAdmission: "KCET",
     categoryClaimed: "GM",
@@ -211,8 +269,11 @@ const submitAndApprove = async (
     primaryEmail: email,
     semesterId,
     departmentId,
+    admissionType: "REGULAR",
+    scholarship: "false",
     primaryPhoneNumber: randomPhone(serial),
     aadharNumber: deterministicAadhar(serial),
+    abcAparId: deterministicAbcAparId(serial),
     dob: faker.date
       .birthdate({ min: 17, max: 21, mode: "age" })
       .toISOString()
@@ -224,17 +285,53 @@ const submitAndApprove = async (
     caste: faker.helpers.arrayElement(["General", "OBC", "SC", "ST"]),
   };
 
+  const { uploadToS3, generateFileName } = await import(
+    "@webcampus/api/src/utils/s3"
+  );
+
+  const rawDeptName = String(departmentName || "unassigned");
+  const deptName = rawDeptName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const studentName =
+    fullName.toLowerCase().replace(/[^a-z0-9]/g, "") || "unknown";
+
+  const prefixBase = `students/${deptName}/${studentName}_${admissionId}/`;
+
+  const photoUpload = await uploadToS3(
+    imgBuffer,
+    generateFileName("photo.png", prefixBase + "photo_"),
+    "image/png"
+  );
+  const aadharUpload = await uploadToS3(
+    pdfBuffer,
+    generateFileName("aadhar.pdf", prefixBase + "aadhar_card_"),
+    "application/pdf"
+  );
+  const marks10Upload = await uploadToS3(
+    pdfBuffer,
+    generateFileName("10th.pdf", prefixBase + "10th_marks_"),
+    "application/pdf"
+  );
+  const marks12Upload = await uploadToS3(
+    pdfBuffer,
+    generateFileName("12th.pdf", prefixBase + "12th_marks_"),
+    "application/pdf"
+  );
+
   const fileUrls: Record<string, string> = {
-    photo: IMAGE_URL,
-    aadharCard: PDF_URL,
-    class10thMarksPdf: PDF_URL,
-    class12thMarksPdf: PDF_URL,
+    photo: photoUpload.success && photoUpload.url ? photoUpload.url : IMAGE_URL,
+    aadharCard:
+      aadharUpload.success && aadharUpload.url ? aadharUpload.url : PDF_URL,
+    class10thMarksPdf:
+      marks10Upload.success && marks10Upload.url ? marks10Upload.url : PDF_URL,
+    class12thMarksPdf:
+      marks12Upload.success && marks12Upload.url ? marks12Upload.url : PDF_URL,
   };
 
   const submitResponse = await AdmissionService.submitApplication(
     email,
     data,
-    fileUrls
+    fileUrls,
+    filledById
   );
 
   if (submitResponse.status !== "success") {
@@ -255,6 +352,30 @@ const submitAndApprove = async (
 };
 
 async function main() {
+  const { uploadToS3, generateFileName } = await import(
+    "@webcampus/api/src/utils/s3"
+  );
+
+  const imgUpload = await uploadToS3(
+    imgBuffer,
+    generateFileName("mock.png", "users/mock/"),
+    "image/png"
+  );
+  if (imgUpload.success && imgUpload.url) IMAGE_URL = imgUpload.url;
+  else IMAGE_URL = "https://placehold.co/400";
+
+  const pdfUpload = await uploadToS3(
+    pdfBuffer,
+    generateFileName("mock.pdf", "users/mock/"),
+    "application/pdf"
+  );
+  if (pdfUpload.success && pdfUpload.url) PDF_URL = pdfUpload.url;
+  else
+    PDF_URL =
+      "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+
+  logger.info(`Initialized mock uploads: IMG=${IMAGE_URL}, PDF=${PDF_URL}`);
+
   let args: ParsedArgs;
   try {
     args = parseCliArguments();
@@ -279,7 +400,8 @@ async function main() {
   });
 
   for (let attempt = 1; attempt <= args.count; attempt++) {
-    const email = `mock${attempt}@bmsce.ac.in`;
+    const deptCode = args.departmentCode.toLowerCase();
+    const email = `mock${attempt}.${deptCode}26@bmsce.ac.in`;
     const password = "password";
 
     const existing = await db.admission.findUnique({
@@ -296,6 +418,11 @@ async function main() {
       continue;
     }
 
+    const existingApplicantUser = await db.user.findFirst({
+      where: { email, role: "applicant" },
+      select: { id: true },
+    });
+
     try {
       const firstName = faker.person.firstName();
       const lastName = faker.person.lastName();
@@ -305,6 +432,7 @@ async function main() {
           primaryEmail: email,
           password,
           semesterId: context.semesterId,
+          departmentId: context.departmentId,
         },
         context.headers
       );
@@ -336,9 +464,10 @@ async function main() {
         email,
         attempt,
         admission.id,
-        firstName,
-        lastName,
+        `${firstName} ${lastName}`,
+        context.filledById,
         context.departmentId,
+        context.departmentName,
         context.semesterId
       );
       approvedCreated += 1;
@@ -358,6 +487,7 @@ async function main() {
         error: errorMsg,
       });
       failedApplicants.push({ email, error: errorMsg });
+      await cleanupPartialApplicant(email, !existingApplicantUser);
     }
   }
 
@@ -372,6 +502,22 @@ async function main() {
     logger.warn(
       "Porting is semester-wide: all APPROVED admissions in this semester will be ported to students, not only the mock applicants created by this script."
     );
+
+    const approvedInSemester = await db.admission.findMany({
+      where: {
+        semesterId: context.semesterId,
+        status: "APPROVED",
+        studentId: null,
+      },
+      select: { primaryEmail: true },
+    });
+
+    for (const { primaryEmail } of approvedInSemester) {
+      await db.user.updateMany({
+        where: { email: primaryEmail },
+        data: { username: primaryEmail },
+      });
+    }
 
     try {
       const portResponse = await AdmissionService.portStudents(

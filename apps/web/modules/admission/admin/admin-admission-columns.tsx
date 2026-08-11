@@ -1,14 +1,20 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@webcampus/ui/components/badge";
 import { AdminAdmissionActions } from "./admin-admission-actions";
 
 export type AdmissionResponse = {
   id: string;
   applicationId: string;
   modeOfAdmission: string;
-  status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | "EXITED";
+  semesterId?: string | null;
+  status:
+    | "PENDING"
+    | "SUBMITTED"
+    | "APPROVED"
+    | "REJECTED"
+    | "EXITED"
+    | "CANCELLED";
   createdAt: string;
 
   departmentId?: string | null;
@@ -19,20 +25,36 @@ export type AdmissionResponse = {
       name: string;
     };
   } | null;
+  cancellation?: {
+    reason: string;
+    cancelledAt: string;
+  } | null;
+  filledBy: {
+    id: string;
+    name: string;
+    email: string;
+    role?: string | null;
+  };
 
   // Added all the fields from the database
-  firstName?: string | null;
-  middleName?: string | null;
-  lastName?: string | null;
   categoryClaimed?: string | null;
   categoryAllotted?: string | null;
   quota?: string | null;
   entranceExamRank?: string | null;
   originalAdmissionOrderNumber?: string | null;
   originalAdmissionOrderDate?: Date | null;
+  firstName?: string | null;
+  middleName?: string | null;
+  lastName?: string | null;
   feePaid?: number | null;
+  feeStatus?: boolean;
+  feeReceiptNumber?: string | null;
   hostel?: boolean | null;
-  hostelRoomNumber?: string | null;
+  scholarship?: boolean | null;
+  abcAparId?: string | null;
+  sspId?: string | null;
+  counsellingRound?: string | null;
+  admissionType?: string | null;
 
   nameAsPer10th?: string | null;
   dob?: Date | null;
@@ -81,7 +103,17 @@ export type AdmissionResponse = {
   aadharNumber?: string | null;
   aadharCard?: string | null;
 
+  passportNumber?: string | null;
+  passportExpiryDate?: string | null;
+  visaNumber?: string | null;
+  visaExpiryDate?: string | null;
+  parentPassportNumber?: string | null;
+  parentVisaNumber?: string | null;
+  parentVisaExpiryDate?: string | null;
+  studiedKannadaIn10th?: boolean | null;
+
   class10thSchoolName?: string | null;
+  class10thRollRegNumber?: string | null;
   class10thSchoolType?: string | null;
   class10thSchoolCity?: string | null;
   class10thSchoolState?: string | null;
@@ -92,6 +124,7 @@ export type AdmissionResponse = {
   class10thMarksPdf?: string | null;
 
   class12thInstituteName?: string | null;
+  class12thRollRegNumber?: string | null;
   class12thInstituteType?: string | null;
   class12thInstituteCity?: string | null;
   class12thInstituteState?: string | null;
@@ -101,6 +134,30 @@ export type AdmissionResponse = {
   class12thAggregateTotal?: number | null;
   class12thMediumOfTeaching: string | null;
   class12thMarksPdf?: string | null;
+  admissionBasedOn?: string | null;
+  physicsMarks?: number | null;
+  physicsMaxMarks?: number | null;
+  physicsMinMarks?: number | null;
+  physicsPercentage?: number | null;
+  chemistryMarks?: number | null;
+  chemistryMaxMarks?: number | null;
+  chemistryMinMarks?: number | null;
+  chemistryPercentage?: number | null;
+  mathematicsMarks?: number | null;
+  mathematicsMaxMarks?: number | null;
+  mathematicsMinMarks?: number | null;
+  mathematicsPercentage?: number | null;
+  pcmPercentage?: number | null;
+
+  diplomaInstituteName?: string | null;
+  diplomaInstituteType?: string | null;
+  diplomaInstituteCity?: string | null;
+  diplomaInstituteState?: string | null;
+  diplomaBranch?: string | null;
+  diplomaYearOfPassing?: string | null;
+  diplomaMediumOfTeaching?: string | null;
+  diplomaAggregateScore?: number | null;
+  diplomaAggregateTotal?: number | null;
 
   studyCertificate?: string | null;
   transferCertificate?: string | null;
@@ -127,37 +184,55 @@ export type AdmissionResponse = {
   uniqueId?: string | null;
 };
 
-const baseColumns: ColumnDef<AdmissionResponse>[] = [
-  {
-    accessorKey: "primaryEmail",
-    header: "College Email",
-    cell: ({ row }) => (
-      <div className="font-medium">{row.original.primaryEmail}</div>
-    ),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const status = row.original.status;
-      const variant =
-        status === "APPROVED"
-          ? "default"
-          : status === "SUBMITTED"
-            ? "secondary"
-            : status === "REJECTED"
-              ? "destructive"
-              : "outline";
+const emailColumn: ColumnDef<AdmissionResponse> = {
+  accessorKey: "primaryEmail",
+  header: "College Email",
+  cell: ({ row }) => (
+    <div className="font-medium">{row.original.primaryEmail}</div>
+  ),
+};
 
-      return <Badge variant={variant}>{status}</Badge>;
-    },
+const createdAtColumn: ColumnDef<AdmissionResponse> = {
+  id: "createdAt",
+  header: "Created On",
+  cell: ({ row }) => {
+    const createdAt = row.original.createdAt;
+    if (!createdAt) return <div>-</div>;
+    const date = new Date(createdAt);
+    return (
+      <div suppressHydrationWarning>
+        {Number.isNaN(date.getTime())
+          ? "-"
+          : date.toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}
+      </div>
+    );
   },
-];
+};
+
+const filledByColumn: ColumnDef<AdmissionResponse> = {
+  id: "filledBy",
+  header: "Filled By",
+  cell: ({ row }) => (
+    <div>
+      <div className="font-medium">{row.original.filledBy.name}</div>
+      <div className="text-muted-foreground text-xs">
+        {row.original.filledBy.role ?? row.original.filledBy.email}
+      </div>
+    </div>
+  ),
+};
 
 export const getAdminAdmissionColumns = (
-  showViewDetails: boolean
+  showViewDetails: boolean,
+  showFilledBy = true
 ): ColumnDef<AdmissionResponse>[] => [
-  ...baseColumns,
+  emailColumn,
+  createdAtColumn,
+  ...(showFilledBy ? [filledByColumn] : []),
   ...(showViewDetails
     ? [
         {
@@ -165,14 +240,7 @@ export const getAdminAdmissionColumns = (
           header: "Name",
           cell: ({ row }: { row: { original: AdmissionResponse } }) => {
             const studentName = row.original.student?.user?.name?.trim();
-            const admissionName = [
-              row.original.firstName?.trim(),
-              row.original.middleName?.trim(),
-              row.original.lastName?.trim(),
-            ]
-              .filter((value): value is string => Boolean(value))
-              .join(" ")
-              .trim();
+            const admissionName = row.original.nameAsPer10th?.trim();
 
             return <div>{studentName || admissionName || "-"}</div>;
           },
@@ -186,11 +254,4 @@ export const getAdminAdmissionColumns = (
         } satisfies ColumnDef<AdmissionResponse>,
       ]
     : []),
-  {
-    id: "menu",
-    header: "",
-    cell: ({ row }) => (
-      <AdminAdmissionActions admission={row.original} menuOnly />
-    ),
-  },
 ];

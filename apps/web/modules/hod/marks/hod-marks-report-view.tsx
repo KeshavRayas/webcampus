@@ -147,7 +147,7 @@ export const HodMarksReportView = () => {
     () =>
       (optionsData?.academicTerms ?? []).map((term) => ({
         value: term.id,
-        label: `${term.type.charAt(0).toUpperCase() + term.type.slice(1)} ${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
       })),
     [optionsData?.academicTerms]
   );
@@ -253,7 +253,7 @@ export const HodMarksReportView = () => {
       `Course: ${reportData.course.code} - ${reportData.course.name}`,
       `Semester: ${reportData.semester.semesterNumber}`,
       `Academic Term: ${reportData.semester.academicTerm.type} ${reportData.semester.academicTerm.year}`,
-      `Min Required CIE: ${reportData.course.cumulativeMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
+      `Min Required CIE: ${reportData.course.cieMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
     ];
   }, [reportData]);
 
@@ -297,7 +297,7 @@ export const HodMarksReportView = () => {
           : "-";
       }),
       student.cieTotal != null ? student.cieTotal.toString() : "-",
-      `${reportData.course.cumulativeMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
+      `${reportData.course.cieMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
       student.status === "ELIGIBLE" ? "Eligible" : "Not Eligible",
     ]);
 
@@ -353,7 +353,7 @@ export const HodMarksReportView = () => {
         return score?.totalMarks != null ? score.totalMarks.toString() : "-";
       }),
       student.cieTotal != null ? student.cieTotal.toString() : "-",
-      `${reportData.course.cumulativeMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
+      `${reportData.course.cieMinMarks} (${reportData.course.cieEligibilityPercent}%)`,
       student.status === "ELIGIBLE" ? "Eligible" : "Not Eligible",
     ]);
 

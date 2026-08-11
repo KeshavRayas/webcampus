@@ -99,6 +99,7 @@ export class AdminFacultyService {
           staffType: request.staffType,
           dob: request.dob,
           dateOfJoining: request.dateOfJoining,
+          phoneNumber: request.phoneNumber,
         },
         include: {
           user: true,
@@ -213,6 +214,8 @@ export class AdminFacultyService {
             select: {
               id: true,
               image: true,
+              email: true,
+              username: true,
               name: true,
             },
           },
@@ -223,6 +226,74 @@ export class AdminFacultyService {
         throw new Error("Faculty not found");
       }
 
+      const nextUserData: {
+        name?: string;
+        email?: string;
+        username?: string;
+        displayUsername?: string;
+      } = {};
+      if (data.name !== undefined) {
+        nextUserData.name = data.name;
+      }
+      if (data.email !== undefined) {
+        nextUserData.email = data.email;
+      }
+      if (data.username !== undefined) {
+        nextUserData.username = data.username;
+      }
+      if (data.displayUsername !== undefined) {
+        nextUserData.displayUsername = data.displayUsername;
+      }
+
+      if (
+        data.email !== undefined &&
+        data.email !== existingFaculty.user.email
+      ) {
+        const existingEmailUser = await db.user.findFirst({
+          where: { email: data.email, NOT: { id: existingFaculty.user.id } },
+          select: { id: true },
+        });
+        if (existingEmailUser) {
+          throw new Error("A user with this email already exists");
+        }
+      }
+
+      if (
+        data.username !== undefined &&
+        data.username !== existingFaculty.user.username
+      ) {
+        const existingUsernameUser = await db.user.findFirst({
+          where: {
+            username: data.username,
+            NOT: { id: existingFaculty.user.id },
+          },
+          select: { id: true },
+        });
+        if (existingUsernameUser) {
+          throw new Error("A user with this username already exists");
+        }
+      }
+
+      const facultyData = { ...data } as Record<string, unknown>;
+      delete facultyData.name;
+      delete facultyData.email;
+      delete facultyData.username;
+      delete facultyData.displayUsername;
+
+      if (
+        data.employeeId !== undefined &&
+        data.employeeId !== existingFaculty.employeeId
+      ) {
+        const existingEmployeeIdFaculty = await db.faculty.findFirst({
+          where: { employeeId: data.employeeId, NOT: { id } },
+          select: { id: true },
+        });
+        if (existingEmployeeIdFaculty) {
+          throw new Error("A faculty with this employee ID already exists");
+        }
+      }
+
+      let nextImageUrl: string | null = null;
       if (imageFile) {
         const department = await db.department.findUnique({
           where: { id: existingFaculty.departmentId },
@@ -246,51 +317,55 @@ export class AdminFacultyService {
           throw new Error("Failed to upload faculty image");
         }
 
+        nextImageUrl = uploadResult.url;
+
         if (existingFaculty.user.image) {
           await deleteFromS3(existingFaculty.user.image);
         }
+      }
 
-        await db.user.update({
-          where: { id: existingFaculty.user.id },
-          data: {
-            image: uploadResult.url,
-          },
+      let updatedFaculty: unknown;
+      await db.$transaction(async (tx) => {
+        if (nextImageUrl) {
+          await tx.user.update({
+            where: { id: existingFaculty.user.id },
+            data: {
+              image: nextImageUrl,
+            },
+          });
+        }
+
+        if (Object.keys(nextUserData).length > 0) {
+          await tx.user.update({
+            where: { id: existingFaculty.user.id },
+            data: nextUserData,
+          });
+        }
+
+        updatedFaculty = await tx.faculty.update({
+          where: { id },
+          data: facultyData,
         });
-      }
-
-      const nextUserData: {
-        name?: string;
-        username?: string;
-        displayUsername?: string;
-      } = {};
-      if (data.name !== undefined) {
-        nextUserData.name = data.name;
-      }
-      if (data.username !== undefined) {
-        nextUserData.username = data.username;
-      }
-      if (data.displayUsername !== undefined) {
-        nextUserData.displayUsername = data.displayUsername;
-      }
-
-      if (Object.keys(nextUserData).length > 0) {
-        await db.user.update({
-          where: { id: existingFaculty.user.id },
-          data: nextUserData,
-        });
-      }
-
-      const facultyData = { ...data } as Record<string, unknown>;
-      delete facultyData.name;
-      delete facultyData.username;
-      delete facultyData.displayUsername;
-
-      const faculty = await db.faculty.update({
-        where: { id },
-        data: facultyData,
       });
-      return { status: "success", message: "Faculty updated", data: faculty };
+
+      return {
+        status: "success",
+        message: "Faculty updated",
+        data: updatedFaculty,
+      };
     } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2002") {
+          throw new Error("Email, username, or employee ID is already in use");
+        }
+        if (error.code === "P2025") {
+          throw new Error("Faculty not found");
+        }
+      }
+      if (error instanceof Error) {
+        logger.error("Failed to update faculty", error);
+        throw new Error(error.message);
+      }
       logger.error("Failed to update faculty", error);
       throw new Error("Failed to update faculty");
     }

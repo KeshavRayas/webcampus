@@ -93,6 +93,7 @@ export const FacultyProfileView = ({
 
         <PersonalInfoCard
           profile={profile}
+          isReadOnly={isReadOnly}
           onSave={
             isReadOnly
               ? () => {}
@@ -110,6 +111,7 @@ export const FacultyProfileView = ({
 
         <QualificationsTable
           profile={profile}
+          isReadOnly={isReadOnly}
           onCreate={
             isReadOnly
               ? () => {}
@@ -132,6 +134,7 @@ export const FacultyProfileView = ({
 
         <PublicationsList
           profile={profile}
+          isReadOnly={isReadOnly}
           onCreate={
             isReadOnly
               ? () => {}
@@ -154,6 +157,7 @@ export const FacultyProfileView = ({
 
         <ExperienceSection
           profile={profile}
+          isReadOnly={isReadOnly}
           onCreate={
             isReadOnly
               ? () => {}

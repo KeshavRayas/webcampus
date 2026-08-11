@@ -7,6 +7,10 @@ import { hallTicketHtml } from "@webcampus/ui/lib/hall-ticket";
 import type { HallTicketTemplateData } from "@webcampus/ui/lib/hall-ticket-template";
 import { academicEligibility } from "./academic-eligibility.service";
 import type { StudentEligibility } from "./academic-eligibility.service";
+import {
+  buildQrPayload,
+  hallTicketVerificationService,
+} from "./hall-ticket-verification.service";
 
 const logoDataUri: string = (() => {
   try {
@@ -76,9 +80,51 @@ type HallTicketWithAcademics = StudentEligibility & {
   isSent: boolean;
   sentAt: string | null;
   sentBy: string | null;
+  verificationToken: string | null;
+  peReady?: boolean;
+  blockReason?: string | null;
 };
 
 export const hallTicketService = {
+  async getStudentPeCourseIds(
+    studentId: string,
+    academicTermId: string
+  ): Promise<string[]> {
+    const regs = await db.courseRegistration.findMany({
+      where: { studentId, academicTermId, course: { courseType: "PE" } },
+      select: { courseId: true },
+    });
+    return regs.map((r) => r.courseId);
+  },
+
+  async assertStudentPeReady(
+    studentId: string,
+    academicTermId: string
+  ): Promise<void> {
+    const { PeCapacityService } = await import(
+      "@webcampus/api/src/services/shared/pe-capacity.service"
+    );
+    const peCourseIds = await this.getStudentPeCourseIds(
+      studentId,
+      academicTermId
+    );
+    for (const courseId of peCourseIds) {
+      await PeCapacityService.assertPeDownstreamReady(courseId);
+    }
+  },
+
+  async isStudentPeReady(
+    studentId: string,
+    academicTermId: string
+  ): Promise<boolean> {
+    try {
+      await this.assertStudentPeReady(studentId, academicTermId);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   async list(
     filters: {
       departmentId?: string;
@@ -99,9 +145,7 @@ export const hallTicketService = {
       academicTermId,
       ...rest,
     });
-
-    const frozenStudents = eligibleStudents.filter((s) => s.allCoursesFrozen);
-    if (frozenStudents.length === 0) return [];
+    if (eligibleStudents.length === 0) return [];
 
     const term = await db.academicTerm.findUnique({
       where: { id: academicTermId },
@@ -111,7 +155,7 @@ export const hallTicketService = {
       ? `${term.type.toUpperCase()} ${term.year}`
       : "N/A";
 
-    const studentIds = frozenStudents.map((s) => s.studentId);
+    const studentIds = eligibleStudents.map((s) => s.studentId);
     const sendRecords = await db.hallTicket.findMany({
       where: {
         studentId: { in: studentIds },
@@ -123,18 +167,50 @@ export const hallTicketService = {
         isSent: true,
         sentAt: true,
         sentBy: true,
+        verificationToken: true,
       },
     });
 
     const sendMap = new Map(sendRecords.map((r) => [r.studentId, r]));
 
-    return frozenStudents.map((student) => ({
-      ...student,
-      academicTermLabel,
-      isSent: sendMap.get(student.studentId)?.isSent ?? false,
-      sentAt: sendMap.get(student.studentId)?.sentAt?.toISOString() ?? null,
-      sentBy: sendMap.get(student.studentId)?.sentBy ?? null,
-    }));
+    const peReadyMap = new Map<string, boolean>();
+    for (const student of eligibleStudents) {
+      if (student.allCoursesFrozen) {
+        peReadyMap.set(
+          student.studentId,
+          await this.isStudentPeReady(student.studentId, academicTermId)
+        );
+      } else {
+        peReadyMap.set(student.studentId, true);
+      }
+    }
+
+    return eligibleStudents.map((student) => {
+      const peReady = peReadyMap.get(student.studentId) ?? false;
+      let blockReason: string | null = null;
+      if (!student.allCoursesFrozen) {
+        const blocked = student.courses.filter((c) => !c.isFrozen);
+        blockReason =
+          blocked.length > 0
+            ? blocked
+                .map((c) => `${c.courseCode}: ${c.reason ?? "not frozen"}`)
+                .join("; ")
+            : "Not all courses are frozen";
+      } else if (!peReady) {
+        blockReason = "PE course mapping is not complete";
+      }
+      return {
+        ...student,
+        academicTermLabel,
+        isSent: sendMap.get(student.studentId)?.isSent ?? false,
+        sentAt: sendMap.get(student.studentId)?.sentAt?.toISOString() ?? null,
+        sentBy: sendMap.get(student.studentId)?.sentBy ?? null,
+        verificationToken:
+          sendMap.get(student.studentId)?.verificationToken ?? null,
+        peReady,
+        blockReason,
+      };
+    });
   },
 
   async unsend(params: {
@@ -186,6 +262,13 @@ export const hallTicketService = {
 
     for (const studentId of studentIds) {
       try {
+        if (!(await this.isStudentPeReady(studentId, academicTermId))) {
+          errors.push({
+            studentId,
+            error: "PE course mapping is not complete",
+          });
+          continue;
+        }
         const eligibility = await academicEligibility.getCourseEligibility(
           studentId,
           academicTermId
@@ -217,6 +300,7 @@ export const hallTicketService = {
             isSent: true,
             sentAt: new Date(),
             sentBy: sentByUsername,
+            verificationToken: hallTicketVerificationService.generateToken(),
           },
           update: {
             isSent: true,
@@ -258,6 +342,13 @@ export const hallTicketService = {
       return null;
     }
 
+    if (!(await this.isStudentPeReady(studentId, academicTermId))) {
+      logger.warn(
+        `[HallTicket] getData: PE mapping not complete for student=${studentId} term=${academicTermId}`
+      );
+      return null;
+    }
+
     const sendRecord = semesterId
       ? await db.hallTicket.findUnique({
           where: {
@@ -271,6 +362,7 @@ export const hallTicketService = {
             isSent: true,
             sentAt: true,
             sentBy: true,
+            verificationToken: true,
             academicTerm: { select: { year: true, type: true } },
           },
         })
@@ -280,6 +372,7 @@ export const hallTicketService = {
             isSent: true,
             sentAt: true,
             sentBy: true,
+            verificationToken: true,
             academicTerm: { select: { year: true, type: true } },
           },
         });
@@ -294,6 +387,7 @@ export const hallTicketService = {
       isSent: sendRecord?.isSent ?? false,
       sentAt: sendRecord?.sentAt?.toISOString() ?? null,
       sentBy: sendRecord?.sentBy ?? null,
+      verificationToken: sendRecord?.verificationToken ?? null,
     };
   },
 
@@ -324,12 +418,19 @@ export const hallTicketService = {
     studentId: string,
     academicTermId: string
   ): Promise<string> {
-    const data = await this.getData(studentId, academicTermId);
-    if (!data) {
-      logger.error(
-        `[HallTicket] generatePdfHtml: data not found for student=${studentId} term=${academicTermId}`
-      );
-      throw new Error("Hall ticket data not found");
+    const peRegs = await db.courseRegistration.findMany({
+      where: {
+        studentId,
+        academicTermId,
+        course: { courseType: "PE" },
+      },
+      select: { courseId: true },
+    });
+    const { PeCapacityService } = await import(
+      "@webcampus/api/src/services/shared/pe-capacity.service"
+    );
+    for (const reg of peRegs) {
+      await PeCapacityService.assertPeDownstreamReady(reg.courseId);
     }
 
     const studentRecord = await db.student.findUnique({
@@ -348,6 +449,30 @@ export const hallTicketService = {
 
     const photo =
       studentRecord.admission?.photo ?? studentRecord.user.image ?? null;
+
+    const data = await this.getData(studentId, academicTermId);
+    if (!data) {
+      logger.error(
+        `[HallTicket] generatePdfHtml: data not found for student=${studentId} term=${academicTermId}`
+      );
+      throw new Error("Hall ticket data not found");
+    }
+
+    const sendRecord = await db.hallTicket.findFirst({
+      where: { studentId, academicTermId },
+      orderBy: { sentAt: "desc" },
+    });
+
+    const qrPayload = sendRecord
+      ? buildQrPayload(
+          sendRecord.verificationToken ??
+            (await hallTicketVerificationService.ensureVerificationToken(
+              studentId,
+              academicTermId,
+              sendRecord.semesterId
+            ))
+        )
+      : undefined;
 
     const templateData: HallTicketTemplateData = {
       id: `${studentId}-${academicTermId}`,
@@ -379,6 +504,7 @@ export const hallTicketService = {
         eligible: c.eligible,
         status: c.eligible ? ("ELIGIBLE" as const) : ("NOT_ELIGIBLE" as const),
       })),
+      qrPayload,
     };
 
     return hallTicketHtml(templateData, logoDataUri);

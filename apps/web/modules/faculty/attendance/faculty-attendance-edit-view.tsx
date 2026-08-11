@@ -32,6 +32,7 @@ type AttendanceSessionModalFilters = {
   courseId: string;
   sectionId: string;
   batchId?: string;
+  electiveBatchId?: string;
 };
 
 type AttendanceSessionQueryState = AttendanceSessionModalFilters & {
@@ -46,6 +47,7 @@ const EMPTY_SESSION_MODAL_FILTERS: AttendanceSessionModalFilters = {
   courseId: "",
   sectionId: "",
   batchId: undefined,
+  electiveBatchId: undefined,
 };
 
 const INITIAL_SESSION_QUERY_STATE: AttendanceSessionQueryState = {
@@ -110,6 +112,8 @@ export const FacultyAttendanceEditView = () => {
     useState<string>("");
   const [modalSectionSelectionKey, setModalSectionSelectionKey] =
     useState<string>("");
+  const [modalElectiveBatchSelectionKey, setModalElectiveBatchSelectionKey] =
+    useState<string>("");
 
   const [sessionModalFilters, setSessionModalFilters] =
     useState<AttendanceSessionModalFilters>(EMPTY_SESSION_MODAL_FILTERS);
@@ -147,6 +151,7 @@ export const FacultyAttendanceEditView = () => {
       courseId: appliedSessionFilters.courseId || undefined,
       sectionId: appliedSessionFilters.sectionId || undefined,
       batchId: appliedSessionFilters.batchId,
+      electiveBatchId: appliedSessionFilters.electiveBatchId,
       page: appliedSessionFilters.page,
       limit: appliedSessionFilters.limit,
     },
@@ -189,6 +194,41 @@ export const FacultyAttendanceEditView = () => {
       .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
   }, [filterOptionsQuery.data?.courses, filterOptionsQuery.data?.sections]);
 
+  const electiveBatchOptions = useMemo(() => {
+    const courses = filterOptionsQuery.data?.courses ?? [];
+    const electiveBatches = filterOptionsQuery.data?.electiveBatches ?? [];
+    const courseById = new Map(courses.map((course) => [course.id, course]));
+
+    return electiveBatches.map((batch) => {
+      const course = courseById.get(batch.courseId);
+      return {
+        id: batch.id,
+        name: batch.name,
+        courseId: batch.courseId,
+        courseCode: course?.code ?? "",
+        courseName: course?.name ?? "",
+        label: `${course?.code ?? ""} - ${course?.name ?? ""} (${batch.name})`,
+      };
+    });
+  }, [
+    filterOptionsQuery.data?.courses,
+    filterOptionsQuery.data?.electiveBatches,
+  ]);
+
+  const isElectiveCourse = useMemo(() => {
+    const selectedCourse = parseCourseSelectionKey(modalCourseSelectionKey);
+    if (!selectedCourse.courseId) {
+      return false;
+    }
+    const hasSections = assignmentOptions.some(
+      (assignment) => assignment.courseId === selectedCourse.courseId
+    );
+    const hasElectiveBatches = electiveBatchOptions.some(
+      (option) => option.courseId === selectedCourse.courseId
+    );
+    return !hasSections && hasElectiveBatches;
+  }, [assignmentOptions, electiveBatchOptions, modalCourseSelectionKey]);
+
   const courseOptions = useMemo(() => {
     const optionsByKey = new Map<
       string,
@@ -202,8 +242,23 @@ export const FacultyAttendanceEditView = () => {
         label: assignment.courseLabel,
       });
     }
+    for (const batch of electiveBatchOptions) {
+      optionsByKey.set(`${batch.courseId}${COURSE_SELECTION_DELIMITER}pe`, {
+        id: `${batch.courseId}${COURSE_SELECTION_DELIMITER}pe`,
+        code: batch.courseCode,
+        name: batch.courseName,
+        label: batch.label,
+      });
+    }
     return Array.from(optionsByKey.values());
-  }, [assignmentOptions]);
+  }, [assignmentOptions, electiveBatchOptions]);
+
+  const electiveBatchesForSelectedCourse = useMemo(() => {
+    const selectedCourse = parseCourseSelectionKey(modalCourseSelectionKey);
+    return electiveBatchOptions.filter(
+      (option) => option.courseId === selectedCourse.courseId
+    );
+  }, [electiveBatchOptions, modalCourseSelectionKey]);
 
   const sectionsForSelectedCourse = useMemo(() => {
     const selectedCourse = parseCourseSelectionKey(modalCourseSelectionKey);
@@ -290,6 +345,7 @@ export const FacultyAttendanceEditView = () => {
     setAppliedSessionFilters(INITIAL_SESSION_QUERY_STATE);
     setModalCourseSelectionKey("");
     setModalSectionSelectionKey("");
+    setModalElectiveBatchSelectionKey("");
   };
 
   const goToSessionPage = (nextPage: number) => {
@@ -388,6 +444,9 @@ export const FacultyAttendanceEditView = () => {
         filters={sessionModalFilters}
         selectedCourseValue={modalCourseSelectionKey}
         selectedSectionValue={modalSectionSelectionKey}
+        selectedElectiveBatchId={modalElectiveBatchSelectionKey}
+        isElective={isElectiveCourse}
+        electiveBatches={electiveBatchesForSelectedCourse}
         onDateChange={(sessionDate) =>
           setSessionModalFilters((current) => ({ ...current, sessionDate }))
         }
@@ -395,20 +454,34 @@ export const FacultyAttendanceEditView = () => {
           const parsed = parseCourseSelectionKey(selectionValue);
           setModalCourseSelectionKey(selectionValue);
           setModalSectionSelectionKey("");
+          setModalElectiveBatchSelectionKey("");
           setSessionModalFilters((current) => ({
             ...current,
             courseId: parsed.courseId,
             batchId: parsed.batchId,
             sectionId: "",
+            electiveBatchId: undefined,
           }));
         }}
         onSectionChange={(sectionSelection) => {
           const parsed = parseSectionSelectionKey(sectionSelection);
           setModalSectionSelectionKey(sectionSelection);
+          setModalElectiveBatchSelectionKey("");
           setSessionModalFilters((current) => ({
             ...current,
             sectionId: parsed.sectionId,
             batchId: parsed.batchId,
+            electiveBatchId: undefined,
+          }));
+        }}
+        onElectiveBatchChange={(electiveBatchId) => {
+          setModalElectiveBatchSelectionKey(electiveBatchId);
+          setModalSectionSelectionKey("");
+          setSessionModalFilters((current) => ({
+            ...current,
+            sectionId: "",
+            batchId: undefined,
+            electiveBatchId,
           }));
         }}
         onApplyFilters={applySessionFilters}
@@ -457,10 +530,13 @@ export const FacultyAttendanceEditView = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                  Section:
+                  {editingSessionInfo?.electiveBatchName
+                    ? "Elective Batch:"
+                    : "Section:"}
                 </span>
                 <span className="text-foreground font-medium">
-                  {editingSessionInfo?.sectionName}
+                  {editingSessionInfo?.electiveBatchName ??
+                    editingSessionInfo?.sectionName}
                 </span>
               </div>
               <div className="flex items-center gap-2">

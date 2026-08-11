@@ -8,11 +8,16 @@ import adminRouter from "./routers/admin/admin.router";
 import admissionRouter from "./routers/admission/admission.router";
 import coeRouter from "./routers/coe/coe.router";
 import facultyRouter from "./routers/faculty/faculty-domain.router";
+import {
+  adminFeedbackRouter,
+  feedbackReportRouter,
+} from "./routers/feedback.router";
 import financeRouter from "./routers/finance/finance.router";
 import hodRouter from "./routers/hod/hod.router";
 import fileRouter from "./routers/shared/file.router";
 import studentRouter from "./routers/student/student-domain.router";
 import supportRouter from "./routers/support/support.router";
+import verificationRouter from "./routers/verification/verification.router";
 
 const app: Express = express();
 
@@ -47,6 +52,12 @@ app.use("/support", supportRouter);
 app.use("/admission", admissionRouter);
 
 app.use("/student", studentRouter);
+app.use("/verification", verificationRouter);
+app.use("/admin/feedback", adminFeedbackRouter);
+app.use("/faculty/feedback", feedbackReportRouter);
+app.use("/hod/feedback", feedbackReportRouter);
+app.use("/department/feedback", feedbackReportRouter);
+app.use("/coe/feedback", feedbackReportRouter);
 
 app.use("/files", fileRouter);
 

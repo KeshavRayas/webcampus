@@ -331,6 +331,15 @@ const dbMock = {
   },
   course: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    findUnique: async ({ where }: any) => {
+      const session = sessions.find((s) => s.courseId === where?.id);
+      return {
+        id: where?.id ?? "course-1",
+        code: session?.Course?.code ?? "CS301",
+        courseType: "PC",
+      };
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findMany: async ({ where }: any) => {
       const ids: string[] = where?.id?.in ?? [];
       const byId = new Map<
@@ -387,6 +396,10 @@ const dbMock = {
       // Mock registered students for the course
       return [{ studentId: "student-1" }, { studentId: "student-2" }];
     },
+  },
+  electiveBatchFaculty: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    findMany: async (): Promise<any[]> => [],
   },
   attendanceRecord: {
     createMany: async () => ({}),

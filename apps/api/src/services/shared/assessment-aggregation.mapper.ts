@@ -20,6 +20,7 @@ export type CourseAggregationSource = {
   theoryMaxExams: number;
   theoryMinExams: number;
   theoryExamMaxMarks: number;
+  theoryCieContribution: number;
   theoryEligibility: number;
   labMaxMarks: number;
   labEligibility: number;
@@ -51,6 +52,7 @@ export function toCourseAggregationConfig(
     cieEligibilityPolicy: course.cieEligibilityPolicy,
     theoryMaxExams: course.theoryMaxExams,
     theoryMinExams: course.theoryMinExams,
+    theoryCieContribution: course.theoryCieContribution,
     theoryTemplateCount,
     labMaxMarks: course.labMaxMarks,
     aatMaxMarks: course.aatMaxMarks,

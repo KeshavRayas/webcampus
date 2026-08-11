@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admission Form</title>
+<style>
+  :root {
+    --brand: #6aa2e0;
+    --brand-dark: #4f86c8;
+    --brand-deep: #35608f;
+    --text: #1f2937;
+    --muted: #5b6b7c;
+    --line: #b9c8d8;
+    --soft: #eef5fd;
+  }
+
+  * { box-sizing: border-box; }
+
+  @page {
+    size: A4 portrait;
+    margin: 20mm;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: #ffffff;
+    color: var(--text);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page {
+    max-width: 210mm;
+    margin: 0 auto;
+  }
+
+  /* ---------- Header ---------- */
+  .letterhead {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--brand);
+    margin-bottom: 20px;
+  }
+
+  .letterhead .logo {
+    width: 92px;
+    height: 92px;
+    flex-shrink: 0;
+  }
+  .letterhead .logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .letterhead .institute {
+    flex: 1;
+    text-align: left;
+  }
+  .institute .name {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: var(--brand-deep);
+    margin: 0;
+    text-transform: uppercase;
+  }
+  .institute .tagline {
+    font-size: 11px;
+    color: var(--muted);
+    margin: 2px 0 0;
+    letter-spacing: 0.3px;
+  }
+  .institute .address {
+    font-size: 11px;
+    color: var(--muted);
+    margin: 2px 0 0;
+  }
+
+  /* ---------- Document title ---------- */
+  .doc-title {
+    background: var(--brand);
+    color: #ffffff;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+  }
+
+  /* ---------- Sections ---------- */
+  section {
+    margin-bottom: 22px;
+    page-break-inside: avoid;
+  }
+
+  section h2 {
+    background: var(--brand);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin: 0 0 12px;
+    padding: 8px 12px;
+    border-radius: 4px;
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+
+  /* ---------- Field rows ---------- */
+  .row {
+    display: flex;
+    align-items: flex-start;
+    padding: 5px 0;
+    border-bottom: 1px dotted var(--line);
+  }
+  .row:last-child { border-bottom: 0; }
+
+  .row label {
+    width: 200px;
+    flex-shrink: 0;
+    font-weight: 600;
+    color: var(--brand-deep);
+    padding-top: 1px;
+  }
+  .row .value {
+    flex: 1;
+    color: var(--text);
+    min-height: 16px;
+  }
+  .row .placeholder {
+    color: #8a97a5;
+    font-style: italic;
+  }
+  .row .placeholder::after {
+    content: "";
+  }
+
+  /* ---------- Tables ---------- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+  table caption {
+    text-align: left;
+    font-weight: 600;
+    color: var(--brand-deep);
+    margin-bottom: 6px;
+  }
+  th {
+    background: var(--brand);
+    color: #ffffff;
+    font-weight: 600;
+    text-align: left;
+    padding: 7px 10px;
+    border: 1px solid var(--brand-deep);
+  }
+  td {
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: var(--soft); }
+  td .value { width: 100%; }
+
+  /* ---------- Highlight box ---------- */
+  .highlight {
+    background: var(--soft);
+    border: 1px solid var(--brand);
+    border-left: 5px solid var(--brand);
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin-top: 12px;
+  }
+  .highlight .hl-title {
+    font-weight: 700;
+    color: var(--brand-deep);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+
+  /* ---------- Footer ---------- */
+  .footer-notes {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 26px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  @media print {
+    .page { max-width: none; }
+    section { page-break-inside: avoid; }
+    thead { display: table-header-group; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- ============ HEADER ============ -->
+    <div class="letterhead">
+      <div class="logo">
+        <img src="/logo.svg" alt="College Logo" />
+      </div>
+      <div class="institute">
+        <p class="name">{{college_name}}</p>
+        <p class="tagline">Affiliated to VTU · Approved by AICTE · ESTD. 1946</p>
+        <p class="address">{{college_address}}, {{college_city}}, {{college_state}} - {{college_pincode}}</p>
+      </div>
+    </div>
+
+    <div class="doc-title">Admission Form</div>
+
+    <!-- ============ PERSONAL INFORMATION ============ -->
+    <section>
+      <h2>Personal Information</h2>
+      <div class="panel">
+        <div class="row"><label>Photo</label><div class="value">{{photo}}</div></div>
+        <div class="row"><label>Full Name (as per marks card)</label><div class="value">{{student_name}}</div></div>
+        <div class="row"><label>Date of Birth</label><div class="value">{{dob}}</div></div>
+        <div class="row"><label>Blood Group</label><div class="value">{{blood_group}}</div></div>
+        <div class="row"><label>Gender</label><div class="value">{{gender}}</div></div>
+        <div class="row"><label>Primary Mobile</label><div class="value">{{primary_phone}}</div></div>
+        <div class="row"><label>Secondary Mobile</label><div class="value">{{secondary_phone}}</div></div>
+        <div class="row"><label>Emergency Contact</label><div class="value">{{emergency_phone}}</div></div>
+        <div class="row"><label>Primary Email</label><div class="value">{{primary_email}}</div></div>
+        <div class="row"><label>Secondary Email</label><div class="value">{{secondary_email}}</div></div>
+
+        <div class="highlight">
+          <div class="label">Current Address</div>
+          <div class="value">{{current_address}}, {{current_area}}, {{current_district}}, {{current_state}}, {{current_country}} - {{current_pincode}}</div>
+        </div>
+        <div class="highlight">
+          <div class="label">Permanent Address</div>
+          <div class="value">{{permanent_address}}, {{permanent_area}}, {{permanent_district}}, {{permanent_state}}, {{permanent_country}} - {{permanent_pincode}}</div>
+        </div>
+
+        <div class="row"><label>Place of Birth</label><div class="value">{{place_of_birth}}</div></div>
+        <div class="row"><label>Domicile State</label><div class="value">{{domicile_state}}</div></div>
+        <div class="row"><label>Religion</label><div class="value">{{religion}}</div></div>
+        <div class="row"><label>Caste</label><div class="value">{{caste}}</div></div>
+        <div class="row"><label>Sub Caste</label><div class="value">{{sub_caste}}</div></div>
+        <div class="row"><label>Mother Tongue</label><div class="value">{{mother_tongue}}</div></div>
+        <div class="row"><label>Nationality</label><div class="value">{{nationality}}</div></div>
+        <div class="row"><label>Aadhaar Number</label><div class="value">{{aadhar_number}}</div></div>
+        <div class="row"><label>NRI Status</label><div class="value">{{nri}}</div></div>
+        <div class="row"><label>Disability</label><div class="value">{{disability}}</div></div>
+        <div class="row"><label>Disability Details</label><div class="value">{{disability_type}}</div></div>
+        <div class="row"><label>Economically Backward</label><div class="value">{{economically_backward}}</div></div>
+        <div class="row"><label>Student Passport No.</label><div class="value">{{passport_number}}</div></div>
+        <div class="row"><label>Passport Expiry Date</label><div class="value">{{passport_expiry}}</div></div>
+        <div class="row"><label>Student Visa No.</label><div class="value">{{visa_number}}</div></div>
+        <div class="row"><label>Visa Expiry Date</label><div class="value">{{visa_expiry}}</div></div>
+      </div>
+    </section>
+
+    <!-- ============ ADMISSION DETAILS ============ -->
+    <section>
+      <h2>Admission Details</h2>
+      <div class="panel">
+        <div class="row"><label>Application ID</label><div class="value">{{application_id}}</div></div>
+        <div class="row"><label>Mode of Admission</label><div class="value">{{mode_of_admission}}</div></div>
+        <div class="row"><label>Branch / Department</label><div class="value">{{branch}}</div></div>
+        <div class="row"><label>Admission Type</label><div class="value">{{admission_type}}</div></div>
+        <div class="row"><label>Admission Based On</label><div class="value">{{admission_based_on}}</div></div>
+        <div class="row"><label>Semester</label><div class="value">{{semester}}</div></div>
+        <div class="row"><label>Category Claimed</label><div class="value">{{category_claimed}}</div></div>
+        <div class="row"><label>Category Allotted</label><div class="value">{{category_allotted}}</div></div>
+        <div class="row"><label>Quota</label><div class="value">{{quota}}</div></div>
+        <div class="row"><label>Entrance Exam Rank</label><div class="value">{{entrance_exam_rank}}</div></div>
+        <div class="row"><label>Sport / Discipline</label><div class="value">{{sport_name}}</div></div>
+        <div class="row"><label>Original Admission Order No.</label><div class="value">{{admission_order_number}}</div></div>
+        <div class="row"><label>Admission Date</label><div class="value">{{admission_date}}</div></div>
+        <div class="row"><label>Counselling Round</label><div class="value">{{counselling_round}}</div></div>
+        <div class="row"><label>ABC / APAAR ID</label><div class="value">{{abc_apar_id}}</div></div>
+        <div class="row"><label>Hostel</label><div class="value">{{hostel}}</div></div>
+        <div class="row"><label>Hostel Room Number</label><div class="value">{{hostel_room_number}}</div></div>
+      </div>
+    </section>
+
+    <!-- ============ EDUCATION DETAILS ============ -->
+    <section>
+      <h2>Education Details</h2>
+
+      <div class="panel">
+        <h3 class="group-heading">Class X</h3>
+        <div class="row"><label>School Name</label><div class="value">{{class10_school_name}}</div></div>
+        <div class="row"><label>Roll / Reg. Number</label><div class="value">{{class10_reg_number}}</div></div>
+        <div class="row"><label>School Type</label><div class="value">{{class10_school_type}}</div></div>
+        <div class="row"><label>School Country</label><div class="value">{{class10_country}}</div></div>
+        <div class="row"><label>School State</label><div class="value">{{class10_state}}</div></div>
+        <div class="row"><label>School City</label><div class="value">{{class10_city}}</div></div>
+        <div class="row"><label>Year of Passing</label><div class="value">{{class10_year}}</div></div>
+        <div class="row"><label>Marks Obtained</label><div class="value">{{class10_marks}}</div></div>
+        <div class="row"><label>Total Marks</label><div class="value">{{class10_total}}</div></div>
+        <div class="row"><label>Medium of Instruction</label><div class="value">{{class10_medium}}</div></div>
+        <div class="row"><label>Studied Kannada</label><div class="value">{{class10_kannada}}</div></div>
+      </div>
+
+      <div class="panel">
+        <h3 class="mb-heading">Class XII / PUC</h3>
+        <div class="row"><label>Institute Name</label><div class="value">{{class12_institute_name}}</div></div>
+        <div class="row"><label>Institute Type</label><div class="value">{{class12_institute_type}}</div></div>
+        <div class="row"><label>Institute Country</label><div class="value">{{class12_country}}</div></div>
+        <div class="row"><label>Institute State</label><div class="value">{{class12_state}}</div></div>
+        <div class="row"><label>Institute City</label><div class="value">{{class12_city}}</div></div>
+        <div class="row"><label>Year of Passing</label><div class="value">{{class12_year}}</div></div>
+        <div class="row"><label>Branch</label><div class="value">{{class12_branch}}</div></div>
+        <div class="row"><label>Roll / Reg. Number</label><div class="value">{{class12_reg_number}}</div></div>
+        <div class="row"><label>Medium of Instruction</label><div class="value">{{class12_medium}}</div></div>
+        <div class="row"><label>Marks Obtained</label><div class="value">{{class12_marks}}</div></div>
+        <div class="row"><label>Total Marks</label><div class="value">{{class12_total}}</div></div>
+
+        <table>
+          <thead>
+            <tr><th>Subject</th><th>Marks Obtained</th><th>Max Marks</th><th>Min / Pass</th><th>Percentage</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Physics</td><td>{{physics_marks}}</td><td>{{physics_max}}</td><td>{{physics_min}}</td><td>{{physics_percentage}}%</td></tr>
+            <tr><td>Chemistry</td><td>{{chemistry_marks}}</td><td>{{chemistry_max}}</td><td>{{chemistry_min}}</td><td>{{chemistry_percentage}}%</td></tr>
+            <tr><td>Mathematics</td><td>{{maths_marks}}</td><td>{{maths_max}}</td><td>{{maths_min}}</td><td>{{maths_percentage}}%</td></tr>
+          </tbody>
+        </table>
+
+        <div class="highlight">
+          <div class="label">PCM Aggregate Percentage :&nbsp;&nbsp;<strong>{{pcm_percentage}}%</strong></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="mb-heading">Diploma</h3>
+        <div class="row"><label>Institute Name</label><div class="value">{{diploma_institute_name}}</div></div>
+        <div class="row"><label>Institute Type</label><div class="value">{{diploma_institute_type}}</div></div>
+        <div class="row"><label>Institute Country</label><div class="value">{{diploma_country}}</div></div>
+        <div class="row"><label>Institute State</label><div class="value">{{diploma_state}}</div></div>
+        <div class="row"><label>Institute City</label><div class="value">{{diploma_city}}</div></div>
+        <div class="row"><label>Branch</label><div class="value">{{diploma_branch}}</div></div>
+        <div class="row"><label>Year of Passing</label><div class="value">{{diploma_year}}</div></div>
+        <div class="row"><label>Medium of Instruction</label><div class="value">{{diploma_medium}}</div></div>
+        <div class="row"><label>Marks Obtained</label><div class="value">{{diploma_marks}}</div></div>
+        <div class="row"><label>Total Marks</label><div class="value">{{diploma_total}}</div></div>
+      </div>
+    </section>
+
+    <!-- ============ PARENT DETAILS ============ -->
+    <section>
+      <h2>Parent Details</h2>
+
+      <div class="two-col">
+        <div class="panel">
+          <h3 class="mb-heading">Father</h3>
+          <div class="row"><label>Full Name</label><div class="value">{{father_name}}</div></div>
+          <div class="row"><label>Occupation</label><div class="value">{{father_occupation}}</div></div>
+          <div class="row"><label>Annual Income</label><div class="value">{{father_income}}</div></div>
+          <div class="row"><label>Mobile No.</label><div class="value">{{father_mobile}}</div></div>
+          <div class="row"><label>Email ID</label><div class="value">{{father_email}}</div></div>
+          <div class="row"><label>Address</label><div class="value">{{father_address}}</div></div>
+          <div class="row"><label>Passport No.</label><div class="value">{{parent_passport}}</div></div>
+          <div class="row"><label>Visa No.</label><div class="value">{{parent_visa}}</div></div>
+          <div class="row"><label>Visa Expiry</label><div class="value">{{parent_visa_expiry}}</div></div>
+        </div>
+
+        <div class="panel">
+          <h3 class="mb-heading">Mother</h3>
+          <div class="row"><label>Full Name</label><div class="value">{{mother_name}}</div></div>
+          <div class="row"><label>Occupation</label><div class="value">{{mother_occupation}}</div></div>
+          <div class="row"><label>Annual Income</label><div class="value">{{mother_income}}</div></div>
+          <div class="row"><label>Mobile No.</label><div class="value">{{mother_mobile}}</div></div>
+          <div class="row"><label>Email ID</label><div class="value">{{mother_email}}</div></div>
+          <div class="row"><label>Address</label><div class="value">{{mother_address}}</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 class="mb-heading">Guardian</h3>
+        <div class="row"><label>Full Name</label><div class="value">{{guardian_name}}</div></div>
+        <div class="row"><label>Occupation</label><div class="value">{{guardian_occupation}}</div></div>
+        <div class="row"><label>Annual Income</label><div class="value">{{guardian_income}}</div></div>
+        <div class="row"><label>Mobile No.</label><div class="value">{{guardian_mobile}}</div></div>
+        <div class="row"><label>Email ID</label><div class="value">{{guardian_email}}</div></div>
+        <div class="row"><label>Address</label><div class="value">{{guardian_address}}</div></div>
+      </div>
+    </section>
+
+    <div class="footer-notes">
+      <span>Applicant Signature</span>
+      <span>{{signature}}</span>
+      <span>Date : {{date}}</span>
+    </div>
+
+  </div>
+</body>
+</html>

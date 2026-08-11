@@ -183,7 +183,8 @@ export function computeEligibility(
     aat: ComponentResult;
   },
   cieTotal: number,
-  courseConfig: CourseAggregationConfig
+  courseConfig: CourseAggregationConfig,
+  theoryAttempted: number
 ): {
   cie: AggregationResult["cie"];
   status: EligibilityStatus;
@@ -203,11 +204,19 @@ export function computeEligibility(
   ].filter((c) => c.active);
   const allComponentsEligible = activeComponents.every((c) => c.eligible);
 
+  const hasMetMinTheoryExams =
+    courseConfig.theoryMinExams > 0
+      ? theoryAttempted >= courseConfig.theoryMinExams
+      : true;
+
   let status: EligibilityStatus;
   if (courseConfig.cieEligibilityPolicy === "OVERALL_ONLY") {
-    status = cieEligible ? "ELIGIBLE" : "NOT_ELIGIBLE";
+    status = cieEligible && hasMetMinTheoryExams ? "ELIGIBLE" : "NOT_ELIGIBLE";
   } else {
-    status = cieEligible && allComponentsEligible ? "ELIGIBLE" : "NOT_ELIGIBLE";
+    status =
+      cieEligible && allComponentsEligible && hasMetMinTheoryExams
+        ? "ELIGIBLE"
+        : "NOT_ELIGIBLE";
   }
 
   return {
@@ -258,12 +267,7 @@ export function computeAggregation(
   const aatAggregate = aatComputed.result.obtained;
 
   const theoryMax = theoryInput?.maxForEligibility ?? 0;
-  const theoryContributionMax = Math.max(
-    0,
-    courseConfig.cieMaxMarks -
-      (courseConfig.labMaxMarks ?? 0) -
-      (courseConfig.aatMaxMarks ?? 0)
-  );
+  const theoryContributionMax = courseConfig.theoryCieContribution;
   const theoryContribution =
     theoryMax > 0
       ? Math.min(
@@ -295,10 +299,20 @@ export function computeAggregation(
     aat: aatComputed.result,
   };
 
+  // Attempts come only from normalized persisted StudentAssessment scores.
+  const theoryAttempted =
+    theoryInput?.assessments.filter(
+      (assessment) =>
+        assessment.score !== null &&
+        assessment.status !== "ABSENT" &&
+        assessment.status !== "MP"
+    ).length ?? 0;
+
   const { cie, status } = computeEligibility(
     componentResults,
     cieTotal,
-    courseConfig
+    courseConfig,
+    theoryAttempted
   );
 
   return {

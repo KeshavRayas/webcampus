@@ -48,13 +48,18 @@ export const useCreateAdminCourseForm = (
       theoryMaxExams: 0,
       theoryExamMaxMarks: 0,
       theoryMinExams: 0,
+      theoryCieContribution: 0,
       theoryEligibility: 40,
       labMaxMarks: 0,
       labEligibility: 40,
       aatMaxMarks: 0,
       aatEligibility: 40,
-      allowFeedback: false,
+      allowFeedback: true,
       attendanceRequired: true,
+      numberOfBatches: undefined,
+      studentsPerBatch: undefined,
+      openElectiveEligibility: "ALL",
+      eligibleDepartmentIds: [],
     },
   });
 
@@ -77,6 +82,7 @@ export const useCreateAdminCourseForm = (
       queryClient.invalidateQueries({
         queryKey: ["admin-course-mapping-status"],
       });
+      queryClient.invalidateQueries({ queryKey: ["pe-capacity-summary"] });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(error.response?.data?.error || "Failed to create course");

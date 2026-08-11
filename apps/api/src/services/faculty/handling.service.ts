@@ -305,6 +305,30 @@ const buildAssignmentWhere = (
   return { AND: andConditions };
 };
 
+type OwnedApprovedElectiveAssignment = {
+  id: string;
+  facultyId: string;
+  semester: number;
+  academicYear: string;
+  electiveBatch: {
+    id: string;
+    name: string;
+  };
+  course: {
+    id: string;
+    code: string;
+    name: string;
+    semesterId: string;
+    semesterNumber: number;
+    semester: {
+      id: string;
+      academicTermId: string;
+      programType: "UG" | "PG";
+    };
+    approvalStatus: "APPROVED" | "PENDING" | "DRAFT" | "NEEDS_REVISION";
+  };
+};
+
 type OwnedApprovedAssignment = {
   id: string;
   facultyId: string;
@@ -420,6 +444,60 @@ export class FacultyHandlingService {
     return assignment;
   }
 
+  private static async getOwnedApprovedElectiveAssignment(
+    facultyId: string,
+    assignmentId: string
+  ): Promise<OwnedApprovedElectiveAssignment | null> {
+    const assignment = await db.electiveBatchFaculty.findUnique({
+      where: { id: assignmentId },
+      select: {
+        id: true,
+        facultyId: true,
+        semester: true,
+        academicYear: true,
+        electiveBatch: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        course: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            semesterId: true,
+            semesterNumber: true,
+            semester: {
+              select: {
+                id: true,
+                academicTermId: true,
+                programType: true,
+              },
+            },
+            approvalStatus: true,
+          },
+        },
+      },
+    });
+
+    if (!assignment) {
+      return null;
+    }
+
+    if (assignment.facultyId !== facultyId) {
+      throw new Error(
+        "Forbidden: assignment does not belong to current faculty"
+      );
+    }
+
+    if (assignment.course.approvalStatus !== "APPROVED") {
+      throw new Error("Assignment course is not approved");
+    }
+
+    return assignment;
+  }
+
   static async getHandlingAssignments(
     userId: string,
     assignmentType: AssignmentType,
@@ -432,7 +510,7 @@ export class FacultyHandlingService {
       const where = buildAssignmentWhere(facultyId, assignmentType, filters);
       const skip = (filters.page - 1) * filters.limit;
 
-      const [total, assignments] = await Promise.all([
+      const [totalPc, assignments, batchFacultyRows] = await Promise.all([
         db.courseAssignment.count({ where }),
         db.courseAssignment.findMany({
           where,
@@ -483,7 +561,69 @@ export class FacultyHandlingService {
             },
           },
         }),
+        assignmentType === "THEORY"
+          ? db.electiveBatchFaculty.findMany({
+              where: {
+                facultyId,
+                course: { approvalStatus: "APPROVED" },
+              },
+              select: {
+                id: true,
+                semester: true,
+                academicYear: true,
+                electiveBatch: {
+                  select: {
+                    id: true,
+                    name: true,
+                    _count: {
+                      select: { studentAssignments: true },
+                    },
+                  },
+                },
+                course: {
+                  select: {
+                    id: true,
+                    code: true,
+                    name: true,
+                    semesterId: true,
+                    semesterNumber: true,
+                    semester: {
+                      select: {
+                        academicTermId: true,
+                        programType: true,
+                      },
+                    },
+                  },
+                },
+              },
+            })
+          : Promise.resolve([]),
       ]);
+
+      const batchAsAssignments = batchFacultyRows.map((row) => ({
+        id: row.id,
+        assignmentType: "THEORY" as const,
+        semester: row.semester,
+        academicYear: row.academicYear,
+        section: {
+          id: row.electiveBatch.id,
+          name: row.electiveBatch.name,
+          semesterId: row.course.semesterId,
+        },
+        course: row.course,
+        batch: {
+          id: row.electiveBatch.id,
+          name: row.electiveBatch.name,
+          _count: { students: row.electiveBatch._count.studentAssignments },
+        },
+      }));
+
+      const total = totalPc + batchAsAssignments.length;
+      // Prefer showing batch rows first when on page 1; keep simple merge for THEORY
+      const merged =
+        assignmentType === "THEORY"
+          ? [...batchAsAssignments, ...assignments].slice(0, filters.limit)
+          : assignments;
 
       const theoryFilters = Array.from(
         new Map(
@@ -572,32 +712,35 @@ export class FacultyHandlingService {
         }
       }
 
-      const items: FacultyHandlingAssignmentDTO[] = assignments.map(
-        (assignment) => {
-          const studentCount =
-            assignment.assignmentType === "THEORY"
-              ? (theoryCountByKey.get(
-                  toStudentSectionCountKey(
-                    assignment.section.id,
-                    assignment.semester,
-                    assignment.academicYear
-                  )
-                ) ?? 0)
-              : (assignment.batch?._count.students ?? 0);
+      const items: FacultyHandlingAssignmentDTO[] = merged.map((assignment) => {
+        const isPeElectiveBatch =
+          assignment.batch?.id === assignment.section.id &&
+          assignment.batch?.name === assignment.section.name;
 
-          return {
-            assignmentId: assignment.id,
-            courseId: assignment.course.id,
-            courseCode: assignment.course.code,
-            courseName: assignment.course.name,
-            semesterNumber: assignment.semester,
-            section: assignment.section.name,
-            batchName: assignment.batch?.name,
-            assignmentType: assignment.assignmentType,
-            studentCount,
-          };
-        }
-      );
+        const studentCount = isPeElectiveBatch
+          ? (assignment.batch?._count.students ?? 0)
+          : assignment.assignmentType === "THEORY"
+            ? (theoryCountByKey.get(
+                toStudentSectionCountKey(
+                  assignment.section.id,
+                  assignment.semester,
+                  assignment.academicYear
+                )
+              ) ?? 0)
+            : (assignment.batch?._count.students ?? 0);
+
+        return {
+          assignmentId: assignment.id,
+          courseId: assignment.course.id,
+          courseCode: assignment.course.code,
+          courseName: assignment.course.name,
+          semesterNumber: assignment.semester,
+          section: assignment.section.name,
+          batchName: assignment.batch?.name,
+          assignmentType: assignment.assignmentType,
+          studentCount,
+        };
+      });
 
       return {
         status: "success",
@@ -775,12 +918,44 @@ export class FacultyHandlingService {
     try {
       const facultyId =
         await FacultyHandlingService.getFacultyIdByUserId(userId);
-      const assignment =
-        await FacultyHandlingService.getOwnedApprovedAssignment(
+
+      const electiveAssignment =
+        await FacultyHandlingService.getOwnedApprovedElectiveAssignment(
+          facultyId,
+          assignmentId
+        );
+
+      let assignment: OwnedApprovedAssignment & {
+        electiveBatchId?: string;
+      };
+      let isElectiveAssignment = false;
+
+      if (electiveAssignment) {
+        isElectiveAssignment = true;
+        assignment = {
+          id: electiveAssignment.id,
+          facultyId: electiveAssignment.facultyId,
+          assignmentType: "THEORY",
+          semester: electiveAssignment.semester,
+          academicYear: electiveAssignment.academicYear,
+          sectionId: electiveAssignment.electiveBatch.id,
+          electiveBatchId: electiveAssignment.electiveBatch.id,
+          batchId: null,
+          course: electiveAssignment.course,
+          section: {
+            id: electiveAssignment.electiveBatch.id,
+            name: electiveAssignment.electiveBatch.name,
+            semesterId: electiveAssignment.course.semesterId,
+          },
+          batch: null,
+        };
+      } else {
+        assignment = await FacultyHandlingService.getOwnedApprovedAssignment(
           facultyId,
           assignmentId,
           assignmentType
         );
+      }
 
       if (assignment.assignmentType === "LAB" && !assignment.batchId) {
         throw new Error("Invalid assignment: LAB assignment must have a batch");
@@ -861,7 +1036,16 @@ export class FacultyHandlingService {
         });
       }
 
-      if (assignment.assignmentType === "THEORY") {
+      if (isElectiveAssignment) {
+        studentConditions.push({
+          electiveStudentAssignments: {
+            some: {
+              courseId: assignment.course.id,
+              electiveBatchId: assignment.electiveBatchId as string,
+            },
+          },
+        });
+      } else if (assignment.assignmentType === "THEORY") {
         studentConditions.push({
           studentSections: {
             some: {
