@@ -8,7 +8,6 @@ import { frontendEnv } from "@webcampus/common/env";
 import {
   admissionTypes,
   counsellingRounds,
-  nationalities,
 } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
@@ -33,6 +32,7 @@ import { City, Country, State } from "country-state-city";
 import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
 import { FileDown } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { AdmissionDocument, COLLEGE, type DocData } from "./admission-document";
@@ -176,6 +176,7 @@ function MemberAddressBlock({
   autoAddress,
   autoCurrent,
   autoPermanent,
+  addressesHydrated,
   savedAddress,
 }: {
   memberKey: "father" | "mother" | "guardian";
@@ -184,6 +185,7 @@ function MemberAddressBlock({
   autoAddress: string;
   autoCurrent: string;
   autoPermanent: string;
+  addressesHydrated: boolean;
   savedAddress?: string;
 }) {
   const [line1, setLine1] = useState("");
@@ -212,10 +214,20 @@ function MemberAddressBlock({
       return;
     }
 
+    if (!addressesHydrated) {
+      return;
+    }
+
     hydratedRef.current = true;
     onSourceChange("custom");
     setLine1(text);
-  }, [savedAddress, autoCurrent, autoPermanent, onSourceChange]);
+  }, [
+    savedAddress,
+    autoCurrent,
+    autoPermanent,
+    addressesHydrated,
+    onSourceChange,
+  ]);
 
   const custom = source === "custom";
   const customAddress = [line1, line2, line3, city, state, pincode, country]
@@ -370,6 +382,7 @@ function ParentMemberCard({
   onIncomeChange,
   autoCurrent,
   autoPermanent,
+  addressesHydrated,
   savedAddress,
   wide = false,
   children,
@@ -389,6 +402,7 @@ function ParentMemberCard({
   onIncomeChange?: (value: string) => void;
   autoCurrent: string;
   autoPermanent: string;
+  addressesHydrated: boolean;
   savedAddress?: string;
   wide?: boolean;
   children?: React.ReactNode;
@@ -503,6 +517,7 @@ function ParentMemberCard({
         autoAddress={source === "current" ? autoCurrent : autoPermanent}
         autoCurrent={autoCurrent}
         autoPermanent={autoPermanent}
+        addressesHydrated={addressesHydrated}
         savedAddress={savedAddress}
       />
 
@@ -525,11 +540,14 @@ export const ApplicantAdmissionView = ({
   initialApplicationId?: string;
 }) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const router = useRouter();
+  const pathname = usePathname();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSameAddress, setIsSameAddress] = useState(false);
   const [activeStep, setActiveStep] = useState<StepKey>(initialStep);
   const [nriEnabled, setNriEnabled] = useState(false);
   const [disabilityEnabled, setDisabilityEnabled] = useState(false);
+  const [addressesHydrated, setAddressesHydrated] = useState(false);
   const [currentCountry, setCurrentCountry] = useState("IN");
   const [currentState, setCurrentState] = useState("");
   const [currentDistrict, setCurrentDistrict] = useState("");
@@ -560,7 +578,7 @@ export const ApplicantAdmissionView = ({
   const [admissionBasedOn, setAdmissionBasedOn] = useState("");
   const [scholarshipEnabled, setScholarshipEnabled] = useState(false);
   const [selectedCounsellingRound, setSelectedCounsellingRound] = useState("");
-  const [selectedNationality, setSelectedNationality] = useState("Indian");
+  const [selectedNationality, setSelectedNationality] = useState("");
   const [feePaid, setFeePaid] = useState("");
   const [feeReceiptNumber, setFeeReceiptNumber] = useState("");
   const [studiedKannadaEnabled, setStudiedKannadaEnabled] = useState(false);
@@ -729,8 +747,6 @@ export const ApplicantAdmissionView = ({
     ? (fetchedStaffAdmission ?? EMPTY_ADMISSION)
     : (fetchedAdmission ?? EMPTY_ADMISSION);
   const countries = Country.getAllCountries();
-  console.log("Admission:", admission);
-  console.log("Primary Email:", admission?.primaryEmail);
 
   const fullName = [
     admission?.firstName,
@@ -851,7 +867,14 @@ export const ApplicantAdmissionView = ({
       });
 
       toast.success("Application submitted successfully!");
-      if (!staffMode) refetch();
+      if (staffMode) {
+        const backPath = (pathname || "").startsWith("/admission-instructor")
+          ? "/admission-instructor"
+          : "/admission";
+        router.push(backPath);
+      } else {
+        refetch();
+      }
     } catch (error: unknown) {
       if (isAxiosError(error)) {
         toast.error(
@@ -1450,6 +1473,8 @@ export const ApplicantAdmissionView = ({
     setPermanentArea(String(a.permanentArea ?? ""));
     setPermanentPincode(String(a.permanentPincode ?? ""));
 
+    setAddressesHydrated(true);
+
     setPrimaryPhone(String(a.primaryPhoneNumber ?? ""));
     setSecondaryPhone(String(a.secondaryPhoneNumber ?? ""));
     setEmergencyPhone(String(a.emergencyContactNumber ?? ""));
@@ -1636,8 +1661,6 @@ export const ApplicantAdmissionView = ({
   );
   const birthStates = State.getStatesOfCountry("IN");
 
-  const educationStates = State.getStatesOfCountry("IN");
-
   useEffect(() => {
     const placeOfBirthState = birthStates.find(
       (state) => state.name === admission?.placeOfBirth
@@ -1666,9 +1689,12 @@ export const ApplicantAdmissionView = ({
     }
   }, [semesterNumber, selectedAdmissionType]);
 
-  const class10Cities = City.getCitiesOfState("IN", class10State);
-  const class12Cities = City.getCitiesOfState("IN", class12State);
-  const diplomaCities = City.getCitiesOfState("IN", diplomaState);
+  const class10States = State.getStatesOfCountry(class10Country);
+  const class12States = State.getStatesOfCountry(class12Country);
+  const diplomaStates = State.getStatesOfCountry(diplomaCountry);
+  const class10Cities = City.getCitiesOfState(class10Country, class10State);
+  const class12Cities = City.getCitiesOfState(class12Country, class12State);
+  const diplomaCities = City.getCitiesOfState(diplomaCountry, diplomaState);
 
   if (isLoading) {
     return (
@@ -2317,6 +2343,7 @@ export const ApplicantAdmissionView = ({
                     <Select
                       value={currentCountry}
                       onValueChange={(value) => {
+                        if (!value) return;
                         setCurrentCountry(value);
                         setCurrentState("");
                         setCurrentDistrict("");
@@ -2355,6 +2382,7 @@ export const ApplicantAdmissionView = ({
                     <Select
                       value={currentState}
                       onValueChange={(value) => {
+                        if (!value) return;
                         setCurrentState(value);
                         setCurrentDistrict("");
                       }}
@@ -2391,7 +2419,9 @@ export const ApplicantAdmissionView = ({
 
                     <Select
                       value={currentDistrict}
-                      onValueChange={setCurrentDistrict}
+                      onValueChange={(v) => {
+                        if (v) setCurrentDistrict(v);
+                      }}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select District" />
@@ -2492,6 +2522,7 @@ export const ApplicantAdmissionView = ({
                     <Select
                       value={permanentCountry}
                       onValueChange={(value) => {
+                        if (!value) return;
                         setPermanentCountry(value);
                         setPermanentState("");
                         setPermanentDistrict("");
@@ -2530,6 +2561,7 @@ export const ApplicantAdmissionView = ({
                     <Select
                       value={permanentState}
                       onValueChange={(value) => {
+                        if (!value) return;
                         setPermanentState(value);
                         setPermanentDistrict("");
                       }}
@@ -2567,7 +2599,9 @@ export const ApplicantAdmissionView = ({
 
                     <Select
                       value={permanentDistrict}
-                      onValueChange={setPermanentDistrict}
+                      onValueChange={(v) => {
+                        if (v) setPermanentDistrict(v);
+                      }}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select District" />
@@ -2692,23 +2726,14 @@ export const ApplicantAdmissionView = ({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="nationality">Nationality *</Label>
-                    <Select
+                    <Input
+                      id="nationality"
                       name="nationality"
                       value={selectedNationality}
-                      onValueChange={setSelectedNationality}
+                      onChange={(e) => setSelectedNationality(e.target.value)}
+                      placeholder="Enter nationality"
                       required
-                    >
-                      <SelectTrigger className="w-full" id="nationality">
-                        <SelectValue placeholder="Select nationality" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {nationalities.map((nationality) => (
-                          <SelectItem key={nationality} value={nationality}>
-                            {nationality}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
                   <div className="space-y-2" />
 
@@ -3028,7 +3053,12 @@ export const ApplicantAdmissionView = ({
 
                 <Select
                   value={class10Country}
-                  onValueChange={setClass10Country}
+                  onValueChange={(value) => {
+                    if (!value) return;
+                    setClass10Country(value);
+                    setClass10State("");
+                    setClass10City("");
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select Country" />
@@ -3059,6 +3089,7 @@ export const ApplicantAdmissionView = ({
                 <Select
                   value={class10State}
                   onValueChange={(value) => {
+                    if (!value) return;
                     setClass10State(value);
                     setClass10City("");
                   }}
@@ -3070,7 +3101,7 @@ export const ApplicantAdmissionView = ({
                   <SelectContent>
                     <SelectItems
                       value={class10State}
-                      items={educationStates.map((state) => ({
+                      items={class10States.map((state) => ({
                         value: state.isoCode,
                         label: state.name,
                       }))}
@@ -3082,7 +3113,7 @@ export const ApplicantAdmissionView = ({
                   type="hidden"
                   name="class10thSchoolState"
                   value={
-                    educationStates.find((s) => s.isoCode === class10State)
+                    class10States.find((s) => s.isoCode === class10State)
                       ?.name ?? ""
                   }
                   required
@@ -3092,7 +3123,12 @@ export const ApplicantAdmissionView = ({
               <div className="space-y-2">
                 <Label htmlFor="class10thSchoolCity">School City *</Label>
 
-                <Select value={class10City} onValueChange={setClass10City}>
+                <Select
+                  value={class10City}
+                  onValueChange={(v) => {
+                    if (v) setClass10City(v);
+                  }}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select City" />
                   </SelectTrigger>
@@ -3247,7 +3283,12 @@ export const ApplicantAdmissionView = ({
 
                     <Select
                       value={class12Country}
-                      onValueChange={setClass12Country}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        setClass12Country(value);
+                        setClass12State("");
+                        setClass12City("");
+                      }}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select Country" />
@@ -3279,6 +3320,7 @@ export const ApplicantAdmissionView = ({
                     <Select
                       value={class12State}
                       onValueChange={(value) => {
+                        if (!value) return;
                         setClass12State(value);
                         setClass12City("");
                       }}
@@ -3290,7 +3332,7 @@ export const ApplicantAdmissionView = ({
                       <SelectContent>
                         <SelectItems
                           value={class12State}
-                          items={educationStates.map((state) => ({
+                          items={class12States.map((state) => ({
                             value: state.isoCode,
                             label: state.name,
                           }))}
@@ -3302,7 +3344,7 @@ export const ApplicantAdmissionView = ({
                       type="hidden"
                       name="class12thInstituteState"
                       value={
-                        educationStates.find((s) => s.isoCode === class12State)
+                        class12States.find((s) => s.isoCode === class12State)
                           ?.name ?? ""
                       }
                       required
@@ -3313,7 +3355,12 @@ export const ApplicantAdmissionView = ({
                       Institute City *
                     </Label>
 
-                    <Select value={class12City} onValueChange={setClass12City}>
+                    <Select
+                      value={class12City}
+                      onValueChange={(v) => {
+                        if (v) setClass12City(v);
+                      }}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select City" />
                       </SelectTrigger>
@@ -3551,7 +3598,12 @@ export const ApplicantAdmissionView = ({
 
                     <Select
                       value={diplomaCountry}
-                      onValueChange={setDiplomaCountry}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        setDiplomaCountry(value);
+                        setDiplomaState("");
+                        setDiplomaCity("");
+                      }}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select Country" />
@@ -3583,6 +3635,7 @@ export const ApplicantAdmissionView = ({
                     <Select
                       value={diplomaState}
                       onValueChange={(value) => {
+                        if (!value) return;
                         setDiplomaState(value);
                         setDiplomaCity("");
                       }}
@@ -3594,7 +3647,7 @@ export const ApplicantAdmissionView = ({
                       <SelectContent>
                         <SelectItems
                           value={diplomaState}
-                          items={educationStates.map((state) => ({
+                          items={diplomaStates.map((state) => ({
                             value: state.isoCode,
                             label: state.name,
                           }))}
@@ -3606,7 +3659,7 @@ export const ApplicantAdmissionView = ({
                       type="hidden"
                       name="diplomaInstituteState"
                       value={
-                        educationStates.find((s) => s.isoCode === diplomaState)
+                        diplomaStates.find((s) => s.isoCode === diplomaState)
                           ?.name ?? ""
                       }
                       required
@@ -3617,7 +3670,12 @@ export const ApplicantAdmissionView = ({
                       Institute City *
                     </Label>
 
-                    <Select value={diplomaCity} onValueChange={setDiplomaCity}>
+                    <Select
+                      value={diplomaCity}
+                      onValueChange={(v) => {
+                        if (v) setDiplomaCity(v);
+                      }}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select City" />
                       </SelectTrigger>
@@ -3738,6 +3796,7 @@ export const ApplicantAdmissionView = ({
               onIncomeChange={(value) => setFatherAnnualIncome(value ?? "")}
               autoCurrent={getAddress("current")}
               autoPermanent={getAddress("permanent")}
+              addressesHydrated={addressesHydrated}
               savedAddress={String(admission?.fatherPermanentAddress ?? "")}
             />
 
@@ -3752,6 +3811,7 @@ export const ApplicantAdmissionView = ({
               onIncomeChange={(value) => setMotherAnnualIncome(value ?? "")}
               autoCurrent={getAddress("current")}
               autoPermanent={getAddress("permanent")}
+              addressesHydrated={addressesHydrated}
               savedAddress={String(admission?.motherPermanentAddress ?? "")}
             />
 
@@ -3785,6 +3845,7 @@ export const ApplicantAdmissionView = ({
                 onIncomeChange={(value) => setGuardianAnnualIncome(value ?? "")}
                 autoCurrent={getAddress("current")}
                 autoPermanent={getAddress("permanent")}
+                addressesHydrated={addressesHydrated}
                 savedAddress={String(admission?.guardianPermanentAddress ?? "")}
               />
             ) : null}
