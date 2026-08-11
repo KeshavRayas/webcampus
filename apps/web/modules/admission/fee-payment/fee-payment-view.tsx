@@ -614,14 +614,9 @@ const FeePaymentStaffView = () => {
             onReset={resetFilters}
             dialogTitle="Advanced Filters"
             dialogDescription="Filter fee payments by email, application ID, status, mode, and date range."
+            onGenerateReport={generateReportPdf}
+            reportButtonLabel="Generate Fee Report PDF"
           />
-
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <Button variant="outline" onClick={generateReportPdf}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Generate Fee Report PDF
-            </Button>
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">

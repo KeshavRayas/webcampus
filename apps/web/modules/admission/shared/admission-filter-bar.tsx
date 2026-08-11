@@ -14,7 +14,7 @@ import {
   FilterBuilder,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import { FilterIcon } from "lucide-react";
+import { FileDown, FilterIcon } from "lucide-react";
 import { useState } from "react";
 
 export const ADMISSION_FILTER_ALL_VALUE = "__all__";
@@ -29,6 +29,8 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   allValue = ADMISSION_FILTER_ALL_VALUE,
   dialogTitle = "Advanced Filters",
   dialogDescription = "Use advanced filters to narrow down the results.",
+  onGenerateReport,
+  reportButtonLabel = "Generate Report PDF",
 }: {
   simpleFields: FilterFieldConfig<TFilters>[];
   advancedFields: FilterFieldConfig<TFilters>[];
@@ -39,6 +41,8 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   allValue?: string;
   dialogTitle?: string;
   dialogDescription?: string;
+  onGenerateReport?: () => void;
+  reportButtonLabel?: string;
 }) {
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
 
@@ -98,6 +102,13 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {onGenerateReport && (
+          <Button type="button" variant="outline" onClick={onGenerateReport}>
+            <FileDown className="mr-2 h-4 w-4" />
+            {reportButtonLabel}
+          </Button>
+        )}
       </div>
     </div>
   );

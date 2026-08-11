@@ -16,9 +16,14 @@ import { DataTable } from "@webcampus/ui/components/data-table";
 import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { AdmissionResponse } from "../admin/admin-admission-columns";
+import {
+  AdmissionsReportDocument,
+  type AdmissionsReportData,
+} from "../admin/admissions-report-document";
+import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import { cancelAdmissionColumns } from "./cancel-admission-columns";
 
@@ -81,6 +86,11 @@ export function CancelAdmissionView() {
     useState<CancelAdmissionFilters>(initialFilters);
   const [appliedFilters, setAppliedFilters] =
     useState<CancelAdmissionFilters>(initialFilters);
+
+  const [reportData, setReportData] = useState<AdmissionsReportData | null>(
+    null
+  );
+  const reportRef = useRef<HTMLDivElement | null>(null);
 
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
@@ -306,6 +316,64 @@ export function CancelAdmissionView() {
     router.replace(pathname, { scroll: false });
   };
 
+  const getFullName = (admission: AdmissionResponse) => {
+    const studentName = admission.student?.user?.name?.trim();
+    const admissionName = [
+      admission.firstName,
+      admission.middleName,
+      admission.lastName,
+      admission.nameAsPer10th,
+    ]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .join(" ");
+
+    return studentName || admissionName || "-";
+  };
+
+  const generateReportPdf = () => {
+    const rows = filteredAdmissions;
+    if (rows.length === 0) {
+      toast.error("No admissions to include in the report.");
+      return;
+    }
+
+    const statusCount = (status: AdmissionResponse["status"]) =>
+      rows.filter((admission) => admission.status === status).length;
+
+    setReportData({
+      generatedAt: new Date().toLocaleString(),
+      total: rows.length,
+      approved: statusCount("APPROVED"),
+      submitted: statusCount("SUBMITTED"),
+      pending: statusCount("PENDING") + statusCount("SUBMITTED"),
+      rejected: statusCount("REJECTED"),
+      rows: rows.map((admission) => ({
+        applicationId: admission.applicationId || "-",
+        name: getFullName(admission),
+        email: admission.primaryEmail || "-",
+        status: admission.status || "-",
+        branch: admission.department?.name || "-",
+        mode: admission.modeOfAdmission || "-",
+        quota: admission.quota || "-",
+        feePaid: admission.feePaid != null ? String(admission.feePaid) : "-",
+        receiptNo: admission.feeReceiptNumber || "-",
+      })),
+    });
+  };
+
+  useEffect(() => {
+    if (!reportData) return;
+    const node = reportRef.current;
+    if (!node) return;
+    void renderNodeToPdf(
+      node,
+      `admissions-report-${new Date().toISOString().slice(0, 10)}.pdf`
+    )
+      .then(() => toast.success("Admissions report PDF downloaded."))
+      .catch(() => toast.error("Failed to generate the admissions report PDF."))
+      .finally(() => setReportData(null));
+  }, [reportData]);
+
   if (isLoading) {
     return (
       <div className="flex items-center gap-2">
@@ -328,6 +396,8 @@ export function CancelAdmissionView() {
             onReset={resetFilters}
             dialogTitle="Advanced Filters"
             dialogDescription="Filter admissions by email, dates, cancellation status, and reason."
+            onGenerateReport={generateReportPdf}
+            reportButtonLabel="Generate Admissions Report PDF"
           />
         </div>
 
@@ -344,6 +414,15 @@ export function CancelAdmissionView() {
         </div>
 
         <DataTable columns={cancelAdmissionColumns} data={filteredAdmissions} />
+      </div>
+
+      <div
+        className="pointer-events-none absolute left-[-10000px] top-0"
+        aria-hidden="true"
+      >
+        <div ref={reportRef}>
+          {reportData ? <AdmissionsReportDocument data={reportData} /> : null}
+        </div>
       </div>
     </div>
   );

@@ -22,11 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@webcampus/ui/components/dialog";
-import {
-  FilterActions,
-  FilterBuilder,
-  type FilterFieldConfig,
-} from "@webcampus/ui/components/filter-builder";
+import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import {
   Form,
   FormControl,
@@ -36,7 +32,7 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import { Eye, EyeOff, FileDown, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
@@ -61,7 +57,6 @@ import { usePortStudents } from "./use-port-students";
 //   "Other",
 // ] as const;
 // const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
-const ALL_FILTERS_VALUE = "__all__";
 
 type AdmissionFilters = {
   applicationId: string;
@@ -121,7 +116,6 @@ export const AdminAdmissionView = ({
   const [createChoice, setCreateChoice] = useState<null | "profile" | "fill">(
     null
   );
-  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [reportData, setReportData] = useState<AdmissionsReportData | null>(
     null
   );
@@ -378,30 +372,6 @@ export const AdminAdmissionView = ({
     },
   ];
 
-  const additionalFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
-    {
-      key: "applicationId",
-      label: "Application ID",
-      type: "text",
-      placeholder: "Search application ID",
-      inputId: "admission-application-id",
-    },
-    {
-      key: "createdFrom",
-      label: "Created From",
-      type: "date",
-      inputId: "admission-created-from",
-      className: "xl:col-start-1",
-    },
-    {
-      key: "createdTo",
-      label: "Created To",
-      type: "date",
-      inputId: "admission-created-to",
-      className: "xl:col-start-2",
-    },
-  ];
-
   const applyFilters = () => {
     if (
       draftFilters.createdFrom &&
@@ -413,7 +383,6 @@ export const AdminAdmissionView = ({
     }
 
     setAppliedFilters(draftFilters);
-    setIsFilterDialogOpen(false);
     if (showFilters) {
       const query = createFilterQueryString(draftFilters);
       router.replace(`${pathname}${query ? `?${query}` : ""}`, {
@@ -425,7 +394,6 @@ export const AdminAdmissionView = ({
   const resetFilters = () => {
     setDraftFilters(EMPTY_FILTERS);
     setAppliedFilters(EMPTY_FILTERS);
-    setIsFilterDialogOpen(false);
     if (showFilters) {
       router.replace(pathname, { scroll: false });
     }
@@ -454,59 +422,11 @@ export const AdminAdmissionView = ({
             onDraftChange={updateDraftFilter}
             onApply={applyFilters}
             onReset={resetFilters}
+            onGenerateReport={generateReportPdf}
+            reportButtonLabel="Generate Admissions Report PDF"
           />
 
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div className="flex flex-wrap items-center gap-2">
-              <FilterActions onApply={applyFilters} onReset={resetFilters} />
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsFilterDialogOpen(true)}
-              >
-                Filter
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={generateReportPdf}
-              >
-                <FileDown className="mr-2 h-4 w-4" />
-                Generate Admissions Report PDF
-              </Button>
-            </div>
-
-            <Dialog
-              open={isFilterDialogOpen}
-              onOpenChange={setIsFilterDialogOpen}
-            >
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Advanced Filters</DialogTitle>
-                  <DialogDescription>
-                    Filter admissions by application ID and created date range.
-                  </DialogDescription>
-                </DialogHeader>
-                <FilterBuilder
-                  fields={additionalFilterFields}
-                  draftFilters={draftFilters}
-                  onDraftChange={updateDraftFilter}
-                  allValue={ALL_FILTERS_VALUE}
-                  className="grid-cols-1 sm:grid-cols-2"
-                />
-                <DialogFooter>
-                  <Button variant="outline" onClick={resetFilters}>
-                    Reset Filters
-                  </Button>
-                  <Button type="button" onClick={applyFilters}>
-                    Apply Filters
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
             {!hideAddForm && canCreate && (
               <Dialog
                 open={isCreateDialogOpen}
