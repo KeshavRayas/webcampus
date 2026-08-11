@@ -21,6 +21,7 @@ export interface EligibleStudent {
   isSent: boolean;
   sentAt: string | null;
   sentBy: string | null;
+  verificationToken: string | null;
   courses: {
     courseAssignmentId: string;
     courseCode: string;

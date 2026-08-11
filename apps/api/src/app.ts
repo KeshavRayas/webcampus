@@ -16,6 +16,7 @@ import financeRouter from "./routers/finance/finance.router";
 import hodRouter from "./routers/hod/hod.router";
 import studentRouter from "./routers/student/student-domain.router";
 import supportRouter from "./routers/support/support.router";
+import verificationRouter from "./routers/verification/verification.router";
 
 const app: Express = express();
 
@@ -50,6 +51,7 @@ app.use("/support", supportRouter);
 app.use("/admission", admissionRouter);
 
 app.use("/student", studentRouter);
+app.use("/verification", verificationRouter);
 app.use("/admin/feedback", adminFeedbackRouter);
 app.use("/faculty/feedback", feedbackReportRouter);
 app.use("/hod/feedback", feedbackReportRouter);

@@ -60,6 +60,8 @@ model AcademicTerm {
   feedbackRounds          FeedbackRound[]
   feedbackQuestionPresets FeedbackQuestionPreset[]
   bonusAttendanceWindows BonusAttendanceWindow[]
+  hallTicketVerificationSettings HallTicketVerificationSetting[]
+  hallTicketVerificationLogs     HallTicketVerificationLog[]
 
   @@unique([type, year])
 }
@@ -296,6 +298,7 @@ model Student {
   studentSections            StudentSection[]
   batches                    Batch[]                     @relation("BatchStudents")
   hallTickets                HallTicket[]
+  hallTicketVerificationLogs HallTicketVerificationLog[]
   finances                   Finance[]
   electiveStudentAssignments ElectiveStudentAssignment[]
 
@@ -756,13 +759,14 @@ model Freeze {
 }
 
 model HallTicket {
-  id             String    @id @default(uuid())
-  studentId      String
-  academicTermId String
-  semesterId     String
-  isSent         Boolean   @default(false)
-  sentAt         DateTime?
-  sentBy         String?
+  id                String    @id @default(uuid())
+  studentId         String
+  academicTermId    String
+  semesterId        String
+  isSent            Boolean   @default(false)
+  sentAt            DateTime?
+  sentBy            String?
+  verificationToken String?   @unique
 
   student      Student      @relation(fields: [studentId], references: [id])
   academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id])
@@ -772,6 +776,40 @@ model HallTicket {
   @@index([studentId])
   @@index([academicTermId])
   @@index([semesterId])
+  @@index([verificationToken])
+}
+
+model HallTicketVerificationSetting {
+  id             String    @id @default(uuid())
+  academicTermId String    @unique
+  enabled        Boolean   @default(false)
+  windowStartAt  DateTime?
+  windowEndAt    DateTime?
+  updatedById    String?
+  updatedAt      DateTime  @updatedAt
+
+  academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+
+  @@index([academicTermId])
+}
+
+model HallTicketVerificationLog {
+  id             String   @id @default(uuid())
+  studentId      String
+  academicTermId String
+  token          String?
+  verifiedById   String?
+  verifiedByRole String?
+  result         String // VALID | NOT_ELIGIBLE | NOT_SENT | NOT_FOUND | INACTIVE | WINDOW_CLOSED
+  detail         String?
+  createdAt      DateTime @default(now())
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id])
+
+  @@index([studentId])
+  @@index([academicTermId])
+  @@index([createdAt])
 }
 
 model Admission {

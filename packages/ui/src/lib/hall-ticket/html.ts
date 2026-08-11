@@ -16,10 +16,12 @@ export async function hallTicketHtml(
   data: HallTicketTemplateData,
   logoUrl: string
 ): Promise<string> {
-  const qrDataUrl = await QRCode.toDataURL(data.student.usn, {
-    width: 130,
-    margin: 1,
-  });
+  const qrDataUrl = data.qrPayload
+    ? await QRCode.toDataURL(data.qrPayload, {
+        width: 130,
+        margin: 1,
+      })
+    : "";
 
   const vNode = createElement(HallTicketTemplate, {
     data,

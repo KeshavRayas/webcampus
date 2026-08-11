@@ -7,6 +7,10 @@ import { hallTicketHtml } from "@webcampus/ui/lib/hall-ticket";
 import type { HallTicketTemplateData } from "@webcampus/ui/lib/hall-ticket-template";
 import { academicEligibility } from "./academic-eligibility.service";
 import type { StudentEligibility } from "./academic-eligibility.service";
+import {
+  buildQrPayload,
+  hallTicketVerificationService,
+} from "./hall-ticket-verification.service";
 
 const logoDataUri: string = (() => {
   try {
@@ -76,6 +80,7 @@ type HallTicketWithAcademics = StudentEligibility & {
   isSent: boolean;
   sentAt: string | null;
   sentBy: string | null;
+  verificationToken: string | null;
   peReady?: boolean;
   blockReason?: string | null;
 };
@@ -162,6 +167,7 @@ export const hallTicketService = {
         isSent: true,
         sentAt: true,
         sentBy: true,
+        verificationToken: true,
       },
     });
 
@@ -199,6 +205,8 @@ export const hallTicketService = {
         isSent: sendMap.get(student.studentId)?.isSent ?? false,
         sentAt: sendMap.get(student.studentId)?.sentAt?.toISOString() ?? null,
         sentBy: sendMap.get(student.studentId)?.sentBy ?? null,
+        verificationToken:
+          sendMap.get(student.studentId)?.verificationToken ?? null,
         peReady,
         blockReason,
       };
@@ -292,6 +300,7 @@ export const hallTicketService = {
             isSent: true,
             sentAt: new Date(),
             sentBy: sentByUsername,
+            verificationToken: hallTicketVerificationService.generateToken(),
           },
           update: {
             isSent: true,
@@ -353,6 +362,7 @@ export const hallTicketService = {
             isSent: true,
             sentAt: true,
             sentBy: true,
+            verificationToken: true,
             academicTerm: { select: { year: true, type: true } },
           },
         })
@@ -362,6 +372,7 @@ export const hallTicketService = {
             isSent: true,
             sentAt: true,
             sentBy: true,
+            verificationToken: true,
             academicTerm: { select: { year: true, type: true } },
           },
         });
@@ -376,6 +387,7 @@ export const hallTicketService = {
       isSent: sendRecord?.isSent ?? false,
       sentAt: sendRecord?.sentAt?.toISOString() ?? null,
       sentBy: sendRecord?.sentBy ?? null,
+      verificationToken: sendRecord?.verificationToken ?? null,
     };
   },
 
@@ -421,14 +433,6 @@ export const hallTicketService = {
       await PeCapacityService.assertPeDownstreamReady(reg.courseId);
     }
 
-    const data = await this.getData(studentId, academicTermId);
-    if (!data) {
-      logger.error(
-        `[HallTicket] generatePdfHtml: data not found for student=${studentId} term=${academicTermId}`
-      );
-      throw new Error("Hall ticket data not found");
-    }
-
     const studentRecord = await db.student.findUnique({
       where: { id: studentId },
       include: {
@@ -445,6 +449,30 @@ export const hallTicketService = {
 
     const photo =
       studentRecord.admission?.photo ?? studentRecord.user.image ?? null;
+
+    const data = await this.getData(studentId, academicTermId);
+    if (!data) {
+      logger.error(
+        `[HallTicket] generatePdfHtml: data not found for student=${studentId} term=${academicTermId}`
+      );
+      throw new Error("Hall ticket data not found");
+    }
+
+    const sendRecord = await db.hallTicket.findFirst({
+      where: { studentId, academicTermId },
+      orderBy: { sentAt: "desc" },
+    });
+
+    const qrPayload = sendRecord
+      ? buildQrPayload(
+          sendRecord.verificationToken ??
+            (await hallTicketVerificationService.ensureVerificationToken(
+              studentId,
+              academicTermId,
+              sendRecord.semesterId
+            ))
+        )
+      : undefined;
 
     const templateData: HallTicketTemplateData = {
       id: `${studentId}-${academicTermId}`,
@@ -476,6 +504,7 @@ export const hallTicketService = {
         eligible: c.eligible,
         status: c.eligible ? ("ELIGIBLE" as const) : ("NOT_ELIGIBLE" as const),
       })),
+      qrPayload,
     };
 
     return hallTicketHtml(templateData, logoDataUri);

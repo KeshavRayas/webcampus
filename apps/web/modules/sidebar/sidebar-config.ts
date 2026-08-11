@@ -144,6 +144,14 @@ export const sidebarConfig: Record<Role, SidebarData> = {
               url: "/admin/academics/hall-ticket",
             },
             {
+              name: "Hall Ticket Verification",
+              url: "/admin/verification",
+            },
+            {
+              name: "Verification Settings",
+              url: "/admin/verification/settings",
+            },
+            {
               name: "Feedback",
               url: "/admin/academics/feedback",
               children: [
@@ -339,6 +347,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Feedback", url: "/faculty/feedback" },
             { name: "Proctor", url: "/faculty/proctor" },
+            {
+              name: "Hall Ticket Verification",
+              url: "/faculty/verification",
+            },
           ],
         },
       ],
@@ -414,7 +426,13 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Academics",
           url: "/hod/feedback",
           icon: GraduationCap,
-          children: [{ name: "Feedback", url: "/hod/feedback" }],
+          children: [
+            { name: "Feedback", url: "/hod/feedback" },
+            {
+              name: "Hall Ticket Verification",
+              url: "/hod/verification",
+            },
+          ],
         },
       ],
     },

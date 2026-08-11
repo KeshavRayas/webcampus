@@ -48,6 +48,7 @@ export interface HallTicketData {
   isSent: boolean;
   sentAt: string | null;
   sentBy: string | null;
+  verificationToken: string | null;
 }
 
 const unwrapSuccess = <T>(response: BaseResponse<T>) => {
