@@ -72,12 +72,12 @@ export class DepartmentService {
 
       createdAuthUserId = user.data.id;
 
-      const { generateFileName, uploadToS3 } = await import(
+      const { generateFileName, uploadToS3, sanitizeForS3 } = await import(
         "@webcampus/api/src/utils/s3"
       );
       const logoFileName = generateFileName(
         request.logoFile.originalname,
-        "department_logo_"
+        `department_${sanitizeForS3(request.name)}_`
       );
       const uploadResult = await uploadToS3(
         request.logoFile.buffer,
@@ -271,14 +271,25 @@ export class DepartmentService {
 
   static async delete(departmentId: string): Promise<BaseResponse<null>> {
     try {
-      // Look up the department to get the associated userId
+      // Look up the department to get the associated userId and image
       const department = await db.department.findUnique({
         where: { id: departmentId },
-        select: { userId: true },
+        select: {
+          userId: true,
+          user: {
+            select: { image: true },
+          },
+        },
       });
 
       if (!department) {
         throw new Error("Department not found");
+      }
+
+      // Delete the image from S3/MinIO if one exists
+      if (department.user.image) {
+        const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+        await deleteFromS3(department.user.image);
       }
 
       // Delete the department first
@@ -330,12 +341,11 @@ export class DepartmentService {
       }
 
       if (logoFile) {
-        const { deleteFromS3, generateFileName, uploadToS3 } = await import(
-          "@webcampus/api/src/utils/s3"
-        );
+        const { deleteFromS3, generateFileName, uploadToS3, sanitizeForS3 } =
+          await import("@webcampus/api/src/utils/s3");
         const nextLogoName = generateFileName(
           logoFile.originalname,
-          "department_logo_"
+          `department_${sanitizeForS3(data.name ?? existingDepartment.name)}_`
         );
         const uploadResult = await uploadToS3(
           logoFile.buffer,

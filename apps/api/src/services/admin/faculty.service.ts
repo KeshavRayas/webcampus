@@ -53,12 +53,18 @@ export class AdminFacultyService {
 
       createdAuthUserId = authUser.data.id;
 
-      const { generateFileName, uploadToS3 } = await import(
+      const department = await db.department.findUnique({
+        where: { id: request.departmentId },
+        select: { name: true },
+      });
+      const deptName = department?.name ?? "unknown";
+
+      const { generateFileName, uploadToS3, sanitizeForS3 } = await import(
         "@webcampus/api/src/utils/s3"
       );
       const imageFileName = generateFileName(
         request.imageFile.originalname,
-        "faculty_image_"
+        `faculty_${sanitizeForS3(deptName)}_${sanitizeForS3(request.name)}_`
       );
       const uploadResult = await uploadToS3(
         request.imageFile.buffer,
@@ -210,6 +216,7 @@ export class AdminFacultyService {
               image: true,
               email: true,
               username: true,
+              name: true,
             },
           },
         },
@@ -288,12 +295,17 @@ export class AdminFacultyService {
 
       let nextImageUrl: string | null = null;
       if (imageFile) {
-        const { deleteFromS3, generateFileName, uploadToS3 } = await import(
-          "@webcampus/api/src/utils/s3"
-        );
+        const department = await db.department.findUnique({
+          where: { id: existingFaculty.departmentId },
+          select: { name: true },
+        });
+        const deptName = department?.name ?? "unknown";
+
+        const { deleteFromS3, generateFileName, uploadToS3, sanitizeForS3 } =
+          await import("@webcampus/api/src/utils/s3");
         const nextImageFileName = generateFileName(
           imageFile.originalname,
-          "faculty_image_"
+          `faculty_${sanitizeForS3(deptName)}_${sanitizeForS3(existingFaculty.user.name)}_`
         );
         const uploadResult = await uploadToS3(
           imageFile.buffer,
@@ -364,11 +376,17 @@ export class AdminFacultyService {
       // 1. Fetch the faculty record to check for HOD linkage and get userId
       const faculty = await db.faculty.findUnique({
         where: { id },
-        include: { hod: true },
+        include: { hod: true, user: { select: { image: true } } },
       });
 
       if (!faculty) {
         throw new Error("Faculty member not found");
+      }
+
+      // --- CLEANUP S3 ON DELETE ---
+      if (faculty.user.image) {
+        const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+        await deleteFromS3(faculty.user.image);
       }
 
       // 2. Safety Check: Prevent deletion if they are an active HOD

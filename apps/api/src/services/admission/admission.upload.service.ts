@@ -45,6 +45,10 @@ export class AdmissionUploadService {
         studyCertificate: true,
         transferCertificate: true,
         embassyPermissionLetter: true,
+        nameAsPer10th: true,
+        department: {
+          select: { name: true },
+        },
       },
     });
 
@@ -58,6 +62,16 @@ export class AdmissionUploadService {
     const uploadedUrls: string[] = [];
     const nextUrls: Partial<Record<DocumentField, string>> = {};
 
+    const rawDeptName = String(admission.department?.name || "unassigned");
+    const deptName = rawDeptName.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    // Use fullName to build studentName
+    const fullName = admission.nameAsPer10th || "unknown";
+    const studentName =
+      fullName.toLowerCase().replace(/[^a-z0-9]/g, "") || "unknown";
+
+    const prefixBase = `students/${deptName}/${studentName}_${admissionId}/`;
+
     try {
       for (const field of selectedFields) {
         const file = files[field]?.[0];
@@ -65,7 +79,7 @@ export class AdmissionUploadService {
 
         const fileName = generateFileName(
           file.originalname,
-          DOCUMENT_PREFIXES[field]
+          prefixBase + DOCUMENT_PREFIXES[field]
         );
         const result = await uploadToS3(file.buffer, fileName, file.mimetype);
 

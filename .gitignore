@@ -63,3 +63,8 @@ scripts/dev.sh
 .playwright-mcp/
 .serena/
 screenshots/
+
+packages/db/data/*
+!packages/db/data/minio/
+packages/db/data/minio/*
+!packages/db/data/minio/.gitkeep

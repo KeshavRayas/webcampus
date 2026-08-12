@@ -238,10 +238,35 @@ export class AdmissionController {
         "@webcampus/api/src/utils/s3"
       );
 
+      // Fetch existing admission ID or generate one if creating new
+      const admissionRecord = await db.admission.findUnique({
+        where: { primaryEmail: email },
+        select: { id: true },
+      });
+      const admissionId = admissionRecord?.id;
+
+      if (!admissionId) {
+        throw new Error("Admission application not found.");
+      }
+
+      // Build prefix
+      const rawDeptName = String(
+        req.body.branch || req.body.departmentName || "unassigned"
+      );
+      const deptName = rawDeptName.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const fullName = String(req.body.nameAsPer10th || "unknown");
+      const studentName =
+        fullName.toLowerCase().replace(/[^a-z0-9]/g, "") || "unknown";
+
+      const prefixBase = `students/${deptName}/${studentName}_${admissionId}/`;
+
       const handleUpload = async (field: string, prefix: string) => {
         if (files && files[field] && files[field][0]) {
           const file = files[field][0];
-          const fileName = generateFileName(file.originalname, prefix);
+          const fileName = generateFileName(
+            file.originalname,
+            prefixBase + prefix
+          );
           const result = await uploadToS3(file.buffer, fileName, file.mimetype);
           if (!result.success || !result.url) {
             throw new Error(`Failed to upload ${field}`);
@@ -336,10 +361,33 @@ export class AdmissionController {
         "@webcampus/api/src/utils/s3"
       );
 
+      const { randomUUID } = await import("crypto");
+
+      // Check if admission exists, else generate new ID for staff creation
+      const admissionRecord = await db.admission.findUnique({
+        where: { primaryEmail: primaryEmail },
+        select: { id: true },
+      });
+      const admissionId = admissionRecord?.id ?? randomUUID();
+
+      // Build prefix
+      const rawDeptName = String(
+        req.body.branch || req.body.departmentName || "unassigned"
+      );
+      const deptName = rawDeptName.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const fullName = String(req.body.nameAsPer10th || "unknown");
+      const studentName =
+        fullName.toLowerCase().replace(/[^a-z0-9]/g, "") || "unknown";
+
+      const prefixBase = `students/${deptName}/${studentName}_${admissionId}/`;
+
       const handleUpload = async (field: string, prefix: string) => {
         if (files?.[field]?.[0]) {
           const file = files[field][0];
-          const fileName = generateFileName(file.originalname, prefix);
+          const fileName = generateFileName(
+            file.originalname,
+            prefixBase + prefix
+          );
           const result = await uploadToS3(file.buffer, fileName, file.mimetype);
           if (!result.success || !result.url) {
             throw new Error(`Failed to upload ${field}`);
@@ -362,6 +410,7 @@ export class AdmissionController {
         req.body,
         fileUrls,
         filledById,
+        admissionId,
         req.headers
       );
 

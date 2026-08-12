@@ -996,6 +996,7 @@ export class AdmissionService {
     data: Record<string, string>,
     fileUrls: { [key: string]: string },
     filledById: string,
+    admissionId?: string,
     headers: IncomingHttpHeaders
   ): Promise<BaseResponse<unknown>> {
     if (!data.semesterId || !data.departmentId) {
@@ -1021,6 +1022,7 @@ export class AdmissionService {
 
       await db.admission.create({
         data: {
+          id: admissionId || randomUUID(),
           applicationId: randomUUID(),
           primaryEmail,
           semesterId: data.semesterId,

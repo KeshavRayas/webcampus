@@ -7,11 +7,17 @@ import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 
-const IMAGE_URL =
-  "https://adminportal-fileupload.s3.ap-southeast-2.amazonaws.com/department_logo_39bc77d3-dc17-4679-952e-2bab6d716229.jpg";
+let IMAGE_URL = "";
+let PDF_URL = "";
 
-const PDF_URL =
-  "https://adminportal-fileupload.s3.ap-southeast-2.amazonaws.com/aadhar_card_0be79490-379c-4895-ae90-ab574a47b685.pdf";
+const imgBuffer = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64"
+);
+const pdfBuffer = Buffer.from(
+  "JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDMgMCBSL0ZpbHRlci9GbGF0ZURlY29kZT4+CnN0cmVhbQp4nDPQM1Qo5ypUMFAwALJMLU31jBQsTAz1LBSK0osSQTz9xJLMYqXExOJUvdTEvNSC1JxUveQUKwOulPziVA2E1Pwi/dwUVw2E4HIFwygFo8KMAgYA+8ccKAplbmRzdHJlYW0KZW5kb2JqCgozIDAgb2JqCjc3CmVuZG9iagoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDIwMCAyMDBdL1BhcmVudCA0IDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNSAwIFI+Pj4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCgo0IDAgb2JqCjw8L1R5cGUvUGFnZXMvQ291bnQgMS9LaWRzWzEgMCBSXT4+CmVuZG9iagoKNSAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9UaW1lcy1Sb21hbj4+CmVuZG9iagoKNiAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgNCAwIFI+PgplbmRvYmoKCjcgMCBvYmoKPDwvUHJvZHVjZXIoR2hvc3RzY3JpcHQgMTAuMDQuMCkKMTw8L0NyZWF0aW9uRGF0ZShEOjIwMjQxMDIyMDQzMDIxKzA1JzMwJyk+PgplbmRvYmoKCnhyZWYKMCA4CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDE2NCAwMDAwMCBuIAowMDAwMDAwMDE1IDAwMDAwIG4gCjAwMDAwMDAxNDMgMDAwMDAgbiAKMDAwMDAwMDI2MiAwMDAwMCBuIAowMDAwMDAwMzE5IDAwMDAwIG4gCjAwMDAwMDA0MDcgMDAwMDAgbiAKMDAwMDAwMDQ1NiAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgOC9Sb290IDYgMCBSL0luZm8gNyAwIFI+PgpzdGFydHhyZWYKNTcyCiUlRU9GCg==",
+  "base64"
+);
 
 interface ParsedArgs {
   count: number;
@@ -239,6 +245,7 @@ const resolveContext = async (departmentCode: string) => {
     headers: adminHeaders,
     filledById,
     departmentId: department.id,
+    departmentName: department.name,
     semesterId: semester.id,
   };
 };
@@ -251,6 +258,7 @@ const submitAndApprove = async (
   filledById: string,
   departmentId: string,
   semesterId: string,
+  departmentName: string,
   headers: { Authorization?: string }
 ): Promise<void> => {
   const data: Record<string, string> = {
@@ -278,11 +286,46 @@ const submitAndApprove = async (
     caste: faker.helpers.arrayElement(["General", "OBC", "SC", "ST"]),
   };
 
+  const { uploadToS3, generateFileName } = await import(
+    "@webcampus/api/src/utils/s3"
+  );
+
+  const rawDeptName = String(departmentName || "unassigned");
+  const deptName = rawDeptName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const studentName =
+    fullName.toLowerCase().replace(/[^a-z0-9]/g, "") || "unknown";
+
+  const prefixBase = `students/${deptName}/${studentName}_${admissionId}/`;
+
+  const photoUpload = await uploadToS3(
+    imgBuffer,
+    generateFileName("photo.png", prefixBase + "photo_"),
+    "image/png"
+  );
+  const aadharUpload = await uploadToS3(
+    pdfBuffer,
+    generateFileName("aadhar.pdf", prefixBase + "aadhar_card_"),
+    "application/pdf"
+  );
+  const marks10Upload = await uploadToS3(
+    pdfBuffer,
+    generateFileName("10th.pdf", prefixBase + "10th_marks_"),
+    "application/pdf"
+  );
+  const marks12Upload = await uploadToS3(
+    pdfBuffer,
+    generateFileName("12th.pdf", prefixBase + "12th_marks_"),
+    "application/pdf"
+  );
+
   const fileUrls: Record<string, string> = {
-    photo: IMAGE_URL,
-    aadharCard: PDF_URL,
-    class10thMarksPdf: PDF_URL,
-    class12thMarksPdf: PDF_URL,
+    photo: photoUpload.success && photoUpload.url ? photoUpload.url : IMAGE_URL,
+    aadharCard:
+      aadharUpload.success && aadharUpload.url ? aadharUpload.url : PDF_URL,
+    class10thMarksPdf:
+      marks10Upload.success && marks10Upload.url ? marks10Upload.url : PDF_URL,
+    class12thMarksPdf:
+      marks12Upload.success && marks12Upload.url ? marks12Upload.url : PDF_URL,
   };
 
   const submitResponse = await AdmissionService.submitApplication(
@@ -311,6 +354,30 @@ const submitAndApprove = async (
 };
 
 async function main() {
+  const { uploadToS3, generateFileName } = await import(
+    "@webcampus/api/src/utils/s3"
+  );
+
+  const imgUpload = await uploadToS3(
+    imgBuffer,
+    generateFileName("mock.png", "users/mock/"),
+    "image/png"
+  );
+  if (imgUpload.success && imgUpload.url) IMAGE_URL = imgUpload.url;
+  else IMAGE_URL = "https://placehold.co/400";
+
+  const pdfUpload = await uploadToS3(
+    pdfBuffer,
+    generateFileName("mock.pdf", "users/mock/"),
+    "application/pdf"
+  );
+  if (pdfUpload.success && pdfUpload.url) PDF_URL = pdfUpload.url;
+  else
+    PDF_URL =
+      "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+
+  logger.info(`Initialized mock uploads: IMG=${IMAGE_URL}, PDF=${PDF_URL}`);
+
   let args: ParsedArgs;
   try {
     args = parseCliArguments();
@@ -403,6 +470,7 @@ async function main() {
         context.filledById,
         context.departmentId,
         context.semesterId,
+        context.departmentName,
         context.headers
       );
       approvedCreated += 1;
