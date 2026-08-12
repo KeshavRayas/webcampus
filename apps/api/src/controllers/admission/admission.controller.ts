@@ -410,8 +410,8 @@ export class AdmissionController {
         req.body,
         fileUrls,
         filledById,
-        admissionId,
-        req.headers
+        req.headers,
+        admissionId
       );
 
       if (response.status === "success") {

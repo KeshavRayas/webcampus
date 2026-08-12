@@ -187,11 +187,19 @@ export class AdmissionService {
               },
             },
             {
-              email: applicationId,
+              email: {
+                equals: applicationId,
+                mode: "insensitive",
+              },
             },
             {
-              email:
-                AdmissionService.applicantEmailFromApplicationId(applicationId),
+              email: {
+                equals:
+                  AdmissionService.applicantEmailFromApplicationId(
+                    applicationId
+                  ),
+                mode: "insensitive",
+              },
             },
           ],
         },
@@ -996,8 +1004,8 @@ export class AdmissionService {
     data: Record<string, string>,
     fileUrls: { [key: string]: string },
     filledById: string,
-    admissionId?: string,
-    headers: IncomingHttpHeaders
+    headers: IncomingHttpHeaders,
+    admissionId?: string
   ): Promise<BaseResponse<unknown>> {
     if (!data.semesterId || !data.departmentId) {
       throw new Error("Semester and department are required");
