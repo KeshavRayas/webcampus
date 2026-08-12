@@ -151,14 +151,14 @@ export class AdmissionService {
     let autoCreatedUsers = 0;
 
     for (const applicationId of missingApplicationIds) {
-      // Username is normalized to lowercase for Better Auth credential lookup compatibility.
-      const normalizedUsername =
-        AdmissionService.normalizeApplicationId(applicationId);
+      // Porting receives the applicant's primary email, so auto-created users
+      // must mirror what `createShell` generates: name "Applicant", email =
+      // primary email, username = email local part.
+      const normalizedUsername = applicationId.split("@")[0] ?? "";
       const userService = new UserService({
         request: {
-          email:
-            AdmissionService.applicantEmailFromApplicationId(applicationId),
-          name: `Applicant ${applicationId.toUpperCase()}`,
+          email: applicationId,
+          name: "Applicant",
           username: normalizedUsername,
           password: "password",
           role: "applicant",
@@ -185,6 +185,15 @@ export class AdmissionService {
                 equals: applicationId,
                 mode: "insensitive",
               },
+            },
+            {
+              username: {
+                equals: normalizedUsername,
+                mode: "insensitive",
+              },
+            },
+            {
+              email: applicationId,
             },
             {
               email:
