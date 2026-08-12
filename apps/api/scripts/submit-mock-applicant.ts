@@ -250,7 +250,8 @@ const submitAndApprove = async (
   fullName: string,
   filledById: string,
   departmentId: string,
-  semesterId: string
+  semesterId: string,
+  headers: { Authorization?: string }
 ): Promise<void> => {
   const data: Record<string, string> = {
     nameAsPer10th: fullName,
@@ -288,6 +289,7 @@ const submitAndApprove = async (
     email,
     data,
     fileUrls,
+    headers,
     filledById
   );
 
@@ -400,7 +402,8 @@ async function main() {
         `${firstName} ${lastName}`,
         context.filledById,
         context.departmentId,
-        context.semesterId
+        context.semesterId,
+        context.headers
       );
       approvedCreated += 1;
 
