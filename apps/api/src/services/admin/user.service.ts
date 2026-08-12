@@ -1,5 +1,11 @@
 import { IncomingHttpHeaders } from "http";
-import { auth, fromNodeHeaders } from "@webcampus/auth";
+import {
+  auth,
+  fromNodeHeaders,
+  getFileContent,
+  sendEmail,
+} from "@webcampus/auth";
+import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
 import { db, User } from "@webcampus/db";
 import {
@@ -142,16 +148,48 @@ export class UserService {
    */
   async create(): Promise<BaseResponse<Partial<User>>> {
     try {
+      let response: BaseResponse<Partial<User>>;
       if (this.body.role === "student" || this.body.role === "applicant") {
-        return await this.createStudent();
+        response = await this.createStudent();
       } else {
-        return await this.createUserWithAdminAPI();
+        response = await this.createUserWithAdminAPI();
       }
+
+      if (this.body.role !== "applicant") {
+        // Send welcome email asynchronously
+        this.sendWelcomeEmail().catch((err) => {
+          logger.error("Failed to send welcome email:", err);
+        });
+      }
+
+      return response;
     } catch (error) {
       logger.error("User creation failed:", error);
       throw new Error(
         error instanceof Error ? error.message : "User creation failed."
       );
+    }
+  }
+
+  private async sendWelcomeEmail(): Promise<void> {
+    try {
+      await sendEmail({
+        to: this.body.email,
+        subject: "Welcome to WebCampus",
+        html: await getFileContent({
+          fileName: "templates/welcome-email.html",
+          variables: {
+            USER: this.body.name,
+            EMAIL: this.body.email,
+            PASSWORD: this.body.password || "password",
+            LOGIN_URL: `${backendEnv().FRONTEND_URL}/sign-in`,
+          },
+        }),
+      });
+      logger.info("Welcome email sent to:", this.body.email);
+    } catch (error) {
+      logger.error("Error sending welcome email", { error });
+      throw error;
     }
   }
 

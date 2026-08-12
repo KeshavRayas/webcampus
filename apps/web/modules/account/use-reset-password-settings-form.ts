@@ -2,8 +2,7 @@
 
 import { authClient } from "@/lib/auth-client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -16,7 +15,7 @@ const passwordSchema = z
   .regex(/[0-9]/, "Must contain at least one number")
   .regex(/[^a-zA-Z0-9]/, "Must contain at least one special character");
 
-const forgotPasswordSchema = z
+const resetPasswordSettingsSchema = z
   .object({
     email: z.email("Invalid email address"),
     password: passwordSchema,
@@ -28,14 +27,16 @@ const forgotPasswordSchema = z
     path: ["confirmPassword"],
   });
 
-export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordSettingsFormValues = z.infer<
+  typeof resetPasswordSettingsSchema
+>;
 
-export const useForgotPasswordForm = () => {
+export const useResetPasswordSettingsForm = () => {
   const [step, setStep] = useState<"request" | "verify">("request");
-  const router = useRouter();
+  const { data: session } = authClient.useSession();
 
-  const form = useForm<ForgotPasswordFormValues>({
-    resolver: zodResolver(forgotPasswordSchema),
+  const form = useForm<ResetPasswordSettingsFormValues>({
+    resolver: zodResolver(resetPasswordSettingsSchema),
     defaultValues: {
       email: "",
       password: "",
@@ -44,7 +45,13 @@ export const useForgotPasswordForm = () => {
     },
   });
 
-  const onSubmit = async (data: ForgotPasswordFormValues) => {
+  useEffect(() => {
+    if (session?.user?.email) {
+      form.setValue("email", session.user.email);
+    }
+  }, [session?.user?.email, form]);
+
+  const onSubmit = async (data: ResetPasswordSettingsFormValues) => {
     if (step === "request") {
       await authClient.emailOtp.sendVerificationOtp(
         {
@@ -90,7 +97,14 @@ export const useForgotPasswordForm = () => {
           onSuccess: () => {
             toast.dismiss();
             toast.success("Password reset successfully!");
-            router.push("/sign-in");
+            // Reset form state back to start
+            setStep("request");
+            form.reset({
+              ...form.getValues(),
+              password: "",
+              confirmPassword: "",
+              otp: "",
+            });
           },
         }
       );

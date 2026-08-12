@@ -2,7 +2,7 @@ import { backendEnv } from "@webcampus/common/env";
 import { db } from "@webcampus/db";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { admin, bearer, username } from "better-auth/plugins";
+import { admin, bearer, emailOTP, username } from "better-auth/plugins";
 import { getFileContent } from "./mail/get-file-content";
 import { sendEmail } from "./mail/send-mail";
 import { ac, roles } from "./rbac/permissions";
@@ -49,6 +49,22 @@ export const auth = betterAuth({
     admin({
       ac,
       roles,
+    }),
+    emailOTP({
+      async sendVerificationOTP({ email, otp, type }) {
+        if (type === "forget-password" || type === "email-verification") {
+          await sendEmail({
+            to: email,
+            subject: "Your One-Time Password",
+            html: await getFileContent({
+              fileName: "templates/otp-email.html",
+              variables: {
+                OTP: otp,
+              },
+            }),
+          });
+        }
+      },
     }),
   ],
 });
