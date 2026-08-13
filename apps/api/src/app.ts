@@ -12,9 +12,9 @@ import {
   adminFeedbackRouter,
   feedbackReportRouter,
 } from "./routers/feedback.router";
+import fileRouter from "./routers/file-management/file.router";
 import financeRouter from "./routers/finance/finance.router";
 import hodRouter from "./routers/hod/hod.router";
-import fileRouter from "./routers/shared/file.router";
 import studentRouter from "./routers/student/student-domain.router";
 import supportRouter from "./routers/support/support.router";
 import verificationRouter from "./routers/verification/verification.router";

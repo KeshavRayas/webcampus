@@ -1,4 +1,4 @@
-import { FileController } from "@webcampus/api/src/controllers/shared/file.controller";
+import { FileController } from "@webcampus/api/src/controllers/file-management/file.controller";
 import { Router } from "express";
 
 const router = Router();

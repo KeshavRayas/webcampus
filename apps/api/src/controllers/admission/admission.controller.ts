@@ -241,7 +241,7 @@ export class AdmissionController {
       // Fetch existing admission ID or generate one if creating new
       const admissionRecord = await db.admission.findUnique({
         where: { primaryEmail: email },
-        select: { id: true },
+        select: { id: true, department: { select: { name: true } } },
       });
       const admissionId = admissionRecord?.id;
 
@@ -249,9 +249,22 @@ export class AdmissionController {
         throw new Error("Admission application not found.");
       }
 
+      let fetchedDeptName: string | undefined =
+        admissionRecord?.department?.name;
+      if (!fetchedDeptName && req.body.departmentId) {
+        const dept = await db.department.findUnique({
+          where: { id: req.body.departmentId },
+          select: { name: true },
+        });
+        fetchedDeptName = dept?.name;
+      }
+
       // Build prefix
       const rawDeptName = String(
-        req.body.branch || req.body.departmentName || "unassigned"
+        req.body.branch ||
+          req.body.departmentName ||
+          fetchedDeptName ||
+          "unassigned"
       );
       const deptName = rawDeptName.toLowerCase().replace(/[^a-z0-9]/g, "");
       const fullName = String(req.body.nameAsPer10th || "unknown");
@@ -366,13 +379,26 @@ export class AdmissionController {
       // Check if admission exists, else generate new ID for staff creation
       const admissionRecord = await db.admission.findUnique({
         where: { primaryEmail: primaryEmail },
-        select: { id: true },
+        select: { id: true, department: { select: { name: true } } },
       });
       const admissionId = admissionRecord?.id ?? randomUUID();
 
+      let fetchedDeptName: string | undefined =
+        admissionRecord?.department?.name;
+      if (!fetchedDeptName && req.body.departmentId) {
+        const dept = await db.department.findUnique({
+          where: { id: req.body.departmentId },
+          select: { name: true },
+        });
+        fetchedDeptName = dept?.name;
+      }
+
       // Build prefix
       const rawDeptName = String(
-        req.body.branch || req.body.departmentName || "unassigned"
+        req.body.branch ||
+          req.body.departmentName ||
+          fetchedDeptName ||
+          "unassigned"
       );
       const deptName = rawDeptName.toLowerCase().replace(/[^a-z0-9]/g, "");
       const fullName = String(req.body.nameAsPer10th || "unknown");
