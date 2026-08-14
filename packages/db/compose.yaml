@@ -1,28 +1,77 @@
 name: webcampus
+
 services:
+  # ----------------------------------------
+  # PostgreSQL Database
+  # ----------------------------------------
   db:
-    image: postgres
+    image: postgres:15-alpine
     container_name: db
-    ports:
-      - 5432:5432
+    restart: unless-stopped
     shm_size: 128mb
     environment:
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: example
+      POSTGRES_DB: webcampus
       PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    # command: >
+    #   postgres
+    #   -c wal_level=replica
+    #   -c archive_mode=on
+    #   -c archive_command="cp %p /var/lib/postgresql/archive/%f"
+    #   -c archive_timeout=300
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # - pgdata:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
+      # - ./data/archive:/var/lib/postgresql/archive
 
-#   pgadmin:
-#     image: dpage/pgadmin4
-#     container_name: pg-admin
-#     ports:
-#       - 5050:80
-#     environment:
-#       PGADMIN_DEFAULT_EMAIL: "codeio@bmsce.ac.in"
-#       PGADMIN_DEFAULT_PASSWORD: "p4#,Q27o$4d/"
-#     volumes:
-#       - pgadmin-data:/var/lib/pgadmin
+  # ----------------------------------------
+  # MinIO Object Storage
+  # ----------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: webcampus-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: webcampus
+      MINIO_ROOT_PASSWORD: example1
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      # - minio_data:/data
+      - ./data/minio:/data
 
-volumes:
-  pgdata:
-  # pgadmin-data:
+  # ----------------------------------------
+  # PgBouncer
+  # ----------------------------------------
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.2-p0
+    container_name: webcampus-pgbouncer
+    restart: unless-stopped
+    ports:
+      - "6432:6432"
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: example
+      AUTH_TYPE: scram-sha-256
+      ADMIN_USERS: pgbouncer_admin
+    volumes:
+      # Mount your custom configs as Read-Only
+      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+    depends_on:
+      - db
+
+  # ----------------------------------------
+  # Volume Declarations
+  # ----------------------------------------
+  # volumes:
+  #   postgres_data:
+  #     driver: local
+  #   postgres_archive: # Add the new archive volume
+  #     driver: local
+  #   minio_data:
+  #     driver: local

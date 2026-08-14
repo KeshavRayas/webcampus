@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_UNPOOLED_URL")
 }
 
 model User {
@@ -78,9 +79,7 @@ model Semester {
   programType         ProgramType
   Admission           Admission[]
   Course              Course[]
-  registrationWindows RegistrationWindow[]
   courseRegistrations CourseRegistration[]
-  Section             Section[]
   hallTickets         HallTicket[]
   feedbackQuestionSet FeedbackQuestionSet?
   feedbackRounds      FeedbackRound[]
@@ -150,6 +149,7 @@ model Department {
   userMemberships     DepartmentUser[]
   faculties           Faculty[]
   hods                Hod[]
+  registrationWindows RegistrationWindow[]
   sections            Section[]
   students            Student[]
   registrationWindows RegistrationWindow[]
@@ -161,7 +161,7 @@ model Department {
 }
 
 model RegistrationWindow {
-  id             String  @id @default(uuid())
+  id             String       @id @default(uuid())
   academicTermId String
   semesterId     String
   departmentId   String?
@@ -243,18 +243,17 @@ model Section {
 
 
 /// *
-///  * TODO Change the Name of this model to support L-T-P
+/// * TODO Change the Name of this model to support L-T-P
 model Batch {
-  id               String             @id @default(uuid())
-  name             String
-  sectionId        String
-  section          Section            @relation(fields: [sectionId], references: [id])
-  ClassSession     ClassSession[]
-  CourseAssignment CourseAssignment[]
-  students         Student[]          @relation("BatchStudents")
-
-  attendances       Attendance[] // <-- NEW: Back-relation
-  attendanceRecords AttendanceRecord[] // <-- NEW: Back-relation
+  id                String             @id @default(uuid())
+  name              String
+  sectionId         String
+  attendances       Attendance[]
+  attendanceRecords AttendanceRecord[]
+  section           Section            @relation(fields: [sectionId], references: [id])
+  ClassSession      ClassSession[]
+  CourseAssignment  CourseAssignment[]
+  students          Student[]          @relation("BatchStudents")
 
   @@unique([name, sectionId])
   @@index([sectionId])
@@ -293,7 +292,8 @@ model Student {
   attendances       Attendance[]
   AttendanceRecord  AttendanceRecord[]
   registrations     CourseRegistration[]
-  assessments       StudentAssessment[]
+  finances          Finance[]
+  hallTickets       HallTicket[]
   marks             Mark[]
   department        Department           @relation(fields: [departmentName], references: [name])
   user              User                 @relation(fields: [userId], references: [id])
@@ -492,7 +492,7 @@ model Course {
   revisionRequestedByRole String?
   revisionNotes           String?
   revisionRequestedAt     DateTime?
-  version                 Int                  @default(1)
+  version                 Int                     @default(1)
   lastOverrideAt          DateTime?
   lastOverrideById        String?
   overrideCount           Int                  @default(0)
@@ -708,6 +708,7 @@ model Attendance {
   absent            Int
   condonationStatus CondonationStatus @default(NOT_REQUESTED)
   percentage        Float
+  batch             Batch?            @relation(fields: [batchId], references: [id])
   course            Course            @relation(fields: [courseId], references: [id])
   student           Student           @relation(fields: [studentId], references: [id])
   batch             Batch?            @relation(fields: [batchId], references: [id])
@@ -1104,12 +1105,11 @@ model ElectiveStudentAssignment {
 }
 
 model CourseCoordinator {
-  id        String @id @default(uuid())
+  id        String  @id @default(uuid())
   courseId  String
   facultyId String
-
-  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  faculty Faculty @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  faculty   Faculty @relation(fields: [facultyId], references: [id], onDelete: Cascade)
 
   @@unique([courseId, facultyId])
   @@index([courseId])
@@ -1142,14 +1142,14 @@ model AssessmentTemplate {
   sequence      Int                     @default(1)
 
   questions      AssessmentQuestion[]
+  course         Course                  @relation(fields: [courseId], references: [id])
   studentRecords StudentAssessment[]
-  course         Course               @relation(fields: [courseId], references: [id])
 
   @@unique([courseId, componentType, sequence])
 }
 
 model AssessmentQuestion {
-  id           String  @id @default(uuid())
+  id           String                @id @default(uuid())
   assessmentId String
   part         String
   qNumber      String
@@ -1158,37 +1158,149 @@ model AssessmentQuestion {
   po           String?
   bl           String?
   orGroupId    String?
-
   assessment   AssessmentTemplate    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   studentMarks StudentQuestionMark[]
 }
 
 model StudentAssessment {
-  id           String @id @default(uuid())
-  studentId    String
-  assessmentId String
-  courseId     String
-  totalMarks   Float
-  status       String @default("PRESENT")
-
-  student       Student               @relation(fields: [studentId], references: [id])
+  id            String                @id @default(uuid())
+  studentId     String
+  assessmentId  String
+  courseId      String
+  totalMarks    Float
+  status        String                @default("PRESENT")
   assessment    AssessmentTemplate    @relation(fields: [assessmentId], references: [id])
   course        Course                @relation(fields: [courseId], references: [id])
+  student       Student               @relation(fields: [studentId], references: [id])
   questionMarks StudentQuestionMark[]
 
   @@unique([studentId, assessmentId])
 }
 
 model StudentQuestionMark {
-  id            String @id @default(uuid())
+  id            String             @id @default(uuid())
   recordId      String
   questionId    String
   marksObtained Float
-
-  record   StudentAssessment  @relation(fields: [recordId], references: [id], onDelete: Cascade)
-  question AssessmentQuestion @relation(fields: [questionId], references: [id])
+  question      AssessmentQuestion @relation(fields: [questionId], references: [id])
+  record        StudentAssessment  @relation(fields: [recordId], references: [id], onDelete: Cascade)
 
   @@unique([recordId, questionId])
+}
+
+model AdminEditLog {
+  id            String          @id @default(uuid())
+  changeGroupId String
+  entityId      String
+  entityType    AuditEntityType
+  courseId      String?
+  fieldName     String?
+  oldValue      Json?
+  newValue      Json?
+  action        AuditAction
+  reason        String?
+  ipAddress     String?
+  userAgent     String?
+  details       String?
+  adminUserId   String
+  editedAt      DateTime        @default(now())
+  adminUser     User            @relation(fields: [adminUserId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([changeGroupId])
+  @@index([courseId])
+  @@index([editedAt])
+  @@index([adminUserId])
+}
+
+model CourseMappingAuditLog {
+  id        String   @id @default(uuid())
+  courseId  String
+  adminId   String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([adminId])
+}
+
+model Finance {
+  id           String           @id @default(uuid())
+  studentId    String
+  academicYear String
+  finalFee     Float            @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  payments     FinancePayment[]
+
+  @@unique([studentId, academicYear])
+  @@index([studentId])
+  @@index([academicYear])
+}
+
+model FinancePayment {
+  id        String   @id @default(uuid())
+  financeId String
+  amount    Float
+  paidAt    DateTime @default(now())
+  reference String?
+  remarks   String?
+  createdAt DateTime @default(now())
+  finance   Finance  @relation(fields: [financeId], references: [id], onDelete: Cascade)
+
+  @@index([financeId])
+  @@index([paidAt])
+}
+
+model SupportTicket {
+  id           String                 @id @default(uuid())
+  ticketNumber String                 @unique
+  createdById  String
+  category     SupportTicketCategory
+  priority     SupportTicketPriority  @default(MEDIUM)
+  status       SupportTicketStatus    @default(OPEN)
+  subject      String
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  resolvedAt   DateTime?
+  closedAt     DateTime?
+  createdBy    User                   @relation("SupportTicketCreator", fields: [createdById], references: [id])
+  messages     SupportTicketMessage[]
+
+  @@index([createdById])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SupportTicketMessage {
+  id          String                    @id @default(uuid())
+  ticketId    String
+  authorId    String
+  body        String
+  createdAt   DateTime                  @default(now())
+  attachments SupportTicketAttachment[]
+  author      User                      @relation("SupportMessageAuthor", fields: [authorId], references: [id])
+  ticket      SupportTicket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@index([authorId])
+}
+
+model SupportTicketAttachment {
+  id         String               @id @default(uuid())
+  messageId  String
+  fileName   String
+  storageKey String               @unique
+  mimeType   String
+  fileSize   Int
+  createdAt  DateTime             @default(now())
+  message    SupportTicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
 }
 
 enum DepartmentScopedRole {
