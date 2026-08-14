@@ -53,6 +53,7 @@ export const HallTicketFilterSchema = z.object({
   academicTermId: z.string().uuid().optional(),
   semesterId: z.string().uuid().optional(),
   sectionId: z.string().uuid().optional(),
+  cycle: z.enum(["PHYSICS", "CHEMISTRY"]).optional(),
   search: z.string().optional(),
 });
 

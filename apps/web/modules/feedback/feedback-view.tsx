@@ -31,6 +31,7 @@ type Round = {
 };
 type Assignment = {
   id: string;
+  electiveBatchFacultyId?: string;
   assignmentType: string;
   course: { code: string; name: string };
   faculty: { shortName: string; user: { name: string } };
@@ -83,7 +84,12 @@ export function FeedbackView() {
       return axios.post(
         `${NEXT_PUBLIC_API_BASE_URL}/student/feedback/submit`,
         {
-          courseAssignmentId: selected.assignment.id,
+          ...(selected.assignment.electiveBatchFacultyId
+            ? {
+                electiveBatchFacultyId:
+                  selected.assignment.electiveBatchFacultyId,
+              }
+            : { courseAssignmentId: selected.assignment.id }),
           feedbackRoundId: selected.round.id,
           answers: selected.round.questions.map((question) => ({
             questionId: question.id,

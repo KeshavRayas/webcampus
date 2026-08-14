@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  COURSE_TYPES,
+  PROJECT_GROUPING_SCOPES,
+} from "../constants/course-types";
 
 const COURSE_MODES = [
   "INTEGRATED",
@@ -6,7 +10,6 @@ const COURSE_MODES = [
   "FINAL_SUMMARY",
   "NCMC",
 ] as const;
-const COURSE_TYPES = ["PC", "PE", "OE", "NCMC"] as const;
 const COURSE_CYCLES = ["PHYSICS", "CHEMISTRY", "NONE"] as const;
 const OPEN_ELECTIVE_ELIGIBILITIES = [
   "ALL",
@@ -74,6 +77,9 @@ const BaseCourseSchema = z.object({
   openElectiveEligibility: z.enum(OPEN_ELECTIVE_ELIGIBILITIES).optional(),
   /** Departments allowed to register when openElectiveEligibility === "CUSTOM" */
   eligibleDepartmentIds: z.array(z.string().uuid()).optional(),
+
+  // Project / Mini-Project (PW) grouping configuration
+  projectGroupingScope: z.enum(PROJECT_GROUPING_SCOPES).optional(),
 });
 
 const MODE_LOCKED_VALUES = {
@@ -316,6 +322,61 @@ const validateOeConfig = (
   }
 };
 
+const validatePwConfig = (
+  value: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+  strict = true
+) => {
+  const courseType = value.courseType as string | undefined;
+  if (courseType !== "PW") {
+    return;
+  }
+
+  const courseMode = value.courseMode as string | undefined;
+  if (courseMode !== undefined && courseMode !== "FINAL_SUMMARY") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["courseMode"],
+      message:
+        "Project / Mini-Project (PW) courses must use FINAL_SUMMARY mode",
+    });
+  }
+
+  const studentsPerBatch = value.studentsPerBatch as number | undefined;
+  if (strict || studentsPerBatch !== undefined) {
+    if (
+      studentsPerBatch === undefined ||
+      !Number.isInteger(studentsPerBatch) ||
+      studentsPerBatch < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["studentsPerBatch"],
+        message: "Students per group is required for PW and must be at least 1",
+      });
+    }
+  }
+
+  const scope = value.projectGroupingScope as string | undefined;
+  if (scope !== undefined && scope !== "WITHIN_SECTION") {
+    const numberOfGroups = value.numberOfBatches as number | undefined;
+    if (strict || numberOfGroups !== undefined) {
+      if (
+        numberOfGroups === undefined ||
+        !Number.isInteger(numberOfGroups) ||
+        numberOfGroups < 1
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["numberOfBatches"],
+          message:
+            "Number of groups is required for DEPARTMENT_WIDE PW and must be at least 1",
+        });
+      }
+    }
+  }
+};
+
 export const CreateCourseSchema = BaseCourseSchema.superRefine((value, ctx) => {
   if (!value.departmentId && !value.departmentName) {
     ctx.addIssue({
@@ -333,6 +394,7 @@ export const CreateCourseSchema = BaseCourseSchema.superRefine((value, ctx) => {
   validateAssessmentBounds(value as unknown as Record<string, unknown>, ctx);
   validatePeConfig(value as unknown as Record<string, unknown>, ctx, true);
   validateOeConfig(value as unknown as Record<string, unknown>, ctx, true);
+  validatePwConfig(value as unknown as Record<string, unknown>, ctx, true);
 });
 
 export const UpdateCourseSchema = BaseCourseSchema.partial()
@@ -354,6 +416,9 @@ export const UpdateCourseSchema = BaseCourseSchema.partial()
     }
     if (value.courseType === "OE" || value.numberOfBatches !== undefined) {
       validateOeConfig(value as unknown as Record<string, unknown>, ctx, false);
+    }
+    if (value.courseType === "PW") {
+      validatePwConfig(value as unknown as Record<string, unknown>, ctx, false);
     }
   });
 
@@ -461,6 +526,7 @@ export const CourseResponseSchema = BaseCourseSchema.extend({
   numberOfBatches: z.number().int().nullable().optional(),
   studentsPerBatch: z.number().int().nullable().optional(),
   electiveMappingVersion: z.number().int().optional(),
+  projectGroupingScope: z.enum(PROJECT_GROUPING_SCOPES).optional(),
   openElectiveEligibility: z.enum(OPEN_ELECTIVE_ELIGIBILITIES).optional(),
   eligibleDepartmentIds: z.array(z.string().uuid()).optional(),
   eligibleDepartments: z

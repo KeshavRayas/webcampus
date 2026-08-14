@@ -10,17 +10,23 @@ export interface SectionOption {
   name: string;
   departmentId: string;
   semesterId: string;
+  cycle: "PHYSICS" | "CHEMISTRY" | "NONE";
 }
 
-export const useSections = (semesterId?: string, departmentId?: string) => {
+export const useSections = (
+  semesterId?: string,
+  departmentId?: string,
+  cycle?: string
+) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
   return useQuery({
-    queryKey: ["sections", semesterId, departmentId],
+    queryKey: ["sections", semesterId, departmentId, cycle],
     queryFn: async () => {
       const params: Record<string, string> = {};
       if (semesterId) params.semesterId = semesterId;
       if (departmentId) params.departmentId = departmentId;
+      if (cycle) params.cycle = cycle;
 
       const res = await axios.get<BaseResponse<SectionOption[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/sections`,

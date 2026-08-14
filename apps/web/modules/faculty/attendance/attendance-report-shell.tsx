@@ -102,6 +102,7 @@ type AttendanceReportShellProps = {
   onDownloadPercentageExcel?: () => void; // New Prop
   showCycleFilter?: boolean;
   cycleOptions?: Array<{ label: string; value: string }>;
+  sectionFilterLabel?: string;
 };
 
 export const AttendanceReportShell = ({
@@ -134,6 +135,7 @@ export const AttendanceReportShell = ({
   onDownloadPercentageExcel,
   showCycleFilter = false,
   cycleOptions = [],
+  sectionFilterLabel = "Section",
 }: AttendanceReportShellProps) => {
   const getStatusEmptyMessage = () => {
     if (!hasRequiredFilters) {
@@ -257,11 +259,11 @@ export const AttendanceReportShell = ({
         },
         {
           key: "sectionId",
-          label: "Section",
+          label: sectionFilterLabel,
           type: "select",
-          allOptionLabel: "All sections",
+          allOptionLabel: `All ${sectionFilterLabel.toLowerCase()}s`,
           placeholder: draftFilters.courseId
-            ? "Select section..."
+            ? `Select ${sectionFilterLabel.toLowerCase()}...`
             : "Select course first",
           options: uniqueSections.map((section) => ({
             label: section.label || section.name,
@@ -277,6 +279,7 @@ export const AttendanceReportShell = ({
       draftFilters,
       showCycleFilter,
       cycleOptions,
+      sectionFilterLabel,
     ]);
 
   return (

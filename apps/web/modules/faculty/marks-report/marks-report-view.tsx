@@ -13,6 +13,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { deriveCourseFilterDomain, DOMAIN_LABELS } from "../filter-domain";
 import { useFacultyHandlingFilterOptions } from "../handling/use-faculty-handling";
 import {
   getMarksReport,
@@ -30,13 +31,16 @@ const EMPTY_FILTERS: MarksReportFilters = {
   assessmentId: "",
 };
 
-const hasRequiredFilters = (filters: MarksReportFilters) =>
+const hasRequiredFilters = (
+  filters: MarksReportFilters,
+  sectionIdRequired = true
+) =>
   Boolean(
     filters.academicTermId &&
       filters.programType &&
       filters.semesterId &&
       filters.courseId &&
-      filters.sectionId
+      (sectionIdRequired ? filters.sectionId : true)
   );
 
 const downloadCSV = (filename: string, rows: string[][]) => {
@@ -73,6 +77,23 @@ export const MarksReportView = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  const selectedCourseRequiresSection = useMemo(
+    () =>
+      (filterOptions?.courses ?? []).some(
+        (c) => c.id === draftFilters.courseId && Boolean(c.sectionId)
+      ),
+    [filterOptions, draftFilters.courseId]
+  );
+
+  const selectedCourseDomainLabel = useMemo(() => {
+    if (!draftFilters.courseId) return undefined;
+    const courseType = (filterOptions?.courses ?? []).find(
+      (c) => c.id === draftFilters.courseId
+    )?.courseType;
+    const domain = deriveCourseFilterDomain(courseType);
+    return domain ? DOMAIN_LABELS[domain] : undefined;
+  }, [filterOptions, draftFilters.courseId]);
+
   const { data: reportData, isFetching: isLoadingReport } = useQuery({
     queryKey: [
       "marks-report",
@@ -92,7 +113,7 @@ export const MarksReportView = () => {
     enabled:
       hasRunReport &&
       !filtersChangedAfterRun &&
-      hasRequiredFilters(appliedFilters),
+      hasRequiredFilters(appliedFilters, selectedCourseRequiresSection),
     staleTime: 0,
   });
 
@@ -141,13 +162,19 @@ export const MarksReportView = () => {
   const sectionOptions = useMemo(() => {
     if (!draftFilters.courseId) return [];
     const unique = new Map<string, { value: string; label: string }>();
-    (filterOptions?.courses ?? [])
-      .filter((c) => c.id === draftFilters.courseId)
-      .forEach((c) => {
-        if (!unique.has(c.sectionId)) {
-          unique.set(c.sectionId, { value: c.sectionId, label: c.sectionName });
-        }
-      });
+    const rowsForCourse = (filterOptions?.courses ?? []).filter(
+      (c) => c.id === draftFilters.courseId
+    );
+    const courseType = rowsForCourse[0]?.courseType;
+    const domain = deriveCourseFilterDomain(courseType);
+    rowsForCourse.forEach((c) => {
+      if (!unique.has(c.sectionId)) {
+        unique.set(c.sectionId, {
+          value: c.sectionId,
+          label: domain === "group" ? c.sectionName : c.sectionName,
+        });
+      }
+    });
     return Array.from(unique.values()).sort((a, b) =>
       a.label.localeCompare(b.label)
     );
@@ -161,8 +188,8 @@ export const MarksReportView = () => {
   }, [filterOptions, draftFilters.courseId]);
 
   const hasRequiredDraftFilters = useMemo(
-    () => hasRequiredFilters(draftFilters),
-    [draftFilters]
+    () => hasRequiredFilters(draftFilters, selectedCourseRequiresSection),
+    [draftFilters, selectedCourseRequiresSection]
   );
 
   const clearReportState = useCallback(() => {
@@ -481,7 +508,7 @@ export const MarksReportView = () => {
   }, [reportData, getHeaderMetadata]);
 
   const getEmptyMessage = () => {
-    if (!hasRequiredFilters(draftFilters)) {
+    if (!hasRequiredFilters(draftFilters, selectedCourseRequiresSection)) {
       return "Select all filters to enable Get Report.";
     }
     if (filtersChangedAfterRun) {
@@ -516,6 +543,7 @@ export const MarksReportView = () => {
       onDownloadExcel={handleDownloadExcel}
       showAssessmentFilter={assessmentOptions.length > 0}
       assessmentOptions={assessmentOptions}
+      sectionFilterLabel={selectedCourseDomainLabel ?? "Section"}
     >
       <Tabs
         value={activeTab}

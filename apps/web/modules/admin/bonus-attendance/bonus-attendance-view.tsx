@@ -227,6 +227,20 @@ export const BonusAttendanceView = () => {
     setEditingWindow(null);
   };
 
+  const formatClosesIn = (expiresAt: string | null): string | null => {
+    if (!expiresAt) {
+      return null;
+    }
+
+    const remainingMs = new Date(expiresAt).getTime() - Date.now();
+    if (remainingMs <= 0) {
+      return "closes today";
+    }
+
+    const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+    return `closes in ${remainingDays}d`;
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -235,8 +249,9 @@ export const BonusAttendanceView = () => {
         </h3>
         <p className="text-muted-foreground text-sm">
           Open or close bonus attendance instances by academic term and
-          semester. When open, faculty can take attendance for dates up to the
-          configured number of days in the future.
+          semester. When open, faculty can take attendance for the configured
+          number of days starting from the open date, and the window auto-closes
+          once those days have elapsed.
         </p>
       </div>
 
@@ -343,6 +358,11 @@ export const BonusAttendanceView = () => {
                       <span className="text-sm">
                         {window.isOpen ? "Open" : "Closed"}
                       </span>
+                      {window.isOpen && (
+                        <span className="text-muted-foreground text-xs">
+                          {formatClosesIn(window.expiresAt)}
+                        </span>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

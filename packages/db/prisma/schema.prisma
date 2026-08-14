@@ -177,15 +177,17 @@ model RegistrationWindow {
 }
 
 model BonusAttendanceWindow {
-  id             String  @id @default(uuid())
+  id             String    @id @default(uuid())
   academicTermId String
   semesterId     String
   departmentId   String?
   cycle          Cycle?
-  days           Int     @default(1)
-  isOpen         Boolean @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  days           Int       @default(1)
+  isOpen         Boolean   @default(false)
+  openedAt       DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
   semester     Semester     @relation(fields: [semesterId], references: [id], onDelete: Cascade)
@@ -226,6 +228,7 @@ model Section {
   cycle           Cycle              @default(NONE)
   departmentId    String
   batches         Batch[]
+  electiveBatches ElectiveBatch[]
   ClassSession    ClassSession[]
   courses         CourseAssignment[]
   department      Department         @relation(fields: [departmentId], references: [id])
@@ -476,6 +479,10 @@ model Course {
   // ─── OPEN ELECTIVE (OE) CONFIG ───
   openElectiveEligibility OpenElectiveEligibility @default(ALL)
 
+  // ─── PROJECT / MINI-PROJECT (PW) CONFIG ───
+  projectGroupingScope      ProjectGroupingScope @default(WITHIN_SECTION)
+  nextProjectGroupSequence  Int                   @default(0)
+
   // ─── APPROVAL & TRACKING FIELDS ───
   approvalStatus          CourseApprovalStatus @default(DRAFT)
   approvedByRole          String?
@@ -650,25 +657,29 @@ model FeedbackRound {
 }
 
 model FeedbackResponse {
-  id                 String   @id @default(uuid())
-  feedbackRoundId    String
-  studentId          String
-  courseAssignmentId String
-  courseId           String
-  facultyId          String
-  sectionId          String
-  batchId            String?
-  submittedAt        DateTime @default(now())
+  id                      String   @id @default(uuid())
+  feedbackRoundId         String
+  studentId               String
+  courseAssignmentId      String?
+  electiveBatchFacultyId  String?
+  courseId                String
+  facultyId               String
+  sectionId               String
+  batchId                 String?
+  submittedAt             DateTime @default(now())
 
-  feedbackRound    FeedbackRound    @relation(fields: [feedbackRoundId], references: [id], onDelete: Cascade)
-  student          Student          @relation(fields: [studentId], references: [id])
-  courseAssignment CourseAssignment @relation(fields: [courseAssignmentId], references: [id])
-  course           Course           @relation(fields: [courseId], references: [id])
-  faculty          Faculty          @relation(fields: [facultyId], references: [id])
-  answers          FeedbackAnswer[]
+  feedbackRound           FeedbackRound           @relation(fields: [feedbackRoundId], references: [id], onDelete: Cascade)
+  student                 Student                 @relation(fields: [studentId], references: [id])
+  courseAssignment        CourseAssignment?       @relation(fields: [courseAssignmentId], references: [id], onDelete: Cascade)
+  electiveBatchFaculty    ElectiveBatchFaculty?   @relation(fields: [electiveBatchFacultyId], references: [id], onDelete: Cascade)
+  course                  Course                  @relation(fields: [courseId], references: [id])
+  faculty                 Faculty                 @relation(fields: [facultyId], references: [id])
+  answers                 FeedbackAnswer[]
 
   @@unique([studentId, feedbackRoundId, courseAssignmentId])
+  @@unique([studentId, feedbackRoundId, electiveBatchFacultyId])
   @@index([feedbackRoundId, courseAssignmentId])
+  @@index([feedbackRoundId, electiveBatchFacultyId])
   @@index([facultyId, feedbackRoundId])
   @@index([courseId, sectionId, feedbackRoundId])
 }
@@ -736,8 +747,9 @@ model Coe {
 }
 
 model Freeze {
-  id                 String           @id @default(uuid())
-  courseAssignmentId String           @unique
+  id                      String                 @id @default(uuid())
+  courseAssignmentId      String?                @unique
+  electiveBatchFacultyId  String?                @unique
   cie1Frozen         Boolean          @default(false)
   cie2Frozen         Boolean          @default(false)
   cie3Frozen         Boolean          @default(false)
@@ -755,7 +767,8 @@ model Freeze {
   frozenByRole       FreezeActorRole?
   frozenByUsername   String?
   frozenByDisplay    String?
-  courseAssignment   CourseAssignment @relation(fields: [courseAssignmentId], references: [id], onDelete: Cascade)
+  courseAssignment   CourseAssignment? @relation(fields: [courseAssignmentId], references: [id], onDelete: Cascade)
+  electiveBatchFaculty ElectiveBatchFaculty? @relation(fields: [electiveBatchFacultyId], references: [id], onDelete: Cascade)
 }
 
 model HallTicket {
@@ -1037,9 +1050,11 @@ model ElectiveBatch {
   courseId           String
   name               String
   sortOrder          Int
+  sectionId          String?
   createdAt          DateTime                    @default(now())
   updatedAt          DateTime                    @updatedAt
   course             Course                      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  section            Section?                    @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   facultyAssignment  ElectiveBatchFaculty?
   studentAssignments ElectiveStudentAssignment[]
   attendances        Attendance[]
@@ -1049,6 +1064,7 @@ model ElectiveBatch {
   @@unique([courseId, name])
   @@unique([courseId, sortOrder])
   @@index([courseId])
+  @@index([sectionId])
 }
 
 model ElectiveBatchFaculty {
@@ -1063,6 +1079,8 @@ model ElectiveBatchFaculty {
   course          Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
   electiveBatch   ElectiveBatch @relation(fields: [electiveBatchId], references: [id], onDelete: Cascade)
   faculty         Faculty       @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  freeze          Freeze?
+  feedbackResponses FeedbackResponse[]
 
   @@unique([courseId, electiveBatchId])
   @@index([facultyId])
@@ -1203,6 +1221,31 @@ enum CourseType {
   PE
   OE
   NCMC
+  CC
+  MJE
+  MNE
+  P
+  PW
+  SR
+  NT
+  BS
+  ES
+  AE
+  HS
+  MG
+  GC
+  AM
+  ASC1
+  ASC2
+  ESC1
+  PLC
+  SDC
+  ETC
+}
+
+enum ProjectGroupingScope {
+  WITHIN_SECTION
+  DEPARTMENT_WIDE
 }
 
 enum AssessmentComponentType {

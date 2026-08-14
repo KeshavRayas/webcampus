@@ -83,7 +83,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Course Configuration", url: "/admin/courses" },
             { name: "Course Mapping", url: "/admin/course-mapping" },
-            { name: "Elective Mapping", url: "/admin/elective-mapping" },
+            {
+              name: "Elective / Project Mapping",
+              url: "/admin/elective-project-mapping",
+            },
             { name: "Appoint Coordinators", url: "/admin/course-coordinators" },
             { name: "Course Approvals", url: "/admin/course-approvals" },
             {
@@ -209,7 +212,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           children: [
             { name: "Course Configuration", url: "/department/courses" },
             { name: "Course Mapping", url: "/department/course-mapping" },
-            { name: "Elective Mapping", url: "/department/elective-mapping" },
+            {
+              name: "Elective / Project Mapping",
+              url: "/department/elective-project-mapping",
+            },
             {
               name: "Appoint Coordinators",
               url: "/department/course-coordinators",

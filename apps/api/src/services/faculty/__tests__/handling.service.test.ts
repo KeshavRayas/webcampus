@@ -16,6 +16,7 @@ type AssignmentRecord = {
     id: string;
     code: string;
     name: string;
+    courseType: string;
     semesterId: string;
     semesterNumber: number;
     approvalStatus: "APPROVED" | "PENDING";
@@ -23,6 +24,11 @@ type AssignmentRecord = {
       id: string;
       academicTermId: string;
       programType: "UG" | "PG";
+      academicTerm?: {
+        id: string;
+        year: string;
+        type: "odd" | "even";
+      };
     };
   };
   section: {
@@ -142,6 +148,68 @@ type DbStudentSectionCountArgs = {
   };
 };
 
+type ElectiveBatchFacultyRecord = {
+  id: string;
+  facultyId: string;
+  semester: number;
+  academicYear: string;
+  electiveBatch: {
+    id: string;
+    name: string;
+    _count: {
+      studentAssignments: number;
+    };
+  };
+  course: {
+    id: string;
+    code: string;
+    name: string;
+    courseType: string;
+    semesterId: string;
+    semesterNumber: number;
+    approvalStatus: "APPROVED" | "PENDING";
+    semester: {
+      id: string;
+      academicTermId: string;
+      programType: "UG" | "PG";
+      academicTerm?: {
+        id: string;
+        year: string;
+        type: "odd" | "even";
+      };
+    };
+  };
+};
+
+type ElectiveWhere = {
+  AND?: ElectiveWhere[];
+  OR?: ElectiveWhere[];
+  facultyId?: string;
+  academicYear?: string;
+  course?: {
+    id?: string;
+    approvalStatus?: string;
+    semesterNumber?: number;
+    code?: ContainsFilter;
+    name?: ContainsFilter;
+    semester?: {
+      id?: string;
+      academicTermId?: string;
+      programType?: "UG" | "PG";
+    };
+  };
+  electiveBatch?: {
+    id?: string;
+    name?: ContainsFilter;
+  };
+};
+
+type DbElectiveArgs = {
+  where?: ElectiveWhere;
+  skip?: number;
+  take?: number;
+};
+
 const facultyByUserId: Record<string, string> = {
   "user-1": "faculty-1",
   "user-2": "faculty-2",
@@ -149,6 +217,7 @@ const facultyByUserId: Record<string, string> = {
 
 let assignments: AssignmentRecord[] = [];
 let students: StudentRecord[] = [];
+let electiveRecords: ElectiveBatchFacultyRecord[] = [];
 let lastAssignmentWhere: unknown = null;
 
 const paginate = <T>(items: T[], skip: number, take: number): T[] => {
@@ -277,6 +346,86 @@ const assignmentMatchesWhere = (
   return true;
 };
 
+const electiveMatchesWhere = (
+  record: ElectiveBatchFacultyRecord,
+  whereInput: ElectiveWhere | null | undefined
+): boolean => {
+  if (!whereInput) {
+    return true;
+  }
+
+  if (Array.isArray(whereInput.AND)) {
+    return whereInput.AND.every((condition) =>
+      electiveMatchesWhere(record, condition)
+    );
+  }
+
+  if (Array.isArray(whereInput.OR)) {
+    return whereInput.OR.some((condition) =>
+      electiveMatchesWhere(record, condition)
+    );
+  }
+
+  if (whereInput.facultyId) {
+    return record.facultyId === whereInput.facultyId;
+  }
+
+  if (whereInput.academicYear) {
+    return record.academicYear === whereInput.academicYear;
+  }
+
+  if (whereInput.course?.id) {
+    return record.course.id === whereInput.course.id;
+  }
+
+  if (whereInput.course?.approvalStatus) {
+    return record.course.approvalStatus === whereInput.course.approvalStatus;
+  }
+
+  if (whereInput.course?.semesterNumber !== undefined) {
+    return record.course.semesterNumber === whereInput.course.semesterNumber;
+  }
+
+  if (whereInput.course?.semester?.id) {
+    return record.course.semester.id === whereInput.course.semester.id;
+  }
+
+  if (whereInput.course?.semester?.academicTermId) {
+    return (
+      record.course.semester.academicTermId ===
+      whereInput.course.semester.academicTermId
+    );
+  }
+
+  if (whereInput.course?.semester?.programType) {
+    return (
+      record.course.semester.programType ===
+      whereInput.course.semester.programType
+    );
+  }
+
+  if (whereInput.course?.code?.contains) {
+    return includesText(record.course.code, whereInput.course.code.contains);
+  }
+
+  if (whereInput.course?.name?.contains) {
+    return includesText(record.course.name, whereInput.course.name.contains);
+  }
+
+  if (whereInput.electiveBatch?.id) {
+    return record.electiveBatch.id === whereInput.electiveBatch.id;
+  }
+
+  if (whereInput.electiveBatch?.name?.contains) {
+    return includesText(
+      record.electiveBatch.name,
+      whereInput.electiveBatch.name.contains
+    );
+  }
+
+  return true;
+};
+
 const studentMatchesWhere = (
   student: StudentRecord,
   where: StudentWhere | null | undefined
@@ -353,7 +502,20 @@ const dbMock = {
       const filtered = assignments.filter((item) =>
         assignmentMatchesWhere(item, where)
       );
-      return paginate(filtered, skip, take);
+      return paginate(filtered, skip, take).map((assignment) => ({
+        ...assignment,
+        course: {
+          ...assignment.course,
+          semester: {
+            ...assignment.course.semester,
+            academicTerm: assignment.course.semester.academicTerm ?? {
+              id: assignment.course.semester.academicTermId,
+              year: "2025-26",
+              type: "odd",
+            },
+          },
+        },
+      }));
     },
     findUnique: async ({ where }: DbFindUniqueArgs) => {
       const assignment = assignments.find((item) => item.id === where.id);
@@ -454,8 +616,44 @@ const dbMock = {
     },
   },
   electiveBatchFaculty: {
-    findMany: async () => [],
-    findUnique: async () => null,
+    count: async ({ where }: DbElectiveArgs) => {
+      return electiveRecords.filter((item) => electiveMatchesWhere(item, where))
+        .length;
+    },
+    findMany: async ({ where }: DbElectiveArgs) => {
+      return electiveRecords.filter((item) =>
+        electiveMatchesWhere(item, where)
+      );
+    },
+    findUnique: async ({ where }: DbFindUniqueArgs) => {
+      const record = electiveRecords.find((item) => item.id === where.id);
+      if (!record) {
+        return null;
+      }
+      return {
+        id: record.id,
+        facultyId: record.facultyId,
+        semester: record.semester,
+        academicYear: record.academicYear,
+        course: {
+          id: record.course.id,
+          code: record.course.code,
+          name: record.course.name,
+          semesterId: record.course.semesterId,
+          semesterNumber: record.course.semesterNumber,
+          approvalStatus: record.course.approvalStatus,
+          semester: {
+            id: record.course.semester.id,
+            academicTermId: record.course.semester.academicTermId,
+            programType: record.course.semester.programType,
+          },
+        },
+        electiveBatch: {
+          id: record.electiveBatch.id,
+          name: record.electiveBatch.name,
+        },
+      };
+    },
   },
   courseRegistration: {
     findMany: async () =>
@@ -480,6 +678,7 @@ mock.module("@webcampus/common/logger", () => ({
 describe("FacultyHandlingService", () => {
   beforeEach(() => {
     lastAssignmentWhere = null;
+    electiveRecords = [];
 
     assignments = [
       {
@@ -494,6 +693,7 @@ describe("FacultyHandlingService", () => {
           id: "course-1",
           code: "CS301",
           name: "Algorithms",
+          courseType: "PC",
           semesterId: "semester-1",
           semesterNumber: 3,
           approvalStatus: "APPROVED",
@@ -522,6 +722,7 @@ describe("FacultyHandlingService", () => {
           id: "course-2",
           code: "CSL37",
           name: "Algorithms Lab",
+          courseType: "PC",
           semesterId: "semester-1",
           semesterNumber: 3,
           approvalStatus: "APPROVED",
@@ -556,6 +757,7 @@ describe("FacultyHandlingService", () => {
           id: "course-3",
           code: "CS302",
           name: "Operating Systems",
+          courseType: "PC",
           semesterId: "semester-1",
           semesterNumber: 3,
           approvalStatus: "PENDING",
@@ -584,6 +786,7 @@ describe("FacultyHandlingService", () => {
           id: "course-4",
           code: "ME301",
           name: "Thermodynamics",
+          courseType: "PC",
           semesterId: "semester-2",
           semesterNumber: 3,
           approvalStatus: "APPROVED",
@@ -784,5 +987,386 @@ describe("FacultyHandlingService", () => {
         { batchId: "other-batch" }
       )
     ).rejects.toThrow("Assignment not found for the provided filters");
+  });
+
+  it("keeps PC courses visible when a batch filter is selected", async () => {
+    const { FacultyHandlingService } = await import("../handling.service");
+
+    const response = await FacultyHandlingService.getHandlingAssignments(
+      "user-1",
+      "THEORY",
+      { batchId: "batch-1", page: 1, limit: 10 }
+    );
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+    expect(response.data.items.map((item) => item.assignmentId)).toContain(
+      "asgn-theory-approved"
+    );
+
+    const where = lastAssignmentWhere as {
+      AND?: Array<Record<string, unknown>>;
+    };
+    expect(
+      where.AND?.some((condition) => condition.batchId !== undefined)
+    ).toBe(false);
+    expect(where.AND?.some((condition) => condition.batch !== undefined)).toBe(
+      false
+    );
+  });
+
+  it("does not apply the section filter to elective (PE/OE/PW) rows", async () => {
+    electiveRecords = [
+      {
+        id: "ebf-1",
+        facultyId: "faculty-1",
+        semester: 3,
+        academicYear: "2025-26",
+        electiveBatch: {
+          id: "eb-1",
+          name: "G-001",
+          _count: { studentAssignments: 3 },
+        },
+        course: {
+          id: "course-pw",
+          code: "PW301",
+          name: "Project",
+          courseType: "PW",
+          semesterId: "semester-1",
+          semesterNumber: 3,
+          approvalStatus: "APPROVED",
+          semester: {
+            id: "semester-1",
+            academicTermId: "term-1",
+            programType: "UG",
+          },
+        },
+      },
+    ];
+
+    const { FacultyHandlingService } = await import("../handling.service");
+
+    const response = await FacultyHandlingService.getHandlingAssignments(
+      "user-1",
+      "THEORY",
+      { sectionId: "section-a", page: 1, limit: 10 }
+    );
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+    const electiveRows = response.data.items.filter((item) => item.isElective);
+    expect(electiveRows).toHaveLength(1);
+    expect(electiveRows[0]?.assignmentId).toBe("ebf-1");
+    expect(electiveRows[0]?.section).toBe("G-001");
+    expect(electiveRows[0]?.studentCount).toBe(3);
+  });
+
+  it("reports PW group student counts from ElectiveStudentAssignment", async () => {
+    electiveRecords = [
+      {
+        id: "ebf-1",
+        facultyId: "faculty-1",
+        semester: 3,
+        academicYear: "2025-26",
+        electiveBatch: {
+          id: "eb-1",
+          name: "G-001",
+          _count: { studentAssignments: 3 },
+        },
+        course: {
+          id: "course-pw",
+          code: "PW301",
+          name: "Project",
+          courseType: "PW",
+          semesterId: "semester-1",
+          semesterNumber: 3,
+          approvalStatus: "APPROVED",
+          semester: {
+            id: "semester-1",
+            academicTermId: "term-1",
+            programType: "UG",
+          },
+        },
+      },
+      {
+        id: "ebf-2",
+        facultyId: "faculty-1",
+        semester: 3,
+        academicYear: "2025-26",
+        electiveBatch: {
+          id: "eb-2",
+          name: "G-002",
+          _count: { studentAssignments: 0 },
+        },
+        course: {
+          id: "course-pw",
+          code: "PW301",
+          name: "Project",
+          courseType: "PW",
+          semesterId: "semester-1",
+          semesterNumber: 3,
+          approvalStatus: "APPROVED",
+          semester: {
+            id: "semester-1",
+            academicTermId: "term-1",
+            programType: "UG",
+          },
+        },
+      },
+    ];
+
+    const { FacultyHandlingService } = await import("../handling.service");
+
+    const response = await FacultyHandlingService.getHandlingAssignments(
+      "user-1",
+      "THEORY",
+      { page: 1, limit: 10 }
+    );
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+    const electiveRows = response.data.items.filter((item) => item.isElective);
+    expect(electiveRows).toHaveLength(2);
+    expect(
+      electiveRows.find((row) => row.section === "G-001")?.studentCount
+    ).toBe(3);
+    expect(
+      electiveRows.find((row) => row.section === "G-002")?.studentCount
+    ).toBe(0);
+  });
+
+  it("only returns the current faculty's own PW groups", async () => {
+    electiveRecords = [
+      {
+        id: "ebf-1",
+        facultyId: "faculty-1",
+        semester: 3,
+        academicYear: "2025-26",
+        electiveBatch: {
+          id: "eb-1",
+          name: "G-001",
+          _count: { studentAssignments: 2 },
+        },
+        course: {
+          id: "course-pw",
+          code: "PW301",
+          name: "Project",
+          courseType: "PW",
+          semesterId: "semester-1",
+          semesterNumber: 3,
+          approvalStatus: "APPROVED",
+          semester: {
+            id: "semester-1",
+            academicTermId: "term-1",
+            programType: "UG",
+          },
+        },
+      },
+      {
+        id: "ebf-other",
+        facultyId: "faculty-2",
+        semester: 3,
+        academicYear: "2025-26",
+        electiveBatch: {
+          id: "eb-other",
+          name: "G-OTHER",
+          _count: { studentAssignments: 5 },
+        },
+        course: {
+          id: "course-pw-2",
+          code: "PW302",
+          name: "Project II",
+          courseType: "PW",
+          semesterId: "semester-1",
+          semesterNumber: 3,
+          approvalStatus: "APPROVED",
+          semester: {
+            id: "semester-1",
+            academicTermId: "term-1",
+            programType: "UG",
+          },
+        },
+      },
+    ];
+
+    const { FacultyHandlingService } = await import("../handling.service");
+
+    const response = await FacultyHandlingService.getHandlingAssignments(
+      "user-1",
+      "THEORY",
+      { page: 1, limit: 10 }
+    );
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+    const electiveRows = response.data.items.filter((item) => item.isElective);
+    expect(electiveRows).toHaveLength(1);
+    expect(electiveRows[0]?.assignmentId).toBe("ebf-1");
+  });
+
+  it("merges PC and elective rows without dropping valid assignments", async () => {
+    electiveRecords = [
+      {
+        id: "ebf-1",
+        facultyId: "faculty-1",
+        semester: 3,
+        academicYear: "2025-26",
+        electiveBatch: {
+          id: "eb-1",
+          name: "G-001",
+          _count: { studentAssignments: 2 },
+        },
+        course: {
+          id: "course-pw",
+          code: "PW301",
+          name: "Project",
+          courseType: "PW",
+          semesterId: "semester-1",
+          semesterNumber: 3,
+          approvalStatus: "APPROVED",
+          semester: {
+            id: "semester-1",
+            academicTermId: "term-1",
+            programType: "UG",
+          },
+        },
+      },
+    ];
+
+    const { FacultyHandlingService } = await import("../handling.service");
+
+    const response = await FacultyHandlingService.getHandlingAssignments(
+      "user-1",
+      "THEORY",
+      { page: 1, limit: 10 }
+    );
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+    const ids = response.data.items.map((item) => item.assignmentId);
+    expect(ids).toContain("asgn-theory-approved");
+    expect(ids).toContain("ebf-1");
+    expect(response.data.pagination.total).toBe(2);
+  });
+
+  it("excludes batch-managed courses from LAB filter options", async () => {
+    electiveRecords = [
+      {
+        id: "ebf-1",
+        facultyId: "faculty-1",
+        semester: 3,
+        academicYear: "2025-26",
+        electiveBatch: {
+          id: "eb-1",
+          name: "G-001",
+          _count: { studentAssignments: 2 },
+        },
+        course: {
+          id: "course-pw",
+          code: "PW301",
+          name: "Project",
+          courseType: "PW",
+          semesterId: "semester-1",
+          semesterNumber: 3,
+          approvalStatus: "APPROVED",
+          semester: {
+            id: "semester-1",
+            academicTermId: "term-1",
+            programType: "UG",
+            academicTerm: { id: "term-1", year: "2025-26", type: "odd" },
+          },
+        },
+      },
+    ];
+
+    const { FacultyHandlingService } = await import("../handling.service");
+
+    const response = await FacultyHandlingService.getFilterOptions(
+      "user-1",
+      "LAB"
+    );
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+    expect(
+      response.data.courses.some((course) => course.courseType === "PW")
+    ).toBe(false);
+    expect(
+      response.data.sections.some((section) => section.isElectiveBatch === true)
+    ).toBe(false);
+    expect(
+      response.data.batches.some((batch) => batch.isElective === true)
+    ).toBe(false);
+  });
+
+  it("includes elective courses in THEORY filter options", async () => {
+    electiveRecords = [
+      {
+        id: "ebf-1",
+        facultyId: "faculty-1",
+        semester: 3,
+        academicYear: "2025-26",
+        electiveBatch: {
+          id: "eb-1",
+          name: "G-001",
+          _count: { studentAssignments: 2 },
+        },
+        course: {
+          id: "course-pw",
+          code: "PW301",
+          name: "Project",
+          courseType: "PW",
+          semesterId: "semester-1",
+          semesterNumber: 3,
+          approvalStatus: "APPROVED",
+          semester: {
+            id: "semester-1",
+            academicTermId: "term-1",
+            programType: "UG",
+            academicTerm: { id: "term-1", year: "2025-26", type: "odd" },
+          },
+        },
+      },
+    ];
+
+    const { FacultyHandlingService } = await import("../handling.service");
+
+    const response = await FacultyHandlingService.getFilterOptions(
+      "user-1",
+      "THEORY"
+    );
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+    expect(
+      response.data.courses.some(
+        (course) => course.courseType === "PW" && course.code === "PW301"
+      )
+    ).toBe(true);
+    expect(
+      response.data.sections.some(
+        (section) =>
+          section.isElectiveBatch === true && section.name === "G-001"
+      )
+    ).toBe(true);
+    expect(
+      response.data.batches.some(
+        (batch) => batch.isElective === true && batch.name === "G-001"
+      )
+    ).toBe(true);
   });
 });

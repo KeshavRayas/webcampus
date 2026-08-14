@@ -6,6 +6,10 @@ import {
 } from "@webcampus/api/src/services/shared/audit.service";
 import { isBatchManagedCourse } from "@webcampus/api/src/services/shared/course-kind";
 import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
+import {
+  assertFacultyReassignmentAllowed,
+  computeBalancedFacultyProposal,
+} from "@webcampus/api/src/services/shared/faculty-distribution";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import type {
@@ -340,7 +344,7 @@ export class CourseAssignmentService {
             },
           },
         },
-        select: { id: true, courseType: true },
+        select: { id: true, courseType: true, projectGroupingScope: true },
       });
 
       if (!course) {
@@ -362,12 +366,15 @@ export class CourseAssignmentService {
                 },
               },
             },
+            section: {
+              select: { id: true, name: true },
+            },
           },
         });
 
         const data = batches.map((b) => ({
           id: b.facultyAssignment?.id ?? b.id,
-          sectionId: null as string | null,
+          sectionId: b.section?.id ?? null,
           facultyId: b.facultyAssignment?.facultyId ?? ("" as string),
           assignmentType: "THEORY" as const,
           batchId: null as string | null,
@@ -377,7 +384,7 @@ export class CourseAssignmentService {
               b.facultyAssignment.faculty.shortName ??
               null)
             : null,
-          sectionName: null as string | null,
+          sectionName: b.section?.name ?? null,
           electiveBatchId: b.id,
           electiveBatchName: b.name,
           hasFaculty: Boolean(
@@ -405,10 +412,20 @@ export class CourseAssignmentService {
           };
         });
 
+        // DEPARTMENT_WIDE project courses: propose a deterministic balanced
+        // faculty distribution for groups that are not yet mapped. Nothing is
+        // persisted here — the proposal is staged client-side and committed
+        // only when Course Mapping is saved (locked decision 5, C2).
+        const withProposal =
+          course.courseType === "PW" &&
+          course.projectGroupingScope === "DEPARTMENT_WIDE"
+            ? await this.buildDepartmentWideProposal(filtered, department)
+            : filtered;
+
         return {
           status: "success",
           message: "Course mappings fetched",
-          data: filtered,
+          data: withProposal,
         };
       }
 
@@ -466,6 +483,63 @@ export class CourseAssignmentService {
   }
 
   /**
+   * Compute a deterministic balanced faculty proposal for a DEPARTMENT_WIDE
+   * project course. Only groups without a faculty assignment receive a
+   * proposal (existing manual mappings are preserved — C2). The proposal is
+   * staged client-side and committed only when Course Mapping is saved.
+   */
+  private static async buildDepartmentWideProposal(
+    rows: {
+      electiveBatchId: string | null;
+      electiveBatchName: string | null;
+      hasFaculty: boolean;
+      facultyId: string;
+    }[],
+    department: { id: string; type: string }
+  ): Promise<((typeof rows)[number] & { proposedFacultyId: string | null })[]> {
+    const groups = rows
+      .filter((row) => row.electiveBatchId !== null)
+      .map((row, index) => ({
+        id: row.electiveBatchId as string,
+        sortOrder: index,
+        hasFaculty: row.hasFaculty,
+      }));
+
+    if (groups.length === 0) {
+      return rows.map((row) => ({ ...row, proposedFacultyId: null }));
+    }
+
+    const whereClause: Prisma.FacultyWhereInput =
+      department.type === "BASIC_SCIENCES"
+        ? {}
+        : { departmentId: department.id };
+
+    const faculty = await db.faculty.findMany({
+      where: whereClause,
+      include: { user: { select: { name: true } } },
+      orderBy: { user: { name: "asc" } },
+    });
+
+    const proposal = computeBalancedFacultyProposal(
+      groups,
+      faculty.map((f) => ({ id: f.id, name: f.user.name }))
+    );
+
+    const proposalByGroup = new Map(
+      proposal.map((p) => [p.groupId, p.facultyId])
+    );
+
+    return rows.map((row) => {
+      const groupId = row.electiveBatchId;
+      return {
+        ...row,
+        proposedFacultyId:
+          groupId !== null ? (proposalByGroup.get(groupId) ?? null) : null,
+      };
+    });
+  }
+
+  /**
    * Upsert course mappings: delete existing, create new ones.
    * Auto-creates batches if needed.
    */
@@ -509,7 +583,7 @@ export class CourseAssignmentService {
         }
       }
 
-      // PE/OE: map faculty to elective batches (no sections)
+      // PE/OE/PW: map faculty to elective batches (no sections)
       if (isBatchManagedCourse(course.courseType)) {
         if (
           !data.electiveBatchMappings ||
@@ -520,9 +594,19 @@ export class CourseAssignmentService {
           );
         }
 
+        // C3: once attendance or marks exist for a project course, faculty
+        // reassignment through Course Mapping is blocked (course-level lock).
+        if (course.courseType === "PW") {
+          await assertFacultyReassignmentAllowed(course.id);
+        }
+
         const batches = await db.electiveBatch.findMany({
           where: { courseId: course.id },
-          select: { id: true },
+          select: {
+            id: true,
+            name: true,
+            section: { select: { name: true } },
+          },
         });
         const batchIds = new Set(batches.map((b) => b.id));
         for (const mapping of data.electiveBatchMappings) {
@@ -541,10 +625,53 @@ export class CourseAssignmentService {
         if (facultyIds.length > 0) {
           const facultyRecords = await db.faculty.findMany({
             where: { id: { in: facultyIds } },
-            select: { id: true },
+            select: { id: true, departmentId: true },
           });
           if (facultyRecords.length !== facultyIds.length) {
             throw new Error("One or more faculty records are invalid");
+          }
+
+          // Q10: faculty must belong to the requesting department (same rule
+          // as the section branch). BASIC_SCIENCES departments may map faculty
+          // from all departments.
+          if (department.type !== "BASIC_SCIENCES") {
+            for (const record of facultyRecords) {
+              if (record.departmentId !== department.id) {
+                throw new Error(
+                  `Faculty ${record.id} does not belong to your department`
+                );
+              }
+            }
+          }
+        }
+
+        // PW only: the save must be rejected unless every active project group
+        // has exactly one faculty assigned. The visible/filtered section must
+        // never determine save scope — completeness is evaluated across ALL
+        // groups of the course before any database write happens.
+        if (course.courseType === "PW") {
+          const facultyByBatch = new Map(
+            data.electiveBatchMappings.map((m) => [
+              m.electiveBatchId,
+              m.facultyId,
+            ])
+          );
+          const incompleteGroups = batches.filter((batch) => {
+            const facultyId = facultyByBatch.get(batch.id);
+            return !facultyId;
+          });
+          if (incompleteGroups.length > 0) {
+            const details = incompleteGroups
+              .map((batch) => {
+                const sectionName = batch.section?.name;
+                return sectionName
+                  ? `${sectionName} — ${batch.name} has no faculty assigned`
+                  : `${batch.name} has no faculty assigned`;
+              })
+              .join("; ");
+            throw new Error(
+              `Project group faculty mapping is incomplete. ${details}`
+            );
           }
         }
 

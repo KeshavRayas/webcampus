@@ -43,6 +43,7 @@ interface EnterMarksDialogProps {
   courseId: string;
   assessmentTitle: string;
   sectionId?: string;
+  electiveBatchId?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -81,6 +82,7 @@ export function EnterMarksDialog({
   courseId,
   assessmentTitle,
   sectionId,
+  electiveBatchId,
   onClose,
   onSuccess,
 }: EnterMarksDialogProps) {
@@ -94,11 +96,14 @@ export function EnterMarksDialog({
 
   // Fetch assessment data with students — uses apiClient which has withCredentials
   const { data: assessmentData, isLoading } = useQuery({
-    queryKey: ["assessmentWithMarks", assessmentId, sectionId],
+    queryKey: ["assessmentWithMarks", assessmentId, sectionId, electiveBatchId],
     queryFn: async () => {
       const params: Record<string, string> = {};
       if (sectionId) {
         params.sectionId = sectionId;
+      }
+      if (electiveBatchId) {
+        params.electiveBatchId = electiveBatchId;
       }
       const response = await apiClient.get<
         BaseResponse<AssessmentWithStudentsType>
@@ -224,7 +229,12 @@ export function EnterMarksDialog({
         queryKey: ["marks-dashboard-assignments"],
       });
       queryClient.invalidateQueries({
-        queryKey: ["assessmentWithMarks", assessmentId],
+        queryKey: [
+          "assessmentWithMarks",
+          assessmentId,
+          sectionId,
+          electiveBatchId,
+        ],
       });
       onSuccess();
     },

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { COURSE_TYPES } from "../constants/course-types";
 
 export const registrationCourseBatchSchema = z.object({
   batchId: z.uuid("Invalid batch ID"),
@@ -14,7 +15,7 @@ export const registrationCourseSchema = z.object({
   id: z.uuid("Invalid course ID"),
   code: z.string(),
   name: z.string(),
-  courseType: z.enum(["PC", "PE", "OE", "NCMC"]),
+  courseType: z.enum(COURSE_TYPES),
   ltp: z.string(),
   totalCredits: z.number().int().nonnegative(),
   capacity: z.number().int().nonnegative().optional(),

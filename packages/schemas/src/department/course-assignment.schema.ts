@@ -149,6 +149,7 @@ export const CourseMappingByCourseItemSchema = z.object({
   sectionName: z.string().nullable(),
   electiveBatchId: z.uuid().nullable().optional(),
   electiveBatchName: z.string().nullable().optional(),
+  proposedFacultyId: z.uuid().nullable().optional(),
 });
 
 export const DownloadMappingTemplateQuerySchema = z.object({

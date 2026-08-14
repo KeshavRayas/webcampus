@@ -8,3 +8,4 @@ export * from "./student.schema";
 export * from "./course-assignment.schema";
 export * from "./course-coordinator.schema";
 export * from "./elective-mapping.schema";
+export * from "./project-mapping.schema";

@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
+import { COURSE_TYPE_LABELS, COURSE_TYPES } from "@webcampus/schemas/constants";
 import {
   CreateCourseDTO,
   CreateCourseSchema,
@@ -16,6 +17,10 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@webcampus/ui/components/radio-group";
 import { Combobox, ComboboxOption } from "@webcampus/ui/molecules/combobox";
 import { MultiCombobox } from "@webcampus/ui/molecules/multi-combobox";
 import axios from "axios";
@@ -30,12 +35,10 @@ const COURSE_MODE_OPTIONS: ComboboxOption[] = [
   { value: "NCMC", label: "NCMC" },
 ];
 
-const COURSE_TYPE_OPTIONS: ComboboxOption[] = [
-  { value: "PC", label: "Professional Core (PC)" },
-  { value: "PE", label: "Professional Elective (PE)" },
-  { value: "OE", label: "Open Elective (OE)" },
-  { value: "NCMC", label: "Non-Credit Mandatory (NCMC)" },
-];
+const COURSE_TYPE_OPTIONS: ComboboxOption[] = COURSE_TYPES.map((value) => ({
+  value,
+  label: `${COURSE_TYPE_LABELS[value]} (${value})`,
+}));
 
 const OPEN_ELECTIVE_ELIGIBILITY_OPTIONS: ComboboxOption[] = [
   { value: "ALL", label: "All departments" },
@@ -209,9 +212,14 @@ export const CourseFormFields = ({
   });
   const isPe = courseType === "PE";
   const isOe = courseType === "OE";
+  const isPw = courseType === "PW";
   const openElectiveEligibility = useWatch({
     control: form.control,
     name: "openElectiveEligibility",
+  });
+  const projectGroupingScope = useWatch({
+    control: form.control,
+    name: "projectGroupingScope",
   });
 
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
@@ -304,7 +312,9 @@ export const CourseFormFields = ({
   const modeOptions =
     isPe || isOe
       ? COURSE_MODE_OPTIONS.filter((o) => o.value === "NON_INTEGRATED")
-      : COURSE_MODE_OPTIONS;
+      : isPw
+        ? COURSE_MODE_OPTIONS.filter((o) => o.value === "FINAL_SUMMARY")
+        : COURSE_MODE_OPTIONS;
 
   return (
     <>
@@ -354,7 +364,7 @@ export const CourseFormFields = ({
                   onValueChange={field.onChange}
                   placeholder="Select mode"
                   className="w-full"
-                  disabled={isPe || isOe}
+                  disabled={isPe || isOe || isPw}
                 />
               </FormControl>
               <FormMessage />
@@ -375,6 +385,12 @@ export const CourseFormFields = ({
                     field.onChange(value);
                     if (value === "PE" || value === "OE") {
                       form.setValue("courseMode", "NON_INTEGRATED", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }
+                    if (value === "PW") {
+                      form.setValue("courseMode", "FINAL_SUMMARY", {
                         shouldDirty: true,
                         shouldValidate: true,
                       });
@@ -722,6 +738,90 @@ export const CourseFormFields = ({
             "Custom" lets you pick specific departments. Students pick their own
             batch at registration time (first-come, first-served).
           </p>
+        </FormSection>
+      )}
+
+      {isPw && (
+        <FormSection title="Project Group Configuration">
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="projectGroupingScope"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Grouping Scope *</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      value={field.value ?? "WITHIN_SECTION"}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        if (value !== "DEPARTMENT_WIDE") {
+                          form.setValue("numberOfBatches", undefined, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                        }
+                      }}
+                      className="gap-3"
+                    >
+                      <label className="flex items-start gap-2">
+                        <RadioGroupItem
+                          value="WITHIN_SECTION"
+                          id="pw-scope-within-section"
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="font-medium">Within Section</span>
+                          <p className="text-muted-foreground text-xs">
+                            Students can only form project groups within their
+                            section.
+                          </p>
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-2">
+                        <RadioGroupItem
+                          value="DEPARTMENT_WIDE"
+                          id="pw-scope-department-wide"
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="font-medium">Department-wide</span>
+                          <p className="text-muted-foreground text-xs">
+                            Students can form groups across sections while
+                            remaining within the same department and academic
+                            cycle/semester.
+                          </p>
+                        </span>
+                      </label>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <NumberField
+                form={form}
+                name="studentsPerBatch"
+                label="Students per Group *"
+                placeholder="5"
+              />
+              {projectGroupingScope === "DEPARTMENT_WIDE" ? (
+                <NumberField
+                  form={form}
+                  name="numberOfBatches"
+                  label="Number of Groups *"
+                  placeholder="100"
+                />
+              ) : (
+                <div className="text-muted-foreground flex items-center rounded-md border px-3 py-2 text-xs">
+                  Group count is derived per section (section students ÷
+                  students per group).
+                </div>
+              )}
+            </div>
+          </div>
         </FormSection>
       )}
 

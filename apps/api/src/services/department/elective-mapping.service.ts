@@ -117,6 +117,7 @@ export class ElectiveMappingService {
             courseId: course.id,
             code: course.code,
             name: course.name,
+            courseType: "PE",
             registeredCount,
             capacity,
             seatsLeft: seatsLeft(capacity, registeredCount),

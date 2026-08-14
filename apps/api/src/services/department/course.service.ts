@@ -1,10 +1,14 @@
-﻿import {
+﻿import { ProjectMappingService } from "@webcampus/api/src/services/department/project-mapping.service";
+import {
   checkAndIncrementOptimisticVersion,
   diffFields,
   diffLists,
   logChanges,
 } from "@webcampus/api/src/services/shared/audit.service";
-import { isBatchManagedCourse } from "@webcampus/api/src/services/shared/course-kind";
+import {
+  isBatchManagedCourse,
+  isProjectCourse,
+} from "@webcampus/api/src/services/shared/course-kind";
 import {
   PeCapacityScope,
   PeCapacityService,
@@ -67,6 +71,8 @@ const TRACKABLE_COURSE_FIELDS = [
   "numberOfBatches",
   "studentsPerBatch",
   "openElectiveEligibility",
+  "projectGroupingScope",
+  "nextProjectGroupSequence",
 ] as const;
 
 const prisma = new PrismaClient();
@@ -129,7 +135,13 @@ export class CourseService {
     const hasLaboratoryComponent =
       (data.practicalCredits || 0) > 0 || (data.labMaxMarks || 0) > 0;
 
-    if (
+    if (isProjectCourse(data.courseType)) {
+      if (data.courseMode !== "FINAL_SUMMARY") {
+        throw new Error(
+          "Project / Mini-Project (PW) courses must use FINAL_SUMMARY mode"
+        );
+      }
+    } else if (
       isBatchManagedCourse(data.courseType) &&
       data.courseMode !== "NON_INTEGRATED"
     ) {
@@ -138,7 +150,21 @@ export class CourseService {
       );
     }
 
-    if (isBatchManagedCourse(data.courseType)) {
+    if (isProjectCourse(data.courseType)) {
+      if (!data.studentsPerBatch || data.studentsPerBatch < 1) {
+        throw new Error(
+          "Students per group is required for Project / Mini-Project (PW) courses"
+        );
+      }
+      if (
+        (data.projectGroupingScope ?? "WITHIN_SECTION") === "DEPARTMENT_WIDE" &&
+        (!data.numberOfBatches || data.numberOfBatches < 1)
+      ) {
+        throw new Error(
+          "Number of groups is required for DEPARTMENT_WIDE Project / Mini-Project (PW) courses"
+        );
+      }
+    } else if (isBatchManagedCourse(data.courseType)) {
       if (!data.numberOfBatches || !data.studentsPerBatch) {
         throw new Error(
           `Number of batches and students per batch are required for ${
@@ -148,7 +174,7 @@ export class CourseService {
       }
       if (peCourseCapacity(data.numberOfBatches, data.studentsPerBatch) <= 0) {
         throw new Error(
-          `${data.courseType === "PE" ? "PE" : "OE"} course capacity must be at least 1 batch Ã— 1 student per batch`
+          `${data.courseType === "PE" ? "PE" : "OE"} course capacity must be at least 1 batch × 1 student per batch`
         );
       }
     }
@@ -201,6 +227,10 @@ export class CourseService {
             studentsPerBatch: isBatchManagedCourse(data.courseType)
               ? data.studentsPerBatch
               : null,
+            projectGroupingScope:
+              data.courseType === "PW"
+                ? (data.projectGroupingScope ?? "WITHIN_SECTION")
+                : "WITHIN_SECTION",
             openElectiveEligibility:
               data.courseType === "OE"
                 ? (data.openElectiveEligibility ?? "ALL")
@@ -244,7 +274,18 @@ export class CourseService {
         });
       }
 
-      if (isBatchManagedCourse(data.courseType) && data.numberOfBatches) {
+      if (isProjectCourse(data.courseType)) {
+        await ProjectMappingService.syncProjectGroups({
+          tx,
+          courseId: created.id,
+          studentsPerGroup: data.studentsPerBatch as number,
+          groupingScope: data.projectGroupingScope ?? "WITHIN_SECTION",
+          targetGroupCount: data.numberOfBatches ?? null,
+        });
+      } else if (
+        isBatchManagedCourse(data.courseType) &&
+        data.numberOfBatches
+      ) {
         await syncBatchManagedCourseBatches({
           tx,
           courseId: created.id,
@@ -358,7 +399,13 @@ export class CourseService {
       }
     }
 
-    if (
+    if (isProjectCourse(nextCourseType)) {
+      if (nextCourseMode !== "FINAL_SUMMARY") {
+        throw new Error(
+          "Project / Mini-Project (PW) courses must use FINAL_SUMMARY mode"
+        );
+      }
+    } else if (
       isBatchManagedCourse(nextCourseType) &&
       nextCourseMode !== "NON_INTEGRATED"
     ) {
@@ -372,14 +419,34 @@ export class CourseService {
       (data.numberOfBatches !== undefined ||
         data.studentsPerBatch !== undefined ||
         data.electiveBatchesToRemove !== undefined ||
+        data.projectGroupingScope !== undefined ||
         (data.courseType === "OE" &&
           (data.openElectiveEligibility !== undefined ||
             data.eligibleDepartmentIds !== undefined)));
 
-    if (isBatchManagedCourse(nextCourseType) && batchConfigChanging) {
+    // PW: section-scope changes (cycle / semester / department) also alter the
+    // derived per-section group counts, so they must re-run group sync and go
+    // through the same lock/capacity guards as batch-config changes.
+    const projectScopeChanging =
+      isProjectCourse(nextCourseType) &&
+      (data.cycle !== undefined ||
+        data.semesterId !== undefined ||
+        data.semesterNumber !== undefined ||
+        data.departmentId !== undefined ||
+        data.departmentName !== undefined);
+
+    const pwOrBatchLabel =
+      nextCourseType === "PW"
+        ? "Project / Mini-Project (PW) group"
+        : `${nextCourseType === "PE" ? "PE" : "OE"} batch`;
+
+    if (
+      isBatchManagedCourse(nextCourseType) &&
+      (batchConfigChanging || projectScopeChanging)
+    ) {
       if (await PeCapacityService.hasAttendanceOrMarksForCourse(id)) {
         throw new Error(
-          `Cannot change ${nextCourseType === "PE" ? "PE" : "OE"} batch configuration after attendance or marks exist`
+          `Cannot change ${pwOrBatchLabel} configuration after attendance or marks exist`
         );
       }
 
@@ -402,28 +469,84 @@ export class CourseService {
 
       if (hasRegs && windowOpen) {
         throw new Error(
-          `Cannot change ${nextCourseType === "PE" ? "PE" : "OE"} batch configuration while registration is open and students have registered`
+          `Cannot change ${pwOrBatchLabel} configuration while registration is open and students have registered`
         );
       }
 
-      if (!nextNumberOfBatches || !nextStudentsPerBatch) {
-        throw new Error(
-          `Number of batches and students per batch are required for ${
-            nextCourseType === "PE" ? "PE" : "OE"
-          } courses`
-        );
-      }
-      if (peCourseCapacity(nextNumberOfBatches, nextStudentsPerBatch) <= 0) {
-        throw new Error(
-          `${nextCourseType === "PE" ? "PE" : "OE"} course capacity must be at least 1 batch Ã— 1 student per batch`
-        );
-      }
+      if (isProjectCourse(nextCourseType)) {
+        if (!nextStudentsPerBatch || nextStudentsPerBatch < 1) {
+          throw new Error(
+            "Students per group is required for Project / Mini-Project (PW) courses"
+          );
+        }
+        const nextGroupingScope =
+          data.projectGroupingScope ?? existingCourse.projectGroupingScope;
+        if (
+          nextGroupingScope === "DEPARTMENT_WIDE" &&
+          (!nextNumberOfBatches || nextNumberOfBatches < 1)
+        ) {
+          throw new Error(
+            "Number of groups is required for DEPARTMENT_WIDE Project / Mini-Project (PW) courses"
+          );
+        }
 
-      await PeCapacityService.assertCourseCapacityAboveRegistrations({
-        courseId: id,
-        numberOfBatches: nextNumberOfBatches,
-        studentsPerBatch: nextStudentsPerBatch,
-      });
+        // Scope-aware capacity guard: effective capacity =
+        // effectiveGroupCount × students-per-group. WITHIN_SECTION derives
+        // group counts per section (ceil(section population / students per
+        // group)); DEPARTMENT_WIDE uses the configured group count. Reject a
+        // config/scope change that would strand registered students.
+        if (registrationCount > 0) {
+          let scopeAcademicYear: string | undefined;
+          if (data.semesterId) {
+            const targetSemester = await prisma.semester.findUnique({
+              where: { id: data.semesterId },
+              include: { academicTerm: true },
+            });
+            scopeAcademicYear = targetSemester?.academicTerm?.year ?? undefined;
+          }
+          const effectiveGroupCount =
+            await ProjectMappingService.computeEffectiveGroupCount({
+              tx: prisma,
+              courseId: id,
+              studentsPerGroup: nextStudentsPerBatch as number,
+              groupingScope: nextGroupingScope,
+              targetGroupCount: nextNumberOfBatches ?? null,
+              scope: {
+                semesterId: data.semesterId,
+                semesterNumber: data.semesterNumber,
+                academicYear: scopeAcademicYear,
+                departmentId: targetDepartmentId,
+                cycle: data.cycle ?? null,
+              },
+            });
+          const effectiveCapacity =
+            effectiveGroupCount * (nextStudentsPerBatch as number);
+          if (effectiveCapacity < registrationCount) {
+            throw new Error(
+              `Cannot change Project / Mini-Project (PW) configuration: effective capacity ${effectiveCapacity} is below ${registrationCount} registered students`
+            );
+          }
+        }
+      } else {
+        if (!nextNumberOfBatches || !nextStudentsPerBatch) {
+          throw new Error(
+            `Number of batches and students per batch are required for ${
+              nextCourseType === "PE" ? "PE" : "OE"
+            } courses`
+          );
+        }
+        if (peCourseCapacity(nextNumberOfBatches, nextStudentsPerBatch) <= 0) {
+          throw new Error(
+            `${nextCourseType === "PE" ? "PE" : "OE"} course capacity must be at least 1 batch × 1 student per batch`
+          );
+        }
+
+        await PeCapacityService.assertCourseCapacityAboveRegistrations({
+          courseId: id,
+          numberOfBatches: nextNumberOfBatches,
+          studentsPerBatch: nextStudentsPerBatch,
+        });
+      }
     }
 
     const course = await prisma.$transaction(async (tx) => {
@@ -496,6 +619,11 @@ export class CourseService {
             studentsPerBatch: isBatchManagedCourse(nextCourseType)
               ? nextStudentsPerBatch
               : null,
+            projectGroupingScope:
+              nextCourseType === "PW"
+                ? (data.projectGroupingScope ??
+                  existingCourse.projectGroupingScope)
+                : "WITHIN_SECTION",
             openElectiveEligibility: nextEligibility,
 
             ...(isAdmin
@@ -542,7 +670,21 @@ export class CourseService {
         }
       }
 
-      if (isBatchManagedCourse(nextCourseType) && nextNumberOfBatches) {
+      if (isProjectCourse(nextCourseType)) {
+        const becameBatchManaged = !isBatchManagedCourse(
+          existingCourse.courseType
+        );
+        if (batchConfigChanging || projectScopeChanging || becameBatchManaged) {
+          await ProjectMappingService.syncProjectGroups({
+            tx,
+            courseId: id,
+            studentsPerGroup: nextStudentsPerBatch as number,
+            groupingScope:
+              data.projectGroupingScope ?? existingCourse.projectGroupingScope,
+            targetGroupCount: nextNumberOfBatches ?? null,
+          });
+        }
+      } else if (isBatchManagedCourse(nextCourseType) && nextNumberOfBatches) {
         const currentBatches = await tx.electiveBatch.count({
           where: { courseId: id },
         });
@@ -1059,7 +1201,7 @@ export class CourseService {
           });
           if (batchCount === 0) {
             throw new Error(
-              `Cannot approve ${course.code}: ${course.courseType === "PE" ? "PE" : "OE"} has no elective batches configured`
+              `Cannot approve ${course.code}: ${course.courseType === "PW" ? "Project / Mini-Project (PW)" : course.courseType === "PE" ? "PE" : "OE"} has no ${course.courseType === "PW" ? "project groups" : "elective batches"} configured`
             );
           }
           const facultyOk = await PeCapacityService.isFacultyMappingComplete(
@@ -1070,7 +1212,7 @@ export class CourseService {
           );
           if (!facultyOk) {
             throw new Error(
-              `Cannot approve ${course.code}: ${course.courseType === "PE" ? "PE" : "OE"} faculty mapping incomplete (every elective batch needs one faculty)`
+              `Cannot approve ${course.code}: ${course.courseType === "PW" ? "project group" : course.courseType === "PE" ? "PE" : "OE"} faculty mapping incomplete (every ${course.courseType === "PW" ? "project group" : "elective batch"} needs one faculty)`
             );
           }
         }
@@ -1379,7 +1521,7 @@ export class CourseService {
           });
           if (batchCount === 0) {
             throw new Error(
-              `Cannot submit for approval. ${course.code} (${course.name}) â€” ${course.courseType === "PE" ? "PE" : "OE"} has no elective batches configured`
+              `Cannot submit for approval. ${course.code} (${course.name}) — ${course.courseType === "PW" ? "Project / Mini-Project (PW)" : course.courseType === "PE" ? "PE" : "OE"} has no ${course.courseType === "PW" ? "project groups" : "elective batches"} configured`
             );
           }
           const facultyOk = await PeCapacityService.isFacultyMappingComplete(
@@ -1390,7 +1532,7 @@ export class CourseService {
           );
           if (!facultyOk) {
             throw new Error(
-              `Cannot submit for approval. ${course.code} (${course.name}) â€” ${course.courseType === "PE" ? "PE" : "OE"} faculty mapping incomplete (every elective batch needs one faculty)`
+              `Cannot submit for approval. ${course.code} (${course.name}) — ${course.courseType === "PW" ? "project group" : course.courseType === "PE" ? "PE" : "OE"} faculty mapping incomplete (every ${course.courseType === "PW" ? "project group" : "elective batch"} needs one faculty)`
             );
           }
         }

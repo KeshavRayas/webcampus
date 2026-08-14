@@ -1,6 +1,8 @@
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import { BaseResponse } from "@webcampus/types/api";
+import { assertBatchBelongsToCourse } from "../../shared/batch-managed";
+import { isBatchManagedCourse } from "../../shared/course-kind";
 
 export class AdminMarksReportService {
   static async getMarksReport(
@@ -32,7 +34,7 @@ export class AdminMarksReportService {
         where: {
           courseId,
           semesterId: course.semesterId,
-          ...(sectionId
+          ...(sectionId && !isBatchManagedCourse(course.courseType)
             ? {
                 student: {
                   studentSections: {
@@ -55,7 +57,28 @@ export class AdminMarksReportService {
         },
       });
 
-      const studentIds = registrations.map((r) => r.student.id);
+      let studentIds: string[] = [];
+      let roster: { id: string; usn: string; user: { name: string } }[] = [];
+
+      if (isBatchManagedCourse(course.courseType) && sectionId) {
+        await assertBatchBelongsToCourse(courseId, sectionId);
+        const batchStudents = await db.electiveStudentAssignment.findMany({
+          where: { courseId, electiveBatchId: sectionId },
+          include: {
+            student: {
+              select: {
+                id: true,
+                usn: true,
+                user: { select: { name: true } },
+              },
+            },
+          },
+        });
+        roster = batchStudents.map((bs) => bs.student);
+      } else {
+        roster = registrations.map((r) => r.student);
+      }
+      studentIds = roster.map((s) => s.id);
 
       const studentAssessments = await db.studentAssessment.findMany({
         where: {
@@ -92,14 +115,14 @@ export class AdminMarksReportService {
         ])
       );
 
-      const students = registrations.map((reg) => {
-        const markInfo = marksMap.get(reg.student.id) ?? {
+      const students = roster.map((student) => {
+        const markInfo = marksMap.get(student.id) ?? {
           cieTotal: null,
           status: "NOT_ELIGIBLE",
         };
 
         const assessmentScores = assessments.map((a) => {
-          const sa = assessmentMap.get(`${reg.student.id}_${a.id}`);
+          const sa = assessmentMap.get(`${student.id}_${a.id}`);
           return {
             assessmentId: a.id,
             assessmentTitle: a.title,
@@ -109,8 +132,8 @@ export class AdminMarksReportService {
         });
 
         return {
-          usn: reg.student.usn,
-          name: reg.student.user.name,
+          usn: student.usn,
+          name: student.user.name,
           assessments: assessmentScores,
           cieTotal: markInfo.cieTotal,
           status: markInfo.status,

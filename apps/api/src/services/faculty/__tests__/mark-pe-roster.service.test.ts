@@ -178,6 +178,7 @@ describe("Mark PE elective-batch roster scoping", () => {
           id: "course-pe",
           code: "PE101",
           name: "PE 101",
+          courseType: "PE",
           semester: {
             id: "sem-1",
             semesterNumber: 3,
@@ -203,6 +204,7 @@ describe("Mark PE elective-batch roster scoping", () => {
         section: unknown;
         course: {
           code: string;
+          courseType: string;
           assessments: Array<{ id: string; hasMarks: boolean }>;
         };
       }>
@@ -211,6 +213,7 @@ describe("Mark PE elective-batch roster scoping", () => {
     const pe = data?.[0];
     expect(pe?.section).toBeNull();
     expect(pe?.course.code).toBe("PE101");
+    expect(pe?.course.courseType).toBe("PE");
     expect(pe?.course.assessments[0]?.hasMarks).toBe(true);
   });
 
@@ -279,5 +282,143 @@ describe("Mark PE elective-batch roster scoping", () => {
     expect(async () => Mark.getMarksReport("user-fac", "course-pe")).toThrow(
       "Unauthorized to view this course"
     );
+  });
+
+  it("getMarksReport serves an OE course via its real course type", async () => {
+    (dbMock.course.findUnique as unknown as ReturnType<typeof mock>) = mock(
+      async () => ({ courseType: "OE" })
+    );
+    rosterMock.mockImplementation(async () => [{ studentId: "stu-b1" }]);
+    (dbMock.electiveBatchFaculty.findFirst as unknown as ReturnType<
+      typeof mock
+    >) = mock(async () => ({
+      course: {
+        id: "course-oe",
+        code: "OE101",
+        name: "OE 101",
+        semesterId: "sem-1",
+        cieEligibility: 40,
+        cieMaxMarks: 100,
+        approvalStatus: "APPROVED",
+        semester: {
+          id: "sem-1",
+          semesterNumber: 3,
+          academicTerm: { id: "term-1", type: "ODD", year: 2026 },
+        },
+      },
+    }));
+    (dbMock.student.findMany as unknown as ReturnType<typeof mock>) = mock(
+      async () => [{ id: "stu-b1", usn: "USN0001", user: { name: "Alice" } }]
+    );
+
+    const result = await Mark.getMarksReport("user-fac", "course-oe");
+
+    expect(result.status).toBe("success");
+    const data = dataOf(result);
+    expect(data?.students).toHaveLength(1);
+    expect(data?.students[0]?.usn).toBe("USN0001");
+  });
+
+  it("getMarksDashboard includes electiveBatchId: null on PC section rows", async () => {
+    (dbMock.courseAssignment.findMany as unknown as ReturnType<typeof mock>) =
+      mock(async () => [
+        {
+          section: { id: "sec-a", name: "A", semesterId: "sem-1" },
+          course: {
+            id: "course-pc",
+            code: "PC101",
+            name: "PC 101",
+            courseType: "PC",
+            semester: {
+              id: "sem-1",
+              semesterNumber: 3,
+              academicTerm: { id: "term-1", type: "ODD", year: 2026 },
+            },
+            assessments: [
+              {
+                id: "assess-1",
+                title: "IA-1",
+                totalMarks: 50,
+                studentRecords: [{ id: "sr-1" }],
+              },
+            ],
+          },
+        },
+      ]);
+    (dbMock.electiveBatchFaculty.findMany as unknown as ReturnType<
+      typeof mock
+    >) = mock(async () => []);
+
+    const result = await Mark.getMarksDashboard("user-fac");
+
+    expect(result.status).toBe("success");
+    const data =
+      dataOf<
+        Array<{
+          electiveBatchId: unknown;
+          electiveBatchName: unknown;
+          course: { courseType: string };
+        }>
+      >(result);
+    expect(data).toHaveLength(1);
+    expect(data?.[0]?.electiveBatchId).toBeNull();
+    expect(data?.[0]?.electiveBatchName).toBeNull();
+    expect(data?.[0]?.course.courseType).toBe("PC");
+  });
+
+  it("getMarksReportFilterOptions carries the PE course type on elective batch rows", async () => {
+    (dbMock.electiveBatchFaculty.findMany as unknown as ReturnType<
+      typeof mock
+    >) = mock(async () => [
+      {
+        course: {
+          id: "course-pe",
+          code: "PE101",
+          name: "PE 101",
+          courseType: "PE",
+          semesterId: "sem-1",
+        },
+        electiveBatch: { id: "eb-g1", name: "G-001" },
+      },
+    ]);
+
+    const result = await Mark.getMarksReportFilterOptions("user-fac");
+
+    expect(result.status).toBe("success");
+    const data = dataOf(result);
+    const peCourse = data?.courses.find((c) => c.id === "course-pe");
+    expect(peCourse).toBeDefined();
+    expect(peCourse?.courseType).toBe("PE");
+    expect(peCourse?.sectionId).toBe("eb-g1");
+    expect(peCourse?.isElectiveBatch).toBe(true);
+  });
+
+  it("getMarksReportFilterOptions carries the PC course type on section rows", async () => {
+    (dbMock.courseAssignment.findMany as unknown as ReturnType<typeof mock>) =
+      mock(async () => [
+        {
+          course: {
+            id: "course-pc",
+            code: "PC101",
+            name: "PC 101",
+            courseType: "PC",
+            semesterId: "sem-1",
+          },
+          section: { id: "sec-a", name: "A" },
+        },
+      ]);
+    (dbMock.electiveBatchFaculty.findMany as unknown as ReturnType<
+      typeof mock
+    >) = mock(async () => []);
+
+    const result = await Mark.getMarksReportFilterOptions("user-fac");
+
+    expect(result.status).toBe("success");
+    const data = dataOf(result);
+    const pcCourse = data?.courses.find((c) => c.id === "course-pc");
+    expect(pcCourse).toBeDefined();
+    expect(pcCourse?.courseType).toBe("PC");
+    expect(pcCourse?.sectionId).toBe("sec-a");
+    expect(pcCourse?.isElectiveBatch).toBe(false);
   });
 });

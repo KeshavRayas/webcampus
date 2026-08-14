@@ -23,7 +23,9 @@ export type AttendanceWindowFreeze = {
 };
 
 export type AttendanceWindowRow = {
-  courseAssignmentId: string;
+  courseAssignmentId: string | null;
+  electiveBatchFacultyId: string | null;
+  isElective: boolean;
   courseCode: string;
   courseName: string;
   department: string;
@@ -35,6 +37,11 @@ export type AttendanceWindowRow = {
   batchName: string | null;
   assignmentType: "THEORY" | "LAB";
   freeze: AttendanceWindowFreeze;
+};
+
+export type FreezeTarget = {
+  courseAssignmentId?: string | null;
+  electiveBatchFacultyId?: string | null;
 };
 
 export type AttendanceWindowFilters = {
@@ -72,7 +79,7 @@ export const useAttendanceWindows = (
         return rows;
       }
 
-      throw new Error(res.data.message || "Failed to fetch attendance windows");
+      throw new Error(res.data.message || "Failed to fetch freeze data");
     },
     enabled,
   });
@@ -97,9 +104,7 @@ export const useBulkFreezeAttendanceWindows = () => {
       });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
-      toast.error(
-        error.response?.data?.message || "Failed to freeze attendance windows"
-      );
+      toast.error(error.response?.data?.message || "Failed to freeze courses");
     },
   });
 };
@@ -124,7 +129,7 @@ export const useBulkUnfreezeAttendanceWindows = () => {
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(
-        error.response?.data?.message || "Failed to unfreeze attendance windows"
+        error.response?.data?.message || "Failed to unfreeze courses"
       );
     },
   });
@@ -135,9 +140,12 @@ export const useFreezeAssignment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (courseAssignmentId: string) => {
+    mutationFn: async (target: FreezeTarget) => {
+      const path = target.courseAssignmentId
+        ? `/admin/attendance-windows/course-assignment/${target.courseAssignmentId}/freeze`
+        : `/admin/attendance-windows/elective-batch/${target.electiveBatchFacultyId ?? ""}/freeze`;
       const res = await axios.post<BaseResponse<AttendanceWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/attendance-windows/${courseAssignmentId}/freeze`,
+        `${NEXT_PUBLIC_API_BASE_URL}${path}`,
         {},
         { withCredentials: true }
       );
@@ -150,9 +158,7 @@ export const useFreezeAssignment = () => {
       });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
-      toast.error(
-        error.response?.data?.message || "Failed to lock attendance window"
-      );
+      toast.error(error.response?.data?.message || "Failed to freeze course");
     },
   });
 };
@@ -162,9 +168,12 @@ export const useUnfreezeAssignment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (courseAssignmentId: string) => {
+    mutationFn: async (target: FreezeTarget) => {
+      const path = target.courseAssignmentId
+        ? `/admin/attendance-windows/course-assignment/${target.courseAssignmentId}/unfreeze`
+        : `/admin/attendance-windows/elective-batch/${target.electiveBatchFacultyId ?? ""}/unfreeze`;
       return axios.post<BaseResponse<AttendanceWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/attendance-windows/${courseAssignmentId}/unfreeze`,
+        `${NEXT_PUBLIC_API_BASE_URL}${path}`,
         {},
         { withCredentials: true }
       );
@@ -176,9 +185,7 @@ export const useUnfreezeAssignment = () => {
       });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
-      toast.error(
-        error.response?.data?.message || "Failed to reopen attendance window"
-      );
+      toast.error(error.response?.data?.message || "Failed to unfreeze course");
     },
   });
 };

@@ -18,6 +18,8 @@ export interface BonusAttendanceWindowRow {
   cycle: "PHYSICS" | "CHEMISTRY" | null;
   days: number;
   isOpen: boolean;
+  openedAt: string | null;
+  expiresAt: string | null;
   instanceName: string;
 }
 

@@ -174,7 +174,9 @@ export const HodMarksReportView = () => {
     () =>
       sections.map((section) => ({
         value: section.id,
-        label: section.name,
+        label: section.isElectiveBatch
+          ? `${section.name} (Elective)`
+          : section.name,
       })),
     [sections]
   );

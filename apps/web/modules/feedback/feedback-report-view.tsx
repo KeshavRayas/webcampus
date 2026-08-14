@@ -87,11 +87,13 @@ export function FeedbackReportView({
       role,
       draftFilters.academicTermId,
       draftFilters.semesterId,
+      draftFilters.courseId,
     ],
     queryFn: () =>
       getFeedbackFilterOptions(role, {
         academicTermId: draftFilters.academicTermId,
         semesterId: draftFilters.semesterId,
+        courseId: draftFilters.courseId,
       }),
     enabled: Boolean(draftFilters.academicTermId && draftFilters.semesterId),
   });
@@ -151,7 +153,17 @@ export function FeedbackReportView({
     setHasRunReport(true);
   };
   const updateFilter = (key: keyof Filters, value: string) => {
-    setDraftFilters((current) => ({ ...current, [key]: value }));
+    setDraftFilters((current) => {
+      const next = { ...current, [key]: value };
+      if (key === "courseId") {
+        next.sectionId = "";
+        next.batchId = "";
+      }
+      if (key === "sectionId") {
+        next.batchId = "";
+      }
+      return next;
+    });
     setHasRunReport(false);
   };
   const changeTerm = (termId: string) => {
@@ -254,7 +266,7 @@ export function FeedbackReportView({
             <option value="">All sections</option>
             {options?.sections.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name}
+                {item.isElectiveBatch ? `${item.name} (Group)` : item.name}
               </option>
             ))}
           </select>

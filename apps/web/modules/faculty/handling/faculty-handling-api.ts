@@ -38,6 +38,12 @@ const toApiParams = (filters: FacultyHandlingFilters) => {
   if (filters.section) {
     params.section = filters.section;
   }
+  if (filters.courseId) {
+    params.courseId = filters.courseId;
+  }
+  if (filters.batchId) {
+    params.batchId = filters.batchId;
+  }
 
   params.page = String(toPositiveInt(filters.page, 1));
   params.limit = String(toPositiveInt(filters.limit ?? "10", 10));

@@ -3,6 +3,7 @@ import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import type { FacultyBulkFreeze } from "@webcampus/schemas/faculty";
 import type { BaseResponse } from "@webcampus/types/api";
+import { FACULTY_COURSE_STATUS } from "../shared/course-approval";
 
 type BulkFreezeResult = {
   processed: number;
@@ -13,7 +14,9 @@ type BulkFreezeResult = {
 };
 
 type WindowsRow = {
-  courseAssignmentId: string;
+  courseAssignmentId: string | null;
+  electiveBatchFacultyId: string | null;
+  isElective: boolean;
   courseCode: string;
   courseName: string;
   sectionId: string;
@@ -87,6 +90,8 @@ export class FacultyAttendanceWindowService {
   ): WindowsRow {
     return {
       courseAssignmentId: row.courseAssignmentId,
+      electiveBatchFacultyId: row.electiveBatchFacultyId,
+      isElective: row.isElective,
       courseCode: row.courseCode,
       courseName: row.courseName,
       sectionId: row.sectionId,
@@ -141,13 +146,91 @@ export class FacultyAttendanceWindowService {
 
   static async freezeAssignment(
     userId: string,
-    courseAssignmentId: string,
+    input: {
+      courseAssignmentId?: string | null;
+      electiveBatchFacultyId?: string | null;
+    },
     username?: string | null,
     displayUsername?: string | null
   ): Promise<BaseResponse<WindowsRow>> {
     try {
       const facultyId =
         await FacultyAttendanceWindowService.getFacultyIdByUserId(userId);
+
+      if (input.electiveBatchFacultyId) {
+        const electiveAssignment = await db.electiveBatchFaculty.findUnique({
+          where: { id: input.electiveBatchFacultyId },
+          select: {
+            id: true,
+            facultyId: true,
+            semester: true,
+            course: {
+              select: {
+                code: true,
+                name: true,
+                approvalStatus: true,
+                department: { select: { name: true } },
+              },
+            },
+            electiveBatch: { select: { id: true, name: true } },
+            freeze: true,
+          },
+        });
+
+        if (!electiveAssignment) {
+          throw new Error("Elective batch faculty assignment not found");
+        }
+
+        if (electiveAssignment.facultyId !== facultyId) {
+          throw new Error(
+            "Forbidden: this elective batch does not belong to you"
+          );
+        }
+
+        if (
+          electiveAssignment.course.approvalStatus !== FACULTY_COURSE_STATUS
+        ) {
+          throw new Error(
+            "Forbidden: this course is not approved for freezing"
+          );
+        }
+
+        const freeze = await FreezeService.freeze(
+          { electiveBatchFacultyId: electiveAssignment.id },
+          "faculty",
+          username,
+          displayUsername
+        );
+
+        return {
+          status: "success",
+          message: "Attendance frozen",
+          data: {
+            courseAssignmentId: null,
+            electiveBatchFacultyId: electiveAssignment.id,
+            isElective: true,
+            courseCode: electiveAssignment.course.code,
+            courseName: electiveAssignment.course.name,
+            sectionId: electiveAssignment.electiveBatch.id,
+            sectionName: electiveAssignment.electiveBatch.name,
+            batchName: null,
+            assignmentType: "THEORY",
+            freeze: {
+              displayState: freeze.displayState,
+              lockedBy: freeze.lockedBy,
+              frozenBy: {
+                frozenByRole: freeze.frozenBy.frozenByRole,
+                frozenByUsername: freeze.frozenBy.frozenByUsername,
+                frozenByDisplay: freeze.frozenBy.frozenByDisplay,
+              },
+              frozenAt: freeze.frozenAt,
+              message: freeze.message,
+            },
+          },
+        };
+      }
+
+      const courseAssignmentId = input.courseAssignmentId ?? "";
 
       const assignment = await db.courseAssignment.findUnique({
         where: { id: courseAssignmentId },
@@ -163,7 +246,7 @@ export class FacultyAttendanceWindowService {
       }
 
       const freeze = await FreezeService.freeze(
-        courseAssignmentId,
+        { courseAssignmentId },
         "faculty",
         username,
         displayUsername
@@ -183,6 +266,8 @@ export class FacultyAttendanceWindowService {
         message: "Attendance frozen",
         data: {
           courseAssignmentId,
+          electiveBatchFacultyId: null,
+          isElective: false,
           courseCode: fullAssignment?.course.code ?? "",
           courseName: fullAssignment?.course.name ?? "",
           sectionId: fullAssignment?.section.id ?? "",
@@ -214,7 +299,7 @@ export class FacultyAttendanceWindowService {
   static async getSections(
     userId: string,
     semesterId: string
-  ): Promise<{ id: string; name: string }[]> {
+  ): Promise<{ id: string; name: string; domain: "section" | "group" }[]> {
     const facultyId =
       await FacultyAttendanceWindowService.getFacultyIdByUserId(userId);
 
@@ -229,12 +314,40 @@ export class FacultyAttendanceWindowService {
       },
     });
 
+    const electiveAssignments = await db.electiveBatchFaculty.findMany({
+      where: {
+        facultyId,
+        course: { approvalStatus: FACULTY_COURSE_STATUS, semesterId },
+      },
+      select: {
+        electiveBatch: { select: { id: true, name: true } },
+      },
+    });
+
     const seen = new Set<string>();
-    const result: { id: string; name: string }[] = [];
+    const result: {
+      id: string;
+      name: string;
+      domain: "section" | "group";
+    }[] = [];
     for (const a of assignments) {
       if (!seen.has(a.sectionId)) {
         seen.add(a.sectionId);
-        result.push({ id: a.section.id, name: a.section.name });
+        result.push({
+          id: a.section.id,
+          name: a.section.name,
+          domain: "section",
+        });
+      }
+    }
+    for (const e of electiveAssignments) {
+      if (!seen.has(e.electiveBatch.id)) {
+        seen.add(e.electiveBatch.id);
+        result.push({
+          id: e.electiveBatch.id,
+          name: e.electiveBatch.name,
+          domain: "group",
+        });
       }
     }
     result.sort((a, b) => a.name.localeCompare(b.name));
@@ -261,9 +374,15 @@ export class FacultyAttendanceWindowService {
         payload.semesterId
       );
 
-      const targetRows = payload.sectionId
-        ? rows.filter((r) => r.sectionId === payload.sectionId)
-        : rows;
+      const targetRows = payload.electiveBatchId
+        ? rows.filter(
+            (r) => r.isElective && r.sectionId === payload.electiveBatchId
+          )
+        : payload.sectionId
+          ? rows.filter(
+              (r) => !r.isElective && r.sectionId === payload.sectionId
+            )
+          : rows;
 
       const result: BulkFreezeResult = {
         processed: 0,
@@ -274,27 +393,29 @@ export class FacultyAttendanceWindowService {
       };
 
       for (const row of targetRows) {
+        const ownershipKey = row.isElective
+          ? (row.electiveBatchFacultyId ?? "")
+          : (row.courseAssignmentId ?? "");
+
         if (row.freeze.displayState !== "OPEN") {
           result.skipped++;
           if (row.freeze.displayState === "FROZEN_BY_FACULTY") {
             result.skippedAssignments.push(
-              `${row.courseAssignmentId} (already frozen by faculty)`
+              `${ownershipKey} (already frozen by faculty)`
             );
           } else if (row.freeze.displayState === "FROZEN_BY_HOD") {
-            result.skippedAssignments.push(
-              `${row.courseAssignmentId} (HOD frozen)`
-            );
+            result.skippedAssignments.push(`${ownershipKey} (HOD frozen)`);
           } else {
-            result.skippedAssignments.push(
-              `${row.courseAssignmentId} (admin locked)`
-            );
+            result.skippedAssignments.push(`${ownershipKey} (admin locked)`);
           }
           continue;
         }
 
         try {
           await FreezeService.freeze(
-            row.courseAssignmentId,
+            row.isElective
+              ? { electiveBatchFacultyId: row.electiveBatchFacultyId ?? "" }
+              : { courseAssignmentId: row.courseAssignmentId ?? "" },
             "faculty",
             username,
             displayUsername
@@ -302,7 +423,7 @@ export class FacultyAttendanceWindowService {
           result.processed++;
         } catch {
           result.failed++;
-          result.failedAssignments.push(row.courseAssignmentId);
+          result.failedAssignments.push(ownershipKey);
         }
       }
 

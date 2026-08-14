@@ -3,10 +3,20 @@ import {
   peCourseCapacity,
 } from "@webcampus/api/src/services/shared/pe-capacity.service";
 import { Prisma } from "@webcampus/db";
+import { COURSE_TYPES } from "@webcampus/schemas/constants";
 import {
   RegistrationCourseType,
   SubmitCourseRegistrationType,
 } from "@webcampus/schemas/student";
+
+/** Mandatory-core course types = every course type except the electives (PE, OE). */
+const CORE_COURSE_TYPES = COURSE_TYPES.filter(
+  (courseType) => courseType !== "PE" && courseType !== "OE"
+);
+const isCoreCourseType = (courseType: string | undefined | null): boolean =>
+  courseType !== undefined &&
+  courseType !== null &&
+  CORE_COURSE_TYPES.includes(courseType as (typeof CORE_COURSE_TYPES)[number]);
 
 export type StudentRegistrationContext = {
   studentId: string;
@@ -49,13 +59,11 @@ export interface RegistrationStrategy {
 export const coreRegistrationStrategy: RegistrationStrategy = {
   bucket: "CORE",
   label: "Core",
-  matches: (courseType) => courseType === "PC" || courseType === "NCMC",
+  matches: (courseType) => isCoreCourseType(courseType),
   visibleCourses: (courses) => courses,
   validateSelection: (available, selectedIds) => {
     const requiredCoreIds = available
-      .filter(
-        (course) => course.courseType === "PC" || course.courseType === "NCMC"
-      )
+      .filter((course) => isCoreCourseType(course.courseType))
       .map((course) => course.id);
     if (requiredCoreIds.some((courseId) => !selectedIds.includes(courseId))) {
       throw new Error("All mandatory core courses must be included");

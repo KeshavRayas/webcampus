@@ -35,7 +35,19 @@ router.get(
 );
 
 router.post(
-  "/:courseAssignmentId/freeze",
+  "/course-assignment/:courseAssignmentId/freeze",
+  validateRequest(FreezeParamsSchema, "params"),
+  protect({
+    role: "faculty",
+    permissions: {
+      freeze: ["lock"],
+    },
+  }),
+  FacultyAttendanceWindowController.freezeAssignment
+);
+
+router.post(
+  "/elective-batch/:electiveBatchFacultyId/freeze",
   validateRequest(FreezeParamsSchema, "params"),
   protect({
     role: "faculty",

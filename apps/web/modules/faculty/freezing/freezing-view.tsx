@@ -122,10 +122,22 @@ export const FreezingView = () => {
   const { mutate: freezeAssignment, isPending: isRowMutating } =
     useFreezeAssignment();
 
+  const selectedSectionDomain = useMemo(() => {
+    if (!appliedFilters.sectionId) return undefined;
+    return sections.find((s) => s.id === appliedFilters.sectionId)?.domain;
+  }, [sections, appliedFilters.sectionId]);
+
   const filteredWindows = useMemo(() => {
-    let result = appliedFilters.sectionId
-      ? windows.filter((row) => row.sectionId === appliedFilters.sectionId)
-      : windows;
+    let result = windows;
+    if (appliedFilters.sectionId && selectedSectionDomain === "group") {
+      result = result.filter(
+        (row) => row.isElective && row.sectionId === appliedFilters.sectionId
+      );
+    } else if (appliedFilters.sectionId) {
+      result = result.filter(
+        (row) => !row.isElective && row.sectionId === appliedFilters.sectionId
+      );
+    }
     if (debouncedSearch) {
       const q = debouncedSearch.toLowerCase();
       result = result.filter(
@@ -136,7 +148,12 @@ export const FreezingView = () => {
       );
     }
     return result;
-  }, [windows, appliedFilters.sectionId, debouncedSearch]);
+  }, [
+    windows,
+    appliedFilters.sectionId,
+    selectedSectionDomain,
+    debouncedSearch,
+  ]);
 
   const groupedWindows = useMemo(() => {
     const groups = new Map<string, FreezingRow[]>();
@@ -157,6 +174,16 @@ export const FreezingView = () => {
   }, [filteredWindows]);
 
   const isMutating = isBulkFreezing;
+
+  const sectionOptions = useMemo(() => {
+    const sectionsList = sections
+      .filter((s) => s.domain === "section")
+      .map((s) => ({ label: s.name, value: s.id }));
+    const groupsList = sections
+      .filter((s) => s.domain === "group")
+      .map((s) => ({ label: `${s.name} (Group)`, value: s.id }));
+    return [...sectionsList, ...groupsList];
+  }, [sections]);
 
   const filterFields = useMemo<FilterFieldConfig<FilterState>[]>(() => {
     return [
@@ -192,16 +219,16 @@ export const FreezingView = () => {
           : sectionsError
             ? "Failed to load sections"
             : draftFilters.semesterId
-              ? "Select section"
+              ? "Select section or group"
               : "Select semester first",
-        options: sections.map((s) => ({ label: s.name, value: s.id })),
+        options: sectionOptions,
       },
     ];
   }, [
     draftFilters.academicTermId,
     semesterOptions,
     terms,
-    sections,
+    sectionOptions,
     sectionsLoading,
     sectionsError,
   ]);
@@ -258,15 +285,22 @@ export const FreezingView = () => {
           />
           <div className="flex flex-wrap items-center gap-2 md:col-span-2 md:justify-end">
             <Button
-              onClick={() =>
+              onClick={() => {
+                const appliedDomain = appliedFilters.sectionId
+                  ? sections.find((s) => s.id === appliedFilters.sectionId)
+                      ?.domain
+                  : undefined;
                 bulkFreeze({
                   academicTermId: appliedFilters.academicTermId,
                   semesterId: appliedFilters.semesterId,
-                  ...(appliedFilters.sectionId
+                  ...(appliedFilters.sectionId && appliedDomain === "group"
+                    ? { electiveBatchId: appliedFilters.sectionId }
+                    : {}),
+                  ...(appliedFilters.sectionId && appliedDomain !== "group"
                     ? { sectionId: appliedFilters.sectionId }
                     : {}),
-                })
-              }
+                });
+              }}
               disabled={
                 isMutating ||
                 !windowsQueryEnabled ||
@@ -339,7 +373,7 @@ export const FreezingView = () => {
                   <TableBody>
                     {rows.map((row) => (
                       <TableRow
-                        key={`${sectionName}-${row.courseAssignmentId}`}
+                        key={`${sectionName}-${row.courseAssignmentId ?? row.electiveBatchFacultyId}`}
                       >
                         <TableCell className="font-medium">
                           <div className="space-y-1">
@@ -352,7 +386,10 @@ export const FreezingView = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">{row.sectionName}</div>
+                          <div className="text-sm">
+                            {row.sectionName}
+                            {row.isElective ? " (Elective)" : ""}
+                          </div>
                           <div className="text-muted-foreground text-xs">
                             {row.assignmentType}
                             {row.batchName
@@ -383,7 +420,17 @@ export const FreezingView = () => {
                               isRowMutating
                             }
                             onClick={() => {
-                              freezeAssignment(row.courseAssignmentId);
+                              freezeAssignment(
+                                row.courseAssignmentId
+                                  ? {
+                                      courseAssignmentId:
+                                        row.courseAssignmentId,
+                                    }
+                                  : {
+                                      electiveBatchFacultyId:
+                                        row.electiveBatchFacultyId,
+                                    }
+                              );
                             }}
                           >
                             {row.freeze.displayState === "OPEN"

@@ -21,7 +21,8 @@ const getStatusCode = (error: unknown): number => {
   if (
     error.message === "Semester not found" ||
     error.message === "Academic Term not found" ||
-    error.message === "Course assignment not found"
+    error.message === "Course assignment not found" ||
+    error.message === "Elective batch faculty assignment not found"
   ) {
     return 404;
   }
@@ -130,20 +131,15 @@ export class AttendanceWindowController {
   static async freezeAssignment(req: Request, res: Response): Promise<void> {
     try {
       const params = req.params as AdminFreezeParams;
-      console.log(
-        "[DEBUG freezeAssignment] req.params:",
-        JSON.stringify(req.params)
-      );
-      console.log(
-        "[DEBUG freezeAssignment] params.courseAssignmentId:",
-        params.courseAssignmentId
-      );
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
 
       const response = await AttendanceWindowService.freezeAssignment(
-        params.courseAssignmentId,
+        {
+          courseAssignmentId: params.courseAssignmentId,
+          electiveBatchFacultyId: params.electiveBatchFacultyId,
+        },
         session?.user?.username,
         session?.user?.displayUsername
       );
@@ -158,14 +154,6 @@ export class AttendanceWindowController {
         });
       }
     } catch (error) {
-      console.log("[DEBUG freezeAssignment] CAUGHT ERROR:", error);
-      console.log(
-        "[DEBUG freezeAssignment] error instanceof Error:",
-        error instanceof Error
-      );
-      if (error instanceof Error) {
-        console.log("[DEBUG freezeAssignment] error.message:", error.message);
-      }
       const errMsg = error instanceof Error ? error.message : "Unknown error";
       logger.error("Error locking attendance window", error);
       sendResponse({
@@ -181,9 +169,10 @@ export class AttendanceWindowController {
   static async unfreezeAssignment(req: Request, res: Response): Promise<void> {
     try {
       const params = req.params as AdminUnfreezeParams;
-      const response = await AttendanceWindowService.unfreezeAssignment(
-        params.courseAssignmentId
-      );
+      const response = await AttendanceWindowService.unfreezeAssignment({
+        courseAssignmentId: params.courseAssignmentId,
+        electiveBatchFacultyId: params.electiveBatchFacultyId,
+      });
 
       if (response.status === "success") {
         sendResponse({

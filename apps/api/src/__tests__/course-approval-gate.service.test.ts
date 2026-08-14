@@ -347,6 +347,25 @@ const oeCourse = {
   _count: { assignments: 0, coordinators: 1 },
 };
 
+const pwCourse = {
+  id: "course-pw",
+  code: "PW101",
+  name: "PW 101",
+  courseType: "PW",
+  semesterId: "sem-1",
+  semester: { semesterNumber: 3, academicTerm: { year: "2026" } },
+  _count: { assignments: 0, coordinators: 1 },
+};
+
+const pwGroup = (
+  id: string,
+  facultyAssignment: {
+    id: string;
+    semester: number;
+    academicYear: string;
+  } | null
+) => ({ id, facultyAssignment });
+
 const makePe = (
   id: string,
   code: string,
@@ -628,6 +647,154 @@ describe("CourseService approval + submit PE mapping gate", () => {
 
       expect(result.status).toBe("success");
       expect(updateManyCalls.length).toBe(1);
+    });
+  });
+
+  describe("PW submit + approve faculty mapping gate (Phase 2: no PW exemption)", () => {
+    it("blocks submit when a PW has an unmapped group (was exempted before Phase 2)", async () => {
+      coursesFixture = [pwCourse];
+      batchesFixture = [
+        pwGroup("g1", { id: "ebf-1", semester: 3, academicYear: "2026" }),
+        pwGroup("g2", null),
+      ];
+
+      await expect(
+        CourseService.bulkSubmitForApproval("sem-1", "dep-1")
+      ).rejects.toThrow(
+        "PW101 (PW 101) — project group faculty mapping incomplete (every project group needs one faculty)"
+      );
+      expect(updateManyCalls.length).toBe(0);
+    });
+
+    it("blocks approve when a PW has an unmapped group (was exempted before Phase 2)", async () => {
+      coursesFixture = [pwCourse];
+      batchesFixture = [
+        pwGroup("g1", { id: "ebf-1", semester: 3, academicYear: "2026" }),
+        pwGroup("g2", null),
+      ];
+
+      await expect(
+        CourseService.approveSemesterCourses("sem-1", "dep-1")
+      ).rejects.toThrow(
+        "Cannot approve PW101: project group faculty mapping incomplete (every project group needs one faculty)"
+      );
+      expect(updateManyCalls.length).toBe(0);
+    });
+
+    it("every-group-faculty: N groups with N-1 mapped blocks submit until the last group is mapped", async () => {
+      // G-001 -> Ambuja, G-002 -> Ravi, G-003 -> NULL
+      coursesFixture = [pwCourse];
+      batchesFixture = [
+        pwGroup("g1", { id: "ebf-1", semester: 3, academicYear: "2026" }),
+        pwGroup("g2", { id: "ebf-2", semester: 3, academicYear: "2026" }),
+        pwGroup("g3", null),
+      ];
+
+      await expect(
+        CourseService.bulkSubmitForApproval("sem-1", "dep-1")
+      ).rejects.toThrow("project group faculty mapping incomplete");
+      expect(updateManyCalls.length).toBe(0);
+
+      // Map the last group: G-003 -> Priya (N groups, N faculty)
+      batchesFixture = [
+        pwGroup("g1", { id: "ebf-1", semester: 3, academicYear: "2026" }),
+        pwGroup("g2", { id: "ebf-2", semester: 3, academicYear: "2026" }),
+        pwGroup("g3", { id: "ebf-3", semester: 3, academicYear: "2026" }),
+      ];
+
+      const result = await CourseService.bulkSubmitForApproval(
+        "sem-1",
+        "dep-1"
+      );
+      expect(result.status).toBe("success");
+      expect(updateManyCalls.length).toBe(1);
+      const args = updateManyCalls[0] as {
+        data: { approvalStatus: string };
+      };
+      expect(args.data.approvalStatus).toBe("PENDING");
+    });
+
+    it("every-group-faculty: N groups with N-1 mapped blocks approve until the last group is mapped", async () => {
+      coursesFixture = [pwCourse];
+      batchesFixture = [
+        pwGroup("g1", { id: "ebf-1", semester: 3, academicYear: "2026" }),
+        pwGroup("g2", { id: "ebf-2", semester: 3, academicYear: "2026" }),
+        pwGroup("g3", null),
+      ];
+
+      await expect(
+        CourseService.approveSemesterCourses("sem-1", "dep-1")
+      ).rejects.toThrow("project group faculty mapping incomplete");
+      expect(updateManyCalls.length).toBe(0);
+
+      batchesFixture = [
+        pwGroup("g1", { id: "ebf-1", semester: 3, academicYear: "2026" }),
+        pwGroup("g2", { id: "ebf-2", semester: 3, academicYear: "2026" }),
+        pwGroup("g3", { id: "ebf-3", semester: 3, academicYear: "2026" }),
+      ];
+
+      const result = await CourseService.approveSemesterCourses(
+        "sem-1",
+        "dep-1"
+      );
+      expect(result.status).toBe("success");
+      expect(updateManyCalls.length).toBe(1);
+      const args = updateManyCalls[0] as {
+        data: { approvalStatus: string };
+      };
+      expect(args.data.approvalStatus).toBe("APPROVED");
+    });
+
+    it("blocks PW when the only faculty mapping is for a different semester/year", async () => {
+      coursesFixture = [pwCourse];
+      batchesFixture = [
+        pwGroup("g1", { id: "ebf-1", semester: 2, academicYear: "2025" }),
+      ];
+
+      await expect(
+        CourseService.bulkSubmitForApproval("sem-1", "dep-1")
+      ).rejects.toThrow("project group faculty mapping incomplete");
+      expect(updateManyCalls.length).toBe(0);
+    });
+
+    it("submits when every PW group is mapped for the current semester/year", async () => {
+      coursesFixture = [pwCourse];
+      batchesFixture = [
+        pwGroup("g1", { id: "ebf-1", semester: 3, academicYear: "2026" }),
+        pwGroup("g2", { id: "ebf-2", semester: 3, academicYear: "2026" }),
+      ];
+
+      const result = await CourseService.bulkSubmitForApproval(
+        "sem-1",
+        "dep-1"
+      );
+
+      expect(result.status).toBe("success");
+      expect(updateManyCalls.length).toBe(1);
+      const args = updateManyCalls[0] as {
+        data: { approvalStatus: string };
+      };
+      expect(args.data.approvalStatus).toBe("PENDING");
+    });
+
+    it("approves when every PW group is mapped for the current semester/year", async () => {
+      coursesFixture = [pwCourse];
+      batchesFixture = [
+        pwGroup("g1", { id: "ebf-1", semester: 3, academicYear: "2026" }),
+        pwGroup("g2", { id: "ebf-2", semester: 3, academicYear: "2026" }),
+      ];
+
+      const result = await CourseService.approveSemesterCourses(
+        "sem-1",
+        "dep-1"
+      );
+
+      expect(result.status).toBe("success");
+      expect(updateManyCalls.length).toBe(1);
+      const args = updateManyCalls[0] as {
+        data: { approvalStatus: string };
+      };
+      expect(args.data.approvalStatus).toBe("APPROVED");
     });
   });
 
