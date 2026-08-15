@@ -289,7 +289,7 @@ model Student {
   attendances                Attendance[]
   AttendanceRecord           AttendanceRecord[]
   registrations              CourseRegistration[]
-  finances                   Finance[]
+  accounts                   Accounts[]
   hallTickets                HallTicket[]
   marks                      Mark[]
   department                 Department                  @relation(fields: [departmentName], references: [name])
@@ -1224,7 +1224,7 @@ model CourseMappingAuditLog {
   @@index([adminId])
 }
 
-model Finance {
+model Accounts {
   id           String           @id @default(uuid())
   studentId    String
   academicYear String
@@ -1232,24 +1232,24 @@ model Finance {
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  payments     FinancePayment[]
+  payments     AccountsPayment[]
 
   @@unique([studentId, academicYear])
   @@index([studentId])
   @@index([academicYear])
 }
 
-model FinancePayment {
-  id        String   @id @default(uuid())
-  financeId String
-  amount    Float
-  paidAt    DateTime @default(now())
-  reference String?
-  remarks   String?
-  createdAt DateTime @default(now())
-  finance   Finance  @relation(fields: [financeId], references: [id], onDelete: Cascade)
+model AccountsPayment {
+  id         String   @id @default(uuid())
+  accountsId String
+  amount     Float
+  paidAt     DateTime @default(now())
+  reference  String?
+  remarks    String?
+  createdAt  DateTime @default(now())
+  accounts   Accounts @relation(fields: [accountsId], references: [id], onDelete: Cascade)
 
-  @@index([financeId])
+  @@index([accountsId])
   @@index([paidAt])
 }
 

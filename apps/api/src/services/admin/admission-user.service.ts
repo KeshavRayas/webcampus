@@ -164,7 +164,7 @@ export class AdminAdmissionUserService {
   static async update(
     id: string,
     data: UpdateAdmissionUserType,
-    // headers: IncomingHttpHeaders
+    headers: IncomingHttpHeaders,
     photoFile?: Express.Multer.File
   ): Promise<BaseResponse<AdmissionUserRecord>> {
     let uploadedImageUrl: string | null = null;
@@ -194,6 +194,13 @@ export class AdminAdmissionUserService {
           photoFile,
           data.name ?? existingUser.name
         );
+      }
+
+      if (data.password) {
+        await auth.api.setUserPassword({
+          headers: fromNodeHeaders(headers),
+          body: { userId: id, newPassword: data.password },
+        });
       }
 
       // Safely Sync Roles with external Auth provider

@@ -62,8 +62,8 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: Users,
           children: [
             { name: "Admission Users", url: "/admin/admission-users" },
-            { name: "COE Users", url: "/admin/coe" },
-            { name: "Finance Users", url: "/admin/finance" },
+            { name: "COE", url: "/admin/coe" },
+            { name: "Accounts", url: "/admin/accounts" },
           ],
         },
         {
@@ -519,13 +519,25 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     },
     navSecondary,
   },
-  finance: {
+  accounts: {
     navMain: {
       items: [
         {
-          name: "Finance",
-          url: "/finance",
+          name: "Accounts",
+          url: "/accounts",
           icon: IndianRupee,
+        },
+      ],
+    },
+    navSecondary,
+  },
+  trust: {
+    navMain: {
+      items: [
+        {
+          name: "Trust",
+          url: "/trust",
+          icon: Building,
         },
       ],
     },

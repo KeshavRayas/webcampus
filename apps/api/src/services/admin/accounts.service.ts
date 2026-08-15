@@ -6,7 +6,7 @@ import { db, Prisma } from "@webcampus/db";
 import { CreateUserType, UpdateAdminUserType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 
-type FinanceUserRecord = {
+type AccountsUserRecord = {
   id: string;
   name: string;
   email: string;
@@ -17,7 +17,7 @@ type FinanceUserRecord = {
   createdAt: Date;
 };
 
-export class AdminFinanceService {
+export class AdminAccountsService {
   private static normalizeUsername(username: string): string {
     return username.trim().toLowerCase();
   }
@@ -30,7 +30,7 @@ export class AdminFinanceService {
       "@webcampus/api/src/utils/s3"
     );
 
-    const prefix = `finance_${sanitizeForS3(name)}_`;
+    const prefix = `accounts_${sanitizeForS3(name)}_`;
     const photoFileName = generateFileName(photoFile.originalname, prefix);
     const uploadResult = await uploadToS3(
       photoFile.buffer,
@@ -63,14 +63,14 @@ export class AdminFinanceService {
       const userService = new UserService({
         request: {
           ...data,
-          role: "finance",
+          role: "accounts",
         },
         headers,
       });
 
       const user = await userService.create();
       if (user.status === "error" || !user.data?.id) {
-        throw new Error(user.message || "Failed to create Finance user");
+        throw new Error(user.message || "Failed to create Accounts user");
       }
 
       createdUserId = user.data.id;
@@ -93,7 +93,7 @@ export class AdminFinanceService {
 
       return {
         status: "success",
-        message: "Finance user created successfully",
+        message: "Accounts user created successfully",
         data: user.data,
       };
     } catch (error) {
@@ -101,7 +101,7 @@ export class AdminFinanceService {
         try {
           await this.deletePhoto(uploadedImageUrl);
         } catch (cleanupError) {
-          logger.warn("Failed to clean up uploaded finance photo", {
+          logger.warn("Failed to clean up uploaded accounts photo", {
             uploadedImageUrl,
             cleanupError,
           });
@@ -115,7 +115,7 @@ export class AdminFinanceService {
             body: { userId: createdUserId },
           });
         } catch (cleanupError) {
-          logger.warn("Failed to clean up auth user after finance failure", {
+          logger.warn("Failed to clean up auth user after accounts failure", {
             createdUserId,
             cleanupError,
           });
@@ -124,21 +124,22 @@ export class AdminFinanceService {
 
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === "P2002") {
-          throw new Error("Finance user already exists for this user");
+          throw new Error("Accounts user already exists for this user");
         }
       }
 
       throw error instanceof Error
         ? error
-        : new Error("Failed to create Finance user");
+        : new Error("Failed to create Accounts user");
     }
   }
 
   static async update(
     id: string,
     data: UpdateAdminUserType,
+    headers: IncomingHttpHeaders,
     photoFile?: Express.Multer.File
-  ): Promise<BaseResponse<FinanceUserRecord>> {
+  ): Promise<BaseResponse<AccountsUserRecord>> {
     let uploadedImageUrl: string | null = null;
 
     try {
@@ -147,8 +148,8 @@ export class AdminFinanceService {
         select: { id: true, role: true, image: true, name: true },
       });
 
-      if (!existingUser || existingUser.role !== "finance") {
-        throw new Error("Finance user not found");
+      if (!existingUser || existingUser.role !== "accounts") {
+        throw new Error("Accounts user not found");
       }
 
       if (photoFile) {
@@ -156,6 +157,13 @@ export class AdminFinanceService {
           photoFile,
           data.name ?? existingUser.name
         );
+      }
+
+      if (data.password) {
+        await auth.api.setUserPassword({
+          headers: fromNodeHeaders(headers),
+          body: { userId: id, newPassword: data.password },
+        });
       }
 
       const updateData: Prisma.UserUpdateInput = {};
@@ -192,7 +200,7 @@ export class AdminFinanceService {
         try {
           await this.deletePhoto(existingUser.image);
         } catch (cleanupError) {
-          logger.warn("Failed to delete previous finance user photo", {
+          logger.warn("Failed to delete previous accounts user photo", {
             previousImageUrl: existingUser.image,
             cleanupError,
           });
@@ -201,15 +209,15 @@ export class AdminFinanceService {
 
       return {
         status: "success",
-        message: "Finance user updated successfully",
-        data: updatedUser as FinanceUserRecord,
+        message: "Accounts user updated successfully",
+        data: updatedUser as AccountsUserRecord,
       };
     } catch (error) {
       if (uploadedImageUrl) {
         try {
           await this.deletePhoto(uploadedImageUrl);
         } catch (cleanupError) {
-          logger.warn("Failed to clean up new finance photo", {
+          logger.warn("Failed to clean up new accounts photo", {
             uploadedImageUrl,
             cleanupError,
           });
@@ -225,14 +233,14 @@ export class AdminFinanceService {
 
       throw error instanceof Error
         ? error
-        : new Error("Failed to update Finance user");
+        : new Error("Failed to update Accounts user");
     }
   }
 
-  static async getAll(): Promise<BaseResponse<FinanceUserRecord[]>> {
+  static async getAll(): Promise<BaseResponse<AccountsUserRecord[]>> {
     try {
       const users = await db.user.findMany({
-        where: { role: "finance" },
+        where: { role: "accounts" },
         select: {
           id: true,
           name: true,
@@ -248,12 +256,12 @@ export class AdminFinanceService {
 
       return {
         status: "success",
-        message: "Finance users fetched successfully",
-        data: users as FinanceUserRecord[],
+        message: "Accounts users fetched successfully",
+        data: users as AccountsUserRecord[],
       };
     } catch (error) {
-      logger.error("Failed to fetch Finance users", error);
-      throw new Error("Failed to fetch Finance users");
+      logger.error("Failed to fetch Accounts users", error);
+      throw new Error("Failed to fetch Accounts users");
     }
   }
 
@@ -265,10 +273,10 @@ export class AdminFinanceService {
       });
 
       if (!user) {
-        throw new Error("Finance user not found");
+        throw new Error("Accounts user not found");
       }
-      if (user.role !== "finance") {
-        throw new Error("Cannot delete non-finance user via this endpoint");
+      if (user.role !== "accounts") {
+        throw new Error("Cannot delete non-accounts user via this endpoint");
       }
 
       if (user.image) {
@@ -280,14 +288,14 @@ export class AdminFinanceService {
 
       return {
         status: "success",
-        message: "Finance user deleted successfully",
+        message: "Accounts user deleted successfully",
         data: null,
       };
     } catch (error) {
-      logger.error("Failed to delete Finance user", error);
+      logger.error("Failed to delete Accounts user", error);
       throw error instanceof Error
         ? error
-        : new Error("Failed to delete Finance user");
+        : new Error("Failed to delete Accounts user");
     }
   }
 }

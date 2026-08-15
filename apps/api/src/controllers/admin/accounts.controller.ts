@@ -1,19 +1,19 @@
-import { AdminFinanceService } from "@webcampus/api/src/services/admin/finance.service";
+import { AdminAccountsService } from "@webcampus/api/src/services/admin/accounts.service";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { Request, Response } from "express";
 
-export class AdminFinanceController {
+export class AdminAccountsController {
   static async create(req: Request, res: Response): Promise<void> {
     try {
-      const response = await AdminFinanceService.create(
+      const response = await AdminAccountsService.create(
         {
           email: req.body.email,
           username: req.body.username,
           password: req.body.password,
           name: req.body.name,
-          role: "finance",
+          role: "accounts",
         },
         req.headers,
         req.file,
@@ -31,7 +31,7 @@ export class AdminFinanceController {
       }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.error("Error creating Finance user:", err);
+      logger.error("Error creating Accounts user:", err);
       sendResponse({
         res,
         status: "error",
@@ -45,7 +45,12 @@ export class AdminFinanceController {
   static async update(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id);
-      const response = await AdminFinanceService.update(id, req.body, req.file);
+      const response = await AdminAccountsService.update(
+        id,
+        req.body,
+        req.headers,
+        req.file
+      );
 
       if (response.status === "success") {
         sendResponse({
@@ -58,7 +63,7 @@ export class AdminFinanceController {
       }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.error("Error updating Finance user:", err);
+      logger.error("Error updating Accounts user:", err);
       sendResponse({
         res,
         status: "error",
@@ -71,7 +76,7 @@ export class AdminFinanceController {
 
   static async getAll(req: Request, res: Response): Promise<void> {
     try {
-      const response = await AdminFinanceService.getAll();
+      const response = await AdminAccountsService.getAll();
 
       if (response.status === "success") {
         sendResponse({
@@ -84,7 +89,7 @@ export class AdminFinanceController {
       }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.error("Error fetching Finance users:", err);
+      logger.error("Error fetching Accounts users:", err);
       sendResponse({
         res,
         status: "error",
@@ -98,7 +103,7 @@ export class AdminFinanceController {
   static async delete(req: Request, res: Response): Promise<void> {
     try {
       const id = String(req.params.id);
-      const response = await AdminFinanceService.delete(id);
+      const response = await AdminAccountsService.delete(id);
 
       if (response.status === "success") {
         sendResponse({
@@ -111,7 +116,7 @@ export class AdminFinanceController {
       }
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.error("Error deleting Finance user:", err);
+      logger.error("Error deleting Accounts user:", err);
       sendResponse({
         res,
         status: "error",

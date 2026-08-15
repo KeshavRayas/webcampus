@@ -1,12 +1,12 @@
-import { FinanceService } from "@webcampus/api/src/services/finance/finance.service";
+import { AccountsService } from "@webcampus/api/src/services/accounts/accounts.service";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import type { Request, Response } from "express";
 
-export class FinanceController {
+export class AccountsController {
   static async search(req: Request, res: Response) {
     try {
-      const response = await FinanceService.searchStudents(req.query as never);
+      const response = await AccountsService.searchStudents(req.query as never);
       sendResponse({
         res,
         status: "success",
@@ -25,7 +25,7 @@ export class FinanceController {
         typeof req.query.academicYear === "string"
           ? req.query.academicYear
           : undefined;
-      const response = await FinanceService.getStudent(
+      const response = await AccountsService.getStudent(
         req.params.studentId,
         academicYear
       );
@@ -43,7 +43,7 @@ export class FinanceController {
 
   static async saveFee(req: Request<{ studentId: string }>, res: Response) {
     try {
-      const response = await FinanceService.saveFee(
+      const response = await AccountsService.saveFee(
         req.params.studentId,
         req.body
       );
@@ -59,10 +59,10 @@ export class FinanceController {
     }
   }
 
-  static async addPayment(req: Request<{ financeId: string }>, res: Response) {
+  static async addPayment(req: Request<{ accountsId: string }>, res: Response) {
     try {
-      const response = await FinanceService.addPayment(
-        req.params.financeId,
+      const response = await AccountsService.addPayment(
+        req.params.accountsId,
         req.body
       );
       sendResponse({
@@ -81,8 +81,8 @@ export class FinanceController {
     const message =
       error instanceof Error
         ? error.message
-        : "Unable to process finance request";
-    logger.error("Finance request failed", error);
+        : "Unable to process accounts request";
+    logger.error("Accounts request failed", error);
     sendResponse({
       res,
       status: "error",

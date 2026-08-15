@@ -1,4 +1,4 @@
-export type FinanceUser = {
+export type AccountsUser = {
   id: string;
   name: string;
   username: string | null;

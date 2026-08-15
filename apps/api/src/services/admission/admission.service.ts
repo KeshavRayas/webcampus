@@ -1292,14 +1292,26 @@ export class AdmissionService {
           data: { status: "CANCELLED" },
         });
 
-        // Free up the applicant email so a new applicant can be created with it.
+        // Free up the applicant email so a new applicant can be created with it,
+        // while keeping the user record for audit by appending a timestamp.
         const applicantUser = await tx.user.findFirst({
           where: { email: admission.primaryEmail, role: "applicant" },
-          select: { id: true },
+          select: { id: true, email: true },
         });
 
         if (applicantUser) {
-          await tx.user.delete({ where: { id: applicantUser.id } });
+          const atIndex = applicantUser.email.lastIndexOf("@");
+          const localPart =
+            atIndex >= 0
+              ? applicantUser.email.slice(0, atIndex)
+              : applicantUser.email;
+          const domain = atIndex >= 0 ? applicantUser.email.slice(atIndex) : "";
+          const suffixedEmail = `${localPart}-cancelled-${Date.now()}${domain}`;
+
+          await tx.user.update({
+            where: { id: applicantUser.id },
+            data: { email: suffixedEmail },
+          });
         }
 
         return cancellation;

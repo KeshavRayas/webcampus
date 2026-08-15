@@ -16,7 +16,9 @@ import { z } from "zod";
 type CreateAdmissionUserFormValues = z.infer<typeof CreateAdmissionUserSchema>;
 type UpdateAdmissionUserFormValues = z.infer<typeof UpdateAdmissionUserSchema>;
 
-export const useAdmissionUsers = () => {
+export const useAdmissionUsers = (
+  defaultRole: "admission" | "admission-instructor" = "admission"
+) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -28,7 +30,7 @@ export const useAdmissionUsers = () => {
       username: "",
       email: "",
       password: "password",
-      role: "admission",
+      role: defaultRole,
       photo: undefined,
     },
   });
@@ -101,6 +103,10 @@ export const useAdmissionUserUpdate = () => {
       formData.append("name", data.name);
       formData.append("username", data.username);
       formData.append("email", data.email);
+
+      if (data.password) {
+        formData.append("password", data.password);
+      }
 
       if (photoFile) {
         formData.append("photo", photoFile);

@@ -1,8 +1,8 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { FinanceActions } from "./finance-actions";
-import { FinanceUser } from "./finance-types";
+import { AccountsActions } from "./accounts-actions";
+import { AccountsUser } from "./accounts-types";
 
-export const FinanceUserColumns: ColumnDef<FinanceUser>[] = [
+export const AccountsUserColumns: ColumnDef<AccountsUser>[] = [
   {
     accessorKey: "name",
     header: "Name",
@@ -18,6 +18,6 @@ export const FinanceUserColumns: ColumnDef<FinanceUser>[] = [
   },
   {
     id: "actions",
-    cell: ({ row }) => <FinanceActions user={row.original} />,
+    cell: ({ row }) => <AccountsActions user={row.original} />,
   },
 ];

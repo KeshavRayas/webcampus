@@ -11,7 +11,7 @@
     "./hod": "./src/hod/index.ts",
     "./student": "./src/student/index.ts",
     "./coe": "./src/coe/index.ts",
-    "./finance": "./src/finance/index.ts",
+    "./accounts": "./src/accounts/index.ts",
     "./support": "./src/support/index.ts",
     "./common": "./src/common.schemas.ts",
     "./constants": "./src/constants/index.ts"

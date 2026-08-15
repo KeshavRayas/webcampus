@@ -40,12 +40,12 @@ type FacultySeed = {
 
 const DEFAULT_PASSWORD = "password";
 
-const MOCK_FINANCE_USER: MockUserInput = {
-  email: "finance@webcampus.com",
-  username: "finance",
+const MOCK_ACCOUNTS_USER: MockUserInput = {
+  email: "accounts@webcampus.com",
+  username: "accounts",
   password: DEFAULT_PASSWORD,
-  name: "Finance",
-  role: "finance" as const,
+  name: "Accounts",
+  role: "accounts" as const,
 };
 
 let IMAGE_URL = "";
@@ -903,13 +903,13 @@ class MockStarter {
     }
   }
 
-  public async seedFinanceUser(): Promise<void> {
-    const financeUser = await this.ensureUser(MOCK_FINANCE_USER);
+  public async seedAccountsUser(): Promise<void> {
+    const accountsUser = await this.ensureUser(MOCK_ACCOUNTS_USER);
 
     logger.info(
-      financeUser.created
-        ? `Created finance user ${MOCK_FINANCE_USER.email}`
-        : `Updated finance user ${MOCK_FINANCE_USER.email}`
+      accountsUser.created
+        ? `Created accounts user ${MOCK_ACCOUNTS_USER.email}`
+        : `Updated accounts user ${MOCK_ACCOUNTS_USER.email}`
     );
   }
 
@@ -970,7 +970,7 @@ class MockStarter {
     await this.seedAcademicTermAndSemesters();
     await this.seedFaculty(departmentIdByCode);
     await this.seedAdmissionUsers();
-    await this.seedFinanceUser();
+    await this.seedAccountsUser();
     await this.seedCoeUser();
     logger.info("mock_start script completed successfully.");
   }

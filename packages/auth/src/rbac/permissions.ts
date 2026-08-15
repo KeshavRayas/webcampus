@@ -20,7 +20,8 @@ const statement = {
   courseCoordinator: ["create", "read", "update"],
   courseApprovalOverride: ["read", "update"],
   registrationWindow: ["create", "read", "update"],
-  finance: ["read", "update"],
+  accounts: ["read", "update"],
+  trust: ["read", "update"],
   support: ["create", "read", "reply", "updateStatus"],
   feedback: ["create", "read", "manage", "export"],
 } as const;
@@ -84,8 +85,15 @@ export const roles = {
     support: ["create", "read", "reply"],
     feedback: ["read", "export"],
   }),
-  finance: ac.newRole({
-    finance: ["read", "update"],
+  accounts: ac.newRole({
+    accounts: ["read", "update"],
+    trust: ["read", "update"],
+    support: ["create", "read", "reply"],
+    feedback: ["read"],
+  }),
+  trust: ac.newRole({
+    accounts: ["read", "update"],
+    trust: ["read", "update"],
     support: ["create", "read", "reply"],
     feedback: ["read"],
   }),

@@ -443,7 +443,6 @@ export const AdminAdmissionActions = ({
                   </div>
                   <DataField label="Temporary USN" value={admission.tempUsn} />
                   <DataField label="USN" value={admission.student?.usn} />
-                  <DataField label="Unique ID" value={admission.uniqueId} />
                 </div>
               </div>
 

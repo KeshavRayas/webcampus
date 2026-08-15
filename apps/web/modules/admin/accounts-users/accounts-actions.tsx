@@ -31,32 +31,41 @@ import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
-import { FinanceUser } from "./finance-types";
-import { useFinanceUserDelete, useFinanceUserEdit } from "./use-finance-users";
+import { AccountsUser } from "./accounts-types";
+import {
+  useAccountsUserDelete,
+  useAccountsUserEdit,
+} from "./use-accounts-users";
 
-const editFinanceUserSchema = z.object({
+const editAccountsUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   username: z.string().min(1, "Username is required"),
   email: z.string().email("Invalid email address"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .optional()
+    .or(z.literal("")),
 });
 
-type UpdateFinanceUserFormValues = z.infer<typeof editFinanceUserSchema>;
+type UpdateAccountsUserFormValues = z.infer<typeof editAccountsUserSchema>;
 
-export const FinanceActions = ({ user }: { user: FinanceUser }) => {
+export const AccountsActions = ({ user }: { user: AccountsUser }) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
   const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
-  const { onDelete, isDeleting } = useFinanceUserDelete();
-  const { onEdit, isEditing } = useFinanceUserEdit();
+  const { onDelete, isDeleting } = useAccountsUserDelete();
+  const { onEdit, isEditing } = useAccountsUserEdit();
 
-  const editForm = useForm<UpdateFinanceUserFormValues>({
-    resolver: zodResolver(editFinanceUserSchema),
+  const editForm = useForm<UpdateAccountsUserFormValues>({
+    resolver: zodResolver(editAccountsUserSchema),
     defaultValues: {
       name: user.name,
       username: user.username || "",
       email: user.email,
+      password: "",
     },
   });
 
@@ -81,6 +90,7 @@ export const FinanceActions = ({ user }: { user: FinanceUser }) => {
       name: user.name,
       username: user.username || "",
       email: user.email,
+      password: "",
     });
     setEditPhotoFile(null);
     replacePhotoPreview(null);
@@ -94,10 +104,14 @@ export const FinanceActions = ({ user }: { user: FinanceUser }) => {
     replacePhotoPreview(file);
   };
 
-  const handleEditSubmit = async (data: UpdateFinanceUserFormValues) => {
+  const handleEditSubmit = async (data: UpdateAccountsUserFormValues) => {
     try {
       const formData = new FormData();
-      Object.entries({ ...data, role: "finance" }).forEach(([key, value]) => {
+      const payload: Record<string, unknown> = { ...data, role: "accounts" };
+      if (!payload.password) {
+        delete payload.password;
+      }
+      Object.entries(payload).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           formData.append(key, String(value));
         }
@@ -160,7 +174,7 @@ export const FinanceActions = ({ user }: { user: FinanceUser }) => {
       >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Edit Finance User</DialogTitle>
+            <DialogTitle>Edit Accounts User</DialogTitle>
             <DialogDescription>
               Update user details and optionally replace the profile photo.
             </DialogDescription>
@@ -192,7 +206,7 @@ export const FinanceActions = ({ user }: { user: FinanceUser }) => {
                   <FormItem>
                     <FormLabel>Username *</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g., finance.manager" />
+                      <Input {...field} placeholder="e.g., accounts.manager" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -208,7 +222,7 @@ export const FinanceActions = ({ user }: { user: FinanceUser }) => {
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="finance@webcampus.edu"
+                        placeholder="accounts@webcampus.edu"
                         {...field}
                       />
                     </FormControl>
@@ -217,21 +231,32 @@ export const FinanceActions = ({ user }: { user: FinanceUser }) => {
                 )}
               />
 
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium">Role</p>
-                  <p className="text-muted-foreground text-sm">Finance</p>
-                </div>
+              <FormField
+                control={editForm.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Leave blank to keep current password"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                <UserPhotoUpload
-                  label="Profile Photo"
-                  personName={editForm.watch("name") || user.name}
-                  previewUrl={editPhotoPreview}
-                  currentImageUrl={user.image}
-                  selectedFileName={editPhotoFile?.name || null}
-                  onChange={handleEditPhotoChange}
-                />
-              </div>
+              <UserPhotoUpload
+                label="Profile Photo"
+                personName={editForm.watch("name") || user.name}
+                previewUrl={editPhotoPreview}
+                currentImageUrl={user.image}
+                selectedFileName={editPhotoFile?.name || null}
+                onChange={handleEditPhotoChange}
+              />
 
               <DialogFooter>
                 <Button
@@ -257,7 +282,7 @@ export const FinanceActions = ({ user }: { user: FinanceUser }) => {
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Finance User</DialogTitle>
+            <DialogTitle>Delete Accounts User</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete {user.name} ({user.email})? This
               action cannot be undone.
