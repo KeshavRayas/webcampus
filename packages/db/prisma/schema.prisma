@@ -157,6 +157,7 @@ model Department {
   openElectiveCourses    OpenElectiveDepartment[]
   bonusAttendanceWindows BonusAttendanceWindow[]
   proctorGroups          ProctorGroup[]
+  feeStructures          FeeStructure[]
 
   @@index([name])
 }
@@ -915,6 +916,8 @@ model Admission {
   guardianPermanentAddress        String?
   guardianAnnualIncome            String?
   hostel                          Boolean?
+  guardianRelation                String?
+  posted                          Boolean              @default(false)
   motherQualification             String?
   motherOccupation                String?
   motherPermanentAddress          String?
@@ -941,7 +944,7 @@ model Admission {
   permanentPincode                String?
   permanentState                  String?
   placeOfBirth                    String?
-  primaryEmail                    String               @unique
+  primaryEmail                    String
   filledById                      String
   primaryPhoneNumber              String?
   religion                        String?
@@ -979,6 +982,22 @@ model AdmissionConstants {
   updatedAt        DateTime @updatedAt
 
   @@unique([modeOfAdmission, quota, categoryClaimed, categoryAllotted])
+  @@index([modeOfAdmission])
+}
+
+model FeeStructure {
+  id             String   @id @default(uuid())
+  departmentId   String
+  modeOfAdmission String
+  categoryAllotted String?
+  quota          String?
+  feeAmount      Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, modeOfAdmission, categoryAllotted, quota])
   @@index([modeOfAdmission])
 }
 
@@ -1392,11 +1411,12 @@ enum AdmissionStatus {
 }
 
 model CancelledAdmissions {
-  id            String   @id @default(uuid())
-  admissionId   String   @unique
+  id            String    @id @default(uuid())
+  admissionId   String    @unique
   reason        String
+  description   String?
   cancelledById String
-  cancelledAt   DateTime @default(now())
+  cancelledAt   DateTime  @default(now())
 
   admission   Admission @relation(fields: [admissionId], references: [id])
   cancelledBy User      @relation(fields: [cancelledById], references: [id])

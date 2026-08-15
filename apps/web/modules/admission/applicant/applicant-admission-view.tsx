@@ -16,10 +16,6 @@ import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
 import { PhoneNumberInput } from "@webcampus/ui/components/phone-input";
 import {
-  RadioGroup,
-  RadioGroupItem,
-} from "@webcampus/ui/components/radio-group";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -35,7 +31,9 @@ import { FileDown } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { AdmissionAcknowledgement } from "./admission-acknowledgement";
 import { AdmissionDocument, COLLEGE, type DocData } from "./admission-document";
+import { renderNodeToPdf } from "./admission-pdf";
 
 type ApplicantAdmissionData = {
   applicationId: string;
@@ -385,6 +383,8 @@ function ParentMemberCard({
   addressesHydrated,
   savedAddress,
   wide = false,
+  defaultValues,
+  fixed = false,
   children,
 }: {
   title: string;
@@ -405,6 +405,8 @@ function ParentMemberCard({
   addressesHydrated: boolean;
   savedAddress?: string;
   wide?: boolean;
+  defaultValues?: { name?: string; occupation?: string; email?: string };
+  fixed?: boolean;
   children?: React.ReactNode;
 }) {
   const [source, setSource] = useState<MemberSource>("custom");
@@ -434,6 +436,8 @@ function ParentMemberCard({
           <Input
             id={`${memberKey}Name`}
             name={`${memberKey}Name`}
+            defaultValue={defaultValues?.name}
+            readOnly={fixed}
             required={nameRequired}
           />
         </div>
@@ -444,6 +448,8 @@ function ParentMemberCard({
           <Input
             id={`${memberKey}Occupation`}
             name={`${memberKey}Occupation`}
+            defaultValue={defaultValues?.occupation}
+            readOnly={fixed}
             required={occupationRequired}
           />
         </div>
@@ -505,6 +511,8 @@ function ParentMemberCard({
             id={`${memberKey}Email`}
             name={`${memberKey}Email`}
             type="email"
+            defaultValue={defaultValues?.email}
+            readOnly={fixed}
             required={emailRequired}
           />
         </div>
@@ -573,7 +581,12 @@ export const ApplicantAdmissionView = ({
   const [fatherAnnualIncome, setFatherAnnualIncome] = useState("");
   const [motherAnnualIncome, setMotherAnnualIncome] = useState("");
   const [guardianAnnualIncome, setGuardianAnnualIncome] = useState("");
-  const [guardianEnabled, setGuardianEnabled] = useState(false);
+  const [guardianDefaults, setGuardianDefaults] = useState<{
+    name: string;
+    occupation: string;
+    email: string;
+  }>({ name: "", occupation: "", email: "" });
+  const [guardianFixed, setGuardianFixed] = useState(false);
   const [selectedAdmissionType, setSelectedAdmissionType] = useState("");
   const [admissionBasedOn, setAdmissionBasedOn] = useState("");
   const [scholarshipEnabled, setScholarshipEnabled] = useState(false);
@@ -588,6 +601,7 @@ export const ApplicantAdmissionView = ({
   const photoPreviewRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
+  const acknowledgementRef = useRef<HTMLDivElement | null>(null);
   const [docData, setDocData] = useState<DocData | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -634,7 +648,7 @@ export const ApplicantAdmissionView = ({
   const [selectedCategoryClaimed, setSelectedCategoryClaimed] = useState("");
   const [selectedCategoryAllotted, setSelectedCategoryAllotted] = useState("");
   const [selectedBloodGroup, setSelectedBloodGroup] = useState("");
-  const [selectedGender, setSelectedGender] = useState("Male");
+  const [selectedGender, setSelectedGender] = useState("");
   const [selectedClass10SchoolType, setSelectedClass10SchoolType] =
     useState("");
   const [selectedClass12InstituteType, setSelectedClass12InstituteType] =
@@ -647,6 +661,9 @@ export const ApplicantAdmissionView = ({
   );
   const [acknowledged] = useState(true);
   const [signature] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [stayingInHostel, setStayingInHostel] = useState("");
+  const [guardianRelation, setGuardianRelation] = useState("");
   const { data: departments } = useAdmissionDepartments();
 
   const { data: admissionConstants } = useAdmissionConstants();
@@ -788,10 +805,10 @@ export const ApplicantAdmissionView = ({
       economicallyBackwardEnabled ? "true" : "false"
     );
     formData.set("scholarship", scholarshipEnabled ? "true" : "false");
-    formData.set("feePaid", feePaid);
-    formData.set("feeReceiptNumber", feeReceiptNumber);
     formData.set("nationality", selectedNationality);
     formData.set("counsellingRound", selectedCounsellingRound);
+    formData.set("stayingInHostel", stayingInHostel);
+    formData.set("guardianRelation", guardianRelation);
     formData.set(
       "hasClass12",
       admissionBasedOn === "CLASS_12_PUC" ? "true" : "false"
@@ -867,14 +884,7 @@ export const ApplicantAdmissionView = ({
       });
 
       toast.success("Application submitted successfully!");
-      if (staffMode) {
-        const backPath = (pathname || "").startsWith("/admission-instructor")
-          ? "/admission-instructor"
-          : "/admission";
-        router.push(backPath);
-      } else {
-        refetch();
-      }
+      setSubmitted(true);
     } catch (error: unknown) {
       if (isAxiosError(error)) {
         toast.error(
@@ -1167,20 +1177,27 @@ export const ApplicantAdmissionView = ({
     }
   };
 
-  const updateDocument = () => {
-    const invalid = findFirstInvalid(STEP_ORDER.length - 1);
-    if (invalid) {
-      warnAndNavigate(invalid);
-      return;
-    }
-    setDocData(buildDocumentData());
-    setIsDocUpdated(true);
-    toast.success("Admission form updated with the latest details.");
-  };
-
   const downloadDocument = () => {
     if (!isDocUpdated) return;
     void generatePdf({ auto: false });
+  };
+
+  const downloadAcknowledgement = async () => {
+    const node = acknowledgementRef.current;
+    if (!node) {
+      toast.error("Could not render the acknowledgement.");
+      return;
+    }
+    try {
+      setIsGeneratingPdf(true);
+      await renderNodeToPdf(node, "admission-acknowledgement.pdf");
+      toast.success("Acknowledgement downloaded.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to generate acknowledgement. Please try again.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const checkStepValid = (step: StepKey) => {
@@ -1227,7 +1244,42 @@ export const ApplicantAdmissionView = ({
   };
 
   const warnAndNavigate = (step: StepKey) => {
-    toast.error(`Please fill ${STEP_LABELS[step]} before proceeding`);
+    const section = sectionRefs.current[step];
+
+    const missingLabels = (() => {
+      if (!section) return [];
+      const fields = Array.from(
+        section.querySelectorAll<
+          HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+        >("input, select, textarea")
+      );
+
+      const missing = fields.filter((field) => {
+        if (
+          field instanceof HTMLInputElement &&
+          (field.type === "file" || field.type === "hidden")
+        ) {
+          return false;
+        }
+        if (field.disabled) return false;
+        return !field.checkValidity();
+      });
+
+      return missing.slice(0, 3).map((field) => {
+        const label =
+          field.id &&
+          section.querySelector(`label[for="${CSS.escape(field.id)}"]`)
+            ?.textContent;
+        const text = label?.trim() ?? "";
+        return text.replace(/[*:]\s*$/, "").trim() || field.name || "field";
+      });
+    })();
+
+    if (missingLabels.length > 0) {
+      toast.error(`Please fill ${missingLabels.join(", ")} before proceeding`);
+    } else {
+      toast.error(`Please fill ${STEP_LABELS[step]} before proceeding`);
+    }
     setActiveStep(step);
   };
 
@@ -1239,6 +1291,31 @@ export const ApplicantAdmissionView = ({
         "Please upload a passport-size photograph before continuing."
       );
       return;
+    }
+
+    if (step === "education" && admissionBasedOn === "CLASS_12_PUC") {
+      const percentage = Number(pcmPercentage);
+      if (pcmPercentage && percentage <= 40) {
+        toast.error("PCM aggregate must be greater than 40% to continue.");
+        return;
+      }
+    }
+
+    if (step === "parent" && stayingInHostel === "yes") {
+      const guardianInputs = formRef.current?.querySelector(
+        'input[name="guardianName"]'
+      ) as HTMLInputElement | null;
+      const guardianMobile = formRef.current?.querySelector(
+        'input[name="guardianNumber"]'
+      ) as HTMLInputElement | null;
+      if (
+        !guardianInputs?.value.trim() ||
+        !guardianMobile?.value.trim() ||
+        !guardianRelation
+      ) {
+        toast.error("Please fill the Guardian details before proceeding.");
+        return;
+      }
     }
 
     const invalid = findFirstInvalid(currentIndex);
@@ -1254,6 +1331,12 @@ export const ApplicantAdmissionView = ({
     ] as StepKey;
     setActiveStep(nextStep);
 
+    // Auto-update the PDF preview whenever a section is saved
+    if (nextStep !== "receipt") {
+      setDocData(buildDocumentData());
+      setIsDocUpdated(true);
+    }
+
     if (nextStep === "receipt") {
       setTimeout(() => {
         void generatePdf({ auto: true });
@@ -1267,13 +1350,8 @@ export const ApplicantAdmissionView = ({
     setActiveStep(previousStep);
   };
 
-  const handleTabChange = (nextStep: StepKey) => {
-    setActiveStep(nextStep);
-    if (nextStep === "receipt") {
-      setTimeout(() => {
-        void generatePdf({ auto: true });
-      }, 150);
-    }
+  const handleTabChange = () => {
+    toast.warn("Please use 'Save & Continue' to move between sections.");
   };
 
   useEffect(() => {
@@ -1323,6 +1401,27 @@ export const ApplicantAdmissionView = ({
     const input = document.getElementById("photo") as HTMLInputElement | null;
     if (input) {
       input.value = "";
+    }
+  };
+
+  const handleGuardianRelationChange = (value: string) => {
+    setGuardianRelation(value);
+
+    if (value === "Father" || value === "Mother") {
+      const prefix = value === "Father" ? "father" : "mother";
+      const readValue = (name: string) =>
+        formRef.current
+          ?.querySelector<HTMLInputElement>(`input[name="${name}"]`)
+          ?.value?.trim() ?? "";
+      setGuardianDefaults({
+        name: readValue(`${prefix}Name`),
+        occupation: readValue(`${prefix}Occupation`),
+        email: readValue(`${prefix}Email`),
+      });
+      setGuardianFixed(true);
+    } else {
+      setGuardianDefaults({ name: "", occupation: "", email: "" });
+      setGuardianFixed(false);
     }
   };
 
@@ -1481,10 +1580,26 @@ export const ApplicantAdmissionView = ({
     setFatherPhone(String(a.fatherNumber ?? ""));
     setMotherPhone(String(a.motherNumber ?? ""));
     setGuardianPhone(String(a.guardianNumber ?? ""));
-    setGuardianEnabled(Boolean(a.guardianName));
     setFatherAnnualIncome(String(a.fatherAnnualIncome ?? ""));
     setMotherAnnualIncome(String(a.motherAnnualIncome ?? ""));
     setGuardianAnnualIncome(String(a.guardianAnnualIncome ?? ""));
+
+    if (a.hostel != null) {
+      setStayingInHostel(a.hostel ? "yes" : "no");
+    }
+
+    if (a.guardianRelation) {
+      setGuardianRelation(String(a.guardianRelation));
+      if (a.guardianRelation === "Father" || a.guardianRelation === "Mother") {
+        const prefix = a.guardianRelation === "Father" ? "father" : "mother";
+        setGuardianDefaults({
+          name: String(a[`${prefix}Name`] ?? ""),
+          occupation: String(a[`${prefix}Occupation`] ?? ""),
+          email: String(a[`${prefix}Email`] ?? ""),
+        });
+        setGuardianFixed(true);
+      }
+    }
 
     setSelectedMode(a.modeOfAdmission ?? "KCET");
     setSelectedDepartment(String(a.departmentId ?? ""));
@@ -1749,6 +1864,25 @@ export const ApplicantAdmissionView = ({
       </div>
     );
   }
+  if (submitted) {
+    const backPath = (pathname || "").startsWith("/admission-instructor")
+      ? "/admission-instructor"
+      : "/admission";
+
+    return (
+      <div className="bg-secondary/20 flex flex-col items-center justify-center rounded-lg border p-12 text-center">
+        <h2 className="text-2xl font-bold tracking-tight">
+          Application submitted successfully
+        </h2>
+        <p className="text-muted-foreground mt-2">
+          Your application is currently under review by the administration.
+        </p>
+        <Button className="mt-6" onClick={() => router.push(backPath)}>
+          Back to Create Admissions
+        </Button>
+      </div>
+    );
+  }
   return (
     <div className="bg-card rounded-lg border p-6 shadow-sm">
       <div className="mb-6 space-y-4">
@@ -1761,10 +1895,7 @@ export const ApplicantAdmissionView = ({
         </div>
 
         <div className="border-border border-b">
-          <Tabs
-            value={activeStep}
-            onValueChange={(value) => handleTabChange(value as StepKey)}
-          >
+          <Tabs value={activeStep} onValueChange={handleTabChange}>
             <TabsList className="flex w-full flex-wrap gap-1 md:gap-2">
               {VISIBLE_STEPS.map((step, index) => (
                 <TabsTrigger
@@ -1809,74 +1940,16 @@ export const ApplicantAdmissionView = ({
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="modeOfAdmission">Mode of Admission *</Label>
-                <Select
-                  name="modeOfAdmission"
-                  value={selectedMode}
-                  onValueChange={setSelectedMode}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItems
-                      value={selectedMode}
-                      items={admissionModes.map((mode) => ({
-                        value: mode,
-                        label: mode,
-                      }))}
-                    />
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="admissionTeam">Admission Team *</Label>
+                <Input
+                  id="admissionTeam"
+                  value={admission.filledBy?.name ?? "-"}
+                  readOnly
+                />
               </div>
 
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="departmentId">Branch/Dept *</Label>
-                <Select
-                  name="departmentId"
-                  value={selectedDepartment}
-                  onValueChange={setSelectedDepartment}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItems
-                      value={selectedDepartment}
-                      items={(departments ?? []).map((dept) => ({
-                        value: dept.id,
-                        label: dept.name,
-                      }))}
-                    />
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="admissionType">Admission Type *</Label>
-                <Select
-                  name="admissionType"
-                  value={selectedAdmissionType}
-                  onValueChange={setSelectedAdmissionType}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select admission type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItems
-                      value={selectedAdmissionType}
-                      items={validAdmissionTypes.map((type) => ({
-                        value: type.value,
-                        label: type.label,
-                      }))}
-                    />
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2 md:col-span-1">
+              <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="semesterDisplay">Semester *</Label>
                 {staffMode ? (
                   <Select
@@ -1893,7 +1966,7 @@ export const ApplicantAdmissionView = ({
                     <SelectContent>
                       {staffSemesterOptions.map((semester) => (
                         <SelectItem key={semester.id} value={semester.id}>
-                          {semester.termLabel} - {semester.programType} Semester{" "}
+                          {semester.programType} Semester{" "}
                           {semester.semesterNumber}
                         </SelectItem>
                       ))}
@@ -1919,19 +1992,75 @@ export const ApplicantAdmissionView = ({
                   required
                 />
               </div>
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="termDisplay">Admission Term</Label>
-                <Input
-                  id="termDisplay"
-                  value={
-                    staffMode
-                      ? (selectedStaffSemester?.termLabel ?? "")
-                      : admission.semester?.academicTerm
-                        ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`
-                        : ""
-                  }
-                  readOnly
-                />
+
+              <div className="grid grid-cols-1 gap-4 md:col-span-2 md:grid-cols-3">
+                <div className="space-y-2 md:col-span-1">
+                  <Label htmlFor="admissionType">Admission Type *</Label>
+                  <Select
+                    name="admissionType"
+                    value={selectedAdmissionType}
+                    onValueChange={setSelectedAdmissionType}
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select admission type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItems
+                        value={selectedAdmissionType}
+                        items={validAdmissionTypes.map((type) => ({
+                          value: type.value,
+                          label: type.label,
+                        }))}
+                      />
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="departmentId">Branch/Dept *</Label>
+                  <Select
+                    name="departmentId"
+                    value={selectedDepartment}
+                    onValueChange={setSelectedDepartment}
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItems
+                        value={selectedDepartment}
+                        items={(departments ?? []).map((dept) => ({
+                          value: dept.id,
+                          label: dept.name,
+                        }))}
+                      />
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="modeOfAdmission">Mode of Admission *</Label>
+                <Select
+                  name="modeOfAdmission"
+                  value={selectedMode}
+                  onValueChange={setSelectedMode}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItems
+                      value={selectedMode}
+                      items={admissionModes.map((mode) => ({
+                        value: mode,
+                        label: mode,
+                      }))}
+                    />
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -2066,51 +2195,38 @@ export const ApplicantAdmissionView = ({
                 />
               </div>
               <div className="md:col-span-2">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   {/* Scholarship */}
-                  <div className="flex shrink-0 items-center gap-4">
-                    <Label
-                      htmlFor="scholarship-yes"
-                      className="whitespace-nowrap"
-                    >
-                      Receiving Scholarship?
+                  <div className="space-y-2 md:col-span-1">
+                    <Label htmlFor="scholarship">
+                      Receiving Scholarship? *
                     </Label>
-
-                    <RadioGroup
+                    <Select
+                      name="scholarship"
                       value={scholarshipEnabled ? "true" : "false"}
                       onValueChange={(value) =>
                         setScholarshipEnabled(value === "true")
                       }
-                      className="flex items-center gap-4"
+                      required
                     >
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="true" id="scholarship-yes" />
-                        <Label
-                          htmlFor="scholarship-yes"
-                          className="font-normal"
-                        >
-                          Yes
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="false" id="scholarship-no" />
-                        <Label htmlFor="scholarship-no" className="font-normal">
-                          No
-                        </Label>
-                      </div>
-                    </RadioGroup>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <input
+                      type="hidden"
+                      name="scholarshipHidden"
+                      value={scholarshipEnabled ? "true" : "false"}
+                    />
                   </div>
 
                   {/* SSP ID */}
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <Label
-                      htmlFor="sspId"
-                      className="shrink-0 whitespace-nowrap"
-                    >
-                      SSP ID
-                    </Label>
-
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="sspId">SSP ID</Label>
                     <Input
                       id="sspId"
                       name="sspId"
@@ -2118,7 +2234,7 @@ export const ApplicantAdmissionView = ({
                       placeholder="Scholarship SSP ID"
                       disabled={!scholarshipEnabled}
                       aria-disabled={!scholarshipEnabled}
-                      className="flex-1"
+                      className="w-full"
                     />
                   </div>
                 </div>
@@ -2274,7 +2390,7 @@ export const ApplicantAdmissionView = ({
                       setStaffPrimaryEmail(event.target.value)
                     }
                     required
-                    placeholder="student@example.com"
+                    placeholder="name.cs2026@bmsce.ac.in"
                   />
                 ) : (
                   <>
@@ -2735,61 +2851,53 @@ export const ApplicantAdmissionView = ({
                       required
                     />
                   </div>
-                  <div className="space-y-2" />
 
                   <div className="space-y-2">
                     <Label htmlFor="nri">NRI Citizen *</Label>
-                    <input
-                      type="hidden"
+                    <Select
                       name="nri"
                       value={nriEnabled ? "true" : "false"}
-                    />
-                    <RadioGroup
-                      value={nriEnabled ? "true" : "false"}
                       onValueChange={(value) => setNriEnabled(value === "true")}
-                      className="flex gap-4"
+                      required
                     >
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="true" id="nri-yes" />
-                        <Label htmlFor="nri-yes" className="font-normal">
-                          Yes
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="false" id="nri-no" />
-                        <Label htmlFor="nri-no" className="font-normal">
-                          No
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="disability">Disability Status *</Label>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <input
                       type="hidden"
-                      name="disability"
-                      value={disabilityEnabled ? "true" : "false"}
+                      name="nriHidden"
+                      value={nriEnabled ? "true" : "false"}
                     />
-                    <RadioGroup
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="disability">Disability Status *</Label>
+                    <Select
+                      name="disability"
                       value={disabilityEnabled ? "true" : "false"}
                       onValueChange={(value) =>
                         setDisabilityEnabled(value === "true")
                       }
-                      className="flex gap-4"
+                      required
                     >
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="true" id="disability-yes" />
-                        <Label htmlFor="disability-yes" className="font-normal">
-                          Yes
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="false" id="disability-no" />
-                        <Label htmlFor="disability-no" className="font-normal">
-                          No
-                        </Label>
-                      </div>
-                    </RadioGroup>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <input
+                      type="hidden"
+                      name="disabilityHidden"
+                      value={disabilityEnabled ? "true" : "false"}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="disabilityType">Disability Details </Label>
@@ -2799,35 +2907,32 @@ export const ApplicantAdmissionView = ({
                       disabled={!disabilityEnabled}
                     />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="economicallyBackward">
                       Economically Backward Status *
                     </Label>
-                    <input
-                      type="hidden"
+                    <Select
                       name="economicallyBackward"
-                      value={economicallyBackwardEnabled ? "true" : "false"}
-                    />
-                    <RadioGroup
                       value={economicallyBackwardEnabled ? "true" : "false"}
                       onValueChange={(value) =>
                         setEconomicallyBackwardEnabled(value === "true")
                       }
-                      className="flex gap-4"
+                      required
                     >
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="true" id="eb-yes" />
-                        <Label htmlFor="eb-yes" className="font-normal">
-                          Yes
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="false" id="eb-no" />
-                        <Label htmlFor="eb-no" className="font-normal">
-                          No
-                        </Label>
-                      </div>
-                    </RadioGroup>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <input
+                      type="hidden"
+                      name="economicallyBackwardHidden"
+                      value={economicallyBackwardEnabled ? "true" : "false"}
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -2842,10 +2947,9 @@ export const ApplicantAdmissionView = ({
                       required
                     />
                   </div>
-                  <div className="space-y-2" />
                   <div className="space-y-2">
                     <Label htmlFor="passportNumber">
-                      Student Passport Number
+                      Student Passport Number {nriEnabled ? "*" : ""}
                     </Label>
                     <Input
                       id="passportNumber"
@@ -2856,11 +2960,12 @@ export const ApplicantAdmissionView = ({
                       maxLength={8}
                       placeholder="A1234567"
                       title={INDIAN_PASSPORT_HINT}
+                      required={nriEnabled}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="passportExpiryDate">
-                      Passport Expiry Date
+                      Passport Expiry Date {nriEnabled ? "*" : ""}
                     </Label>
                     <Input
                       id="passportExpiryDate"
@@ -2869,19 +2974,23 @@ export const ApplicantAdmissionView = ({
                       defaultValue={
                         admission.passportExpiryDate?.slice(0, 10) ?? ""
                       }
+                      required={nriEnabled}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="visaNumber">Student Visa Number</Label>
+                    <Label htmlFor="visaNumber">
+                      Student Visa Number {nriEnabled ? "*" : ""}
+                    </Label>
                     <Input
                       id="visaNumber"
                       name="visaNumber"
                       defaultValue={admission.visaNumber ?? ""}
+                      required={nriEnabled}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="visaExpiryDate">
-                      Student Visa Expiry Date
+                      Student Visa Expiry Date {nriEnabled ? "*" : ""}
                     </Label>
                     <Input
                       id="visaExpiryDate"
@@ -2890,6 +2999,7 @@ export const ApplicantAdmissionView = ({
                       defaultValue={
                         admission.visaExpiryDate?.slice(0, 10) ?? ""
                       }
+                      required={nriEnabled}
                     />
                   </div>
 
@@ -3202,31 +3312,27 @@ export const ApplicantAdmissionView = ({
                 <Label htmlFor="studiedKannadaIn10th">
                   Studied Kannada in 10th? *
                 </Label>
-                <input
-                  type="hidden"
+                <Select
                   name="studiedKannadaIn10th"
-                  value={studiedKannadaEnabled ? "true" : "false"}
-                />
-                <RadioGroup
                   value={studiedKannadaEnabled ? "true" : "false"}
                   onValueChange={(value) =>
                     setStudiedKannadaEnabled(value === "true")
                   }
-                  className="flex gap-4"
+                  required
                 >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="true" id="kannada-yes" />
-                    <Label htmlFor="kannada-yes" className="font-normal">
-                      Yes
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="false" id="kannada-no" />
-                    <Label htmlFor="kannada-no" className="font-normal">
-                      No
-                    </Label>
-                  </div>
-                </RadioGroup>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Yes</SelectItem>
+                    <SelectItem value="false">No</SelectItem>
+                  </SelectContent>
+                </Select>
+                <input
+                  type="hidden"
+                  name="studiedKannadaIn10thHidden"
+                  value={studiedKannadaEnabled ? "true" : "false"}
+                />
               </div>
 
               {admissionBasedOn === "CLASS_12_PUC" ? (
@@ -3699,8 +3805,12 @@ export const ApplicantAdmissionView = ({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="diplomaBranch">Branch *</Label>
-                    <Input id="diplomaBranch" name="diplomaBranch" required />
+                    <Label htmlFor="diplomaBranch">Branch</Label>
+                    <Input
+                      id="diplomaBranch"
+                      name="diplomaBranch"
+                      placeholder="e.g. Mechanical Engineering"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="diplomaYearOfPassing">
@@ -3782,6 +3892,24 @@ export const ApplicantAdmissionView = ({
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="lg:col-span-2">
+              <Label htmlFor="stayingInHostel">Staying in Hostel? *</Label>
+              <Select
+                name="stayingInHostel"
+                value={stayingInHostel}
+                onValueChange={setStayingInHostel}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <ParentMemberCard
               title="Father's Details"
               memberKey="father"
@@ -3815,39 +3943,53 @@ export const ApplicantAdmissionView = ({
               savedAddress={String(admission?.motherPermanentAddress ?? "")}
             />
 
-            <div className="lg:col-span-2">
-              <div className="bg-muted/20 flex items-center gap-2 rounded-lg border px-4 py-3">
-                <Checkbox
-                  id="guardian-toggle"
-                  checked={guardianEnabled}
-                  onCheckedChange={(checked) =>
-                    setGuardianEnabled(Boolean(checked))
-                  }
-                />
-                <Label
-                  htmlFor="guardian-toggle"
-                  className="cursor-pointer text-sm font-medium"
-                >
-                  Add Guardian's Details (Optional)
-                </Label>
-              </div>
-            </div>
+            {stayingInHostel === "yes" ? (
+              <>
+                <div className="lg:col-span-2">
+                  <Label htmlFor="guardianRelation">Guardian *</Label>
+                  <Select
+                    name="guardianRelation"
+                    value={guardianRelation}
+                    onValueChange={handleGuardianRelationChange}
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select guardian" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Father">Father</SelectItem>
+                      <SelectItem value="Mother">Mother</SelectItem>
+                      <SelectItem value="Custom">Custom Guardian</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            {guardianEnabled ? (
-              <ParentMemberCard
-                title="Guardian's Details"
-                memberKey="guardian"
-                optional
-                wide
-                phone={guardianPhone}
-                onPhoneChange={(value) => setGuardianPhone(value ?? "")}
-                incomeValue={guardianAnnualIncome}
-                onIncomeChange={(value) => setGuardianAnnualIncome(value ?? "")}
-                autoCurrent={getAddress("current")}
-                autoPermanent={getAddress("permanent")}
-                addressesHydrated={addressesHydrated}
-                savedAddress={String(admission?.guardianPermanentAddress ?? "")}
-              />
+                <ParentMemberCard
+                  key={guardianRelation}
+                  title="Guardian's Details"
+                  memberKey="guardian"
+                  nameRequired
+                  occupationRequired
+                  income="range"
+                  incomeRequired
+                  mobileRequired
+                  wide
+                  phone={guardianPhone}
+                  onPhoneChange={(value) => setGuardianPhone(value ?? "")}
+                  incomeValue={guardianAnnualIncome}
+                  onIncomeChange={(value) =>
+                    setGuardianAnnualIncome(value ?? "")
+                  }
+                  autoCurrent={getAddress("current")}
+                  autoPermanent={getAddress("permanent")}
+                  addressesHydrated={addressesHydrated}
+                  savedAddress={String(
+                    admission?.guardianPermanentAddress ?? ""
+                  )}
+                  defaultValues={guardianFixed ? guardianDefaults : undefined}
+                  fixed={guardianFixed}
+                />
+              </>
             ) : null}
           </div>
 
@@ -3881,9 +4023,8 @@ export const ApplicantAdmissionView = ({
             </div>
             <div className="text-muted-foreground mt-2 space-y-2 text-sm">
               <p>
-                Provide fee details and upload a recent passport-size
-                photograph. The image is saved with your application and used on
-                your hall ticket.
+                Upload a recent passport-size photograph. The image is saved
+                with your application and used on your hall ticket.
               </p>
             </div>
           </div>
@@ -3948,40 +4089,6 @@ export const ApplicantAdmissionView = ({
             </div>
           </div>
 
-          <div className="border-muted/50 bg-muted/20 rounded-lg border p-4 sm:p-6">
-            <h4 className="text-base font-semibold">Fee Details</h4>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Provide details of the fee payment made for this admission.
-            </p>
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="feePaid">Fee Paid (₹)</Label>
-                <Input
-                  id="feePaid"
-                  name="feePaid"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={feePaid}
-                  onChange={(event) => setFeePaid(event.target.value)}
-                  placeholder="e.g. 50000"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="feeReceiptNumber">
-                  Fee Receipt / Transaction No.
-                </Label>
-                <Input
-                  id="feeReceiptNumber"
-                  name="feeReceiptNumber"
-                  value={feeReceiptNumber}
-                  onChange={(event) => setFeeReceiptNumber(event.target.value)}
-                  placeholder="Receipt / transaction number"
-                />
-              </div>
-            </div>
-          </div>
-
           <div className="flex flex-wrap justify-between gap-3">
             <Button
               type="button"
@@ -4021,30 +4128,16 @@ export const ApplicantAdmissionView = ({
               <div>
                 <h4 className="text-base font-semibold">Admission Form PDF</h4>
                 <p className="text-muted-foreground text-sm">
-                  Update the preview with your latest details, then download the
-                  final PDF.
+                  The preview below is updated automatically whenever you save
+                  and continue from a previous section.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <Button
                   type="button"
-                  variant="outline"
-                  size="lg"
-                  disabled={isGeneratingPdf}
-                  onClick={updateDocument}
-                >
-                  Update
-                </Button>
-                <Button
-                  type="button"
                   size="lg"
                   disabled={isGeneratingPdf || !isDocUpdated}
                   onClick={downloadDocument}
-                  title={
-                    !isDocUpdated
-                      ? "Click Update first to refresh the document with the latest details"
-                      : undefined
-                  }
                 >
                   {isGeneratingPdf ? "Generating..." : "Download PDF"}
                 </Button>
@@ -4052,27 +4145,12 @@ export const ApplicantAdmissionView = ({
             </div>
 
             {pdfUrl && (
-              <div className="space-y-3">
-                <div className="bg-background overflow-hidden rounded-lg border">
-                  <iframe
-                    title="Generated admission form PDF"
-                    src={pdfUrl}
-                    className="h-[75vh] w-full"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-                      setPdfUrl(null);
-                      setDocData(null);
-                    }}
-                  >
-                    Clear Preview
-                  </Button>
-                </div>
+              <div className="bg-background overflow-hidden rounded-lg border">
+                <iframe
+                  title="Generated admission form PDF"
+                  src={pdfUrl}
+                  className="h-[60vh] w-full"
+                />
               </div>
             )}
 
@@ -4099,7 +4177,7 @@ export const ApplicantAdmissionView = ({
                   Admission Acknowledgement
                 </h4>
                 <p className="text-muted-foreground text-sm">
-                  Sample acknowledgement for your reference.
+                  Acknowledgement mapped from your application details.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -4110,25 +4188,27 @@ export const ApplicantAdmissionView = ({
                 >
                   {showAcknowledgement ? "Hide" : "View"}
                 </Button>
-                <Button type="button" variant="outline" asChild>
-                  <a
-                    href="/sample-acknowledgement.pdf"
-                    download="Sample Acknowledgement.pdf"
-                  >
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Download
-                  </a>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isGeneratingPdf || !isDocUpdated}
+                  onClick={downloadAcknowledgement}
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Download
                 </Button>
               </div>
             </div>
 
             {showAcknowledgement ? (
-              <div className="bg-background overflow-hidden rounded-lg border">
-                <iframe
-                  title="Sample Acknowledgement PDF"
-                  src="/sample-acknowledgement.pdf"
-                  className="h-[75vh] w-full"
-                />
+              <div className="bg-background overflow-auto rounded-lg border">
+                <div
+                  ref={acknowledgementRef}
+                  className="mx-auto w-max"
+                  aria-hidden="true"
+                >
+                  <AdmissionAcknowledgement data={docData ?? {}} />
+                </div>
               </div>
             ) : null}
           </div>

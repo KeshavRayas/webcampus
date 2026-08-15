@@ -406,10 +406,11 @@ async function main() {
     const email = `mock${attempt}.${deptCode}26@bmsce.ac.in`;
     const password = "password";
 
-    const existing = await db.admission.findUnique({
+    const existing = await db.admission.findFirst({
       where: {
         primaryEmail: email,
       },
+      orderBy: { createdAt: "desc" },
       select: {
         id: true,
       },

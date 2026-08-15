@@ -181,6 +181,7 @@ export const CancelAdmissionSchema = z
   .object({
     reason: AdmissionCancellationReasonSchema,
     otherReason: z.string().trim().max(500).optional(),
+    description: z.string().trim().max(2000).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.reason === "OTHER" && !data.otherReason?.trim()) {
@@ -300,6 +301,11 @@ export type GetAdmissionsQueryType = z.infer<typeof GetAdmissionsQuerySchema>;
 export type AdmissionActionParamType = z.infer<
   typeof AdmissionActionParamSchema
 >;
+
+export const ApproveAdmissionSchema = z.object({
+  feePaid: z.coerce.number().nonnegative().optional(),
+  feeReceiptNumber: z.string().trim().max(100).optional(),
+});
 
 export type SubmitApplicationType = z.infer<typeof SubmitApplicationSchema>;
 

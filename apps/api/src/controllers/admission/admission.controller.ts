@@ -239,8 +239,9 @@ export class AdmissionController {
       );
 
       // Fetch existing admission ID or generate one if creating new
-      const admissionRecord = await db.admission.findUnique({
+      const admissionRecord = await db.admission.findFirst({
         where: { primaryEmail: email },
+        orderBy: { createdAt: "desc" },
         select: { id: true, department: { select: { name: true } } },
       });
       const admissionId = admissionRecord?.id;
@@ -377,8 +378,9 @@ export class AdmissionController {
       const { randomUUID } = await import("crypto");
 
       // Check if admission exists, else generate new ID for staff creation
-      const admissionRecord = await db.admission.findUnique({
+      const admissionRecord = await db.admission.findFirst({
         where: { primaryEmail: primaryEmail },
+        orderBy: { createdAt: "desc" },
         select: { id: true, department: { select: { name: true } } },
       });
       const admissionId = admissionRecord?.id ?? randomUUID();
@@ -478,8 +480,15 @@ export class AdmissionController {
 
   static async approve(req: Request, res: Response): Promise<void> {
     try {
+      const body = req.body as { feePaid?: number; feeReceiptNumber?: string };
+
       const response = await AdmissionService.approveAdmission(
-        req.params as AdmissionActionParamType
+        req.params as AdmissionActionParamType,
+        {
+          feePaid:
+            body.feePaid !== undefined ? Number(body.feePaid) : undefined,
+          feeReceiptNumber: body.feeReceiptNumber,
+        }
       );
 
       if (response.status === "success") {
@@ -661,6 +670,75 @@ export class AdmissionController {
       }
     } catch (error) {
       logger.error("Error porting students", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
+  static async portAdmission(req: Request, res: Response): Promise<void> {
+    try {
+      const response = await AdmissionService.portAdmission(
+        req.params.id as string,
+        req.headers
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error porting admission", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
+  static async getFeeStructure(req: Request, res: Response): Promise<void> {
+    try {
+      const { departmentId, modeOfAdmission, categoryAllotted, quota } =
+        req.query;
+
+      if (!departmentId || !modeOfAdmission) {
+        throw new Error("Department and mode of admission are required");
+      }
+
+      const response = await AdmissionService.getFeeStructure({
+        departmentId: String(departmentId),
+        modeOfAdmission: String(modeOfAdmission),
+        categoryAllotted: categoryAllotted
+          ? String(categoryAllotted)
+          : undefined,
+        quota: quota ? String(quota) : undefined,
+      });
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error fetching fee structure", error);
       sendResponse({
         res,
         status: "error",

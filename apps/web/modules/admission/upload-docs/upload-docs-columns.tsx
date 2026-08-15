@@ -56,14 +56,6 @@ const totalDocuments = (row: UploadDocsResponse) => (row.disability ? 9 : 8);
 
 export const uploadDocsColumns: ColumnDef<UploadDocsResponse>[] = [
   {
-    accessorKey: "primaryEmail",
-    header: "College Email",
-    cell: ({ row }) => (
-      <div className="font-medium">{row.original.primaryEmail}</div>
-    ),
-  },
-
-  {
     id: "name",
     header: "Name",
     cell: ({ row }) => {
@@ -73,6 +65,14 @@ export const uploadDocsColumns: ColumnDef<UploadDocsResponse>[] = [
 
       return <div>{studentName || admissionName || "-"}</div>;
     },
+  },
+
+  {
+    accessorKey: "primaryEmail",
+    header: "College Email",
+    cell: ({ row }) => (
+      <div className="font-medium">{row.original.primaryEmail}</div>
+    ),
   },
 
   {

@@ -31,7 +31,10 @@ export function CancelAdmissionActions({
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<CancellationReason | "">("");
   const [otherReason, setOtherReason] = useState("");
+  const [description, setDescription] = useState("");
   const { cancelAdmission, isPending } = useCancelAdmission();
+
+  const isPorted = Boolean(admission.posted || admission.studentId);
 
   const submit = () => {
     if (!reason || (reason === "OTHER" && !otherReason.trim())) return;
@@ -41,12 +44,14 @@ export function CancelAdmissionActions({
         id: admission.id,
         reason,
         otherReason: reason === "OTHER" ? otherReason.trim() : undefined,
+        description: description.trim() || undefined,
       },
       {
         onSuccess: () => {
           setOpen(false);
           setReason("");
           setOtherReason("");
+          setDescription("");
         },
       }
     );
@@ -58,7 +63,12 @@ export function CancelAdmissionActions({
         <Button
           variant="default"
           size="sm"
-          disabled={admission.status === "CANCELLED"}
+          disabled={admission.status === "CANCELLED" || isPorted}
+          title={
+            isPorted
+              ? "This admission has been ported to students and cannot be cancelled."
+              : undefined
+          }
           className={
             admission.status === "CANCELLED"
               ? "bg-red-200! text-red-400! hover:bg-red-200! disabled:opacity-100"
@@ -106,6 +116,20 @@ export function CancelAdmissionActions({
               />
             </div>
           )}
+          <div className="space-y-2">
+            <Label htmlFor="cancellationDescription">
+              Description (Optional)
+            </Label>
+            <textarea
+              id="cancellationDescription"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Add additional context for this cancellation"
+              maxLength={2000}
+              rows={3}
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[60px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>

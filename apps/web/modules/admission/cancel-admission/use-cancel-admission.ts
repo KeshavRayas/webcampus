@@ -17,14 +17,16 @@ export const useCancelAdmission = () => {
       id,
       reason,
       otherReason,
+      description,
     }: {
       id: string;
       reason: CancellationReason;
       otherReason?: string;
+      description?: string;
     }) => {
       const response = await apiClient.patch<BaseResponse<unknown>>(
         `/admission/${id}/cancel`,
-        { reason, otherReason },
+        { reason, otherReason, description },
         { withCredentials: true }
       );
 

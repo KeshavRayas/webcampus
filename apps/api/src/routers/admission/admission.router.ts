@@ -8,6 +8,7 @@ import {
   AdmissionReferenceCreateSchema,
   AdmissionReferenceListsSchema,
   AdmissionReferenceModeParamSchema,
+  ApproveAdmissionSchema,
   CancelAdmissionSchema,
   CreateAdmissionShellSchema,
   GetAdmissionsQuerySchema,
@@ -116,6 +117,16 @@ router.get(
   AdmissionConstantsController.getOptions
 );
 
+// Fee structure lookup used to surface an uneditable Fees value on the Pay Now dialog
+router.get(
+  "/fee-structure",
+  protect({
+    role: ["admin", "admission"],
+    permissions: { admission: ["read"] },
+  }),
+  AdmissionController.getFeeStructure
+);
+
 // Management of admission reference data (modes, quotas, categories) by admin/admission
 router.post(
   "/constants/modes",
@@ -163,6 +174,7 @@ router.delete(
 router.patch(
   "/:id/approve",
   validateRequest(AdmissionActionParamSchema, "params"),
+  validateRequest(ApproveAdmissionSchema),
   protect({
     role: ["admin", "admission"],
     permissions: {
@@ -205,6 +217,18 @@ router.post(
     },
   }),
   AdmissionController.portStudents
+);
+
+router.post(
+  "/:id/port",
+  validateRequest(AdmissionActionParamSchema, "params"),
+  protect({
+    role: ["admin", "admission"],
+    permissions: {
+      admission: ["port"],
+    },
+  }),
+  AdmissionController.portAdmission
 );
 
 // Endpoint for applicant to submit their final form
