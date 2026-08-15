@@ -9,10 +9,17 @@ export const useExitAdmission = () => {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (payload: {
+      id: string;
+      cancellationReason?: string;
+      cancellationDescription?: string;
+    }) => {
       const res = await apiClient.patch<BaseResponse<unknown>>(
-        `/admission/${id}/exit`,
-        {},
+        `/admission/${payload.id}/exit`,
+        {
+          cancellationReason: payload.cancellationReason,
+          cancellationDescription: payload.cancellationDescription,
+        },
         {
           withCredentials: true,
         }
@@ -45,7 +52,14 @@ export const useExitAdmission = () => {
   });
 
   return {
-    exitAdmission: mutation.mutate,
+    exitAdmission: (
+      payload: {
+        id: string;
+        cancellationReason?: string;
+        cancellationDescription?: string;
+      },
+      options?: Parameters<typeof mutation.mutate>[1]
+    ) => mutation.mutate(payload, options),
     exitAdmissionAsync: mutation.mutateAsync,
     isPending: mutation.isPending,
   };

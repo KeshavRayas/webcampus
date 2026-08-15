@@ -8,7 +8,17 @@ export type AdmissionResponse = {
   id: string;
   applicationId: string;
   modeOfAdmission: string;
-  status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | "EXITED";
+  admissionType?: string | null;
+  scholarship?: string | null;
+  sspId?: string | null;
+  status:
+    | "PENDING"
+    | "SUBMITTED"
+    | "APPROVED"
+    | "REJECTED"
+    | "EXITED"
+    | "POSTED"
+    | "CANCELLED";
   createdAt: string;
 
   departmentId?: string | null;
@@ -31,6 +41,10 @@ export type AdmissionResponse = {
   originalAdmissionOrderNumber?: string | null;
   originalAdmissionOrderDate?: Date | null;
   feePaid?: number | null;
+  receiptNo?: string | null;
+  dateOfAdmission?: Date | null;
+  cancellationReason?: string | null;
+  cancellationDescription?: string | null;
   hostel?: boolean | null;
   hostelRoomNumber?: string | null;
 
@@ -39,6 +53,8 @@ export type AdmissionResponse = {
   bloodGroup?: string | null;
   gender?: string | null;
   photo?: string | null;
+  passportNumber?: string | null;
+  visaValidityDetails?: string | null;
   primaryPhoneNumber?: string | null;
   secondaryPhoneNumber?: string | null;
   emergencyContactNumber?: string | null;
@@ -129,6 +145,23 @@ export type AdmissionResponse = {
 
 const baseColumns: ColumnDef<AdmissionResponse>[] = [
   {
+    id: "name",
+    header: "Name",
+    cell: ({ row }: { row: { original: AdmissionResponse } }) => {
+      const studentName = row.original.student?.user?.name?.trim();
+      const admissionName = [
+        row.original.firstName?.trim(),
+        row.original.middleName?.trim(),
+        row.original.lastName?.trim(),
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join(" ")
+        .trim();
+
+      return <div>{studentName || admissionName || "-"}</div>;
+    },
+  },
+  {
     accessorKey: "primaryEmail",
     header: "College Email",
     cell: ({ row }) => (
@@ -141,7 +174,7 @@ const baseColumns: ColumnDef<AdmissionResponse>[] = [
     cell: ({ row }) => {
       const status = row.original.status;
       const variant =
-        status === "APPROVED"
+        status === "APPROVED" || status === "POSTED"
           ? "default"
           : status === "SUBMITTED"
             ? "secondary"
@@ -160,23 +193,6 @@ export const getAdminAdmissionColumns = (
   ...baseColumns,
   ...(showViewDetails
     ? [
-        {
-          id: "name",
-          header: "Name",
-          cell: ({ row }: { row: { original: AdmissionResponse } }) => {
-            const studentName = row.original.student?.user?.name?.trim();
-            const admissionName = [
-              row.original.firstName?.trim(),
-              row.original.middleName?.trim(),
-              row.original.lastName?.trim(),
-            ]
-              .filter((value): value is string => Boolean(value))
-              .join(" ")
-              .trim();
-
-            return <div>{studentName || admissionName || "-"}</div>;
-          },
-        },
         {
           id: "actions",
           header: "Actions",

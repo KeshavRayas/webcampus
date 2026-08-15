@@ -15,6 +15,8 @@ export const AdmissionStatusSchema = z.enum([
   "APPROVED",
   "REJECTED",
   "EXITED",
+  "CANCELLED",
+  "POSTED",
 ]);
 
 export const AdmissionActionParamSchema = z.object({
@@ -23,6 +25,18 @@ export const AdmissionActionParamSchema = z.object({
 
 export const PortStudentsSchema = z.object({
   semesterId: z.string().uuid("Invalid semester ID"),
+  admissionIds: z.array(z.string().uuid("Invalid admission ID")).optional(),
+});
+
+export const CancelAdmissionSchema = z.object({
+  cancellationReason: z.string().min(1, "Cancellation reason is required"),
+  cancellationDescription: z.string().trim().optional(),
+});
+
+export const RecordFeesSchema = z.object({
+  feePaid: z.coerce.number().nonnegative("Fee paid must be a positive number"),
+  receiptNo: z.string().trim().optional(),
+  dateOfAdmission: z.iso.date().optional(),
 });
 
 export const ChangeAdmissionModeSchema = z
@@ -111,7 +125,10 @@ export const GetAdmissionsQuerySchema = z
     }
   );
 
-export const ExitAdmissionSchema = z.object({});
+export const ExitAdmissionSchema = z.object({
+  cancellationReason: z.string().trim().optional(),
+  cancellationDescription: z.string().trim().optional(),
+});
 
 export const SubmitApplicationSchema = z
   .object({
@@ -191,3 +208,7 @@ export type PortStudentsType = z.infer<typeof PortStudentsSchema>;
 export type ChangeAdmissionModeType = z.infer<typeof ChangeAdmissionModeSchema>;
 
 export type ExitAdmissionType = z.infer<typeof ExitAdmissionSchema>;
+
+export type CancelAdmissionType = z.infer<typeof CancelAdmissionSchema>;
+
+export type RecordFeesType = z.infer<typeof RecordFeesSchema>;

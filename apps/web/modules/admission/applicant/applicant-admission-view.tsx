@@ -28,14 +28,27 @@ import axios, { isAxiosError } from "axios";
 import { City, Country, State } from "country-state-city";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 
 type ApplicantAdmissionData = {
   applicationId: string;
   modeOfAdmission: string;
+  admissionType?: string | null;
+  scholarship?: string | null;
+  sspId?: string | null;
+  feePaid?: number | null;
+  feeReceipt?: string | null;
+  receiptNo?: string | null;
   status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
   department?: { id: string; name: string };
+  semester?: {
+    id: string;
+    semesterNumber: number;
+    programType: string;
+    academicTerm: { type: string; year: string };
+  };
   firstName?: string;
   middleName?: string;
   lastName?: string;
@@ -72,12 +85,23 @@ const VISIBLE_STEPS: StepKey[] = [
 
 export const ApplicantAdmissionView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSameAddress, setIsSameAddress] = useState(false);
   const [activeStep, setActiveStep] = useState<StepKey>("admission");
+  const [maxUnlockedStep, setMaxUnlockedStep] = useState(0);
   const [hostelEnabled, setHostelEnabled] = useState(false);
   const [nriEnabled, setNriEnabled] = useState(false);
   const [disabilityEnabled, setDisabilityEnabled] = useState(false);
+  const [gender, setGender] = useState("");
+  const [admissionType, setAdmissionType] = useState("Regular");
+  const [scholarship, setScholarship] = useState("No");
+  const [sspId, setSspId] = useState("");
+  const [passportNumber, setPassportNumber] = useState("");
+  const [visaValidityDetails, setVisaValidityDetails] = useState("");
+  const [guardianRelation, setGuardianRelation] = useState<
+    "custom" | "father" | "mother"
+  >("custom");
   const [fatherAddressSource, setFatherAddressSource] = useState<
     "current" | "permanent" | "custom"
   >("current");
@@ -194,6 +218,27 @@ export const ApplicantAdmissionView = () => {
     );
     formData.set("hasClass12", class12Enabled ? "true" : "false");
     formData.set("hasDiploma", diplomaEnabled ? "true" : "false");
+
+    if (guardianRelation === "father" || guardianRelation === "mother") {
+      const source = guardianRelation === "father" ? "father" : "mother";
+      formData.set("guardianName", String(formData.get(`${source}Name`) ?? ""));
+      formData.set(
+        "guardianEmail",
+        String(formData.get(`${source}Email`) ?? "")
+      );
+      formData.set(
+        "guardianNumber",
+        String(formData.get(`${source}Number`) ?? "")
+      );
+      formData.set(
+        "guardianPermanentAddress",
+        String(formData.get(`${source}PermanentAddress`) ?? "")
+      );
+      formData.set(
+        "guardianOccupation",
+        String(formData.get(`${source}Occupation`) ?? "")
+      );
+    }
     for (const [key, value] of formData.entries()) {
       console.log(key, value);
     }
@@ -227,27 +272,101 @@ export const ApplicantAdmissionView = () => {
   const activeIndex = STEP_ORDER.indexOf(activeStep);
   const progressValue = ((activeIndex + 1) / STEP_ORDER.length) * 100;
 
-  const validateStep = (step: StepKey) => {
+  const MAX_MISSING_FIELDS = 3;
+
+  const formatFieldName = (name: string) =>
+    name
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const collectMissingFields = (step: StepKey): string[] => {
     const section = sectionRefs.current[step];
+    if (!section) return [];
 
-    if (!section) return true;
-
-    const fields = Array.from(
+    const missing: string[] = [];
+    const elements = Array.from(
       section.querySelectorAll<
         HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
       >("input, select, textarea")
     );
 
-    // Validate normal fields only
-    for (const field of fields) {
+    for (const field of elements) {
       if (field instanceof HTMLInputElement && field.type === "file") {
         continue;
       }
 
-      if (!field.checkValidity()) {
-        field.reportValidity();
-        field.focus();
-        return false;
+      if (!field.required || field.disabled) {
+        continue;
+      }
+
+      const value = typeof field.value === "string" ? field.value.trim() : "";
+      if (!value) {
+        const fieldName = field.name || field.id;
+        if (!fieldName) continue;
+        missing.push(formatFieldName(fieldName));
+      }
+    }
+
+    return Array.from(new Set(missing));
+  };
+
+  const validateStep = (step: StepKey) => {
+    const missing = collectMissingFields(step);
+
+    if (missing.length > 0) {
+      const capped = missing.slice(0, MAX_MISSING_FIELDS);
+      const suffix =
+        missing.length > MAX_MISSING_FIELDS
+          ? ` and ${missing.length - MAX_MISSING_FIELDS} more`
+          : "";
+      toast.error(
+        `Please fill ${capped.join(", ")}${suffix} before proceeding.`
+      );
+      return false;
+    }
+
+    if (step === "education") {
+      const form = formRef.current;
+      const formData = form ? new FormData(form) : null;
+
+      if (formData && formData.get("hasClass12") === "true") {
+        const branch = String(
+          formData.get("class12thBranch") ?? ""
+        ).toUpperCase();
+
+        if (branch.includes("PCM")) {
+          const score = parseFloat(
+            String(formData.get("class12thAggregateScore") ?? "")
+          );
+          const total = parseFloat(
+            String(formData.get("class12thAggregateTotal") ?? "")
+          );
+
+          if (total && (score / total) * 100 <= 40) {
+            toast.error(
+              "Class 12 aggregate score (PCM) must be greater than 40%."
+            );
+            return false;
+          }
+        }
+      }
+    }
+
+    if (step === "parent") {
+      const form = formRef.current;
+      const formData = form ? new FormData(form) : null;
+
+      if (formData && formData.get("hostel") === "true") {
+        const guardianComplete =
+          String(formData.get("guardianName") ?? "").trim() &&
+          String(formData.get("guardianNumber") ?? "").trim();
+        if (!guardianComplete) {
+          toast.error(
+            "Please fill Guardian Details before proceeding, as hostel accommodation is required."
+          );
+          return false;
+        }
       }
     }
 
@@ -273,6 +392,8 @@ export const ApplicantAdmissionView = () => {
         console.log(k, v);
       }
     }
+
+    setMaxUnlockedStep((current) => Math.max(current, nextIndex));
     setActiveStep(nextStep);
   };
 
@@ -323,7 +444,7 @@ export const ApplicantAdmissionView = () => {
     };
   };
 
-  const generateReviewPdf = () => {
+  const generateReviewPdf = (title = "Application Review Summary") => {
     if (!formRef.current) return null;
 
     if (reviewPdfRef.current) {
@@ -346,7 +467,7 @@ export const ApplicantAdmissionView = () => {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("Application Review Summary", margin, cursorY);
+    doc.text(title, margin, cursorY);
 
     cursorY += 16;
 
@@ -363,6 +484,7 @@ export const ApplicantAdmissionView = () => {
         title: "Admission Details",
         fields: [
           "applicationId",
+          "admissionType",
           "modeOfAdmission",
           "firstName",
           "middleName",
@@ -374,7 +496,8 @@ export const ApplicantAdmissionView = () => {
           "entranceExamRank",
           "originalAdmissionOrderNumber",
           "originalAdmissionOrderDate",
-          "feePaid",
+          "scholarship",
+          "sspId",
           "hostel",
           "hostelRoomNumber",
         ],
@@ -411,6 +534,8 @@ export const ApplicantAdmissionView = () => {
           "motherTongue",
           "nationality",
           "nri",
+          "passportNumber",
+          "visaValidityDetails",
           "disability",
           "disabilityType",
           "economicallyBackward",
@@ -536,23 +661,28 @@ export const ApplicantAdmissionView = () => {
       return;
     }
 
-    const nextUrl = generateReviewPdf();
+    const nextUrl = generateReviewPdf("Application Review Summary");
     if (!nextUrl) {
       return;
     }
 
+    setMaxUnlockedStep((current) =>
+      Math.max(current, STEP_ORDER.indexOf("review"))
+    );
     setActiveStep("review");
   };
 
   const handleTabChange = (nextStep: StepKey) => {
-    const currentIndex = STEP_ORDER.indexOf(activeStep);
     const nextIndex = STEP_ORDER.indexOf(nextStep);
 
-    if (nextIndex > currentIndex && !validateStep(activeStep)) {
+    if (nextIndex <= maxUnlockedStep) {
+      setActiveStep(nextStep);
       return;
     }
 
-    setActiveStep(nextStep);
+    toast.warning(
+      "Please click 'Save & Continue' before switching sections. Unsaved changes will be lost."
+    );
   };
 
   useEffect(() => {
@@ -666,12 +796,20 @@ export const ApplicantAdmissionView = () => {
     return (
       <div className="bg-secondary/20 flex flex-col items-center justify-center rounded-lg border p-12 text-center">
         <h2 className="text-2xl font-bold tracking-tight">
-          Application Submitted!
+          Application submitted successfully
         </h2>
         <p className="text-muted-foreground mt-2">
           Your application (ID: {admission.applicationId}) is currently under
           review by the administration.
         </p>
+        <Button
+          type="button"
+          size="lg"
+          className="mt-6"
+          onClick={() => router.push("/admission")}
+        >
+          Back to Create Admissions
+        </Button>
       </div>
     );
   }
@@ -731,12 +869,70 @@ export const ApplicantAdmissionView = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
-            <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="applicationId">Application ID *</Label>
-
-              <Input id="applicationId" name="applicationId" required />
+            <div className="space-y-2 md:col-span-6">
+              <Label htmlFor="admissionTeam">Admission Team *</Label>
+              <Input
+                id="admissionTeam"
+                value={
+                  admission.semester?.academicTerm
+                    ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`
+                    : "N/A"
+                }
+                readOnly
+                disabled
+              />
+            </div>
+            <div className="space-y-2 md:col-span-6">
+              <Label htmlFor="semesterNumber">Semester *</Label>
+              <Input
+                id="semesterNumber"
+                value={
+                  admission.semester?.semesterNumber
+                    ? `Semester ${admission.semester.semesterNumber}`
+                    : "N/A"
+                }
+                readOnly
+                disabled
+              />
             </div>
             <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="admissionType">Admission Type *</Label>
+              <Select
+                name="admissionType"
+                value={admissionType}
+                onValueChange={setAdmissionType}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select admission type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Regular">Regular</SelectItem>
+                  <SelectItem value="Lateral Entry">Lateral Entry</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 md:col-span-8">
+              <Label htmlFor="departmentId">Branch *</Label>
+              <Select
+                name="departmentId"
+                value={selectedDepartment}
+                onValueChange={setSelectedDepartment}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments?.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 md:col-span-6">
               <Label htmlFor="modeOfAdmission">Mode of Admission *</Label>
               <Select
                 name="modeOfAdmission"
@@ -758,6 +954,13 @@ export const ApplicantAdmissionView = () => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2 md:col-span-6">
+              <Label htmlFor="applicationId">Application ID *</Label>
+
+              <Input id="applicationId" name="applicationId" required />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
             <div className="space-y-2 md:col-span-4">
               <Label htmlFor="firstName">First Name *</Label>
 
@@ -786,26 +989,6 @@ export const ApplicantAdmissionView = () => {
                 defaultValue={admission.lastName ?? ""}
                 required
               />
-            </div>
-            <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="departmentId">Branch *</Label>
-              <Select
-                name="departmentId"
-                value={selectedDepartment}
-                onValueChange={setSelectedDepartment}
-                required
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments?.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
@@ -893,39 +1076,43 @@ export const ApplicantAdmissionView = () => {
               />
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="feePaid">Fee Paid (₹) *</Label>
-              <Input id="feePaid" name="feePaid" type="number" required />
+              <Label htmlFor="scholarship">Receiving Scholarship *</Label>
+              <Select
+                name="scholarship"
+                value={scholarship}
+                onValueChange={setScholarship}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select option" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="No">No</SelectItem>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="hostel-toggle">Hostel Required *</Label>
-              <input
-                type="hidden"
-                name="hostel"
-                value={hostelEnabled ? "true" : "false"}
-              />
-              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                <Checkbox
-                  id="hostel-toggle"
-                  checked={hostelEnabled}
-                  onCheckedChange={(checked) =>
-                    setHostelEnabled(Boolean(checked))
-                  }
-                />
-                <Label
-                  htmlFor="hostel-toggle"
-                  className="cursor-pointer text-sm font-medium"
-                >
-                  Staying in hostel
-                </Label>
-              </div>
-            </div>
-            <div className="space-y-2 md:col-span-4">
-              <Label htmlFor="hostelRoomNumber">Hostel Room Number</Label>
+              <Label htmlFor="sspId">
+                SSP ID {scholarship === "Yes" && "*"}
+              </Label>
               <Input
-                id="hostelRoomNumber"
-                name="hostelRoomNumber"
-                type="number"
-                disabled={!hostelEnabled}
+                id="sspId"
+                name="sspId"
+                value={sspId}
+                onChange={(event) => setSspId(event.target.value)}
+                disabled={scholarship !== "Yes"}
+                required={scholarship === "Yes"}
+                placeholder="Enter SSP ID"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-4">
+              <Label htmlFor="fees">Fees (₹)</Label>
+              <Input
+                id="fees"
+                value={admission.feePaid ?? 0}
+                readOnly
+                disabled
               />
             </div>
           </div>
@@ -987,7 +1174,12 @@ export const ApplicantAdmissionView = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="gender">Gender *</Label>
-              <Select name="gender" required>
+              <Select
+                name="gender"
+                value={gender}
+                onValueChange={setGender}
+                required
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -1056,9 +1248,14 @@ export const ApplicantAdmissionView = () => {
             </div>
             <div className="space-y-2 md:col-span-1 lg:col-span-1">
               <Label htmlFor="primaryEmail">Primary Email Address *</Label>
-              <div className="border-input bg-background text-muted-foreground flex h-9 w-full items-center rounded-md border px-3 py-1 text-sm">
-                {admission.primaryEmail}
-              </div>
+              <Input
+                id="primaryEmail"
+                type="email"
+                readOnly
+                disabled
+                placeholder="@bmsce.ac.in"
+                value={admission.primaryEmail ?? ""}
+              />
 
               <input
                 type="hidden"
@@ -1489,86 +1686,76 @@ export const ApplicantAdmissionView = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nri">NRI Citizen *</Label>
-                  <input
-                    type="hidden"
+                  <Select
                     name="nri"
                     value={nriEnabled ? "true" : "false"}
-                  />
-                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                    <Checkbox
-                      id="nri-toggle"
-                      checked={nriEnabled}
-                      onCheckedChange={(checked) =>
-                        setNriEnabled(Boolean(checked))
-                      }
-                    />
-                    <Label
-                      htmlFor="nri-toggle"
-                      className="cursor-pointer text-sm font-medium"
-                    >
-                      Has NRI status
-                    </Label>
-                  </div>
+                    onValueChange={(value) => setNriEnabled(value === "true")}
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="false">No</SelectItem>
+                      <SelectItem value="true">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="disability">Disability Status *</Label>
-                  <input
-                    type="hidden"
+                  <Select
                     name="disability"
                     value={disabilityEnabled ? "true" : "false"}
-                  />
-                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                    <Checkbox
-                      id="disability-toggle"
-                      checked={disabilityEnabled}
-                      onCheckedChange={(checked) =>
-                        setDisabilityEnabled(Boolean(checked))
-                      }
-                    />
-                    <Label
-                      htmlFor="disability-toggle"
-                      className="cursor-pointer text-sm font-medium"
-                    >
-                      Has disability
-                    </Label>
-                  </div>
+                    onValueChange={(value) =>
+                      setDisabilityEnabled(value === "true")
+                    }
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="false">No</SelectItem>
+                      <SelectItem value="true">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="disabilityType">Disability Details </Label>
+                  <Label htmlFor="disabilityType">
+                    Disability Details {disabilityEnabled && "*"}
+                  </Label>
                   <Input
                     id="disabilityType"
                     name="disabilityType"
                     disabled={!disabilityEnabled}
+                    required={disabilityEnabled}
                   />
                 </div>
-                <div className="space-y-2">
+
+                <div className="space-y-2 md:col-span-2 lg:col-span-3">
                   <Label htmlFor="economicallyBackward">
                     Economically Backward Status *
                   </Label>
-                  <input
-                    type="hidden"
+                  <Select
                     name="economicallyBackward"
                     value={economicallyBackwardEnabled ? "true" : "false"}
-                  />
-                  <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                    <Checkbox
-                      id="economicallyBackward-toggle"
-                      checked={economicallyBackwardEnabled}
-                      onCheckedChange={(checked) =>
-                        setEconomicallyBackwardEnabled(Boolean(checked))
-                      }
-                    />
-                    <Label
-                      htmlFor="economicallyBackward-toggle"
-                      className="cursor-pointer text-sm font-medium"
-                    >
-                      Economically backward
-                    </Label>
-                  </div>
+                    onValueChange={(value) =>
+                      setEconomicallyBackwardEnabled(value === "true")
+                    }
+                    required
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="false">No</SelectItem>
+                      <SelectItem value="true">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2 lg:col-span-3">
                   <Label htmlFor="aadharNumber">Aadhar Number *</Label>
                   <Input
                     id="aadharNumber"
@@ -1580,6 +1767,39 @@ export const ApplicantAdmissionView = () => {
                     required
                   />
                 </div>
+
+                {nriEnabled && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="passportNumber">Passport Number *</Label>
+                      <Input
+                        id="passportNumber"
+                        name="passportNumber"
+                        value={passportNumber}
+                        onChange={(event) =>
+                          setPassportNumber(event.target.value)
+                        }
+                        required
+                        placeholder="Enter passport number"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="visaValidityDetails">
+                        Visa Validity Details *
+                      </Label>
+                      <Input
+                        id="visaValidityDetails"
+                        name="visaValidityDetails"
+                        value={visaValidityDetails}
+                        onChange={(event) =>
+                          setVisaValidityDetails(event.target.value)
+                        }
+                        required
+                        placeholder="e.g. Valid until Dec 2027"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -2042,11 +2262,11 @@ export const ApplicantAdmissionView = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="diplomaBranch">Branch *</Label>
+                <Label htmlFor="diplomaBranch">Branch</Label>
                 <Input
                   id="diplomaBranch"
                   name="diplomaBranch"
-                  required={diplomaEnabled}
+                  required={false}
                 />
               </div>
               <div className="space-y-2">
@@ -2295,37 +2515,87 @@ export const ApplicantAdmissionView = () => {
               <h4 className="text-lg font-semibold">
                 Guardian's Details{" "}
                 <span className="text-muted-foreground text-sm font-normal">
-                  (Optional)
+                  {hostelEnabled ? "(Required)" : "(Optional)"}
                 </span>
               </h4>
+              <div className="space-y-2">
+                <Label htmlFor="guardianRelation">
+                  Guardian Relationship {hostelEnabled && "*"}
+                </Label>
+                <Select
+                  name="guardianRelation"
+                  value={guardianRelation}
+                  onValueChange={(value) =>
+                    setGuardianRelation(value as "custom" | "father" | "mother")
+                  }
+                  required={hostelEnabled}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select guardian" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="custom">Custom Guardian</SelectItem>
+                    <SelectItem value="father">Father</SelectItem>
+                    <SelectItem value="mother">Mother</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {guardianRelation !== "custom" && (
+                <p className="text-muted-foreground text-sm">
+                  Guardian details will be copied from the selected parent's
+                  information.
+                </p>
+              )}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="guardianName">Name</Label>
-                  <Input id="guardianName" name="guardianName" />
+                  <Label htmlFor="guardianName">
+                    Name {hostelEnabled && guardianRelation === "custom" && "*"}
+                  </Label>
+                  <Input
+                    id="guardianName"
+                    name="guardianName"
+                    disabled={guardianRelation !== "custom"}
+                    required={hostelEnabled && guardianRelation === "custom"}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="guardianEmail">Email Address</Label>
-                  <Input id="guardianEmail" name="guardianEmail" type="email" />
+                  <Input
+                    id="guardianEmail"
+                    name="guardianEmail"
+                    type="email"
+                    disabled={guardianRelation !== "custom"}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="guardianNumber">Phone Number</Label>
+                  <Label htmlFor="guardianNumber">
+                    Phone Number{" "}
+                    {hostelEnabled && guardianRelation === "custom" && "*"}
+                  </Label>
 
                   <PhoneNumberInput
                     id="guardianNumber"
                     value={guardianPhone}
                     onChange={(value) => setGuardianPhone(value ?? "")}
                     defaultCountry="IN"
+                    disabled={guardianRelation !== "custom"}
+                    required={hostelEnabled && guardianRelation === "custom"}
                   />
 
                   <input
                     type="hidden"
                     name="guardianNumber"
                     value={guardianPhone}
+                    required={hostelEnabled && guardianRelation === "custom"}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="guardianOccupation">Occupation</Label>
-                  <Input id="guardianOccupation" name="guardianOccupation" />
+                  <Input
+                    id="guardianOccupation"
+                    name="guardianOccupation"
+                    disabled={guardianRelation !== "custom"}
+                  />
                 </div>
                 <div className="space-y-3">
                   <Label>Address</Label>
@@ -2368,6 +2638,7 @@ export const ApplicantAdmissionView = () => {
                       name="guardianPermanentAddress"
                       placeholder="Enter guardian's address"
                       defaultValue=""
+                      disabled={guardianRelation !== "custom"}
                     />
                   ) : (
                     <Input
@@ -2382,6 +2653,38 @@ export const ApplicantAdmissionView = () => {
                     />
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-6">
+            <h4 className="mb-4 text-lg font-semibold">Hostel Accommodation</h4>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="hostel">Staying in Hostel *</Label>
+                <Select
+                  name="hostel"
+                  value={hostelEnabled ? "true" : "false"}
+                  onValueChange={(value) => setHostelEnabled(value === "true")}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="false">No</SelectItem>
+                    <SelectItem value="true">Yes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hostelRoomNumber">Hostel Room Number</Label>
+                <Input
+                  id="hostelRoomNumber"
+                  name="hostelRoomNumber"
+                  type="number"
+                  disabled={!hostelEnabled}
+                />
               </div>
             </div>
           </div>
@@ -2435,19 +2738,40 @@ export const ApplicantAdmissionView = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={generateReviewPdf}
+                  onClick={() =>
+                    generateReviewPdf("Application Review Summary")
+                  }
                 >
-                  Generate PDF Preview
+                  Regenerate Preview
                 </Button>
                 {reviewPdfUrl ? (
-                  <Button asChild variant="outline">
-                    <a
-                      href={reviewPdfUrl}
-                      download={`application-review-${admission.applicationId}.pdf`}
+                  <>
+                    <Button asChild variant="outline">
+                      <a
+                        href={reviewPdfUrl}
+                        download={`application-review-${admission.applicationId}.pdf`}
+                      >
+                        Download PDF
+                      </a>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const url = generateReviewPdf(
+                          "Admission Acknowledgement"
+                        );
+                        if (url) {
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = `admission-acknowledgement-${admission.applicationId}.pdf`;
+                          link.click();
+                        }
+                      }}
                     >
-                      Download PDF
-                    </a>
-                  </Button>
+                      Download Acknowledgement
+                    </Button>
+                  </>
                 ) : null}
               </div>
 
@@ -2461,8 +2785,7 @@ export const ApplicantAdmissionView = () => {
                 </div>
               ) : (
                 <div className="bg-background text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
-                  Generate the PDF preview to review all submitted details in
-                  one document.
+                  Review your details in the preview above before submitting.
                 </div>
               )}
             </div>

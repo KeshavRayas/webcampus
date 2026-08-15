@@ -61,6 +61,8 @@ const ADMISSION_STATUSES = [
   "SUBMITTED",
   "APPROVED",
   "REJECTED",
+  "POSTED",
+  "CANCELLED",
 ] as const;
 const ALL_FILTERS_VALUE = "__all__";
 

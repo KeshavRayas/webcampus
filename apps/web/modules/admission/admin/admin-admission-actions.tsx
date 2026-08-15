@@ -24,15 +24,22 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@webcampus/ui/components/dropdown-menu";
+import { Input } from "@webcampus/ui/components/input";
+import { Label } from "@webcampus/ui/components/label";
 import { Eye, MoreHorizontal } from "lucide-react";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { AdmissionResponse } from "./admin-admission-columns";
+import { useAdmissionCancel } from "./use-admission-cancel";
 import { useAdmissionDelete } from "./use-admission-delete";
 import { useAdmissionReview } from "./use-admission-review";
+import { usePortAdmission } from "./use-port-admission";
+import { useRecordFees } from "./use-record-fees";
 
 const getStatusVariant = (status: AdmissionResponse["status"]) => {
   switch (status) {
     case "APPROVED":
+      return "default";
+    case "POSTED":
       return "default";
     case "SUBMITTED":
       return "secondary";
@@ -40,6 +47,8 @@ const getStatusVariant = (status: AdmissionResponse["status"]) => {
       return "destructive";
     case "EXITED":
       return "outline";
+    case "CANCELLED":
+      return "destructive";
     default:
       return "outline";
   }
@@ -103,10 +112,28 @@ export const AdminAdmissionActions = ({
 
   const isPending = admission.status === "PENDING";
   const isSubmitted = admission.status === "SUBMITTED";
+  const isApproved = admission.status === "APPROVED";
+  const isPosted = admission.status === "POSTED";
+  const isCancelled = admission.status === "CANCELLED";
   const { onDelete } = useAdmissionDelete();
   const { onApprove, onReject, isApproving, isRejecting } =
     useAdmissionReview();
+  const { onCancel, isCancelling } = useAdmissionCancel();
+  const { onPortAdmission, isPorting } = usePortAdmission();
+  const { onRecordFees, isRecordingFees } = useRecordFees();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [isPostOpen, setIsPostOpen] = useState(false);
+  const [isPayOpen, setIsPayOpen] = useState(false);
+
+  const [cancellationReason, setCancellationReason] = useState("");
+  const [cancellationDescription, setCancellationDescription] = useState("");
+
+  const [feePaid, setFeePaid] = useState("");
+  const [receiptNo, setReceiptNo] = useState("");
+  const [dateOfAdmission, setDateOfAdmission] = useState("");
+  const [feeReceipt, setFeeReceipt] = useState<File | null>(null);
+  const feeReceiptRef = useRef<HTMLInputElement>(null);
 
   // Compute Full Name
   const fullName = [
@@ -153,7 +180,28 @@ export const AdminAdmissionActions = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            {canDelete && (
+            {isApproved && (
+              <DropdownMenuItem
+                onClick={() => setIsPostOpen(true)}
+                disabled={isPorting}
+              >
+                Post Student
+              </DropdownMenuItem>
+            )}
+            {!isPosted && !isCancelled && (
+              <DropdownMenuItem onClick={() => setIsPayOpen(true)}>
+                Pay Now
+              </DropdownMenuItem>
+            )}
+            {!isPosted && (
+              <DropdownMenuItem
+                onClick={() => setIsCancelOpen(true)}
+                className="text-red-600 focus:text-red-600"
+              >
+                Cancel Admission
+              </DropdownMenuItem>
+            )}
+            {!isPosted && canDelete && (
               <DropdownMenuItem
                 onClick={() => setIsDeleteOpen(true)}
                 className="text-red-600 focus:text-red-600"
@@ -185,6 +233,164 @@ export const AdminAdmissionActions = ({
                 }}
               >
                 Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isPostOpen} onOpenChange={setIsPostOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Post Student</DialogTitle>
+              <DialogDescription>
+                Post this approved admission to its semester, creating the
+                student record. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPostOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={isPorting}
+                onClick={() => {
+                  onPortAdmission(admission.id);
+                  setIsPostOpen(false);
+                }}
+              >
+                {isPorting ? "Posting..." : "Post Student"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isCancelOpen} onOpenChange={setIsCancelOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel Admission</DialogTitle>
+              <DialogDescription>
+                Cancelling this admission frees its email for reuse by a new
+                applicant. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="cancel-reason">Cancellation Reason *</Label>
+                <Input
+                  id="cancel-reason"
+                  value={cancellationReason}
+                  onChange={(event) =>
+                    setCancellationReason(event.target.value)
+                  }
+                  placeholder="e.g. Student did not join"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cancel-description">
+                  Additional Description
+                </Label>
+                <textarea
+                  id="cancel-description"
+                  value={cancellationDescription}
+                  onChange={(event) =>
+                    setCancellationDescription(event.target.value)
+                  }
+                  placeholder="Provide additional details (optional)"
+                  className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCancelOpen(false)}>
+                Keep Admission
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={isCancelling || !cancellationReason.trim()}
+                onClick={() => {
+                  onCancel({
+                    id: admission.id,
+                    cancellationReason,
+                    cancellationDescription,
+                  });
+                  setIsCancelOpen(false);
+                }}
+              >
+                {isCancelling ? "Cancelling..." : "Cancel Admission"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isPayOpen} onOpenChange={setIsPayOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Record Fee Payment</DialogTitle>
+              <DialogDescription>
+                Record the fee payment details for this admission.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fee-paid">Fee Paid (₹) *</Label>
+                <Input
+                  id="fee-paid"
+                  type="number"
+                  min={0}
+                  value={feePaid}
+                  onChange={(event) => setFeePaid(event.target.value)}
+                  placeholder="Enter amount paid"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="receipt-no">Receipt No.</Label>
+                <Input
+                  id="receipt-no"
+                  value={receiptNo}
+                  onChange={(event) => setReceiptNo(event.target.value)}
+                  placeholder="Enter receipt number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="date-of-admission">Date of Admission</Label>
+                <Input
+                  id="date-of-admission"
+                  type="date"
+                  value={dateOfAdmission}
+                  onChange={(event) => setDateOfAdmission(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fee-receipt">Fee Receipt (Upload)</Label>
+                <Input
+                  id="fee-receipt"
+                  ref={feeReceiptRef}
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(event) =>
+                    setFeeReceipt(event.target.files?.[0] ?? null)
+                  }
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPayOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={isRecordingFees || !feePaid.trim()}
+                onClick={() => {
+                  onRecordFees({
+                    id: admission.id,
+                    feePaid: parseFloat(feePaid),
+                    receiptNo: receiptNo || undefined,
+                    dateOfAdmission: dateOfAdmission || undefined,
+                    feeReceipt,
+                  });
+                  setIsPayOpen(false);
+                }}
+              >
+                {isRecordingFees ? "Recording..." : "Record Payment"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -242,6 +448,17 @@ export const AdminAdmissionActions = ({
                     value={admission.modeOfAdmission}
                   />
                   <DataField
+                    label="Admission Type"
+                    value={admission.admissionType}
+                  />
+                  <DataField
+                    label="Scholarship"
+                    value={admission.scholarship}
+                  />
+                  {admission.scholarship === "Yes" && (
+                    <DataField label="SSP ID" value={admission.sspId} />
+                  )}
+                  <DataField
                     label="Application ID"
                     value={admission.applicationId}
                   />
@@ -274,6 +491,18 @@ export const AdminAdmissionActions = ({
                       </Button>
                     </div>
                   )}
+
+                  {isApproved && (
+                    <div className="flex flex-col gap-2 border-t pt-3">
+                      <Button
+                        size="sm"
+                        onClick={() => onPortAdmission(admission.id)}
+                        disabled={isPorting}
+                      >
+                        {isPorting ? "Posting..." : "Post Student"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -294,6 +523,10 @@ export const AdminAdmissionActions = ({
                         <DataField
                           label="Branch"
                           value={admission.department?.name}
+                        />
+                        <DataField
+                          label="Admission Type"
+                          value={admission.admissionType}
                         />
                         <DataField label="Quota" value={admission.quota} />
                         <DataField
@@ -317,10 +550,25 @@ export const AdminAdmissionActions = ({
                           value={admission.originalAdmissionOrderDate}
                         />
                         <DataField
+                          label="Scholarship"
+                          value={admission.scholarship}
+                        />
+                        {admission.scholarship === "Yes" && (
+                          <DataField label="SSP ID" value={admission.sspId} />
+                        )}
+                        <DataField
                           label="Fee Paid"
                           value={
                             admission.feePaid ? `₹${admission.feePaid}` : null
                           }
+                        />
+                        <DataField
+                          label="Receipt No."
+                          value={admission.receiptNo}
+                        />
+                        <DataField
+                          label="Date of Admission"
+                          value={admission.dateOfAdmission}
                         />
                         <DataField
                           label="Hostel Required"

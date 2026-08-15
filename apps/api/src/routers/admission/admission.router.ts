@@ -3,11 +3,13 @@ import { AdmissionController } from "@webcampus/api/src/controllers/admission/ad
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   AdmissionActionParamSchema,
+  CancelAdmissionSchema,
   ChangeAdmissionModeSchema,
   CreateAdmissionShellSchema,
   ExitAdmissionSchema,
   GetAdmissionsQuerySchema,
   PortStudentsSchema,
+  RecordFeesSchema,
 } from "@webcampus/schemas/admission";
 import { Router } from "express";
 import multer from "multer";
@@ -130,6 +132,42 @@ router.patch(
     },
   }),
   AdmissionController.exitAdmission
+);
+router.patch(
+  "/:id/cancel",
+  validateRequest(AdmissionActionParamSchema, "params"),
+  validateRequest(CancelAdmissionSchema),
+  protect({
+    role: ["admin", "admission"],
+    permissions: {
+      admission: ["update"],
+    },
+  }),
+  AdmissionController.cancelAdmission
+);
+router.post(
+  "/:id/fees",
+  validateRequest(AdmissionActionParamSchema, "params"),
+  protect({
+    role: ["admin", "admission"],
+    permissions: {
+      admission: ["update"],
+    },
+  }),
+  upload.fields([{ name: "feeReceipt", maxCount: 1 }]),
+  validateRequest(RecordFeesSchema),
+  AdmissionController.recordFees
+);
+router.post(
+  "/:id/port",
+  validateRequest(AdmissionActionParamSchema, "params"),
+  protect({
+    role: ["admin", "admission"],
+    permissions: {
+      admission: ["port"],
+    },
+  }),
+  AdmissionController.portStudent
 );
 router.post(
   "/port",

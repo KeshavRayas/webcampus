@@ -4,10 +4,12 @@ import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
   AdmissionActionParamType,
+  CancelAdmissionType,
   ChangeAdmissionModeType,
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
   PortStudentsType,
+  RecordFeesType,
 } from "@webcampus/schemas/admission";
 import { BaseResponse } from "@webcampus/types/api";
 import {
@@ -252,7 +254,28 @@ export class AdmissionService {
       });
 
       if (existingApplicantUser) {
-        throw new Error("An account with this email already exists");
+        // Free up emails of previously cancelled admissions so a new
+        // applicant can be created using the same email ID.
+        const cancelledAdmission = await db.admission.findFirst({
+          where: {
+            primaryEmail: applicantEmail,
+            status: "CANCELLED",
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (cancelledAdmission) {
+          await db.$transaction(async (tx) => {
+            await tx.admission.delete({
+              where: { id: cancelledAdmission.id },
+            });
+            await tx.user.delete({ where: { id: existingApplicantUser.id } });
+          });
+        } else {
+          throw new Error("An account with this email already exists");
+        }
       }
 
       const userService = new UserService({
@@ -565,6 +588,34 @@ export class AdmissionService {
         }
       }
 
+      if (data.nri === "true") {
+        if (!data.passportNumber?.trim()) {
+          throw new Error("Passport Details are required for NRI applicants.");
+        }
+        if (!data.visaValidityDetails?.trim()) {
+          throw new Error("Visa Details are required for NRI applicants.");
+        }
+      }
+
+      if (data.hasClass12 === "true") {
+        const branch = (data.class12thBranch ?? "").toUpperCase();
+        const score = data.class12thAggregateScore
+          ? parseFloat(data.class12thAggregateScore)
+          : null;
+        const total = data.class12thAggregateTotal
+          ? parseFloat(data.class12thAggregateTotal)
+          : null;
+
+        if (branch.includes("PCM") && score != null && total) {
+          const pcmPercentage = (score / total) * 100;
+          if (pcmPercentage <= 40) {
+            throw new Error(
+              "Class 12 aggregate score (PCM) must be greater than 40%."
+            );
+          }
+        }
+      }
+
       const updatedAdmission = await db.admission.update({
         where: {
           id: admission.id,
@@ -578,18 +629,20 @@ export class AdmissionService {
           middleName: data.middleName,
           lastName: data.lastName,
           modeOfAdmission: data.modeOfAdmission,
+          admissionType: data.admissionType ?? null,
           semesterId: data.semesterId,
           departmentId: data.departmentId,
           categoryClaimed: data.categoryClaimed,
           categoryAllotted: data.categoryAllotted,
           quota: data.modeOfAdmission === "KCET" ? data.quota : null,
+          scholarship: data.scholarship ?? null,
+          sspId: data.sspId ?? null,
 
           entranceExamRank: data.entranceExamRank,
           originalAdmissionOrderNumber: data.originalAdmissionOrderNumber,
           originalAdmissionOrderDate: data.originalAdmissionOrderDate
             ? new Date(data.originalAdmissionOrderDate)
             : null,
-          feePaid: data.feePaid ? parseFloat(data.feePaid) : null,
           hostel: data.hostel === "true",
           hostelRoomNumber: data.hostelRoomNumber ?? null,
 
@@ -628,6 +681,8 @@ export class AdmissionService {
           motherTongue: data.motherTongue,
           nri: data.nri === "true",
           nationality: data.nationality,
+          passportNumber: data.passportNumber ?? null,
+          visaValidityDetails: data.visaValidityDetails ?? null,
           disability: data.disability === "true",
           disabilityType: data.disabilityType ?? null,
           economicallyBackward: data.economicallyBackward === "true",
@@ -799,7 +854,13 @@ export class AdmissionService {
     }
   }
 
-  static async exitAdmission(id: string): Promise<BaseResponse<unknown>> {
+  static async exitAdmission(
+    id: string,
+    data: {
+      cancellationReason?: string;
+      cancellationDescription?: string;
+    } = {}
+  ): Promise<BaseResponse<unknown>> {
     try {
       const admission = await db.admission.findUnique({
         where: { id },
@@ -819,6 +880,10 @@ export class AdmissionService {
         throw new Error("Student has already exited the college");
       }
 
+      if (admission.status === "POSTED") {
+        throw new Error("Posted admissions cannot be exited");
+      }
+
       if (!admission.studentId) {
         throw new Error("Only admitted students can be marked as exited");
       }
@@ -827,6 +892,8 @@ export class AdmissionService {
         where: { id },
         data: {
           status: "EXITED",
+          cancellationReason: data.cancellationReason ?? null,
+          cancellationDescription: data.cancellationDescription ?? null,
         },
       });
 
@@ -843,11 +910,104 @@ export class AdmissionService {
       );
     }
   }
+
+  static async cancelAdmission(
+    id: string,
+    data: CancelAdmissionType
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const admission = await db.admission.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          status: true,
+          studentId: true,
+          applicationId: true,
+        },
+      });
+
+      if (!admission) {
+        throw new Error("Admission not found");
+      }
+
+      if (
+        ["APPROVED", "POSTED", "EXITED", "CANCELLED"].includes(admission.status)
+      ) {
+        throw new Error(
+          `Only pending or submitted admissions can be cancelled. Current status is ${admission.status}`
+        );
+      }
+
+      const updatedAdmission = await db.admission.update({
+        where: { id },
+        data: {
+          status: "CANCELLED",
+          cancellationReason: data.cancellationReason,
+          cancellationDescription: data.cancellationDescription ?? null,
+        },
+      });
+
+      return {
+        status: "success",
+        message:
+          "Admission cancelled successfully. The email ID is now freed for reuse.",
+        data: updatedAdmission,
+      };
+    } catch (error) {
+      logger.error("Failed to cancel admission", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to cancel admission"
+      );
+    }
+  }
+
+  static async recordFees(
+    id: string,
+    data: RecordFeesType,
+    receiptUrl?: string
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const admission = await db.admission.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!admission) {
+        throw new Error("Admission not found");
+      }
+
+      const updatedAdmission = await db.admission.update({
+        where: { id },
+        data: {
+          feePaid: data.feePaid,
+          receiptNo: data.receiptNo ?? null,
+          dateOfAdmission: data.dateOfAdmission
+            ? new Date(data.dateOfAdmission)
+            : null,
+          feeReceipt: receiptUrl ?? null,
+        },
+      });
+
+      return {
+        status: "success",
+        message: "Fee payment recorded successfully",
+        data: updatedAdmission,
+      };
+    } catch (error) {
+      logger.error("Failed to record fee payment", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to record fee payment"
+      );
+    }
+  }
   static async portStudents(
     payload: PortStudentsType,
     headers: IncomingHttpHeaders
   ): Promise<BaseResponse<unknown>> {
     try {
+      const isIndividual =
+        Array.isArray(payload.admissionIds) && payload.admissionIds.length > 0;
+
       const [semester, unresolvedCount, approvedAdmissions] = await Promise.all(
         [
           db.semester.findUnique({
@@ -859,18 +1019,21 @@ export class AdmissionService {
               semesterNumber: true,
             },
           }),
-          db.admission.count({
-            where: {
-              semesterId: payload.semesterId,
-              status: {
-                in: ["PENDING", "SUBMITTED"],
-              },
-            },
-          }),
+          isIndividual
+            ? Promise.resolve(0)
+            : db.admission.count({
+                where: {
+                  semesterId: payload.semesterId,
+                  status: {
+                    in: ["PENDING", "SUBMITTED"],
+                  },
+                },
+              }),
           db.admission.findMany({
             where: {
               semesterId: payload.semesterId,
               status: "APPROVED",
+              ...(isIndividual ? { id: { in: payload.admissionIds } } : {}),
             },
             orderBy: [{ applicationId: "asc" }],
             select: {
@@ -893,10 +1056,22 @@ export class AdmissionService {
         throw new Error("Semester not found");
       }
 
-      if (unresolvedCount > 0) {
+      if (!isIndividual && unresolvedCount > 0) {
         throw new Error(
           `Cannot port students. ${unresolvedCount} application(s) are still pending review.`
         );
+      }
+
+      if (isIndividual) {
+        const approvedIds = new Set(approvedAdmissions.map((a) => a.id));
+        const invalidIds = (payload.admissionIds ?? []).filter(
+          (id) => !approvedIds.has(id)
+        );
+        if (invalidIds.length > 0) {
+          throw new Error(
+            "Only approved admissions can be posted. One or more selected admissions are not approved."
+          );
+        }
       }
 
       const approvedUnportedAdmissions = approvedAdmissions.filter(
@@ -1148,6 +1323,7 @@ export class AdmissionService {
                 data: {
                   tempUsn: finalStudentUsn,
                   studentId: existingStudent.id,
+                  status: "POSTED",
                 },
               });
 
@@ -1192,6 +1368,7 @@ export class AdmissionService {
               data: {
                 tempUsn: finalStudentUsn,
                 studentId: createdStudent.id,
+                status: "POSTED",
               },
             });
 
@@ -1261,5 +1438,30 @@ export class AdmissionService {
         error instanceof Error ? error.message : "Failed to port students"
       );
     }
+  }
+
+  static async portStudent(
+    admissionId: string,
+    headers: IncomingHttpHeaders
+  ): Promise<BaseResponse<unknown>> {
+    const admission = await db.admission.findUnique({
+      where: { id: admissionId },
+      select: { semesterId: true, status: true },
+    });
+
+    if (!admission) {
+      throw new Error("Admission not found");
+    }
+
+    if (admission.status !== "APPROVED") {
+      throw new Error(
+        `Only approved admissions can be posted. Current status is ${admission.status}`
+      );
+    }
+
+    return AdmissionService.portStudents(
+      { semesterId: admission.semesterId, admissionIds: [admissionId] },
+      headers
+    );
   }
 }

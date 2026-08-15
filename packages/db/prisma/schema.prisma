@@ -748,6 +748,9 @@ model Admission {
   semesterId                      String
   status                          AdmissionStatus @default(PENDING)
   updatedAt                       DateTime        @updatedAt
+  admissionType                   String?
+  scholarship                     String?
+  sspId                           String?
   aadharCard                      String?
   aadharNumber                    String?         @unique
   bloodGroup                      String?
@@ -806,6 +809,11 @@ model Admission {
   guardianPermanentAddress        String?
   hostel                          Boolean?
   hostelRoomNumber                String?
+  feeReceipt                      String?
+  receiptNo                       String?
+  dateOfAdmission                 DateTime?
+  cancellationReason              String?
+  cancellationDescription         String?
   lastName                        String?
   middleName                      String?
   motherQualification             String?
@@ -1069,6 +1077,8 @@ enum AdmissionStatus {
   APPROVED
   REJECTED
   EXITED
+  CANCELLED
+  POSTED
 }
 
 enum DepartmentType {

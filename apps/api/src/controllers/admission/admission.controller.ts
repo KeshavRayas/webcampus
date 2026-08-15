@@ -6,10 +6,12 @@ import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import {
   AdmissionActionParamType,
+  CancelAdmissionType,
   ChangeAdmissionModeType,
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
   PortStudentsType,
+  RecordFeesType,
 } from "@webcampus/schemas/admission";
 import { Request, Response } from "express";
 
@@ -128,6 +130,11 @@ export class AdmissionController {
             select: {
               id: true,
               name: true,
+            },
+          },
+          semester: {
+            include: {
+              academicTerm: true,
             },
           },
         },
@@ -378,7 +385,11 @@ export class AdmissionController {
   static async exitAdmission(req: Request, res: Response): Promise<void> {
     try {
       const response = await AdmissionService.exitAdmission(
-        req.params.id as string
+        req.params.id as string,
+        req.body as {
+          cancellationReason?: string;
+          cancellationDescription?: string;
+        }
       );
 
       if (response.status === "success") {
@@ -411,6 +422,137 @@ export class AdmissionController {
       });
     }
   }
+  static async cancelAdmission(req: Request, res: Response): Promise<void> {
+    try {
+      const response = await AdmissionService.cancelAdmission(
+        req.params.id as string,
+        req.body as CancelAdmissionType
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error cancelling admission", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
+  static async recordFees(req: Request, res: Response): Promise<void> {
+    const uploadedFileUrls = new Set<string>();
+
+    try {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(req.headers),
+      });
+
+      if (!session?.user?.id) {
+        throw new Error("Unauthorized");
+      }
+
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      let receiptUrl: string | undefined;
+
+      if (files && files.feeReceipt && files.feeReceipt[0]) {
+        const { uploadToS3, generateFileName } = await import(
+          "@webcampus/api/src/utils/s3"
+        );
+        const file = files.feeReceipt[0];
+        const fileName = generateFileName(file.originalname, "fee_receipt_");
+        const result = await uploadToS3(file.buffer, fileName, file.mimetype);
+        if (!result.success || !result.url) {
+          throw new Error("Failed to upload fee receipt");
+        }
+        receiptUrl = result.url;
+        uploadedFileUrls.add(result.url);
+      }
+
+      const response = await AdmissionService.recordFees(
+        req.params.id as string,
+        req.body as RecordFeesType,
+        receiptUrl
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      if (uploadedFileUrls.size > 0) {
+        try {
+          const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+          await Promise.all(
+            Array.from(uploadedFileUrls).map((url) => deleteFromS3(url))
+          );
+        } catch (cleanupError) {
+          logger.warn("Failed to clean up uploaded fee receipt", {
+            cleanupError,
+          });
+        }
+      }
+
+      logger.error("Error recording fee payment", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode:
+          error instanceof Error && error.message.includes("Unauthorized")
+            ? 401
+            : 400,
+        error,
+      });
+    }
+  }
+
+  static async portStudent(req: Request, res: Response): Promise<void> {
+    try {
+      const response = await AdmissionService.portStudent(
+        req.params.id as string,
+        req.headers
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error posting admission", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 400,
+        error,
+      });
+    }
+  }
+
   static async portStudents(req: Request, res: Response): Promise<void> {
     try {
       const response = await AdmissionService.portStudents(
