@@ -37,6 +37,7 @@ import { toast } from "react-toastify";
 import { MultiSelect } from "./multi-select";
 import { CATEGORY_LABELS, RECIPIENT_LABELS } from "./template-form";
 import type {
+  MaxMarksSource,
   MessageCategory,
   MessageChannel,
   MessageScope,
@@ -64,6 +65,8 @@ export const SendView = () => {
   const [channel, setChannel] = useState<MessageChannel>("WHATSAPP");
 
   const [cieNumber, setCieNumber] = useState<1 | 2 | 3>(1);
+  const [maxMarksSource, setMaxMarksSource] =
+    useState<MaxMarksSource>("ASSESSMENT");
   const [subjectMode, setSubjectMode] = useState<"all" | "custom">("all");
   const [subjectIds, setSubjectIds] = useState<string[]>([]);
   const [deadline, setDeadline] = useState("");
@@ -129,6 +132,11 @@ export const SendView = () => {
     selectedStudentIds.size ===
       new Set(preview.recipients.map((r) => r.studentId)).size;
 
+  const allSectionsSelected =
+    sections.length > 0 &&
+    sectionIds.length === sections.length &&
+    sectionIds.every((id) => sections.some((s) => s.id === id));
+
   const buildConfig = (customStudentIds?: string[]): SendConfig => {
     const adHocData =
       activeCategory === "BALANCE_FEE" || activeCategory === "ANNUAL_FEE"
@@ -150,6 +158,7 @@ export const SendView = () => {
       studentTemplateId: studentTemplateId || undefined,
       parentTemplateId: parentTemplateId || undefined,
       cieNumber: activeCategory === "CIE" ? cieNumber : undefined,
+      maxMarksSource: activeCategory === "CIE" ? maxMarksSource : undefined,
       subjectIds:
         activeCategory === "CIE" && subjectMode === "custom"
           ? subjectIds
@@ -312,7 +321,27 @@ export const SendView = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Sections (one or multiple)</Label>
+            <div className="flex items-center justify-between">
+              <Label>Sections (one or multiple)</Label>
+              <label className="flex cursor-pointer items-center gap-1.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={allSectionsSelected}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSectionIds(sections.map((s) => s.id));
+                    } else {
+                      setSectionIds([]);
+                    }
+                  }}
+                  disabled={
+                    !semesterId || !departmentId || sections.length === 0
+                  }
+                  className="size-4"
+                />
+                All Sections
+              </label>
+            </div>
             <MultiSelect
               options={sections.map((s) => ({ value: s.id, label: s.name }))}
               selected={sectionIds}
@@ -326,6 +355,11 @@ export const SendView = () => {
               }
               disabled={!semesterId || !departmentId}
             />
+            {sectionIds.length > 0 && (
+              <p className="text-muted-foreground text-xs">
+                {sectionIds.length} section(s) selected
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -402,6 +436,26 @@ export const SendView = () => {
                     <SelectItem value="1">CIE 1</SelectItem>
                     <SelectItem value="2">CIE 2</SelectItem>
                     <SelectItem value="3">CIE 3</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Max Marks</Label>
+                <Select
+                  value={maxMarksSource}
+                  onValueChange={(v) => setMaxMarksSource(v as MaxMarksSource)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ASSESSMENT">
+                      Assessment Template
+                    </SelectItem>
+                    <SelectItem value="THEORY">Theory Max</SelectItem>
+                    <SelectItem value="LAB">Lab Max</SelectItem>
+                    <SelectItem value="AAT">AAT Max</SelectItem>
+                    <SelectItem value="CIE">CIE Max</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

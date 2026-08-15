@@ -17,6 +17,15 @@ export type MessageRecipientType = (typeof MESSAGE_RECIPIENT_TYPES)[number];
 export const MESSAGE_SCOPES = ["STUDENT", "PARENT", "BOTH"] as const;
 export type MessageScope = (typeof MESSAGE_SCOPES)[number];
 
+export const MAX_MARKS_SOURCES = [
+  "ASSESSMENT",
+  "THEORY",
+  "LAB",
+  "AAT",
+  "CIE",
+] as const;
+export type MaxMarksSource = (typeof MAX_MARKS_SOURCES)[number];
+
 export const MESSAGE_FIELD_SOURCES = [
   "STUDENT_NAME",
   "USN",
@@ -28,6 +37,8 @@ export const MESSAGE_FIELD_SOURCES = [
   "SUBJECT_NAME",
   "CIE_MARKS",
   "CIE_MAX",
+  "CIE_NUMBER",
+  "CIE_MARKS_DETAILS",
   "FEE_DEMAND",
   "AMOUNT_PAID",
   "BALANCE",
@@ -48,6 +59,7 @@ export const MessageRecipientTypeSchema = z.enum(MESSAGE_RECIPIENT_TYPES);
 export const MessageScopeSchema = z.enum(MESSAGE_SCOPES);
 export const MessageFieldSourceSchema = z.enum(MESSAGE_FIELD_SOURCES);
 export const ReceiptStatusSchema = z.enum(RECEIPT_STATUSES);
+export const MaxMarksSourceSchema = z.enum(MAX_MARKS_SOURCES);
 
 export const MessageTemplateVariableSchema = z.object({
   position: z.number().int().min(1),
@@ -155,6 +167,7 @@ export const SendConfigSchema = z.object({
     },
     z.union([z.literal(1), z.literal(2), z.literal(3)]).optional()
   ),
+  maxMarksSource: MaxMarksSourceSchema.optional().default("ASSESSMENT"),
   subjectIds: optionalUuidList,
   studentIds: optionalUuidList,
   adHocData: z

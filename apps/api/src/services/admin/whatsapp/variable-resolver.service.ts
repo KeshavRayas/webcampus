@@ -14,6 +14,7 @@ export type ResolutionContext = {
   cieNumber?: number;
   cieMarks?: number | null;
   cieMax?: number | null;
+  cieMarksDetails?: string;
   finance?: {
     demand: number;
     paid: number;
@@ -60,6 +61,10 @@ export function resolveFieldSource(
       return formatNumber(ctx.cieMarks);
     case "CIE_MAX":
       return formatNumber(ctx.cieMax);
+    case "CIE_NUMBER":
+      return ctx.cieNumber != null ? String(ctx.cieNumber) : "";
+    case "CIE_MARKS_DETAILS":
+      return ctx.cieMarksDetails ?? "";
     case "FEE_DEMAND":
       return formatNumber(ctx.finance?.demand);
     case "AMOUNT_PAID":
