@@ -18,6 +18,7 @@ import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { getAdmissionFullName } from "../admin/admin-admission-columns";
 import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import { uploadDocsColumns, UploadDocsResponse } from "./upload-docs-columns";
@@ -41,6 +42,8 @@ type UploadDocumentFilters = {
   mode: string;
   admissionType: string;
   email: string;
+  name: string;
+  filledBy: string;
   createdFrom: string;
   createdTo: string;
 };
@@ -53,6 +56,8 @@ const EMPTY_FILTERS: UploadDocumentFilters = {
   mode: "",
   admissionType: "",
   email: "",
+  name: "",
+  filledBy: "",
   createdFrom: "",
   createdTo: "",
 };
@@ -99,9 +104,16 @@ export function UploadDocsView() {
 
   const nestedSemesters = selectedTerm?.Semester ?? [];
 
+  const semesterOptions = nestedSemesters.filter(
+    (semester) =>
+      (semester.programType === "UG" &&
+        (semester.semesterNumber === 1 || semester.semesterNumber === 3)) ||
+      (semester.programType === "PG" && semester.semesterNumber === 1)
+  );
+
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: nestedSemesters,
+    semesters: semesterOptions,
     departments,
   });
 
@@ -129,12 +141,47 @@ export function UploadDocsView() {
   });
 
   const filteredDocuments = useMemo(() => {
+    let rows = data ?? [];
     const email = appliedFilters.email.trim().toLowerCase();
-    if (!email) return data ?? [];
-    return (data ?? []).filter((admission) =>
-      admission.primaryEmail?.toLowerCase().includes(email)
+    if (email) {
+      rows = rows.filter((admission) =>
+        admission.primaryEmail?.toLowerCase().includes(email)
+      );
+    }
+    const name = appliedFilters.name.trim().toLowerCase();
+    if (name) {
+      rows = rows.filter((admission) =>
+        getAdmissionFullName(admission).toLowerCase().includes(name)
+      );
+    }
+    if (appliedFilters.filledBy) {
+      rows = rows.filter(
+        (admission) => admission.filledBy?.id === appliedFilters.filledBy
+      );
+    }
+    return rows;
+  }, [
+    data,
+    appliedFilters.email,
+    appliedFilters.name,
+    appliedFilters.filledBy,
+  ]);
+
+  const filledByOptions = useMemo(() => {
+    const byId = new Map<string, { label: string; value: string }>();
+    (data ?? []).forEach((admission) => {
+      if (admission.filledBy?.id) {
+        byId.set(admission.filledBy.id, {
+          value: admission.filledBy.id,
+          label:
+            admission.filledBy.name || admission.filledBy.email || "Unknown",
+        });
+      }
+    });
+    return Array.from(byId.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
     );
-  }, [data, appliedFilters.email]);
+  }, [data]);
 
   const updateDraftFilter = (
     key: keyof UploadDocumentFilters,
@@ -164,7 +211,7 @@ export function UploadDocsView() {
       placeholder: "All terms",
       allOptionLabel: "All terms",
       options: terms.map((term) => ({
-        label: `${term.type} ${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
     },
@@ -176,7 +223,7 @@ export function UploadDocsView() {
         ? "All semesters"
         : "Select term first",
       allOptionLabel: "All semesters",
-      options: nestedSemesters.map((semester) => ({
+      options: semesterOptions.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
@@ -184,6 +231,13 @@ export function UploadDocsView() {
   ];
 
   const advancedFilterFields: FilterFieldConfig<UploadDocumentFilters>[] = [
+    {
+      key: "name",
+      label: "Name",
+      type: "text",
+      inputId: "name",
+      placeholder: "Search by name",
+    },
     {
       key: "email",
       label: "Email",
@@ -197,6 +251,14 @@ export function UploadDocsView() {
       type: "text",
       inputId: "applicationId",
       placeholder: "Search application ID",
+    },
+    {
+      key: "filledBy",
+      label: "Filled By",
+      type: "select",
+      placeholder: "All",
+      allOptionLabel: "All",
+      options: filledByOptions,
     },
     {
       key: "createdFrom",
@@ -289,9 +351,6 @@ export function UploadDocsView() {
 
   const totalDocuments = (row: UploadDocsResponse) => (row.disability ? 9 : 8);
 
-  const getFullName = (row: UploadDocsResponse) =>
-    row.student?.user?.name?.trim() || row.nameAsPer10th?.trim() || "-";
-
   const generateReportPdf = () => {
     const rows = filteredDocuments;
     if (rows.length === 0) {
@@ -310,7 +369,7 @@ export function UploadDocsView() {
         .length,
       rows: rows.map((row, i) => ({
         applicationId: row.applicationId || "-",
-        name: getFullName(row),
+        name: getAdmissionFullName(row),
         email: row.primaryEmail || "-",
         status: row.status || "-",
         uploaded: uploaded[i] ?? 0,

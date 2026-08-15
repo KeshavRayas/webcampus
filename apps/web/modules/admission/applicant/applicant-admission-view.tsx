@@ -16,10 +16,6 @@ import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
 import { PhoneNumberInput } from "@webcampus/ui/components/phone-input";
 import {
-  RadioGroup,
-  RadioGroupItem,
-} from "@webcampus/ui/components/radio-group";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -31,7 +27,7 @@ import axios, { isAxiosError } from "axios";
 import { City, Country, State } from "country-state-city";
 import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
-import { FileDown } from "lucide-react";
+import { CheckCircle2, FileDown } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
@@ -106,8 +102,8 @@ const EMPTY_ADMISSION: ApplicantAdmissionData = {
 };
 
 const STEP_ORDER: StepKey[] = [
-  "personal",
   "admission",
+  "personal",
   "education",
   "parent",
   "payment",
@@ -119,13 +115,13 @@ const STEP_LABELS: Record<StepKey, string> = {
   admission: "Admission Details",
   education: "Education Details",
   parent: "Parent Details",
-  payment: "Payment & Photo",
+  payment: "Photo",
   receipt: "Verification",
 };
 
 const VISIBLE_STEPS: StepKey[] = [
-  "personal",
   "admission",
+  "personal",
   "education",
   "parent",
   "payment",
@@ -528,7 +524,7 @@ function ParentMemberCard({
 
 export const ApplicantAdmissionView = ({
   staffMode = false,
-  initialStep = "personal",
+  initialStep = "admission",
   initialSemesterId = "",
   initialEmail = "",
   initialApplicationId = "",
@@ -543,6 +539,7 @@ export const ApplicantAdmissionView = ({
   const router = useRouter();
   const pathname = usePathname();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [isSameAddress, setIsSameAddress] = useState(false);
   const [activeStep, setActiveStep] = useState<StepKey>(initialStep);
   const [nriEnabled, setNriEnabled] = useState(false);
@@ -573,14 +570,12 @@ export const ApplicantAdmissionView = ({
   const [fatherAnnualIncome, setFatherAnnualIncome] = useState("");
   const [motherAnnualIncome, setMotherAnnualIncome] = useState("");
   const [guardianAnnualIncome, setGuardianAnnualIncome] = useState("");
-  const [guardianEnabled, setGuardianEnabled] = useState(false);
+  const [stayingInHostel, setStayingInHostel] = useState(false);
   const [selectedAdmissionType, setSelectedAdmissionType] = useState("");
   const [admissionBasedOn, setAdmissionBasedOn] = useState("");
   const [scholarshipEnabled, setScholarshipEnabled] = useState(false);
   const [selectedCounsellingRound, setSelectedCounsellingRound] = useState("");
   const [selectedNationality, setSelectedNationality] = useState("");
-  const [feePaid, setFeePaid] = useState("");
-  const [feeReceiptNumber, setFeeReceiptNumber] = useState("");
   const [studiedKannadaEnabled, setStudiedKannadaEnabled] = useState(false);
   const [economicallyBackwardEnabled, setEconomicallyBackwardEnabled] =
     useState(false);
@@ -589,9 +584,7 @@ export const ApplicantAdmissionView = ({
   const formRef = useRef<HTMLFormElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
   const [docData, setDocData] = useState<DocData | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [isDocUpdated, setIsDocUpdated] = useState(false);
   const [showAcknowledgement, setShowAcknowledgement] = useState(true);
   const sectionRefs = useRef<Record<StepKey, HTMLDivElement | null>>({
     personal: null,
@@ -634,7 +627,7 @@ export const ApplicantAdmissionView = ({
   const [selectedCategoryClaimed, setSelectedCategoryClaimed] = useState("");
   const [selectedCategoryAllotted, setSelectedCategoryAllotted] = useState("");
   const [selectedBloodGroup, setSelectedBloodGroup] = useState("");
-  const [selectedGender, setSelectedGender] = useState("Male");
+  const [selectedGender, setSelectedGender] = useState("");
   const [selectedClass10SchoolType, setSelectedClass10SchoolType] =
     useState("");
   const [selectedClass12InstituteType, setSelectedClass12InstituteType] =
@@ -662,7 +655,7 @@ export const ApplicantAdmissionView = ({
     .flatMap((term) =>
       (term.Semester ?? []).map((semester) => ({
         ...semester,
-        termLabel: `${term.type} ${term.year}`,
+        termLabel: `${term.type} ${term.year}`.toUpperCase(),
       }))
     )
     .filter(
@@ -767,6 +760,12 @@ export const ApplicantAdmissionView = ({
       return;
     }
 
+    if (!class12AggregateValid()) {
+      toast.error("Class 12th aggregate must be above 40%.");
+      setActiveStep("education");
+      return;
+    }
+
     const photoFile = formData.get("photo");
     const hasPhoto =
       (photoFile instanceof File && photoFile.size > 0) ||
@@ -788,8 +787,6 @@ export const ApplicantAdmissionView = ({
       economicallyBackwardEnabled ? "true" : "false"
     );
     formData.set("scholarship", scholarshipEnabled ? "true" : "false");
-    formData.set("feePaid", feePaid);
-    formData.set("feeReceiptNumber", feeReceiptNumber);
     formData.set("nationality", selectedNationality);
     formData.set("counsellingRound", selectedCounsellingRound);
     formData.set(
@@ -867,14 +864,7 @@ export const ApplicantAdmissionView = ({
       });
 
       toast.success("Application submitted successfully!");
-      if (staffMode) {
-        const backPath = (pathname || "").startsWith("/admission-instructor")
-          ? "/admission-instructor"
-          : "/admission";
-        router.push(backPath);
-      } else {
-        refetch();
-      }
+      setSubmitted(true);
     } catch (error: unknown) {
       if (isAxiosError(error)) {
         toast.error(
@@ -960,7 +950,7 @@ export const ApplicantAdmissionView = ({
       semester: staffMode
         ? (selectedStaffSemester?.termLabel ?? "")
         : admission.semester?.academicTerm
-          ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`
+          ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`.toUpperCase()
           : "",
       category_claimed: selectedCategoryClaimed,
       category_allotted: selectedCategoryAllotted,
@@ -1032,8 +1022,6 @@ export const ApplicantAdmissionView = ({
       guardian_email: g("guardianEmail"),
       guardian_address: g("guardianPermanentAddress"),
       receiving_scholarship: isYes(scholarshipEnabled),
-      fee_paid: feePaid,
-      fee_receipt: feeReceiptNumber,
       signature,
       date: new Date().toLocaleDateString("en-IN", {
         day: "2-digit",
@@ -1140,10 +1128,8 @@ export const ApplicantAdmissionView = ({
         pageIndex++;
       }
 
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
       const blob = pdf.output("blob");
       const url = URL.createObjectURL(blob);
-      setPdfUrl(url);
 
       if (!opts?.auto) {
         const downloadLink = document.createElement("a");
@@ -1167,20 +1153,26 @@ export const ApplicantAdmissionView = ({
     }
   };
 
-  const updateDocument = () => {
-    const invalid = findFirstInvalid(STEP_ORDER.length - 1);
-    if (invalid) {
-      warnAndNavigate(invalid);
-      return;
-    }
-    setDocData(buildDocumentData());
-    setIsDocUpdated(true);
-    toast.success("Admission form updated with the latest details.");
-  };
+  const cleanLabelText = (text: string | null | undefined) =>
+    (text ?? "")
+      .replace(/\s*\*\s*$/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
-  const downloadDocument = () => {
-    if (!isDocUpdated) return;
-    void generatePdf({ auto: false });
+  const getFieldLabel = (field: Element): string => {
+    const input = field as HTMLInputElement;
+    if (input.id) {
+      const forLabel = document.querySelector(`label[for="${input.id}"]`);
+      if (forLabel) return cleanLabelText(forLabel.textContent);
+    }
+    const labels = input.labels;
+    if (labels && labels.length > 0) {
+      return cleanLabelText(labels[0]?.textContent);
+    }
+    const wrapper = field.closest("[class*='space-y']");
+    const label = wrapper?.querySelector("label");
+    if (label) return cleanLabelText(label.textContent);
+    return "";
   };
 
   const checkStepValid = (step: StepKey) => {
@@ -1216,6 +1208,29 @@ export const ApplicantAdmissionView = ({
     return null;
   };
 
+  const collectInvalidFieldLabels = (upToIndex: number): string[] => {
+    const labels = new Set<string>();
+    for (const step of STEP_ORDER.slice(0, upToIndex + 1)) {
+      const section = sectionRefs.current[step];
+      if (!section) continue;
+      const fields = Array.from(
+        section.querySelectorAll<
+          HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+        >("input, select, textarea")
+      );
+      for (const field of fields) {
+        if (field instanceof HTMLInputElement && field.type === "file") {
+          continue;
+        }
+        if (field.checkValidity()) continue;
+        const label = getFieldLabel(field);
+        if (label) labels.add(label);
+        if (labels.size >= 3) return Array.from(labels);
+      }
+    }
+    return Array.from(labels);
+  };
+
   const hasPhotoUploaded = () => {
     const photoInput = formRef.current?.querySelector<HTMLInputElement>(
       'input[name="photo"]'
@@ -1227,12 +1242,34 @@ export const ApplicantAdmissionView = ({
   };
 
   const warnAndNavigate = (step: StepKey) => {
-    toast.error(`Please fill ${STEP_LABELS[step]} before proceeding`);
+    const upToIndex = STEP_ORDER.indexOf(step);
+    const names = collectInvalidFieldLabels(upToIndex);
+    const subject = names.length > 0 ? names.join(", ") : STEP_LABELS[step];
+    toast.error(`Please fill ${subject} before proceeding`);
     setActiveStep(step);
+  };
+
+  const class12AggregateValid = () => {
+    if (admissionBasedOn !== "CLASS_12_PUC") return true;
+    const score = formRef.current?.querySelector<HTMLInputElement>(
+      'input[name="class12thAggregateScore"]'
+    );
+    const total = formRef.current?.querySelector<HTMLInputElement>(
+      'input[name="class12thAggregateTotal"]'
+    );
+    if (!score?.value || !total?.value) return true;
+    const totalValue = Number(total.value);
+    if (totalValue <= 0) return true;
+    return (Number(score.value) / totalValue) * 100 > 40;
   };
 
   const saveAndNext = (step: StepKey) => {
     const currentIndex = STEP_ORDER.indexOf(step);
+
+    if (step === "education" && !class12AggregateValid()) {
+      toast.error("Class 12th aggregate must be above 40%.");
+      return;
+    }
 
     if (step === "payment" && !hasPhotoUploaded()) {
       toast.error(
@@ -1253,12 +1290,7 @@ export const ApplicantAdmissionView = ({
       Math.min(nextIndex, STEP_ORDER.length - 1)
     ] as StepKey;
     setActiveStep(nextStep);
-
-    if (nextStep === "receipt") {
-      setTimeout(() => {
-        void generatePdf({ auto: true });
-      }, 150);
-    }
+    setDocData(buildDocumentData());
   };
 
   const goBack = (step: StepKey) => {
@@ -1269,21 +1301,8 @@ export const ApplicantAdmissionView = ({
 
   const handleTabChange = (nextStep: StepKey) => {
     setActiveStep(nextStep);
-    if (nextStep === "receipt") {
-      setTimeout(() => {
-        void generatePdf({ auto: true });
-      }, 150);
-    }
+    setDocData(buildDocumentData());
   };
-
-  useEffect(() => {
-    if (activeStep === "receipt") {
-      const timer = setTimeout(() => {
-        void generatePdf({ auto: true });
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -1380,14 +1399,6 @@ export const ApplicantAdmissionView = ({
       setSelectedNationality(admission.nationality);
     }
 
-    if (admission?.feePaid != null) {
-      setFeePaid(String(admission.feePaid));
-    }
-
-    if (admission?.feeReceiptNumber) {
-      setFeeReceiptNumber(admission.feeReceiptNumber);
-    }
-
     if (admission?.scholarship != null) {
       setScholarshipEnabled(admission.scholarship);
     }
@@ -1481,7 +1492,7 @@ export const ApplicantAdmissionView = ({
     setFatherPhone(String(a.fatherNumber ?? ""));
     setMotherPhone(String(a.motherNumber ?? ""));
     setGuardianPhone(String(a.guardianNumber ?? ""));
-    setGuardianEnabled(Boolean(a.guardianName));
+    setStayingInHostel(Boolean(a.guardianName));
     setFatherAnnualIncome(String(a.fatherAnnualIncome ?? ""));
     setMotherAnnualIncome(String(a.motherAnnualIncome ?? ""));
     setGuardianAnnualIncome(String(a.guardianAnnualIncome ?? ""));
@@ -1497,8 +1508,6 @@ export const ApplicantAdmissionView = ({
     );
     setSelectedCounsellingRound(String(a.counsellingRound ?? ""));
     setSelectedNationality(String(a.nationality ?? "Indian"));
-    setFeePaid(String(a.feePaid ?? ""));
-    setFeeReceiptNumber(String(a.feeReceiptNumber ?? ""));
     setScholarshipEnabled(Boolean(a.scholarship));
     setStudiedKannadaEnabled(Boolean(a.studiedKannadaIn10th));
     setNriEnabled(Boolean(a.nri));
@@ -1696,6 +1705,103 @@ export const ApplicantAdmissionView = ({
   const class12Cities = City.getCitiesOfState(class12Country, class12State);
   const diplomaCities = City.getCitiesOfState(diplomaCountry, diplomaState);
 
+  const countryNameOf = (code: string) =>
+    countries.find((c) => c.isoCode === code)?.name ?? code;
+
+  const class10CountryName = countryNameOf(class10Country);
+  const class12CountryName = countryNameOf(class12Country);
+  const diplomaCountryName = countryNameOf(diplomaCountry);
+
+  const class10StateName =
+    class10States.length > 0
+      ? (class10States.find((s) => s.isoCode === class10State)?.name ?? "")
+      : class10State || class10CountryName;
+  const class12StateName =
+    class12States.length > 0
+      ? (class12States.find((s) => s.isoCode === class12State)?.name ?? "")
+      : class12State || class12CountryName;
+  const diplomaStateName =
+    diplomaStates.length > 0
+      ? (diplomaStates.find((s) => s.isoCode === diplomaState)?.name ?? "")
+      : diplomaState || diplomaCountryName;
+
+  const class10StateOptions =
+    class10States.length > 0
+      ? class10States.map((s) => ({ value: s.isoCode, label: s.name }))
+      : class10CountryName
+        ? [{ value: class10CountryName, label: class10CountryName }]
+        : [];
+  const class12StateOptions =
+    class12States.length > 0
+      ? class12States.map((s) => ({ value: s.isoCode, label: s.name }))
+      : class12CountryName
+        ? [{ value: class12CountryName, label: class12CountryName }]
+        : [];
+  const diplomaStateOptions =
+    diplomaStates.length > 0
+      ? diplomaStates.map((s) => ({ value: s.isoCode, label: s.name }))
+      : diplomaCountryName
+        ? [{ value: diplomaCountryName, label: diplomaCountryName }]
+        : [];
+
+  const class10CityOptions =
+    class10Cities.length > 0
+      ? class10Cities.map((c) => ({ value: c.name, label: c.name }))
+      : class10StateName
+        ? [{ value: class10StateName, label: class10StateName }]
+        : [];
+  const class12CityOptions =
+    class12Cities.length > 0
+      ? class12Cities.map((c) => ({ value: c.name, label: c.name }))
+      : class12StateName
+        ? [{ value: class12StateName, label: class12StateName }]
+        : [];
+  const diplomaCityOptions =
+    diplomaCities.length > 0
+      ? diplomaCities.map((c) => ({ value: c.name, label: c.name }))
+      : diplomaStateName
+        ? [{ value: diplomaStateName, label: diplomaStateName }]
+        : [];
+
+  useEffect(() => {
+    if (class10Country && class10States.length === 0) {
+      setClass10State(class10CountryName);
+      setClass10City(class10CountryName);
+    }
+  }, [class10Country, class10CountryName, class10States.length]);
+
+  useEffect(() => {
+    if (class12Country && class12States.length === 0) {
+      setClass12State(class12CountryName);
+      setClass12City(class12CountryName);
+    }
+  }, [class12Country, class12CountryName, class12States.length]);
+
+  useEffect(() => {
+    if (diplomaCountry && diplomaStates.length === 0) {
+      setDiplomaState(diplomaCountryName);
+      setDiplomaCity(diplomaCountryName);
+    }
+  }, [diplomaCountry, diplomaCountryName, diplomaStates.length]);
+
+  useEffect(() => {
+    if (class10State && class10Cities.length === 0 && class10StateName) {
+      setClass10City(class10StateName);
+    }
+  }, [class10Country, class10State, class10StateName, class10Cities.length]);
+
+  useEffect(() => {
+    if (class12State && class12Cities.length === 0 && class12StateName) {
+      setClass12City(class12StateName);
+    }
+  }, [class12Country, class12State, class12StateName, class12Cities.length]);
+
+  useEffect(() => {
+    if (diplomaState && diplomaCities.length === 0 && diplomaStateName) {
+      setDiplomaCity(diplomaStateName);
+    }
+  }, [diplomaCountry, diplomaState, diplomaStateName, diplomaCities.length]);
+
   if (isLoading) {
     return (
       <div className="flex justify-center p-12">
@@ -1749,6 +1855,28 @@ export const ApplicantAdmissionView = ({
       </div>
     );
   }
+
+  if (submitted) {
+    const backPath = (pathname || "").startsWith("/admission-instructor")
+      ? "/admission-instructor"
+      : "/admission";
+    return (
+      <div className="bg-card flex flex-col items-center justify-center gap-6 rounded-lg border p-12 text-center shadow-sm">
+        <div className="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full">
+          <CheckCircle2 className="text-primary h-8 w-8" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            Application submitted successfully
+          </h2>
+        </div>
+        <Button size="lg" onClick={() => router.push(backPath)}>
+          Create Admission
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card rounded-lg border p-6 shadow-sm">
       <div className="mb-6 space-y-4">
@@ -1804,77 +1932,24 @@ export const ApplicantAdmissionView = ({
           <div className="bg-muted/10 rounded-xl border p-4 sm:p-6">
             <div className="border-b pb-3">
               <h3 className="text-xl font-semibold tracking-tight">
-                2. Admission Details
+                1. Admission Details
               </h3>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="modeOfAdmission">Mode of Admission *</Label>
-                <Select
-                  name="modeOfAdmission"
-                  value={selectedMode}
-                  onValueChange={setSelectedMode}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItems
-                      value={selectedMode}
-                      items={admissionModes.map((mode) => ({
-                        value: mode,
-                        label: mode,
-                      }))}
-                    />
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="departmentId">Branch/Dept *</Label>
-                <Select
-                  name="departmentId"
-                  value={selectedDepartment}
-                  onValueChange={setSelectedDepartment}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItems
-                      value={selectedDepartment}
-                      items={(departments ?? []).map((dept) => ({
-                        value: dept.id,
-                        label: dept.name,
-                      }))}
-                    />
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="admissionType">Admission Type *</Label>
-                <Select
-                  name="admissionType"
-                  value={selectedAdmissionType}
-                  onValueChange={setSelectedAdmissionType}
-                  required
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select admission type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItems
-                      value={selectedAdmissionType}
-                      items={validAdmissionTypes.map((type) => ({
-                        value: type.value,
-                        label: type.label,
-                      }))}
-                    />
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="termDisplay">Academic Term</Label>
+                <Input
+                  id="termDisplay"
+                  value={
+                    staffMode
+                      ? (selectedStaffSemester?.termLabel ?? "")
+                      : admission.semester?.academicTerm
+                        ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`.toUpperCase()
+                        : ""
+                  }
+                  readOnly
+                />
               </div>
               <div className="space-y-2 md:col-span-1">
                 <Label htmlFor="semesterDisplay">Semester *</Label>
@@ -1893,7 +1968,7 @@ export const ApplicantAdmissionView = ({
                     <SelectContent>
                       {staffSemesterOptions.map((semester) => (
                         <SelectItem key={semester.id} value={semester.id}>
-                          {semester.termLabel} - {semester.programType} Semester{" "}
+                          {semester.programType} Semester{" "}
                           {semester.semesterNumber}
                         </SelectItem>
                       ))}
@@ -1920,18 +1995,70 @@ export const ApplicantAdmissionView = ({
                 />
               </div>
               <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="termDisplay">Admission Term</Label>
-                <Input
-                  id="termDisplay"
-                  value={
-                    staffMode
-                      ? (selectedStaffSemester?.termLabel ?? "")
-                      : admission.semester?.academicTerm
-                        ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`
-                        : ""
-                  }
-                  readOnly
-                />
+                <Label htmlFor="admissionType">Admission Type *</Label>
+                <Select
+                  name="admissionType"
+                  value={selectedAdmissionType}
+                  onValueChange={setSelectedAdmissionType}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select admission type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItems
+                      value={selectedAdmissionType}
+                      items={validAdmissionTypes.map((type) => ({
+                        value: type.value,
+                        label: type.label,
+                      }))}
+                    />
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-1">
+                <Label htmlFor="departmentId">Branch/Dept *</Label>
+                <Select
+                  name="departmentId"
+                  value={selectedDepartment}
+                  onValueChange={setSelectedDepartment}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItems
+                      value={selectedDepartment}
+                      items={(departments ?? []).map((dept) => ({
+                        value: dept.id,
+                        label: dept.name,
+                      }))}
+                    />
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-1">
+                <Label htmlFor="modeOfAdmission">Mode of Admission *</Label>
+                <Select
+                  name="modeOfAdmission"
+                  value={selectedMode}
+                  onValueChange={setSelectedMode}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItems
+                      value={selectedMode}
+                      items={admissionModes.map((mode) => ({
+                        value: mode,
+                        label: mode,
+                      }))}
+                    />
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -2068,38 +2195,25 @@ export const ApplicantAdmissionView = ({
               <div className="md:col-span-2">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center">
                   {/* Scholarship */}
-                  <div className="flex shrink-0 items-center gap-4">
-                    <Label
-                      htmlFor="scholarship-yes"
-                      className="whitespace-nowrap"
-                    >
+                  <div className="flex shrink-0 items-center gap-3">
+                    <Label htmlFor="scholarship" className="whitespace-nowrap">
                       Receiving Scholarship?
                     </Label>
 
-                    <RadioGroup
+                    <Select
                       value={scholarshipEnabled ? "true" : "false"}
                       onValueChange={(value) =>
                         setScholarshipEnabled(value === "true")
                       }
-                      className="flex items-center gap-4"
                     >
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="true" id="scholarship-yes" />
-                        <Label
-                          htmlFor="scholarship-yes"
-                          className="font-normal"
-                        >
-                          Yes
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="false" id="scholarship-no" />
-                        <Label htmlFor="scholarship-no" className="font-normal">
-                          No
-                        </Label>
-                      </div>
-                    </RadioGroup>
+                      <SelectTrigger id="scholarship" className="w-full">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* SSP ID */}
@@ -2142,7 +2256,7 @@ export const ApplicantAdmissionView = ({
         >
           <div className="border-b pb-2">
             <h3 className="text-xl font-semibold tracking-tight">
-              1. Personal Information
+              2. Personal Information
             </h3>
           </div>
 
@@ -2274,7 +2388,7 @@ export const ApplicantAdmissionView = ({
                       setStaffPrimaryEmail(event.target.value)
                     }
                     required
-                    placeholder="student@example.com"
+                    placeholder="student@bmsce.ac.in"
                   />
                 ) : (
                   <>
@@ -2735,7 +2849,6 @@ export const ApplicantAdmissionView = ({
                       required
                     />
                   </div>
-                  <div className="space-y-2" />
 
                   <div className="space-y-2">
                     <Label htmlFor="nri">NRI Citizen *</Label>
@@ -2744,24 +2857,18 @@ export const ApplicantAdmissionView = ({
                       name="nri"
                       value={nriEnabled ? "true" : "false"}
                     />
-                    <RadioGroup
+                    <Select
                       value={nriEnabled ? "true" : "false"}
                       onValueChange={(value) => setNriEnabled(value === "true")}
-                      className="flex gap-4"
                     >
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="true" id="nri-yes" />
-                        <Label htmlFor="nri-yes" className="font-normal">
-                          Yes
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="false" id="nri-no" />
-                        <Label htmlFor="nri-no" className="font-normal">
-                          No
-                        </Label>
-                      </div>
-                    </RadioGroup>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Yes or No" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="disability">Disability Status *</Label>
@@ -2770,26 +2877,20 @@ export const ApplicantAdmissionView = ({
                       name="disability"
                       value={disabilityEnabled ? "true" : "false"}
                     />
-                    <RadioGroup
+                    <Select
                       value={disabilityEnabled ? "true" : "false"}
                       onValueChange={(value) =>
                         setDisabilityEnabled(value === "true")
                       }
-                      className="flex gap-4"
                     >
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="true" id="disability-yes" />
-                        <Label htmlFor="disability-yes" className="font-normal">
-                          Yes
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="false" id="disability-no" />
-                        <Label htmlFor="disability-no" className="font-normal">
-                          No
-                        </Label>
-                      </div>
-                    </RadioGroup>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Yes or No" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="disabilityType">Disability Details </Label>
@@ -2799,7 +2900,7 @@ export const ApplicantAdmissionView = ({
                       disabled={!disabilityEnabled}
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="economicallyBackward">
                       Economically Backward Status *
                     </Label>
@@ -2808,26 +2909,20 @@ export const ApplicantAdmissionView = ({
                       name="economicallyBackward"
                       value={economicallyBackwardEnabled ? "true" : "false"}
                     />
-                    <RadioGroup
+                    <Select
                       value={economicallyBackwardEnabled ? "true" : "false"}
                       onValueChange={(value) =>
                         setEconomicallyBackwardEnabled(value === "true")
                       }
-                      className="flex gap-4"
                     >
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="true" id="eb-yes" />
-                        <Label htmlFor="eb-yes" className="font-normal">
-                          Yes
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="false" id="eb-no" />
-                        <Label htmlFor="eb-no" className="font-normal">
-                          No
-                        </Label>
-                      </div>
-                    </RadioGroup>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Yes or No" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -2842,10 +2937,9 @@ export const ApplicantAdmissionView = ({
                       required
                     />
                   </div>
-                  <div className="space-y-2" />
                   <div className="space-y-2">
                     <Label htmlFor="passportNumber">
-                      Student Passport Number
+                      Student Passport Number {nriEnabled ? "*" : ""}
                     </Label>
                     <Input
                       id="passportNumber"
@@ -2856,11 +2950,12 @@ export const ApplicantAdmissionView = ({
                       maxLength={8}
                       placeholder="A1234567"
                       title={INDIAN_PASSPORT_HINT}
+                      required={nriEnabled}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="passportExpiryDate">
-                      Passport Expiry Date
+                      Passport Expiry Date {nriEnabled ? "*" : ""}
                     </Label>
                     <Input
                       id="passportExpiryDate"
@@ -2869,19 +2964,23 @@ export const ApplicantAdmissionView = ({
                       defaultValue={
                         admission.passportExpiryDate?.slice(0, 10) ?? ""
                       }
+                      required={nriEnabled}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="visaNumber">Student Visa Number</Label>
+                    <Label htmlFor="visaNumber">
+                      Student Visa Number {nriEnabled ? "*" : ""}
+                    </Label>
                     <Input
                       id="visaNumber"
                       name="visaNumber"
                       defaultValue={admission.visaNumber ?? ""}
+                      required={nriEnabled}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="visaExpiryDate">
-                      Student Visa Expiry Date
+                      Student Visa Expiry Date {nriEnabled ? "*" : ""}
                     </Label>
                     <Input
                       id="visaExpiryDate"
@@ -2890,6 +2989,7 @@ export const ApplicantAdmissionView = ({
                       defaultValue={
                         admission.visaExpiryDate?.slice(0, 10) ?? ""
                       }
+                      required={nriEnabled}
                     />
                   </div>
 
@@ -3101,10 +3201,7 @@ export const ApplicantAdmissionView = ({
                   <SelectContent>
                     <SelectItems
                       value={class10State}
-                      items={class10States.map((state) => ({
-                        value: state.isoCode,
-                        label: state.name,
-                      }))}
+                      items={class10StateOptions}
                     />
                   </SelectContent>
                 </Select>
@@ -3112,10 +3209,7 @@ export const ApplicantAdmissionView = ({
                 <input
                   type="hidden"
                   name="class10thSchoolState"
-                  value={
-                    class10States.find((s) => s.isoCode === class10State)
-                      ?.name ?? ""
-                  }
+                  value={class10StateName}
                   required
                 />
               </div>
@@ -3136,10 +3230,7 @@ export const ApplicantAdmissionView = ({
                   <SelectContent>
                     <SelectItems
                       value={class10City}
-                      items={class10Cities.map((city) => ({
-                        value: city.name,
-                        label: city.name,
-                      }))}
+                      items={class10CityOptions}
                     />
                   </SelectContent>
                 </Select>
@@ -3207,26 +3298,20 @@ export const ApplicantAdmissionView = ({
                   name="studiedKannadaIn10th"
                   value={studiedKannadaEnabled ? "true" : "false"}
                 />
-                <RadioGroup
+                <Select
                   value={studiedKannadaEnabled ? "true" : "false"}
                   onValueChange={(value) =>
                     setStudiedKannadaEnabled(value === "true")
                   }
-                  className="flex gap-4"
                 >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="true" id="kannada-yes" />
-                    <Label htmlFor="kannada-yes" className="font-normal">
-                      Yes
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="false" id="kannada-no" />
-                    <Label htmlFor="kannada-no" className="font-normal">
-                      No
-                    </Label>
-                  </div>
-                </RadioGroup>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Yes or No" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Yes</SelectItem>
+                    <SelectItem value="false">No</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {admissionBasedOn === "CLASS_12_PUC" ? (
@@ -3332,10 +3417,7 @@ export const ApplicantAdmissionView = ({
                       <SelectContent>
                         <SelectItems
                           value={class12State}
-                          items={class12States.map((state) => ({
-                            value: state.isoCode,
-                            label: state.name,
-                          }))}
+                          items={class12StateOptions}
                         />
                       </SelectContent>
                     </Select>
@@ -3343,10 +3425,7 @@ export const ApplicantAdmissionView = ({
                     <input
                       type="hidden"
                       name="class12thInstituteState"
-                      value={
-                        class12States.find((s) => s.isoCode === class12State)
-                          ?.name ?? ""
-                      }
+                      value={class12StateName}
                       required
                     />
                   </div>
@@ -3368,10 +3447,7 @@ export const ApplicantAdmissionView = ({
                       <SelectContent>
                         <SelectItems
                           value={class12City}
-                          items={class12Cities.map((city) => ({
-                            value: city.name,
-                            label: city.name,
-                          }))}
+                          items={class12CityOptions}
                         />
                       </SelectContent>
                     </Select>
@@ -3647,10 +3723,7 @@ export const ApplicantAdmissionView = ({
                       <SelectContent>
                         <SelectItems
                           value={diplomaState}
-                          items={diplomaStates.map((state) => ({
-                            value: state.isoCode,
-                            label: state.name,
-                          }))}
+                          items={diplomaStateOptions}
                         />
                       </SelectContent>
                     </Select>
@@ -3658,10 +3731,7 @@ export const ApplicantAdmissionView = ({
                     <input
                       type="hidden"
                       name="diplomaInstituteState"
-                      value={
-                        diplomaStates.find((s) => s.isoCode === diplomaState)
-                          ?.name ?? ""
-                      }
+                      value={diplomaStateName}
                       required
                     />
                   </div>
@@ -3683,10 +3753,7 @@ export const ApplicantAdmissionView = ({
                       <SelectContent>
                         <SelectItems
                           value={diplomaCity}
-                          items={diplomaCities.map((city) => ({
-                            value: city.name,
-                            label: city.name,
-                          }))}
+                          items={diplomaCityOptions}
                         />
                       </SelectContent>
                     </Select>
@@ -3699,8 +3766,8 @@ export const ApplicantAdmissionView = ({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="diplomaBranch">Branch *</Label>
-                    <Input id="diplomaBranch" name="diplomaBranch" required />
+                    <Label htmlFor="diplomaBranch">Branch</Label>
+                    <Input id="diplomaBranch" name="diplomaBranch" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="diplomaYearOfPassing">
@@ -3816,28 +3883,40 @@ export const ApplicantAdmissionView = ({
             />
 
             <div className="lg:col-span-2">
-              <div className="bg-muted/20 flex items-center gap-2 rounded-lg border px-4 py-3">
-                <Checkbox
-                  id="guardian-toggle"
-                  checked={guardianEnabled}
-                  onCheckedChange={(checked) =>
-                    setGuardianEnabled(Boolean(checked))
+              <div className="bg-muted/20 space-y-2 rounded-lg border px-4 py-3">
+                <Label htmlFor="stayingInHostel">Staying in Hostel? *</Label>
+                <Select
+                  value={stayingInHostel ? "true" : "false"}
+                  onValueChange={(value) =>
+                    setStayingInHostel(value === "true")
                   }
-                />
-                <Label
-                  htmlFor="guardian-toggle"
-                  className="cursor-pointer text-sm font-medium"
                 >
-                  Add Guardian's Details (Optional)
-                </Label>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Yes or No" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Yes</SelectItem>
+                    <SelectItem value="false">No</SelectItem>
+                  </SelectContent>
+                </Select>
+                <input
+                  type="hidden"
+                  name="stayingInHostel"
+                  value={stayingInHostel ? "true" : "false"}
+                  required
+                />
               </div>
             </div>
 
-            {guardianEnabled ? (
+            {stayingInHostel ? (
               <ParentMemberCard
                 title="Guardian's Details"
                 memberKey="guardian"
-                optional
+                nameRequired
+                occupationRequired
+                income="range"
+                incomeRequired
+                mobileRequired
                 wide
                 phone={guardianPhone}
                 onPhoneChange={(value) => setGuardianPhone(value ?? "")}
@@ -3875,15 +3954,12 @@ export const ApplicantAdmissionView = ({
         >
           <div className="border-b pb-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-xl font-semibold tracking-tight">
-                5. Payment & Photo
-              </h3>
+              <h3 className="text-xl font-semibold tracking-tight">5. Photo</h3>
             </div>
             <div className="text-muted-foreground mt-2 space-y-2 text-sm">
               <p>
-                Provide fee details and upload a recent passport-size
-                photograph. The image is saved with your application and used on
-                your hall ticket.
+                Upload a recent passport-size photograph. The image is saved
+                with your application and used on your hall ticket.
               </p>
             </div>
           </div>
@@ -3948,40 +4024,6 @@ export const ApplicantAdmissionView = ({
             </div>
           </div>
 
-          <div className="border-muted/50 bg-muted/20 rounded-lg border p-4 sm:p-6">
-            <h4 className="text-base font-semibold">Fee Details</h4>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Provide details of the fee payment made for this admission.
-            </p>
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="feePaid">Fee Paid (₹)</Label>
-                <Input
-                  id="feePaid"
-                  name="feePaid"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={feePaid}
-                  onChange={(event) => setFeePaid(event.target.value)}
-                  placeholder="e.g. 50000"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="feeReceiptNumber">
-                  Fee Receipt / Transaction No.
-                </Label>
-                <Input
-                  id="feeReceiptNumber"
-                  name="feeReceiptNumber"
-                  value={feeReceiptNumber}
-                  onChange={(event) => setFeeReceiptNumber(event.target.value)}
-                  placeholder="Receipt / transaction number"
-                />
-              </div>
-            </div>
-          </div>
-
           <div className="flex flex-wrap justify-between gap-3">
             <Button
               type="button"
@@ -4016,71 +4058,27 @@ export const ApplicantAdmissionView = ({
             </div>
           </div>
 
-          <div className="bg-background/60 space-y-4 rounded-lg border p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h4 className="text-base font-semibold">Admission Form PDF</h4>
-                <p className="text-muted-foreground text-sm">
-                  Update the preview with your latest details, then download the
-                  final PDF.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="bg-background/60 flex flex-col space-y-4 rounded-lg border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-base font-semibold">Filled Form PDF</h4>
+                  <p className="text-muted-foreground text-sm">
+                    This preview auto-updates with your latest details. Download
+                    the final PDF when ready.
+                  </p>
+                </div>
                 <Button
                   type="button"
-                  variant="outline"
                   size="lg"
                   disabled={isGeneratingPdf}
-                  onClick={updateDocument}
-                >
-                  Update
-                </Button>
-                <Button
-                  type="button"
-                  size="lg"
-                  disabled={isGeneratingPdf || !isDocUpdated}
-                  onClick={downloadDocument}
-                  title={
-                    !isDocUpdated
-                      ? "Click Update first to refresh the document with the latest details"
-                      : undefined
-                  }
+                  onClick={() => void generatePdf({ auto: false })}
                 >
                   {isGeneratingPdf ? "Generating..." : "Download PDF"}
                 </Button>
               </div>
-            </div>
 
-            {pdfUrl && (
-              <div className="space-y-3">
-                <div className="bg-background overflow-hidden rounded-lg border">
-                  <iframe
-                    title="Generated admission form PDF"
-                    src={pdfUrl}
-                    className="h-[75vh] w-full"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-                      setPdfUrl(null);
-                      setDocData(null);
-                    }}
-                  >
-                    Clear Preview
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
-                Filled Form Preview
-              </p>
-              <div className="overflow-auto border bg-white">
+              <div className="bg-background h-[70vh] overflow-auto rounded-lg border">
                 <div
                   ref={documentRef}
                   className="mx-auto w-max"
@@ -4090,47 +4088,49 @@ export const ApplicantAdmissionView = ({
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-background/60 space-y-4 rounded-lg border p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h4 className="text-base font-semibold">
-                  Admission Acknowledgement
-                </h4>
-                <p className="text-muted-foreground text-sm">
-                  Sample acknowledgement for your reference.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowAcknowledgement((current) => !current)}
-                >
-                  {showAcknowledgement ? "Hide" : "View"}
-                </Button>
-                <Button type="button" variant="outline" asChild>
-                  <a
-                    href="/sample-acknowledgement.pdf"
-                    download="Sample Acknowledgement.pdf"
+            <div className="bg-background/60 flex flex-col space-y-4 rounded-lg border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-base font-semibold">
+                    Admission Acknowledgement
+                  </h4>
+                  <p className="text-muted-foreground text-sm">
+                    Sample acknowledgement for your reference.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      setShowAcknowledgement((current) => !current)
+                    }
                   >
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Download
-                  </a>
-                </Button>
+                    {showAcknowledgement ? "Hide" : "View"}
+                  </Button>
+                  <Button type="button" variant="outline" asChild>
+                    <a
+                      href="/sample-acknowledgement.pdf"
+                      download="Sample Acknowledgement.pdf"
+                    >
+                      <FileDown className="mr-2 h-4 w-4" />
+                      Download
+                    </a>
+                  </Button>
+                </div>
               </div>
-            </div>
 
-            {showAcknowledgement ? (
-              <div className="bg-background overflow-hidden rounded-lg border">
-                <iframe
-                  title="Sample Acknowledgement PDF"
-                  src="/sample-acknowledgement.pdf"
-                  className="h-[75vh] w-full"
-                />
-              </div>
-            ) : null}
+              {showAcknowledgement ? (
+                <div className="bg-background h-[70vh] overflow-hidden rounded-lg border">
+                  <iframe
+                    title="Sample Acknowledgement PDF"
+                    src="/sample-acknowledgement.pdf"
+                    className="h-full w-full"
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex flex-wrap justify-between gap-3 border-t pt-6">

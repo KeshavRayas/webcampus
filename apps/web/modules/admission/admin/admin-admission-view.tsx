@@ -41,6 +41,7 @@ import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import {
   AdmissionResponse,
   getAdminAdmissionColumns,
+  getAdmissionFullName,
 } from "./admin-admission-columns";
 import {
   AdmissionsReportDocument,
@@ -63,6 +64,8 @@ type AdmissionFilters = {
   academicTerm: string;
   semester: string;
   email: string;
+  name: string;
+  filledBy: string;
   createdFrom: string;
   createdTo: string;
 };
@@ -72,6 +75,8 @@ const EMPTY_FILTERS: AdmissionFilters = {
   academicTerm: "",
   semester: "",
   email: "",
+  name: "",
+  filledBy: "",
   createdFrom: "",
   createdTo: "",
 };
@@ -79,12 +84,9 @@ const EMPTY_FILTERS: AdmissionFilters = {
 export const AdminAdmissionView = ({
   hideAddForm = false,
   showFilters = false,
-  admissionSemestersOnly = false,
 }: {
   hideAddForm?: boolean;
   showFilters?: boolean;
-  /** Only show UG/PG Semesters 1 and 3 in the semester filter */
-  admissionSemestersOnly?: boolean;
 }) => {
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
@@ -138,12 +140,11 @@ export const AdminAdmissionView = ({
   const nestedSemesters = selectedTerm?.Semester || [];
   const admissionEligibleSemesters = nestedSemesters.filter(
     (semester) =>
-      (semester.programType === "UG" || semester.programType === "PG") &&
-      (semester.semesterNumber === 1 || semester.semesterNumber === 3)
+      (semester.programType === "UG" &&
+        (semester.semesterNumber === 1 || semester.semesterNumber === 3)) ||
+      (semester.programType === "PG" && semester.semesterNumber === 1)
   );
-  const semesterOptions = admissionSemestersOnly
-    ? admissionEligibleSemesters
-    : nestedSemesters;
+  const semesterOptions = admissionEligibleSemesters;
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
     semesters: semesterOptions,
@@ -171,12 +172,46 @@ export const AdminAdmissionView = ({
     },
   });
   const relevantAdmissions = useMemo(() => {
+    let rows = admissions ?? [];
     const email = appliedFilters.email.trim().toLowerCase();
-    if (!email) return admissions ?? [];
-    return (admissions ?? []).filter((admission) =>
-      admission.primaryEmail.toLowerCase().includes(email)
+    if (email) {
+      rows = rows.filter((admission) =>
+        admission.primaryEmail.toLowerCase().includes(email)
+      );
+    }
+    const name = appliedFilters.name.trim().toLowerCase();
+    if (name) {
+      rows = rows.filter((admission) =>
+        getAdmissionFullName(admission).toLowerCase().includes(name)
+      );
+    }
+    if (appliedFilters.filledBy) {
+      rows = rows.filter(
+        (admission) => admission.filledBy?.id === appliedFilters.filledBy
+      );
+    }
+    return rows;
+  }, [
+    admissions,
+    appliedFilters.email,
+    appliedFilters.name,
+    appliedFilters.filledBy,
+  ]);
+  const filledByOptions = useMemo(() => {
+    const byId = new Map<string, { label: string; value: string }>();
+    (admissions ?? []).forEach((admission) => {
+      if (admission.filledBy?.id) {
+        byId.set(admission.filledBy.id, {
+          value: admission.filledBy.id,
+          label:
+            admission.filledBy.name || admission.filledBy.email || "Unknown",
+        });
+      }
+    });
+    return Array.from(byId.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
     );
-  }, [admissions, appliedFilters.email]);
+  }, [admissions]);
   const selectedSemesterId = draftFilters.semester;
   const { form, onSubmit } = useCreateAdmissionShellForm(
     selectedSemesterId,
@@ -240,20 +275,6 @@ export const AdminAdmissionView = ({
     );
   };
 
-  const getFullName = (admission: AdmissionResponse) => {
-    const studentName = admission.student?.user?.name?.trim();
-    const admissionName = [
-      admission.firstName,
-      admission.middleName,
-      admission.lastName,
-      admission.nameAsPer10th,
-    ]
-      .filter((value): value is string => Boolean(value?.trim()))
-      .join(" ");
-
-    return studentName || admissionName || "-";
-  };
-
   const generateReportPdf = () => {
     const rows = admissions ?? [];
     if (rows.length === 0) {
@@ -273,7 +294,7 @@ export const AdminAdmissionView = ({
       rejected: statusCount("REJECTED"),
       rows: rows.map((admission) => ({
         applicationId: admission.applicationId || "-",
-        name: getFullName(admission),
+        name: getAdmissionFullName(admission),
         email: admission.primaryEmail || "-",
         status: admission.status || "-",
         branch: admission.department?.name || "-",
@@ -322,7 +343,7 @@ export const AdminAdmissionView = ({
       placeholder: "All terms",
       allOptionLabel: "All terms",
       options: terms.map((term) => ({
-        label: `${term.type} ${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
     },
@@ -343,6 +364,13 @@ export const AdminAdmissionView = ({
 
   const advancedFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
     {
+      key: "name",
+      label: "Name",
+      type: "text",
+      placeholder: "Search by name",
+      inputId: "admission-name",
+    },
+    {
       key: "email",
       label: "Email",
       type: "text",
@@ -355,6 +383,14 @@ export const AdminAdmissionView = ({
       type: "text",
       placeholder: "Search application ID",
       inputId: "admission-application-id",
+    },
+    {
+      key: "filledBy",
+      label: "Filled By",
+      type: "select",
+      placeholder: "All",
+      allOptionLabel: "All",
+      options: filledByOptions,
     },
     {
       key: "createdFrom",

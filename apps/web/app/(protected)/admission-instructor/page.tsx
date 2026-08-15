@@ -11,7 +11,7 @@ export default function AddAdmissionPage() {
         </p>
       </div>
       <Suspense>
-        <AdminAdmissionView admissionSemestersOnly />
+        <AdminAdmissionView />
       </Suspense>
     </div>
   );

@@ -1,38 +1,50 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@webcampus/ui/components/badge";
-import { AdmissionResponse } from "../admin/admin-admission-columns";
+import {
+  AdmissionResponse,
+  getAdmissionFullName,
+} from "../admin/admin-admission-columns";
 import { CancelAdmissionActions } from "./cancel-admission-actions";
 
-const nameFor = (admission: AdmissionResponse) => {
-  const studentName = admission.student?.user?.name?.trim();
-  const admissionName = [admission.nameAsPer10th?.trim()]
-    .filter((value): value is string => Boolean(value))
-    .join(" ")
-    .trim();
-
-  return studentName || admissionName || "-";
+const formatDate = (value: string | undefined | null) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 export const cancelAdmissionColumns: ColumnDef<AdmissionResponse>[] = [
   {
     id: "name",
     header: "Name",
-    cell: ({ row }) => nameFor(row.original),
+    cell: ({ row }) => (
+      <div className="font-medium">{getAdmissionFullName(row.original)}</div>
+    ),
   },
   {
     accessorKey: "primaryEmail",
     header: "Email",
   },
   {
-    accessorKey: "modeOfAdmission",
-    header: "Admission Mode",
+    id: "createdOn",
+    header: "Created On",
+    cell: ({ row }) => (
+      <div suppressHydrationWarning>{formatDate(row.original.createdAt)}</div>
+    ),
   },
   {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => <Badge>{row.original.status}</Badge>,
+    id: "cancelledOn",
+    header: "Cancelled On",
+    cell: ({ row }) => (
+      <div suppressHydrationWarning>
+        {formatDate(row.original.cancellation?.cancelledAt)}
+      </div>
+    ),
   },
   {
     id: "actions",
