@@ -27,7 +27,7 @@ import axios, { isAxiosError } from "axios";
 import { City, Country, State } from "country-state-city";
 import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
-import { CheckCircle2, FileDown } from "lucide-react";
+import { CheckCircle2, FileDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
@@ -2947,28 +2947,30 @@ export const ApplicantAdmissionView = ({
                       disabled={!disabilityEnabled}
                     />
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="economicallyBackward">
-                      Economically Backward Status *
-                    </Label>
-                    <Select
-                      name="economicallyBackward"
-                      value={economicallyBackwardEnabled ? "true" : "false"}
-                    />
-                    <Select
-                      value={economicallyBackwardEnabled ? "true" : "false"}
-                      onValueChange={(value) =>
-                        setEconomicallyBackwardEnabled(value === "true")
-                      }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select Yes or No" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="true">Yes</SelectItem>
-                        <SelectItem value="false">No</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="md:col-span-2">
+                    <div className="space-y-2 md:max-w-[calc(50%-0.75rem)]">
+                      <Label htmlFor="economicallyBackward">
+                        Economically Backward Status *
+                      </Label>
+                      <Select
+                        name="economicallyBackward"
+                        value={economicallyBackwardEnabled ? "true" : "false"}
+                      />
+                      <Select
+                        value={economicallyBackwardEnabled ? "true" : "false"}
+                        onValueChange={(value) =>
+                          setEconomicallyBackwardEnabled(value === "true")
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select Yes or No" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Yes</SelectItem>
+                          <SelectItem value="false">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -3894,30 +3896,6 @@ export const ApplicantAdmissionView = ({
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="lg:col-span-2">
-              <Label htmlFor="stayingInHostel">Staying in Hostel? *</Label>
-              <Select
-                name="stayingInHostel"
-                value={stayingInHostel}
-                onValueChange={setStayingInHostel}
-                required
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="yes">Yes</SelectItem>
-                  <SelectItem value="no">No</SelectItem>
-                </SelectContent>
-              </Select>
-              <input
-                type="hidden"
-                name="stayingInHostel"
-                value={stayingInHostel}
-                required
-              />
-            </div>
-
             <ParentMemberCard
               title="Father's Details"
               memberKey="father"
@@ -3950,6 +3928,30 @@ export const ApplicantAdmissionView = ({
               addressesHydrated={addressesHydrated}
               savedAddress={String(admission?.motherPermanentAddress ?? "")}
             />
+
+            <div className="lg:col-span-2">
+              <Label htmlFor="stayingInHostel">Staying in Hostel? *</Label>
+              <Select
+                name="stayingInHostel"
+                value={stayingInHostel}
+                onValueChange={setStayingInHostel}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+              <input
+                type="hidden"
+                name="stayingInHostel"
+                value={stayingInHostel}
+                required
+              />
+            </div>
 
             <div className="lg:col-span-2">
               {stayingInHostel === "yes" ? (
@@ -4121,11 +4123,21 @@ export const ApplicantAdmissionView = ({
                 </div>
                 <Button
                   type="button"
-                  size="lg"
+                  variant="outline"
                   disabled={isGeneratingPdf}
                   onClick={() => void generatePdf({ auto: false })}
                 >
-                  {isGeneratingPdf ? "Generating..." : "Download PDF"}
+                  {isGeneratingPdf ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <FileDown className="mr-2 h-4 w-4" />
+                      Download PDF
+                    </>
+                  )}
                 </Button>
               </div>
 

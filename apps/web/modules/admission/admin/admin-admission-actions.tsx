@@ -27,7 +27,6 @@ import {
 } from "../applicant/admission-document";
 import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { AdmissionResponse } from "./admin-admission-columns";
-import { usePortAdmission } from "./use-port-admission";
 
 const getStatusVariant = (status: AdmissionResponse["status"]) => {
   switch (status) {
@@ -310,15 +309,8 @@ export const AdminAdmissionActions = ({
   const [open, setOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [docData, setDocData] = useState<DocData | null>(null);
-  const [confirmPort, setConfirmPort] = useState(false);
   const documentRef = useRef<HTMLDivElement | null>(null);
   const acknowledgementRef = useRef<HTMLDivElement | null>(null);
-  const { portAdmission, isPorting } = usePortAdmission();
-
-  const canPort = role === "admin" || role === "admission";
-  const alreadyPorted = Boolean(admission.student || admission.posted);
-  const canShowPort =
-    canPort && admission.status === "APPROVED" && !alreadyPorted;
 
   // Compute Full Name
   const fullName =
@@ -344,7 +336,6 @@ export const AdminAdmissionActions = ({
 
   const handleOpenChange = (value: boolean) => {
     setOpen(value);
-    setConfirmPort(false);
     if (value && !docData) {
       setDocData(buildDocData(admission));
     }
@@ -394,16 +385,16 @@ export const AdminAdmissionActions = ({
           </Button>
         </DialogTrigger>
         <DialogContent className="max-h-[92vh] w-full overflow-hidden p-0 sm:max-w-6xl">
-          <DialogHeader className="px-8 pt-8">
+          <DialogHeader className="px-4 pt-4 sm:px-8 sm:pt-8">
             <DialogTitle className="text-left text-2xl">
               Admission Details
             </DialogTitle>
             <DialogDescription>
-              Application ID: {admission.applicationId}
+              Review the full admission record for the selected applicant.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="max-h-[calc(92vh-8rem)] overflow-y-auto px-8 pb-8">
+          <div className="max-h-[calc(92vh-8rem)] overflow-y-auto px-4 pb-4 sm:px-8 sm:pb-8">
             <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[18rem_1fr]">
               <div className="bg-card flex w-full flex-col items-center gap-4 rounded-xl border p-6 lg:w-72">
                 <Avatar className="h-28 w-28 border">
@@ -431,10 +422,6 @@ export const AdminAdmissionActions = ({
                     label="Mode of Admission"
                     value={admission.modeOfAdmission}
                   />
-                  <DataField
-                    label="Application ID"
-                    value={admission.applicationId}
-                  />
                   <div className="space-y-1">
                     <p className="text-muted-foreground text-sm">Status</p>
                     <Badge variant={getStatusVariant(admission.status)}>
@@ -446,7 +433,7 @@ export const AdminAdmissionActions = ({
                 </div>
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <div className="mb-6 flex flex-wrap items-center gap-3">
                   {canEdit && (
                     <Button size="sm" onClick={openFillForm}>
@@ -480,27 +467,6 @@ export const AdminAdmissionActions = ({
                     <FileDown className="mr-2 h-4 w-4" />
                     Download Acknowledgement
                   </Button>
-                  {canShowPort && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={isPorting}
-                      onClick={() => {
-                        if (!confirmPort) {
-                          setConfirmPort(true);
-                          return;
-                        }
-                        setConfirmPort(false);
-                        portAdmission({ id: admission.id });
-                      }}
-                    >
-                      {isPorting
-                        ? "Posting..."
-                        : confirmPort
-                          ? "Confirm Post?"
-                          : "Post to Students"}
-                    </Button>
-                  )}
                 </div>
 
                 {isPending ? (

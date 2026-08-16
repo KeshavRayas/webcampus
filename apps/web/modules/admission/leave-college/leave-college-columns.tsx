@@ -7,13 +7,6 @@ import { LeaveCollegeActions } from "./leave-college-actions";
 
 const baseColumns: ColumnDef<AdmissionResponse>[] = [
   {
-    accessorKey: "applicationId",
-    header: "Application ID",
-    cell: ({ row }) => (
-      <div className="font-medium">{row.original.applicationId}</div>
-    ),
-  },
-  {
     id: "name",
     header: "Name",
     cell: ({ row }) => {

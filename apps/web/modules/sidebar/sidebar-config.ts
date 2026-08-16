@@ -548,19 +548,9 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     navMain: {
       items: [
         {
-          name: "Create Admission",
-          url: "/admission",
-          icon: LayoutDashboard,
-        },
-        {
-          name: "View Admissions",
-          url: "/admission/view-admissions",
-          icon: BookCopy,
-        },
-        {
-          name: "Fee Payment",
-          url: "/admission/fee-payment",
-          icon: IndianRupee,
+          name: "Admission Setup",
+          url: "/admission/setup",
+          icon: Settings2,
         },
         {
           name: "Cancel Admission",
@@ -568,9 +558,14 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: GraduationCap,
         },
         {
-          name: "Upload Documents",
-          url: "/admission/upload-documents",
-          icon: Upload,
+          name: "Create Admission",
+          url: "/admission",
+          icon: LayoutDashboard,
+        },
+        {
+          name: "Fee Payment",
+          url: "/admission/fee-payment",
+          icon: IndianRupee,
         },
         {
           name: "Reports",
@@ -592,9 +587,14 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           ],
         },
         {
-          name: "Admission Setup",
-          url: "/admission/setup",
-          icon: Settings2,
+          name: "Upload Documents",
+          url: "/admission/upload-documents",
+          icon: Upload,
+        },
+        {
+          name: "View Admissions",
+          url: "/admission/view-admissions",
+          icon: BookCopy,
         },
       ],
     },

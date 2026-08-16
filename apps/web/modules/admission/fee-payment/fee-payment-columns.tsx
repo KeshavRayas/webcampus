@@ -47,10 +47,6 @@ export const createFeePaymentColumns = ({
     },
   },
   {
-    accessorKey: "applicationId",
-    header: "Application ID",
-  },
-  {
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => (

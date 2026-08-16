@@ -40,12 +40,7 @@ import { getAdmissionFullName } from "../admin/admin-admission-columns";
 import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { ApplicantAdmissionView } from "../applicant/applicant-admission-view";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
-import {
-  FeeReceiptDocument,
-  FeeReportDocument,
-  type FeeReceiptData,
-  type FeeReportData,
-} from "./fee-document";
+import { FeeReceiptDocument, type FeeReceiptData } from "./fee-document";
 import { type FeePaymentResponse } from "./fee-payment-columns";
 import { useAdmissionPayment } from "./use-admission-payment";
 
@@ -80,22 +75,6 @@ const EMPTY_FILTERS: FeePaymentFilters = {
   filledBy: "",
   createdFrom: "",
   createdTo: "",
-};
-
-const buildFeePaymentSummary = (admissions: FeePaymentResponse[]) => {
-  const paid = admissions.filter(
-    (admission) => admission.feeStatus === true
-  ).length;
-  const unpaid = admissions.length - paid;
-  const approved = admissions.filter(
-    (admission) => admission.status === "APPROVED"
-  ).length;
-  const pending = admissions.filter(
-    (admission) =>
-      admission.status === "PENDING" || admission.status === "SUBMITTED"
-  ).length;
-
-  return { total: admissions.length, paid, unpaid, approved, pending };
 };
 
 const getFullName = (admission: FeePaymentResponse) => {
@@ -209,15 +188,11 @@ const FeePaymentStaffView = () => {
   const [paymentAdmission, setPaymentAdmission] =
     useState<FeePaymentResponse | null>(null);
   const [feeReceiptNumber, setFeeReceiptNumber] = useState("");
-  const [feeStructure, setFeeStructure] = useState<{
-    feeAmount: number;
-  } | null>(null);
+  const [feeAmount, setFeeAmount] = useState(0);
   const [isFetchingFee, setIsFetchingFee] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const { initiatePayment, isProcessing } = useAdmissionPayment();
-  const [reportData, setReportData] = useState<FeeReportData | null>(null);
   const [receiptData, setReceiptData] = useState<FeeReceiptData | null>(null);
-  const reportRef = useRef<HTMLDivElement | null>(null);
   const receiptRef = useRef<HTMLDivElement | null>(null);
 
   const { data: termsData } = useAcademicTerms();
@@ -313,11 +288,6 @@ const FeePaymentStaffView = () => {
       a.label.localeCompare(b.label)
     );
   }, [data]);
-
-  const summary = useMemo(
-    () => buildFeePaymentSummary(admissions),
-    [admissions]
-  );
 
   const simpleFilterFields: FilterFieldConfig<FeePaymentFilters>[] = [
     {
@@ -440,45 +410,6 @@ const FeePaymentStaffView = () => {
     router.replace(pathname, { scroll: false });
   };
 
-  const generateReportPdf = () => {
-    if (admissions.length === 0) {
-      toast.error("No admissions to include in the report.");
-      return;
-    }
-
-    setReportData({
-      generatedAt: new Date().toLocaleString(),
-      total: summary.total,
-      paid: summary.paid,
-      unpaid: summary.unpaid,
-      approved: summary.approved,
-      pending: summary.pending,
-      rows: admissions.map((admission) => ({
-        applicationId: admission.applicationId || "-",
-        name: getFullName(admission),
-        email: admission.primaryEmail,
-        feePaid:
-          admission.feePaid != null ? String(admission.feePaid) : "Not paid",
-        receiptNo: admission.feeReceiptNumber || "-",
-        status: admission.status,
-        mode: admission.modeOfAdmission || "-",
-      })),
-    });
-  };
-
-  useEffect(() => {
-    if (!reportData) return;
-    const node = reportRef.current;
-    if (!node) return;
-    void renderNodeToPdf(
-      node,
-      `fee-payment-report-${new Date().toISOString().slice(0, 10)}.pdf`
-    )
-      .then(() => toast.success("Fee report PDF downloaded."))
-      .catch(() => toast.error("Failed to generate the fee report PDF."))
-      .finally(() => setReportData(null));
-  }, [reportData]);
-
   const generateReceiptPdf = (admission: FeePaymentResponse) => {
     if (!admission) {
       toast.error("No student details available for receipt.");
@@ -504,7 +435,6 @@ const FeePaymentStaffView = () => {
         year: "numeric",
       }),
       name: getFullName(admission),
-      applicationId: admission.applicationId || "-",
       usn: admission.student?.usn || "-",
       contact,
       branch,
@@ -523,7 +453,7 @@ const FeePaymentStaffView = () => {
     if (!node) return;
     void renderNodeToPdf(
       node,
-      `fee-receipt-${receiptData.applicationId || "application"}.pdf`
+      `fee-receipt-${new Date().toISOString().slice(0, 10)}.pdf`
     )
       .then(() => toast.success("Fee receipt PDF downloaded."))
       .catch(() => toast.error("Failed to generate the fee receipt PDF."))
@@ -533,7 +463,7 @@ const FeePaymentStaffView = () => {
   const handlePay = (admission: FeePaymentResponse) => {
     setPaymentAdmission(admission);
     setFeeReceiptNumber("");
-    setFeeStructure(null);
+    setFeeAmount(0);
     setIsPayOpen(true);
 
     const params = new URLSearchParams();
@@ -551,7 +481,6 @@ const FeePaymentStaffView = () => {
     }
 
     if (params.size === 0) {
-      setFeeStructure({ feeAmount: 0 });
       return;
     }
 
@@ -562,13 +491,10 @@ const FeePaymentStaffView = () => {
         { withCredentials: true }
       )
       .then((response) => {
-        if (response.data.status === "success") {
-          setFeeStructure(response.data.data);
-        } else {
-          setFeeStructure(null);
+        if (response.data.status === "success" && response.data.data != null) {
+          setFeeAmount(response.data.data.feeAmount);
         }
       })
-      .catch(() => setFeeStructure(null))
       .finally(() => setIsFetchingFee(false));
   };
 
@@ -578,7 +504,7 @@ const FeePaymentStaffView = () => {
     try {
       await initiatePayment({
         id: paymentAdmission.id,
-        feePaid: feeStructure?.feeAmount ?? 0,
+        feePaid: feeAmount,
         feeReceiptNumber: feeReceiptNumber.trim() || undefined,
       });
       setIsPayOpen(false);
@@ -713,9 +639,7 @@ const FeePaymentStaffView = () => {
             onApply={applyFilters}
             onReset={resetFilters}
             dialogTitle="Advanced Filters"
-            dialogDescription="Filter fee payments by email, application ID, status, mode, and date range."
-            onGenerateReport={generateReportPdf}
-            reportButtonLabel="Generate Fee Report PDF"
+            dialogDescription="Filter fee payments by email, status, mode, and date range."
           />
         </div>
 
@@ -788,14 +712,6 @@ const FeePaymentStaffView = () => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div className="rounded-md border p-3">
-                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                      Application ID
-                    </p>
-                    <p className="mt-1 font-medium">
-                      {selectedAdmission.applicationId || "-"}
-                    </p>
-                  </div>
                   <div className="rounded-md border p-3">
                     <p className="text-muted-foreground text-xs uppercase tracking-wide">
                       Admission Mode
@@ -907,25 +823,28 @@ const FeePaymentStaffView = () => {
                     {paymentAdmission.primaryEmail}
                   </p>
                   <p className="text-muted-foreground text-sm">
-                    {paymentAdmission.applicationId} ·{" "}
                     {paymentAdmission.department?.name || "-"}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Fee Amount (₹)</Label>
+                  <Label htmlFor="feeAmount">Fee Amount (₹)</Label>
                   {isFetchingFee ? (
                     <div className="bg-muted/20 flex h-10 items-center gap-2 rounded-md border px-3 text-sm">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading fee structure...
                     </div>
-                  ) : feeStructure ? (
-                    <Input
-                      readOnly
-                      value={feeStructure.feeAmount.toLocaleString("en-IN")}
-                    />
                   ) : (
-                    <Input readOnly placeholder="No fee structure defined" />
+                    <Input
+                      id="feeAmount"
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={feeAmount}
+                      onChange={(event) =>
+                        setFeeAmount(Number(event.target.value))
+                      }
+                    />
                   )}
                 </div>
 
@@ -948,9 +867,7 @@ const FeePaymentStaffView = () => {
                   </Button>
                   <Button
                     onClick={() => void handleConfirmPay()}
-                    disabled={
-                      isProcessing || !feeStructure || !feeReceiptNumber.trim()
-                    }
+                    disabled={isProcessing || !feeReceiptNumber.trim()}
                   >
                     {isProcessing ? (
                       <>
@@ -968,14 +885,6 @@ const FeePaymentStaffView = () => {
         </Dialog>
       </div>
 
-      <div
-        className="pointer-events-none absolute left-[-10000px] top-0"
-        aria-hidden="true"
-      >
-        <div ref={reportRef}>
-          {reportData ? <FeeReportDocument data={reportData} /> : null}
-        </div>
-      </div>
       <div
         className="pointer-events-none absolute left-[-10000px] top-0"
         aria-hidden="true"

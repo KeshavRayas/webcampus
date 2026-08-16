@@ -235,7 +235,9 @@ export function UploadDocsActions({ admission }: Props) {
         <DialogHeader>
           <DialogTitle>Admission Documents</DialogTitle>
 
-          <DialogDescription>{admission.applicationId}</DialogDescription>
+          <DialogDescription>
+            Manage the uploaded documents for this applicant.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_1fr]">
@@ -257,14 +259,6 @@ export function UploadDocsActions({ admission }: Props) {
                 <Badge variant={getStatusVariant(admission.status)}>
                   {admission.status}
                 </Badge>
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-lg border p-4">
-              <div>
-                <p className="text-muted-foreground text-sm">Application ID</p>
-
-                <p className="font-medium">{admission.applicationId}</p>
               </div>
             </div>
           </div>

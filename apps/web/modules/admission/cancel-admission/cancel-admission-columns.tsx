@@ -1,6 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import { Badge } from "@webcampus/ui/components/badge";
 import {
   AdmissionResponse,
   getAdmissionFullName,
@@ -45,6 +46,24 @@ export const cancelAdmissionColumns: ColumnDef<AdmissionResponse>[] = [
         {formatDate(row.original.cancellation?.cancelledAt)}
       </div>
     ),
+  },
+  {
+    id: "status",
+    header: "Status",
+    cell: ({ row }) => {
+      const status = row.original.status;
+
+      const variant =
+        status === "APPROVED"
+          ? "default"
+          : status === "SUBMITTED"
+            ? "secondary"
+            : status === "CANCELLED"
+              ? "destructive"
+              : "outline";
+
+      return <Badge variant={variant}>{status}</Badge>;
+    },
   },
   {
     id: "actions",

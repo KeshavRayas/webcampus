@@ -34,21 +34,15 @@ import {
 import { Input } from "@webcampus/ui/components/input";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import {
   AdmissionResponse,
   getAdminAdmissionColumns,
   getAdmissionFullName,
 } from "./admin-admission-columns";
-import {
-  AdmissionsReportDocument,
-  type AdmissionsReportData,
-} from "./admissions-report-document";
 import { useCreateAdmissionShellForm } from "./use-create-admission-shell-form";
-import { usePortStudents } from "./use-port-students";
 
 // const ADMISSION_MODES = [
 //   "KCET",
@@ -94,7 +88,6 @@ export const AdminAdmissionView = ({
     (role === "admin" ||
       role === "admission" ||
       role === "admission-instructor");
-  const canPort = isMounted && (role === "admin" || role === "admission");
 
   const router = useRouter();
   const pathname = usePathname();
@@ -108,16 +101,11 @@ export const AdminAdmissionView = ({
     useState<AdmissionFilters>(initialFilters);
   const [appliedFilters, setAppliedFilters] =
     useState<AdmissionFilters>(initialFilters);
-  const [isPortPreviewOpen, setIsPortPreviewOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [createChoice, setCreateChoice] = useState<null | "profile" | "fill">(
     null
   );
-  const [reportData, setReportData] = useState<AdmissionsReportData | null>(
-    null
-  );
-  const reportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!showFilters) return;
@@ -204,107 +192,6 @@ export const AdminAdmissionView = ({
     selectedSemesterId,
     departments
   );
-  const { onPortStudents, isPorting } = usePortStudents();
-
-  const selectedSemester = nestedSemesters.find(
-    (semester) => semester.id === selectedSemesterId
-  );
-  const { data: semesterAdmissions, isFetching: isFetchingSemesterAdmissions } =
-    useQuery({
-      queryKey: ["admissions", "semester", selectedSemesterId],
-      queryFn: async () => {
-        if (!selectedSemesterId) return [] as AdmissionResponse[];
-
-        const res = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
-          `/admission/semester/${selectedSemesterId}`,
-          { withCredentials: true }
-        );
-
-        if (res.data.status === "success" && Array.isArray(res.data.data)) {
-          return res.data.data;
-        }
-
-        return [] as AdmissionResponse[];
-      },
-      enabled: showFilters && !!selectedSemesterId,
-    });
-
-  const unresolvedAdmissionsCount = (semesterAdmissions || []).filter(
-    (admission) =>
-      admission.status === "PENDING" || admission.status === "SUBMITTED"
-  ).length;
-
-  const approvedAdmissions = (semesterAdmissions || []).filter(
-    (admission) => admission.status === "APPROVED"
-  );
-
-  const admissionsToPort = approvedAdmissions.filter(
-    (admission) => !admission.student?.usn
-  );
-
-  const alreadyPortedAdmissions = approvedAdmissions.filter(
-    (admission) => !!admission.student?.usn
-  );
-
-  const handleConfirmPort = () => {
-    if (!selectedSemesterId) {
-      toast.error("Please select a semester first");
-      return;
-    }
-
-    onPortStudents(
-      { semesterId: selectedSemesterId },
-      {
-        onSuccess: () => {
-          setIsPortPreviewOpen(false);
-        },
-      }
-    );
-  };
-
-  const generateReportPdf = () => {
-    const rows = admissions ?? [];
-    if (rows.length === 0) {
-      toast.error("No admissions to include in the report.");
-      return;
-    }
-
-    const statusCount = (status: AdmissionResponse["status"]) =>
-      rows.filter((admission) => admission.status === status).length;
-
-    setReportData({
-      generatedAt: new Date().toLocaleString(),
-      total: rows.length,
-      approved: statusCount("APPROVED"),
-      submitted: statusCount("SUBMITTED"),
-      pending: statusCount("PENDING") + statusCount("SUBMITTED"),
-      rejected: statusCount("REJECTED"),
-      rows: rows.map((admission) => ({
-        applicationId: admission.applicationId || "-",
-        name: getAdmissionFullName(admission),
-        email: admission.primaryEmail || "-",
-        status: admission.status || "-",
-        branch: admission.department?.name || "-",
-        mode: admission.modeOfAdmission || "-",
-        quota: admission.quota || "-",
-        feePaid: admission.feePaid != null ? String(admission.feePaid) : "-",
-        receiptNo: admission.feeReceiptNumber || "-",
-      })),
-    });
-  };
-
-  useEffect(() => {
-    if (!reportData) return;
-    const node = reportRef.current;
-    if (!node) return;
-    void renderNodeToPdf(
-      node,
-      `admissions-report-${new Date().toISOString().slice(0, 10)}.pdf`
-    )
-      .then(() => toast.success("Admissions report PDF downloaded."))
-      .catch(() => toast.error("Failed to generate the admissions report PDF."))
-      .finally(() => setReportData(null));
-  }, [reportData]);
 
   const updateDraftFilter = (key: keyof AdmissionFilters, value: string) => {
     if (key === "academicTerm") {
@@ -431,8 +318,6 @@ export const AdminAdmissionView = ({
             onDraftChange={updateDraftFilter}
             onApply={applyFilters}
             onReset={resetFilters}
-            onGenerateReport={generateReportPdf}
-            reportButtonLabel="Generate Admissions Report PDF"
           />
 
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -595,155 +480,11 @@ export const AdminAdmissionView = ({
             <h3 className="text-xl font-semibold tracking-tight">Admissions</h3>
             <p className="text-muted-foreground text-sm">
               {showFilters
-                ? "Filter by academic term, semester, application ID, and created date."
+                ? "Filter by academic term, semester, and created date."
                 : "Showing admissions for the selected semester."}
             </p>
-            {showFilters && selectedSemesterId && (
-              <p
-                className="text-muted-foreground mt-1 text-sm"
-                suppressHydrationWarning
-              >
-                {isFetchingSemesterAdmissions
-                  ? "Checking port readiness..."
-                  : unresolvedAdmissionsCount > 0
-                    ? `${unresolvedAdmissionsCount} application(s) still pending review before porting.`
-                    : "All applications are reviewed. Ready to port approved students."}
-              </p>
-            )}
           </div>
-
-          {showFilters && canPort && (
-            <Button
-              onClick={() => {
-                if (!selectedSemesterId) {
-                  toast.error("Please select a semester first");
-                  return;
-                }
-                setIsPortPreviewOpen(true);
-              }}
-              disabled={
-                !selectedSemesterId || isFetchingSemesterAdmissions || isPorting
-              }
-            >
-              {isPorting ? "Porting..." : "Preview Port"}
-            </Button>
-          )}
         </div>
-
-        {showFilters && (
-          <Dialog open={isPortPreviewOpen} onOpenChange={setIsPortPreviewOpen}>
-            <DialogContent className="sm:max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>Preview Student Port</DialogTitle>
-                <DialogDescription>
-                  Review admissions for{" "}
-                  {selectedSemester
-                    ? `${selectedSemester.programType} - Semester ${selectedSemester.semesterNumber}`
-                    : "the selected semester"}{" "}
-                  before final port.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
-                  <div className="bg-muted/30 rounded-md border p-3">
-                    <p className="text-muted-foreground">Pending/Submitted</p>
-                    <p className="text-lg font-semibold">
-                      {unresolvedAdmissionsCount}
-                    </p>
-                  </div>
-                  <div className="bg-muted/30 rounded-md border p-3">
-                    <p className="text-muted-foreground">Will be ported</p>
-                    <p className="text-lg font-semibold">
-                      {admissionsToPort.length}
-                    </p>
-                  </div>
-                  <div className="bg-muted/30 rounded-md border p-3">
-                    <p className="text-muted-foreground">Already ported</p>
-                    <p className="text-lg font-semibold">
-                      {alreadyPortedAdmissions.length}
-                    </p>
-                  </div>
-                </div>
-
-                {admissionsToPort.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">
-                      Admissions that will be ported
-                    </p>
-                    <div className="max-h-56 overflow-auto rounded-md border">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted sticky top-0 z-10">
-                          <tr>
-                            <th className="bg-muted px-3 py-2 text-left font-medium">
-                              Application ID
-                            </th>
-                            <th className="bg-muted px-3 py-2 text-left font-medium">
-                              Student Name
-                            </th>
-                            <th className="bg-muted px-3 py-2 text-left font-medium">
-                              Status
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {admissionsToPort.map((admission) => {
-                            const fullName = admission.nameAsPer10th?.trim();
-                            return (
-                              <tr key={admission.id} className="border-t">
-                                <td className="px-3 py-2">
-                                  {admission.applicationId}
-                                </td>
-                                <td className="px-3 py-2">{fullName || "-"}</td>
-                                <td className="px-3 py-2">
-                                  {admission.status}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    No approved admissions pending port in this semester.
-                  </p>
-                )}
-
-                {unresolvedAdmissionsCount > 0 && (
-                  <p className="text-sm font-medium text-amber-700">
-                    Port is disabled until all admissions are reviewed (no
-                    pending or submitted records).
-                  </p>
-                )}
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsPortPreviewOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleConfirmPort}
-                  disabled={
-                    isPorting ||
-                    unresolvedAdmissionsCount > 0 ||
-                    admissionsToPort.length === 0
-                  }
-                >
-                  {isPorting
-                    ? "Porting..."
-                    : `Confirm Port (${admissionsToPort.length})`}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
 
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm">
@@ -767,15 +508,6 @@ export const AdminAdmissionView = ({
             />
           </div>
         )}
-      </div>
-
-      <div
-        className="pointer-events-none absolute left-[-10000px] top-0"
-        aria-hidden="true"
-      >
-        <div ref={reportRef}>
-          {reportData ? <AdmissionsReportDocument data={reportData} /> : null}
-        </div>
       </div>
     </div>
   );
