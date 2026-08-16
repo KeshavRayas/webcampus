@@ -31,9 +31,7 @@ import { CheckCircle2, FileDown } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { AdmissionAcknowledgement } from "./admission-acknowledgement";
 import { AdmissionDocument, COLLEGE, type DocData } from "./admission-document";
-import { renderNodeToPdf } from "./admission-pdf";
 
 type ApplicantAdmissionData = {
   applicationId: string;
@@ -582,7 +580,6 @@ export const ApplicantAdmissionView = ({
   const [fatherAnnualIncome, setFatherAnnualIncome] = useState("");
   const [motherAnnualIncome, setMotherAnnualIncome] = useState("");
   const [guardianAnnualIncome, setGuardianAnnualIncome] = useState("");
-  const [stayingInHostel, setStayingInHostel] = useState(false);
   const [selectedAdmissionType, setSelectedAdmissionType] = useState("");
   const [admissionBasedOn, setAdmissionBasedOn] = useState("");
   const [scholarshipEnabled, setScholarshipEnabled] = useState(false);
@@ -595,7 +592,6 @@ export const ApplicantAdmissionView = ({
   const photoPreviewRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
-  const acknowledgementRef = useRef<HTMLDivElement | null>(null);
   const [docData, setDocData] = useState<DocData | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [showAcknowledgement, setShowAcknowledgement] = useState(true);
@@ -653,9 +649,14 @@ export const ApplicantAdmissionView = ({
   );
   const [acknowledged] = useState(true);
   const [signature] = useState("");
-  const [submitted, setSubmitted] = useState(false);
   const [stayingInHostel, setStayingInHostel] = useState("");
   const [guardianRelation, setGuardianRelation] = useState("");
+  const [guardianDefaults, setGuardianDefaults] = useState<{
+    name?: string;
+    occupation?: string;
+    email?: string;
+  }>({});
+  const [guardianFixed, setGuardianFixed] = useState(false);
   const { data: departments } = useAdmissionDepartments();
 
   const { data: admissionConstants } = useAdmissionConstants();
@@ -1193,24 +1194,6 @@ export const ApplicantAdmissionView = ({
     return "";
   };
 
-  const downloadAcknowledgement = async () => {
-    const node = acknowledgementRef.current;
-    if (!node) {
-      toast.error("Could not render the acknowledgement.");
-      return;
-    }
-    try {
-      setIsGeneratingPdf(true);
-      await renderNodeToPdf(node, "admission-acknowledgement.pdf");
-      toast.success("Acknowledgement downloaded.");
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to generate acknowledgement. Please try again.");
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  };
-
   const checkStepValid = (step: StepKey) => {
     const section = sectionRefs.current[step];
 
@@ -1360,8 +1343,8 @@ export const ApplicantAdmissionView = ({
     setActiveStep(previousStep);
   };
 
-  const handleTabChange = (nextStep: StepKey) => {
-    setActiveStep(nextStep);
+  const handleTabChange = (nextStep: string) => {
+    setActiveStep(nextStep as StepKey);
     setDocData(buildDocumentData());
   };
 
@@ -1403,27 +1386,6 @@ export const ApplicantAdmissionView = ({
     const input = document.getElementById("photo") as HTMLInputElement | null;
     if (input) {
       input.value = "";
-    }
-  };
-
-  const handleGuardianRelationChange = (value: string) => {
-    setGuardianRelation(value);
-
-    if (value === "Father" || value === "Mother") {
-      const prefix = value === "Father" ? "father" : "mother";
-      const readValue = (name: string) =>
-        formRef.current
-          ?.querySelector<HTMLInputElement>(`input[name="${name}"]`)
-          ?.value?.trim() ?? "";
-      setGuardianDefaults({
-        name: readValue(`${prefix}Name`),
-        occupation: readValue(`${prefix}Occupation`),
-        email: readValue(`${prefix}Email`),
-      });
-      setGuardianFixed(true);
-    } else {
-      setGuardianDefaults({ name: "", occupation: "", email: "" });
-      setGuardianFixed(false);
     }
   };
 
@@ -1574,7 +1536,6 @@ export const ApplicantAdmissionView = ({
     setFatherPhone(String(a.fatherNumber ?? ""));
     setMotherPhone(String(a.motherNumber ?? ""));
     setGuardianPhone(String(a.guardianNumber ?? ""));
-    setStayingInHostel(Boolean(a.guardianName));
     setFatherAnnualIncome(String(a.fatherAnnualIncome ?? ""));
     setMotherAnnualIncome(String(a.motherAnnualIncome ?? ""));
     setGuardianAnnualIncome(String(a.guardianAnnualIncome ?? ""));
@@ -2942,10 +2903,7 @@ export const ApplicantAdmissionView = ({
 
                   <div className="space-y-2">
                     <Label htmlFor="nri">NRI Citizen *</Label>
-                    <Select
-                      name="nri"
-                      value={nriEnabled ? "true" : "false"}
-                    />
+                    <Select name="nri" value={nriEnabled ? "true" : "false"} />
                     <Select
                       value={nriEnabled ? "true" : "false"}
                       onValueChange={(value) => setNriEnabled(value === "true")}
@@ -3952,6 +3910,12 @@ export const ApplicantAdmissionView = ({
                   <SelectItem value="no">No</SelectItem>
                 </SelectContent>
               </Select>
+              <input
+                type="hidden"
+                name="stayingInHostel"
+                value={stayingInHostel}
+                required
+              />
             </div>
 
             <ParentMemberCard
@@ -3988,51 +3952,33 @@ export const ApplicantAdmissionView = ({
             />
 
             <div className="lg:col-span-2">
-              <div className="bg-muted/20 space-y-2 rounded-lg border px-4 py-3">
-                <Label htmlFor="stayingInHostel">Staying in Hostel? *</Label>
-                <Select
-                  value={stayingInHostel ? "true" : "false"}
-                  onValueChange={(value) =>
-                    setStayingInHostel(value === "true")
+              {stayingInHostel === "yes" ? (
+                <ParentMemberCard
+                  title="Guardian's Details"
+                  memberKey="guardian"
+                  nameRequired
+                  occupationRequired
+                  income="range"
+                  incomeRequired
+                  mobileRequired
+                  wide
+                  phone={guardianPhone}
+                  onPhoneChange={(value) => setGuardianPhone(value ?? "")}
+                  incomeValue={guardianAnnualIncome}
+                  onIncomeChange={(value) =>
+                    setGuardianAnnualIncome(value ?? "")
                   }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Yes or No" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">Yes</SelectItem>
-                    <SelectItem value="false">No</SelectItem>
-                  </SelectContent>
-                </Select>
-                <input
-                  type="hidden"
-                  name="stayingInHostel"
-                  value={stayingInHostel ? "true" : "false"}
-                  required
+                  autoCurrent={getAddress("current")}
+                  autoPermanent={getAddress("permanent")}
+                  addressesHydrated={addressesHydrated}
+                  savedAddress={String(
+                    admission?.guardianPermanentAddress ?? ""
+                  )}
+                  defaultValues={guardianDefaults}
+                  fixed={guardianFixed}
                 />
-              </div>
+              ) : null}
             </div>
-
-            {stayingInHostel ? (
-              <ParentMemberCard
-                title="Guardian's Details"
-                memberKey="guardian"
-                nameRequired
-                occupationRequired
-                income="range"
-                incomeRequired
-                mobileRequired
-                wide
-                phone={guardianPhone}
-                onPhoneChange={(value) => setGuardianPhone(value ?? "")}
-                incomeValue={guardianAnnualIncome}
-                onIncomeChange={(value) => setGuardianAnnualIncome(value ?? "")}
-                autoCurrent={getAddress("current")}
-                autoPermanent={getAddress("permanent")}
-                addressesHydrated={addressesHydrated}
-                savedAddress={String(admission?.guardianPermanentAddress ?? "")}
-              />
-            ) : null}
           </div>
 
           <div className="flex flex-wrap justify-between gap-3">

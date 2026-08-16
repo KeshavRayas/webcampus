@@ -5,6 +5,7 @@ import {
   Building,
   CalendarDays,
   ClipboardList,
+  FileBarChart,
   FileText,
   Fingerprint,
   GraduationCap,
@@ -570,6 +571,25 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Upload Documents",
           url: "/admission/upload-documents",
           icon: Upload,
+        },
+        {
+          name: "Reports",
+          url: "/admission/reports/admission",
+          icon: FileBarChart,
+          children: [
+            {
+              name: "Admission Report",
+              url: "/admission/reports/admission",
+            },
+            {
+              name: "Cancellation Report",
+              url: "/admission/reports/cancellation",
+            },
+            {
+              name: "Fee Report",
+              url: "/admission/reports/fee",
+            },
+          ],
         },
         {
           name: "Admission Setup",

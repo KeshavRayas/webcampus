@@ -557,7 +557,7 @@ const FeePaymentStaffView = () => {
       .finally(() => setReceiptData(null));
   }, [receiptData]);
 
-  const handleOpenPay = (admission: FeePaymentResponse) => {
+  const handlePay = (admission: FeePaymentResponse) => {
     setPaymentAdmission(admission);
     setFeeReceiptNumber("");
     setFeeStructure(null);
@@ -684,7 +684,7 @@ const FeePaymentStaffView = () => {
               {!isPaid && (
                 <Button
                   size="sm"
-                  onClick={() => handlePay(admission.id)}
+                  onClick={() => handlePay(admission)}
                   disabled={!canPay || isPaying}
                   title={
                     !canPay

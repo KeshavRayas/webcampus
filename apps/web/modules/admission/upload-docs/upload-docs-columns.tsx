@@ -80,14 +80,6 @@ export const uploadDocsColumns: ColumnDef<UploadDocsResponse>[] = [
   },
 
   {
-    accessorKey: "primaryEmail",
-    header: "College Email",
-    cell: ({ row }) => (
-      <div className="font-medium">{row.original.primaryEmail}</div>
-    ),
-  },
-
-  {
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
