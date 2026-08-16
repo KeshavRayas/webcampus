@@ -9,6 +9,7 @@ import {
   CancelAdmissionType,
   ChangeAdmissionModeType,
   CreateAdmissionShellType,
+  GetAdmissionReportsQueryType,
   GetAdmissionsQueryType,
   PortStudentsType,
 } from "@webcampus/schemas/admission";
@@ -109,6 +110,42 @@ export class AdmissionController {
       }
     } catch (error) {
       logger.error("Error fetching admissions", error);
+      sendResponse({
+        res,
+        status: "error",
+        message: ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 500,
+        error,
+      });
+    }
+  }
+
+  static async getAdmissionReports(req: Request, res: Response): Promise<void> {
+    try {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(req.headers),
+      });
+      const filledById =
+        session?.user?.role === "admission-instructor"
+          ? session.user.id
+          : undefined;
+
+      const response = await AdmissionService.getAdmissionReports(
+        req.query as GetAdmissionReportsQueryType,
+        filledById
+      );
+
+      if (response.status === "success") {
+        sendResponse({
+          res,
+          status: "success",
+          statusCode: 200,
+          message: response.message,
+          data: response.data,
+        });
+      }
+    } catch (error) {
+      logger.error("Error fetching admission report data", error);
       sendResponse({
         res,
         status: "error",

@@ -3,12 +3,13 @@ import { IncomingHttpHeaders } from "http";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { logger } from "@webcampus/common/logger";
-import { db, Prisma } from "@webcampus/db";
+import { $Enums, db, Prisma } from "@webcampus/db";
 import {
   AdmissionActionParamType,
   CancelAdmissionType,
   ChangeAdmissionModeType,
   CreateAdmissionShellType,
+  GetAdmissionReportsQueryType,
   GetAdmissionsQueryType,
   PortStudentsType,
 } from "@webcampus/schemas/admission";
@@ -371,58 +372,170 @@ export class AdmissionService {
     }
   }
 
+  private static buildAdmissionWhere(
+    filters: GetAdmissionReportsQueryType,
+    filledById?: string
+  ): Prisma.AdmissionWhereInput {
+    const createdTo = filters.createdTo
+      ? new Date(filters.createdTo)
+      : undefined;
+
+    if (createdTo) {
+      createdTo.setHours(23, 59, 59, 999);
+    }
+
+    const splitValues = (value?: string): string[] =>
+      value
+        ? value
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [];
+
+    const VALID_STATUSES = [
+      "PENDING",
+      "SUBMITTED",
+      "APPROVED",
+      "REJECTED",
+      "EXITED",
+      "CANCELLED",
+    ];
+    const VALID_ADMISSION_TYPES = [
+      "REGULAR",
+      "LATERAL_ENTRY",
+      "COLLEGE_CHANGE",
+    ];
+
+    const statusValues = splitValues(filters.status).filter((status) =>
+      VALID_STATUSES.includes(status)
+    );
+    const admissionTypeValues = splitValues(filters.admissionType).filter(
+      (type) => VALID_ADMISSION_TYPES.includes(type)
+    );
+
+    let statusIn: string[] | undefined = statusValues.length
+      ? statusValues
+      : undefined;
+    let statusNotIn: string[] | undefined;
+
+    const cancellationStatusValues = splitValues(filters.cancellationStatus);
+    if (cancellationStatusValues.length) {
+      const wantsCancelled = cancellationStatusValues.includes("CANCELLED");
+      const wantsActive = cancellationStatusValues.includes("ACTIVE");
+      if (wantsCancelled && !wantsActive) {
+        statusIn = statusIn
+          ? statusIn.filter((status) => status === "CANCELLED")
+          : ["CANCELLED"];
+      } else if (wantsActive && !wantsCancelled) {
+        statusIn = statusIn
+          ? statusIn.filter((status) => status !== "CANCELLED")
+          : undefined;
+        statusNotIn = ["CANCELLED"];
+      }
+    }
+
+    const feeStatusValues = splitValues(filters.feeStatus);
+    const wantsPaid = feeStatusValues.includes("true");
+    const wantsUnpaid = feeStatusValues.includes("false");
+
+    const cancellationReasons = splitValues(filters.cancellationReason);
+    const hasOtherReason = cancellationReasons.includes("OTHER");
+    const directReasons = cancellationReasons.filter(
+      (reason) => reason !== "OTHER"
+    );
+
+    const hostelValues = splitValues(filters.hostel);
+    const search = filters.search?.trim();
+
+    return {
+      filledById,
+      applicationId: filters.applicationId
+        ? {
+            contains: filters.applicationId,
+            mode: "insensitive",
+          }
+        : undefined,
+      status: statusIn
+        ? { in: statusIn as $Enums.AdmissionStatus[] }
+        : statusNotIn
+          ? { notIn: statusNotIn as $Enums.AdmissionStatus[] }
+          : undefined,
+      feeStatus:
+        feeStatusValues.length && wantsPaid !== wantsUnpaid
+          ? wantsPaid
+          : undefined,
+      modeOfAdmission: filters.mode
+        ? { in: splitValues(filters.mode) }
+        : undefined,
+      admissionType: admissionTypeValues.length
+        ? { in: admissionTypeValues }
+        : undefined,
+      admissionBasedOn: filters.admissionBasedOn
+        ? { in: splitValues(filters.admissionBasedOn) }
+        : undefined,
+      departmentId: filters.department
+        ? { in: splitValues(filters.department) }
+        : undefined,
+      categoryClaimed: filters.categoryClaimed
+        ? { in: splitValues(filters.categoryClaimed) }
+        : undefined,
+      categoryAllotted: filters.categoryAllotted
+        ? { in: splitValues(filters.categoryAllotted) }
+        : undefined,
+      quota: filters.quota ? { in: splitValues(filters.quota) } : undefined,
+      counsellingRound: filters.round
+        ? { in: splitValues(filters.round) }
+        : undefined,
+      hostel:
+        hostelValues.length === 1 ? hostelValues[0] === "true" : undefined,
+      cancellation: cancellationReasons.length
+        ? {
+            is: {
+              OR: [
+                ...(directReasons.length
+                  ? [{ reason: { in: directReasons } }]
+                  : []),
+                ...(hasOtherReason
+                  ? [{ reason: { startsWith: "OTHER:" } }]
+                  : []),
+              ],
+            },
+          }
+        : undefined,
+      semesterId: filters.semester,
+      createdAt:
+        filters.createdFrom || createdTo
+          ? {
+              gte: filters.createdFrom
+                ? new Date(filters.createdFrom)
+                : undefined,
+              lte: createdTo,
+            }
+          : undefined,
+      ...(search
+        ? {
+            OR: [
+              { primaryEmail: { contains: search, mode: "insensitive" } },
+              {
+                student: {
+                  is: {
+                    user: { name: { contains: search, mode: "insensitive" } },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+  }
+
   static async getAdmissions(
     filters: GetAdmissionsQueryType,
     filledById?: string
   ): Promise<BaseResponse<unknown>> {
     try {
-      const createdTo = filters.createdTo
-        ? new Date(filters.createdTo)
-        : undefined;
-
-      if (createdTo) {
-        createdTo.setHours(23, 59, 59, 999);
-      }
-
       const admissions = await db.admission.findMany({
-        where: {
-          filledById,
-          applicationId: filters.applicationId
-            ? {
-                contains: filters.applicationId,
-                mode: "insensitive",
-              }
-            : undefined,
-          status: filters.status,
-          feeStatus:
-            filters.feeStatus === "true"
-              ? true
-              : filters.feeStatus === "false"
-                ? false
-                : undefined,
-          modeOfAdmission: filters.mode
-            ? {
-                equals: filters.mode,
-                mode: "insensitive",
-              }
-            : undefined,
-          admissionType: filters.admissionType
-            ? {
-                equals: filters.admissionType,
-                mode: "insensitive",
-              }
-            : undefined,
-          semesterId: filters.semester,
-          createdAt:
-            filters.createdFrom || createdTo
-              ? {
-                  gte: filters.createdFrom
-                    ? new Date(filters.createdFrom)
-                    : undefined,
-                  lte: createdTo,
-                }
-              : undefined,
-        },
+        where: this.buildAdmissionWhere(filters, filledById),
         orderBy: { createdAt: "desc" },
         include: {
           semester: true,
@@ -461,6 +574,82 @@ export class AdmissionService {
       };
     } catch (error) {
       logger.error("Failed to fetch admissions", error);
+      throw error;
+    }
+  }
+
+  static async getAdmissionReports(
+    filters: GetAdmissionReportsQueryType,
+    filledById?: string
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const page = Math.max(Number(filters.page) || 0, 0);
+      const pageSize = Math.min(
+        Math.max(Number(filters.pageSize) || 10, 1),
+        100
+      );
+      const where = this.buildAdmissionWhere(filters, filledById);
+
+      const [total, items] = await Promise.all([
+        db.admission.count({ where }),
+        db.admission.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip: page * pageSize,
+          take: pageSize,
+          select: {
+            id: true,
+            applicationId: true,
+            primaryEmail: true,
+            status: true,
+            createdAt: true,
+            departmentId: true,
+            modeOfAdmission: true,
+            categoryClaimed: true,
+            categoryAllotted: true,
+            quota: true,
+            admissionType: true,
+            admissionBasedOn: true,
+            hostel: true,
+            counsellingRound: true,
+            feeStatus: true,
+            feePaid: true,
+            feeReceiptNumber: true,
+            semesterId: true,
+            studentId: true,
+            nameAsPer10th: true,
+            department: { select: { name: true } },
+            student: {
+              select: {
+                usn: true,
+                user: { select: { name: true } },
+              },
+            },
+            filledBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+              },
+            },
+            cancellation: {
+              select: {
+                reason: true,
+                cancelledAt: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+      return {
+        status: "success",
+        message: "Report data fetched successfully",
+        data: { items, total, page, pageSize },
+      };
+    } catch (error) {
+      logger.error("Failed to fetch report data", error);
       throw error;
     }
   }

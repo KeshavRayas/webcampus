@@ -5,6 +5,8 @@ import {
   flexRender,
   getCoreRowModel,
   getPaginationRowModel,
+  PaginationState,
+  Updater,
   useReactTable,
 } from "@tanstack/react-table";
 import {
@@ -21,22 +23,50 @@ import { DataTablePagination } from "./data-table-pagination";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  manualPagination?: boolean;
+  page?: number;
+  pageSize?: number;
+  totalRows?: number;
+  onPaginationChange?: (page: number, pageSize: number) => void;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  manualPagination = false,
+  page = 0,
+  pageSize = 10,
+  totalRows = 0,
+  onPaginationChange,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: {
-      pagination: {
-        pageSize: 10,
-      },
-    },
+    ...(manualPagination
+      ? {
+          manualPagination: true,
+          rowCount: totalRows,
+          pageCount: Math.max(Math.ceil(totalRows / pageSize), 1),
+          state: {
+            pagination: { pageIndex: page, pageSize },
+          },
+          onPaginationChange: (updater: Updater<PaginationState>) => {
+            const next =
+              typeof updater === "function"
+                ? updater({ pageIndex: page, pageSize })
+                : updater;
+            onPaginationChange?.(next.pageIndex, next.pageSize);
+          },
+        }
+      : {
+          getPaginationRowModel: getPaginationRowModel(),
+          initialState: {
+            pagination: {
+              pageSize: 10,
+            },
+          },
+        }),
   });
 
   return (

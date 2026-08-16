@@ -31,6 +31,8 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   dialogDescription = "Use advanced filters to narrow down the results.",
   onGenerateReport,
   reportButtonLabel = "Generate Report PDF",
+  fieldToggles,
+  onToggleField,
 }: {
   simpleFields: FilterFieldConfig<TFilters>[];
   advancedFields: FilterFieldConfig<TFilters>[];
@@ -43,6 +45,8 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   dialogDescription?: string;
   onGenerateReport?: () => void;
   reportButtonLabel?: string;
+  fieldToggles?: Record<string, boolean>;
+  onToggleField?: (columnKey: string) => void;
 }) {
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
 
@@ -91,6 +95,8 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
                 draftFilters={draftFilters}
                 onDraftChange={onDraftChange}
                 allValue={allValue}
+                toggles={fieldToggles}
+                onToggle={onToggleField}
                 className="grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2"
               />
             </div>

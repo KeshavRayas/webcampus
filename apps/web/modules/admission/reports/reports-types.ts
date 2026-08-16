@@ -15,8 +15,7 @@ export type ReportColumn = {
 export type AdmissionReportFilters = {
   academicTerm: string;
   semester: string;
-  name: string;
-  email: string;
+  search: string;
   status: string;
   department: string;
   mode: string;
@@ -37,8 +36,7 @@ export type AdmissionReportFilters = {
 export const EMPTY_REPORT_FILTERS: AdmissionReportFilters = {
   academicTerm: "",
   semester: "",
-  name: "",
-  email: "",
+  search: "",
   status: "",
   department: "",
   mode: "",
@@ -167,90 +165,73 @@ export const getBaseReportColumns = (
   return base;
 };
 
-export const getDynamicReportColumns = (
-  filters: AdmissionReportFilters
-): ReportColumn[] => {
-  const columns: ReportColumn[] = [];
+export type ReportColumnSelection = Record<string, boolean>;
 
-  if (filters.department) {
-    columns.push({
-      key: "branch",
-      label: "Branch",
-      value: (admission) => admission.department?.name || "-",
-    });
-  }
-  if (filters.mode) {
-    columns.push({
-      key: "mode",
-      label: "Mode of Admission",
-      value: (admission) => admission.modeOfAdmission || "-",
-    });
-  }
-  if (filters.categoryClaimed) {
-    columns.push({
-      key: "categoryClaimed",
-      label: "Category Claimed",
-      value: (admission) => admission.categoryClaimed || "-",
-    });
-  }
-  if (filters.categoryAllotted) {
-    columns.push({
-      key: "categoryAllotted",
-      label: "Category Allotted",
-      value: (admission) => admission.categoryAllotted || "-",
-    });
-  }
-  if (filters.quota) {
-    columns.push({
-      key: "quota",
-      label: "Quota",
-      value: (admission) => admission.quota || "-",
-    });
-  }
-  if (filters.createdFrom || filters.createdTo) {
-    columns.push({
-      key: "createdAt",
-      label: "Date",
-      value: (admission) => formatReportDate(admission.createdAt),
-    });
-  }
-  if (filters.admissionType) {
-    columns.push({
-      key: "admissionType",
-      label: "Admission Type",
-      value: (admission) => admissionTypeLabel(admission.admissionType || ""),
-    });
-  }
-  if (filters.admissionBasedOn) {
-    columns.push({
-      key: "admissionBasedOn",
-      label: "Qualification",
-      value: (admission) =>
-        qualificationLabel(admission.admissionBasedOn || ""),
-    });
-  }
-  if (filters.hostel) {
-    columns.push({
-      key: "hostel",
-      label: "Hostel",
-      value: (admission) => (admission.hostel ? "Yes" : "No"),
-    });
-  }
-  if (filters.round) {
-    columns.push({
-      key: "round",
-      label: "Round",
-      value: (admission) => admission.counsellingRound || "-",
-    });
-  }
+export const getAvailableReportColumns = (): ReportColumn[] => [
+  {
+    key: "branch",
+    label: "Branch",
+    value: (admission) => admission.department?.name || "-",
+  },
+  {
+    key: "mode",
+    label: "Mode of Admission",
+    value: (admission) => admission.modeOfAdmission || "-",
+  },
+  {
+    key: "categoryClaimed",
+    label: "Category Claimed",
+    value: (admission) => admission.categoryClaimed || "-",
+  },
+  {
+    key: "categoryAllotted",
+    label: "Category Allotted",
+    value: (admission) => admission.categoryAllotted || "-",
+  },
+  {
+    key: "quota",
+    label: "Quota",
+    value: (admission) => admission.quota || "-",
+  },
+  {
+    key: "createdAt",
+    label: "Date",
+    value: (admission) => formatReportDate(admission.createdAt),
+  },
+  {
+    key: "admissionType",
+    label: "Admission Type",
+    value: (admission) => admissionTypeLabel(admission.admissionType || ""),
+  },
+  {
+    key: "admissionBasedOn",
+    label: "Qualification",
+    value: (admission) => qualificationLabel(admission.admissionBasedOn || ""),
+  },
+  {
+    key: "hostel",
+    label: "Hostel",
+    value: (admission) => (admission.hostel ? "Yes" : "No"),
+  },
+  {
+    key: "round",
+    label: "Round",
+    value: (admission) => admission.counsellingRound || "-",
+  },
+];
 
-  return columns;
+export const createEmptyReportColumnSelection = (): ReportColumnSelection => {
+  const selection: ReportColumnSelection = {};
+  for (const column of getAvailableReportColumns()) {
+    selection[column.key] = false;
+  }
+  return selection;
 };
 
 export const getReportColumns = (
   reportType: ReportType,
-  filters: AdmissionReportFilters
+  selection: ReportColumnSelection
 ): ReportColumn[] => [
   ...getBaseReportColumns(reportType),
-  ...getDynamicReportColumns(filters),
+  ...getAvailableReportColumns().filter((column) => selection[column.key]),
 ];

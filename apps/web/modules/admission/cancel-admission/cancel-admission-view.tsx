@@ -52,12 +52,10 @@ type CancellationReason = (typeof CANCELLATION_REASON_VALUES)[number];
 type CancelAdmissionFilters = {
   academicTerm: string;
   semester: string;
-  applicationId: string;
+  search: string;
   status: string;
   mode: string;
   admissionType: string;
-  email: string;
-  name: string;
   filledBy: string;
   createdFrom: string;
   createdTo: string;
@@ -68,12 +66,10 @@ type CancelAdmissionFilters = {
 const EMPTY_FILTERS: CancelAdmissionFilters = {
   academicTerm: "",
   semester: "",
-  applicationId: "",
+  search: "",
   status: "",
   mode: "",
   admissionType: "",
-  email: "",
-  name: "",
   filledBy: "",
   createdFrom: "",
   createdTo: "",
@@ -133,7 +129,6 @@ export function CancelAdmissionView() {
   const queryFilters = {
     academicTerm: appliedFilters.academicTerm,
     semester: appliedFilters.semester,
-    applicationId: appliedFilters.applicationId,
     status: appliedFilters.status,
     mode: appliedFilters.mode,
     admissionType: appliedFilters.admissionType,
@@ -194,25 +189,11 @@ export function CancelAdmissionView() {
 
   const advancedFilterFields: FilterFieldConfig<CancelAdmissionFilters>[] = [
     {
-      key: "name",
-      label: "Name",
+      key: "search",
+      label: "Search",
       type: "text",
-      placeholder: "Search by name",
-      inputId: "cancel-name",
-    },
-    {
-      key: "email",
-      label: "Email",
-      type: "text",
-      placeholder: "Search by email",
-      inputId: "cancel-email",
-    },
-    {
-      key: "applicationId",
-      label: "Application ID",
-      type: "text",
-      placeholder: "Search application ID",
-      inputId: "cancel-application-id",
+      placeholder: "Search by name or email",
+      inputId: "cancel-search",
     },
     {
       key: "filledBy",
@@ -299,17 +280,12 @@ export function CancelAdmissionView() {
   const filteredAdmissions = useMemo(() => {
     let admissions = data ?? [];
 
-    const email = appliedFilters.email.trim().toLowerCase();
-    if (email) {
-      admissions = admissions.filter((admission) =>
-        admission.primaryEmail.toLowerCase().includes(email)
-      );
-    }
-
-    const name = appliedFilters.name.trim().toLowerCase();
-    if (name) {
-      admissions = admissions.filter((admission) =>
-        getAdmissionFullName(admission).toLowerCase().includes(name)
+    const search = appliedFilters.search.trim().toLowerCase();
+    if (search) {
+      admissions = admissions.filter(
+        (admission) =>
+          getAdmissionFullName(admission).toLowerCase().includes(search) ||
+          admission.primaryEmail.toLowerCase().includes(search)
       );
     }
 
@@ -347,8 +323,7 @@ export function CancelAdmissionView() {
   }, [
     appliedFilters.cancellationReason,
     appliedFilters.cancellationStatus,
-    appliedFilters.email,
-    appliedFilters.name,
+    appliedFilters.search,
     appliedFilters.filledBy,
     data,
   ]);

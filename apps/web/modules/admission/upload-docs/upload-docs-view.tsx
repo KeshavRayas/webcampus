@@ -37,12 +37,10 @@ const ADMISSION_STATUSES = [
 type UploadDocumentFilters = {
   academicTerm: string;
   semester: string;
-  applicationId: string;
+  search: string;
   status: string;
   mode: string;
   admissionType: string;
-  email: string;
-  name: string;
   filledBy: string;
   createdFrom: string;
   createdTo: string;
@@ -51,12 +49,10 @@ type UploadDocumentFilters = {
 const EMPTY_FILTERS: UploadDocumentFilters = {
   academicTerm: "",
   semester: "",
-  applicationId: "",
+  search: "",
   status: "",
   mode: "",
   admissionType: "",
-  email: "",
-  name: "",
   filledBy: "",
   createdFrom: "",
   createdTo: "",
@@ -120,7 +116,7 @@ export function UploadDocsView() {
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["upload-documents", appliedFilters],
     queryFn: async () => {
-      const apiFilters: Omit<UploadDocumentFilters, "email"> = {
+      const apiFilters: Omit<UploadDocumentFilters, "search"> = {
         ...appliedFilters,
       };
       const query = createFilterQueryString(apiFilters);
@@ -142,16 +138,12 @@ export function UploadDocsView() {
 
   const filteredDocuments = useMemo(() => {
     let rows = data ?? [];
-    const email = appliedFilters.email.trim().toLowerCase();
-    if (email) {
-      rows = rows.filter((admission) =>
-        admission.primaryEmail?.toLowerCase().includes(email)
-      );
-    }
-    const name = appliedFilters.name.trim().toLowerCase();
-    if (name) {
-      rows = rows.filter((admission) =>
-        getAdmissionFullName(admission).toLowerCase().includes(name)
+    const search = appliedFilters.search.trim().toLowerCase();
+    if (search) {
+      rows = rows.filter(
+        (admission) =>
+          getAdmissionFullName(admission).toLowerCase().includes(search) ||
+          admission.primaryEmail?.toLowerCase().includes(search)
       );
     }
     if (appliedFilters.filledBy) {
@@ -160,12 +152,7 @@ export function UploadDocsView() {
       );
     }
     return rows;
-  }, [
-    data,
-    appliedFilters.email,
-    appliedFilters.name,
-    appliedFilters.filledBy,
-  ]);
+  }, [data, appliedFilters.search, appliedFilters.filledBy]);
 
   const filledByOptions = useMemo(() => {
     const byId = new Map<string, { label: string; value: string }>();
@@ -232,25 +219,11 @@ export function UploadDocsView() {
 
   const advancedFilterFields: FilterFieldConfig<UploadDocumentFilters>[] = [
     {
-      key: "name",
-      label: "Name",
+      key: "search",
+      label: "Search",
       type: "text",
-      inputId: "name",
-      placeholder: "Search by name",
-    },
-    {
-      key: "email",
-      label: "Email",
-      type: "text",
-      inputId: "email",
-      placeholder: "Search by email",
-    },
-    {
-      key: "applicationId",
-      label: "Application ID",
-      type: "text",
-      inputId: "applicationId",
-      placeholder: "Search application ID",
+      inputId: "search",
+      placeholder: "Search by name or email",
     },
     {
       key: "filledBy",

@@ -9,7 +9,7 @@ import { useAdmissionConstants } from "@/lib/use-admission-constants";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   admissionTypes,
   allQuotas,
@@ -22,10 +22,7 @@ import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import {
-  AdmissionResponse,
-  getAdmissionFullName,
-} from "../admin/admin-admission-columns";
+import { AdmissionResponse } from "../admin/admin-admission-columns";
 import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import {
@@ -37,10 +34,12 @@ import {
   CANCELLATION_REASON_VALUES,
   CANCELLATION_STATUS_VALUES,
   cancellationReasonLabel,
+  createEmptyReportColumnSelection,
   EMPTY_REPORT_FILTERS,
   getReportColumns,
   HOSTEL_OPTIONS,
   type AdmissionReportFilters,
+  type ReportColumnSelection,
   type ReportType,
 } from "./reports-types";
 
@@ -65,6 +64,50 @@ const REPORT_DIALOG_DESCRIPTIONS: Record<ReportType, string> = {
   cancellation:
     "Filter by name, email, status, department, mode, category, quota, date range, and cancellation details.",
   fee: "Filter by name, email, status, department, mode, category, quota, date range, and fee status.",
+};
+
+const ALWAYS_SHOWN_LABELS: Record<ReportType, string> = {
+  admission: "Name, Email, and Status are always included.",
+  cancellation:
+    "Name, Email, Status, Cancellation Reason, and Cancelled On are always included.",
+  fee: "Name, Email, Status, Fee Paid, Fee Status, and Receipt No. are always included.",
+};
+
+type ReportPage = {
+  items: AdmissionResponse[];
+  total: number;
+};
+
+const REPORT_FETCH_PAGE_SIZE = 500;
+
+const fetchReportRows = async (
+  filters: AdmissionReportFilters,
+  page: number,
+  pageSize: number
+): Promise<ReportPage> => {
+  const query = createFilterQueryString(filters);
+  const response = await apiClient.get<BaseResponse<ReportPage>>(
+    `/admission/reports?${query}${query ? "&" : ""}page=${page}&pageSize=${pageSize}`,
+    { withCredentials: true }
+  );
+  if (response.data.status === "error") {
+    throw new Error(response.data.message);
+  }
+  return response.data.data ?? { items: [], total: 0 };
+};
+
+const fetchAllReportRows = async (
+  filters: AdmissionReportFilters
+): Promise<AdmissionResponse[]> => {
+  const all: AdmissionResponse[] = [];
+  let page = 0;
+  while (true) {
+    const result = await fetchReportRows(filters, page, REPORT_FETCH_PAGE_SIZE);
+    all.push(...result.items);
+    if (all.length >= result.total || result.items.length === 0) break;
+    page += 1;
+  }
+  return all;
 };
 
 const flattenCategories = (map?: Record<string, string[]>) => {
@@ -124,7 +167,13 @@ export function AdmissionReportView({
   const [appliedFilters, setAppliedFilters] =
     useState<AdmissionReportFilters>(initialFilters);
   const [reportData, setReportData] = useState<ReportDocumentData | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [columnSelection, setColumnSelection] = useState<ReportColumnSelection>(
+    () => createEmptyReportColumnSelection()
+  );
   const reportRef = useRef<HTMLDivElement | null>(null);
+  const generatingRef = useRef(false);
 
   useEffect(() => {
     const nextFilters = getFiltersFromSearchParams(
@@ -242,33 +291,25 @@ export function AdmissionReportView({
 
   const advancedFilterFields: FilterFieldConfig<AdmissionReportFilters>[] = [
     {
-      key: "name",
-      label: "Name",
+      key: "search",
+      label: "Search",
       type: "text",
-      placeholder: "Search by name",
-      inputId: "report-name",
-    },
-    {
-      key: "email",
-      label: "Email",
-      type: "text",
-      placeholder: "Search by email",
-      inputId: "report-email",
+      placeholder: "Search by name or email",
+      inputId: "report-search",
     },
     {
       key: "status",
       label: "Status",
-      type: "select",
+      type: "multiselect",
       placeholder: "All statuses",
-      allOptionLabel: "All statuses",
       options: toOptions(ADMISSION_STATUSES),
     },
     {
       key: "department",
       label: "Department / Branch",
-      type: "select",
+      type: "multiselect",
       placeholder: "All departments",
-      allOptionLabel: "All departments",
+      columnKey: "branch",
       options: departments.map((department) => ({
         label: department.name,
         value: department.id,
@@ -277,33 +318,33 @@ export function AdmissionReportView({
     {
       key: "mode",
       label: "Mode of Admission",
-      type: "select",
+      type: "multiselect",
       placeholder: "All modes",
-      allOptionLabel: "All modes",
+      columnKey: "mode",
       options: toOptions(admissionModes),
     },
     {
       key: "categoryClaimed",
       label: "Category Claimed",
-      type: "select",
+      type: "multiselect",
       placeholder: "All categories",
-      allOptionLabel: "All categories",
+      columnKey: "categoryClaimed",
       options: categoryClaimedOptions,
     },
     {
       key: "categoryAllotted",
       label: "Category Allotted",
-      type: "select",
+      type: "multiselect",
       placeholder: "All categories",
-      allOptionLabel: "All categories",
+      columnKey: "categoryAllotted",
       options: categoryAllottedOptions,
     },
     {
       key: "quota",
       label: "Quota",
-      type: "select",
+      type: "multiselect",
       placeholder: "All quotas",
-      allOptionLabel: "All quotas",
+      columnKey: "quota",
       options: quotaOptions,
     },
     {
@@ -311,19 +352,21 @@ export function AdmissionReportView({
       label: "From (Date)",
       type: "date",
       inputId: "report-created-from",
+      columnKey: "createdAt",
     },
     {
       key: "createdTo",
       label: "To (Date)",
       type: "date",
       inputId: "report-created-to",
+      columnKey: "createdAt",
     },
     {
       key: "admissionType",
       label: "Admission Type",
-      type: "select",
+      type: "multiselect",
       placeholder: "All admission types",
-      allOptionLabel: "All admission types",
+      columnKey: "admissionType",
       options: admissionTypes.map((type) => ({
         label: type.label,
         value: type.value,
@@ -332,25 +375,25 @@ export function AdmissionReportView({
     {
       key: "admissionBasedOn",
       label: "Qualification",
-      type: "select",
+      type: "multiselect",
       placeholder: "All qualifications",
-      allOptionLabel: "All qualifications",
+      columnKey: "admissionBasedOn",
       options: ADMISSION_BASED_ON_OPTIONS,
     },
     {
       key: "hostel",
       label: "Hostel",
-      type: "select",
+      type: "multiselect",
       placeholder: "All",
-      allOptionLabel: "All",
+      columnKey: "hostel",
       options: HOSTEL_OPTIONS,
     },
     {
       key: "round",
       label: "Round",
-      type: "select",
+      type: "multiselect",
       placeholder: "All rounds",
-      allOptionLabel: "All rounds",
+      columnKey: "round",
       options: toOptions(counsellingRounds),
     },
     ...(reportType === "cancellation"
@@ -358,9 +401,8 @@ export function AdmissionReportView({
           {
             key: "cancellationStatus",
             label: "Cancellation Status",
-            type: "select" as const,
+            type: "multiselect" as const,
             placeholder: "All cancellation statuses",
-            allOptionLabel: "All cancellation statuses",
             options: CANCELLATION_STATUS_VALUES.map((status) => ({
               label:
                 status === "ACTIVE"
@@ -372,9 +414,8 @@ export function AdmissionReportView({
           {
             key: "cancellationReason",
             label: "Cancellation Reason",
-            type: "select" as const,
+            type: "multiselect" as const,
             placeholder: "All cancellation reasons",
-            allOptionLabel: "All cancellation reasons",
             options: CANCELLATION_REASON_VALUES.map((reason) => ({
               label: cancellationReasonLabel(reason),
               value: reason,
@@ -387,9 +428,8 @@ export function AdmissionReportView({
           {
             key: "feeStatus",
             label: "Fee Status",
-            type: "select" as const,
+            type: "multiselect" as const,
             placeholder: "All fee statuses",
-            allOptionLabel: "All fee statuses",
             options: [
               { label: "Paid", value: "true" },
               { label: "Unpaid", value: "false" },
@@ -399,123 +439,32 @@ export function AdmissionReportView({
       : []),
   ];
 
-  const query = createFilterQueryString(appliedFilters);
   const { data, isFetching, isLoading } = useQuery({
-    queryKey: ["admission-reports", reportType, appliedFilters],
-    queryFn: async () => {
-      const response = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
-        `/admission${query ? `?${query}` : ""}`,
-        { withCredentials: true }
-      );
-      if (response.data.status === "error") {
-        throw new Error(response.data.message);
-      }
-      return response.data.data ?? [];
-    },
+    queryKey: ["admission-reports", reportType, appliedFilters, page, pageSize],
+    queryFn: () => fetchReportRows(appliedFilters, page, pageSize),
+    placeholderData: keepPreviousData,
   });
 
-  const filteredAdmissions = useMemo(() => {
-    let rows = data ?? [];
-    const filters = appliedFilters;
+  const total = data?.total ?? 0;
+  const maxPage = Math.max(Math.ceil(total / pageSize) - 1, 0);
 
-    const name = filters.name.trim().toLowerCase();
-    if (name) {
-      rows = rows.filter((admission) =>
-        getAdmissionFullName(admission).toLowerCase().includes(name)
-      );
-    }
+  useEffect(() => {
+    if (page > maxPage) setPage(maxPage);
+  }, [page, maxPage]);
 
-    const email = filters.email.trim().toLowerCase();
-    if (email) {
-      rows = rows.filter((admission) =>
-        admission.primaryEmail?.toLowerCase().includes(email)
-      );
-    }
-
-    if (filters.status) {
-      rows = rows.filter((admission) => admission.status === filters.status);
-    }
-    if (filters.department) {
-      rows = rows.filter(
-        (admission) => admission.departmentId === filters.department
-      );
-    }
-    if (filters.mode) {
-      rows = rows.filter(
-        (admission) =>
-          admission.modeOfAdmission?.toLowerCase() ===
-          filters.mode.toLowerCase()
-      );
-    }
-    if (filters.categoryClaimed) {
-      rows = rows.filter(
-        (admission) => admission.categoryClaimed === filters.categoryClaimed
-      );
-    }
-    if (filters.categoryAllotted) {
-      rows = rows.filter(
-        (admission) => admission.categoryAllotted === filters.categoryAllotted
-      );
-    }
-    if (filters.quota) {
-      rows = rows.filter((admission) => admission.quota === filters.quota);
-    }
-    if (filters.admissionType) {
-      rows = rows.filter(
-        (admission) => admission.admissionType === filters.admissionType
-      );
-    }
-    if (filters.admissionBasedOn) {
-      rows = rows.filter(
-        (admission) => admission.admissionBasedOn === filters.admissionBasedOn
-      );
-    }
-    if (filters.hostel) {
-      rows = rows.filter((admission) =>
-        filters.hostel === "true"
-          ? admission.hostel === true
-          : admission.hostel !== true
-      );
-    }
-    if (filters.round) {
-      rows = rows.filter(
-        (admission) => admission.counsellingRound === filters.round
-      );
-    }
-
-    if (reportType === "cancellation") {
-      if (filters.cancellationStatus === "ACTIVE") {
-        rows = rows.filter((admission) => admission.status !== "CANCELLED");
-      } else if (filters.cancellationStatus === "CANCELLED") {
-        rows = rows.filter((admission) => admission.status === "CANCELLED");
-      }
-      if (filters.cancellationReason) {
-        rows = rows.filter((admission) => {
-          const reason = admission.cancellation?.reason;
-          if (!reason) return false;
-          if (filters.cancellationReason === "OTHER") {
-            return reason.startsWith("OTHER:");
-          }
-          return reason === filters.cancellationReason;
-        });
-      }
-    }
-
-    if (reportType === "fee" && filters.feeStatus) {
-      rows = rows.filter((admission) =>
-        filters.feeStatus === "true"
-          ? admission.feeStatus === true
-          : admission.feeStatus !== true
-      );
-    }
-
-    return rows;
-  }, [data, appliedFilters, reportType]);
+  const rows = data?.items ?? [];
 
   const reportColumns = useMemo(
-    () => getReportColumns(reportType, appliedFilters),
-    [reportType, appliedFilters]
+    () => getReportColumns(reportType, columnSelection),
+    [reportType, columnSelection]
   );
+
+  const toggleColumn = (key: string) => {
+    setColumnSelection((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
+  };
 
   const tableColumns = useMemo(
     () =>
@@ -540,6 +489,7 @@ export function AdmissionReportView({
     }
 
     setAppliedFilters(draftFilters);
+    setPage(0);
     const filterQuery = createFilterQueryString(draftFilters);
     router.replace(`${pathname}${filterQuery ? `?${filterQuery}` : ""}`, {
       scroll: false,
@@ -549,31 +499,40 @@ export function AdmissionReportView({
   const resetFilters = () => {
     setDraftFilters(EMPTY_REPORT_FILTERS);
     setAppliedFilters(EMPTY_REPORT_FILTERS);
+    setPage(0);
     router.replace(pathname, { scroll: false });
   };
 
-  const generateReportPdf = () => {
-    const rows = filteredAdmissions;
-    if (rows.length === 0) {
-      toast.error("No records to include in the report.");
-      return;
+  const generateReportPdf = async () => {
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    try {
+      const rows = await fetchAllReportRows(appliedFilters);
+      if (rows.length === 0) {
+        toast.error("No records to include in the report.");
+        return;
+      }
+
+      const columns = getReportColumns(reportType, columnSelection);
+
+      setReportData({
+        title: REPORT_TITLES[reportType],
+        generatedAt: new Date().toLocaleString(),
+        total: rows.length,
+        summary: buildReportSummary(reportType, rows),
+        columns: columns.map((column) => ({
+          key: column.key,
+          label: column.label,
+        })),
+        rows: rows.map((admission) =>
+          columns.map((column) => column.value(admission))
+        ),
+      });
+    } catch {
+      toast.error("Failed to fetch data for the report.");
+    } finally {
+      generatingRef.current = false;
     }
-
-    const columns = getReportColumns(reportType, appliedFilters);
-
-    setReportData({
-      title: REPORT_TITLES[reportType],
-      generatedAt: new Date().toLocaleString(),
-      total: rows.length,
-      summary: buildReportSummary(reportType, rows),
-      columns: columns.map((column) => ({
-        key: column.key,
-        label: column.label,
-      })),
-      rows: rows.map((admission) =>
-        columns.map((column) => column.value(admission))
-      ),
-    });
   };
 
   useEffect(() => {
@@ -613,6 +572,8 @@ export function AdmissionReportView({
             dialogDescription={REPORT_DIALOG_DESCRIPTIONS[reportType]}
             onGenerateReport={generateReportPdf}
             reportButtonLabel={`Generate ${REPORT_TITLES[reportType]} PDF`}
+            fieldToggles={columnSelection}
+            onToggleField={toggleColumn}
           />
         </div>
 
@@ -622,8 +583,8 @@ export function AdmissionReportView({
               {REPORT_TITLES[reportType]}
             </h3>
             <p className="text-muted-foreground text-sm">
-              Columns are injected dynamically based on the advanced filters you
-              apply. Name, email, and status are always shown.
+              Check the box beside a filter to include its column in the report.{" "}
+              {ALWAYS_SHOWN_LABELS[reportType]}
             </p>
           </div>
           {isFetching && (
@@ -631,7 +592,18 @@ export function AdmissionReportView({
           )}
         </div>
 
-        <DataTable columns={tableColumns} data={filteredAdmissions} />
+        <DataTable
+          columns={tableColumns}
+          data={rows}
+          manualPagination
+          page={page}
+          pageSize={pageSize}
+          totalRows={total}
+          onPaginationChange={(nextPage, nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(nextPageSize !== pageSize ? 0 : Math.max(nextPage, 0));
+          }}
+        />
       </div>
 
       <div

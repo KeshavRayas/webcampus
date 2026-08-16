@@ -60,22 +60,18 @@ import { usePortStudents } from "./use-port-students";
 // const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
 
 type AdmissionFilters = {
-  applicationId: string;
   academicTerm: string;
   semester: string;
-  email: string;
-  name: string;
+  search: string;
   filledBy: string;
   createdFrom: string;
   createdTo: string;
 };
 
 const EMPTY_FILTERS: AdmissionFilters = {
-  applicationId: "",
   academicTerm: "",
   semester: "",
-  email: "",
-  name: "",
+  search: "",
   filledBy: "",
   createdFrom: "",
   createdTo: "",
@@ -159,7 +155,7 @@ export const AdminAdmissionView = ({
   } = useQuery({
     queryKey: ["admissions", appliedFilters],
     queryFn: async () => {
-      const apiFilters: Omit<AdmissionFilters, "email"> = {
+      const apiFilters: Omit<AdmissionFilters, "search"> = {
         ...appliedFilters,
       };
       const query = createFilterQueryString(apiFilters);
@@ -173,16 +169,12 @@ export const AdminAdmissionView = ({
   });
   const relevantAdmissions = useMemo(() => {
     let rows = admissions ?? [];
-    const email = appliedFilters.email.trim().toLowerCase();
-    if (email) {
-      rows = rows.filter((admission) =>
-        admission.primaryEmail.toLowerCase().includes(email)
-      );
-    }
-    const name = appliedFilters.name.trim().toLowerCase();
-    if (name) {
-      rows = rows.filter((admission) =>
-        getAdmissionFullName(admission).toLowerCase().includes(name)
+    const search = appliedFilters.search.trim().toLowerCase();
+    if (search) {
+      rows = rows.filter(
+        (admission) =>
+          getAdmissionFullName(admission).toLowerCase().includes(search) ||
+          admission.primaryEmail.toLowerCase().includes(search)
       );
     }
     if (appliedFilters.filledBy) {
@@ -191,12 +183,7 @@ export const AdminAdmissionView = ({
       );
     }
     return rows;
-  }, [
-    admissions,
-    appliedFilters.email,
-    appliedFilters.name,
-    appliedFilters.filledBy,
-  ]);
+  }, [admissions, appliedFilters.search, appliedFilters.filledBy]);
   const filledByOptions = useMemo(() => {
     const byId = new Map<string, { label: string; value: string }>();
     (admissions ?? []).forEach((admission) => {
@@ -364,25 +351,11 @@ export const AdminAdmissionView = ({
 
   const advancedFilterFields: FilterFieldConfig<AdmissionFilters>[] = [
     {
-      key: "name",
-      label: "Name",
+      key: "search",
+      label: "Search",
       type: "text",
-      placeholder: "Search by name",
-      inputId: "admission-name",
-    },
-    {
-      key: "email",
-      label: "Email",
-      type: "text",
-      placeholder: "Search by email",
-      inputId: "admission-email",
-    },
-    {
-      key: "applicationId",
-      label: "Application ID",
-      type: "text",
-      placeholder: "Search application ID",
-      inputId: "admission-application-id",
+      placeholder: "Search by name or email",
+      inputId: "admission-search",
     },
     {
       key: "filledBy",

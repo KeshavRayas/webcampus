@@ -11,6 +11,7 @@ import {
   ApproveAdmissionSchema,
   CancelAdmissionSchema,
   CreateAdmissionShellSchema,
+  GetAdmissionReportsQuerySchema,
   GetAdmissionsQuerySchema,
   PortStudentsSchema,
 } from "@webcampus/schemas/admission";
@@ -49,6 +50,19 @@ router.get(
     },
   }),
   AdmissionController.getAdmissions
+);
+
+// Paginated report data for the admission reports tab (server-side filtering + pagination)
+router.get(
+  "/reports",
+  validateRequest(GetAdmissionReportsQuerySchema, "query"),
+  protect({
+    role: ["admin", "admission", "admission-instructor"],
+    permissions: {
+      admission: ["read"],
+    },
+  }),
+  AdmissionController.getAdmissionReports
 );
 
 // Endpoint to create the Admission Shell

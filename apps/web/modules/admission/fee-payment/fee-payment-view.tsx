@@ -59,13 +59,11 @@ const ADMISSION_STATUSES = [
 type FeePaymentFilters = {
   academicTerm: string;
   semester: string;
-  applicationId: string;
+  search: string;
   status: string;
   feeStatus: string;
   mode: string;
   admissionType: string;
-  email: string;
-  name: string;
   filledBy: string;
   createdFrom: string;
   createdTo: string;
@@ -74,13 +72,11 @@ type FeePaymentFilters = {
 const EMPTY_FILTERS: FeePaymentFilters = {
   academicTerm: "",
   semester: "",
-  applicationId: "",
+  search: "",
   status: "",
   feeStatus: "",
   mode: "",
   admissionType: "",
-  email: "",
-  name: "",
   filledBy: "",
   createdFrom: "",
   createdTo: "",
@@ -264,7 +260,7 @@ const FeePaymentStaffView = () => {
 
   const query = createFilterQueryString(
     (() => {
-      const apiFilters: Omit<FeePaymentFilters, "email"> = {
+      const apiFilters: Omit<FeePaymentFilters, "search"> = {
         ...appliedFilters,
       };
       return apiFilters;
@@ -286,16 +282,12 @@ const FeePaymentStaffView = () => {
 
   const admissions = useMemo(() => {
     let rows = data ?? [];
-    const email = appliedFilters.email.trim().toLowerCase();
-    if (email) {
-      rows = rows.filter((admission) =>
-        admission.primaryEmail?.toLowerCase().includes(email)
-      );
-    }
-    const name = appliedFilters.name.trim().toLowerCase();
-    if (name) {
-      rows = rows.filter((admission) =>
-        getAdmissionFullName(admission).toLowerCase().includes(name)
+    const search = appliedFilters.search.trim().toLowerCase();
+    if (search) {
+      rows = rows.filter(
+        (admission) =>
+          getAdmissionFullName(admission).toLowerCase().includes(search) ||
+          admission.primaryEmail?.toLowerCase().includes(search)
       );
     }
     if (appliedFilters.filledBy) {
@@ -304,12 +296,7 @@ const FeePaymentStaffView = () => {
       );
     }
     return rows;
-  }, [
-    data,
-    appliedFilters.email,
-    appliedFilters.name,
-    appliedFilters.filledBy,
-  ]);
+  }, [data, appliedFilters.search, appliedFilters.filledBy]);
 
   const filledByOptions = useMemo(() => {
     const byId = new Map<string, { label: string; value: string }>();
@@ -361,25 +348,11 @@ const FeePaymentStaffView = () => {
 
   const advancedFilterFields: FilterFieldConfig<FeePaymentFilters>[] = [
     {
-      key: "name",
-      label: "Name",
+      key: "search",
+      label: "Search",
       type: "text",
-      placeholder: "Search by name",
-      inputId: "fee-payment-name",
-    },
-    {
-      key: "email",
-      label: "Email",
-      type: "text",
-      placeholder: "Search by email",
-      inputId: "fee-payment-email",
-    },
-    {
-      key: "applicationId",
-      label: "Application ID",
-      type: "text",
-      placeholder: "Search application ID",
-      inputId: "fee-payment-application-id",
+      placeholder: "Search by name or email",
+      inputId: "fee-payment-search",
     },
     {
       key: "filledBy",
