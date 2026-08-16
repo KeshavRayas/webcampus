@@ -636,6 +636,7 @@ export class AdmissionService {
             cancellation: {
               select: {
                 reason: true,
+                description: true,
                 cancelledAt: true,
               },
             },
