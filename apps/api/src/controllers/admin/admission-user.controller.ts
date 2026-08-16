@@ -36,6 +36,7 @@ export class AdminAdmissionUserController {
       const response = await AdminAdmissionUserService.update(
         id,
         req.body,
+        req.headers,
         req.file
       );
       return res.status(200).json(response);

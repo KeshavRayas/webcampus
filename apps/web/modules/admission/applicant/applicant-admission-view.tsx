@@ -31,7 +31,9 @@ import { CheckCircle2, FileDown } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { AdmissionAcknowledgement } from "./admission-acknowledgement";
 import { AdmissionDocument, COLLEGE, type DocData } from "./admission-document";
+import { renderNodeToPdf } from "./admission-pdf";
 
 type ApplicantAdmissionData = {
   applicationId: string;
@@ -381,6 +383,8 @@ function ParentMemberCard({
   addressesHydrated,
   savedAddress,
   wide = false,
+  defaultValues,
+  fixed = false,
   children,
 }: {
   title: string;
@@ -401,6 +405,8 @@ function ParentMemberCard({
   addressesHydrated: boolean;
   savedAddress?: string;
   wide?: boolean;
+  defaultValues?: { name?: string; occupation?: string; email?: string };
+  fixed?: boolean;
   children?: React.ReactNode;
 }) {
   const [source, setSource] = useState<MemberSource>("custom");
@@ -430,6 +436,8 @@ function ParentMemberCard({
           <Input
             id={`${memberKey}Name`}
             name={`${memberKey}Name`}
+            defaultValue={defaultValues?.name}
+            readOnly={fixed}
             required={nameRequired}
           />
         </div>
@@ -440,6 +448,8 @@ function ParentMemberCard({
           <Input
             id={`${memberKey}Occupation`}
             name={`${memberKey}Occupation`}
+            defaultValue={defaultValues?.occupation}
+            readOnly={fixed}
             required={occupationRequired}
           />
         </div>
@@ -501,6 +511,8 @@ function ParentMemberCard({
             id={`${memberKey}Email`}
             name={`${memberKey}Email`}
             type="email"
+            defaultValue={defaultValues?.email}
+            readOnly={fixed}
             required={emailRequired}
           />
         </div>
@@ -583,6 +595,7 @@ export const ApplicantAdmissionView = ({
   const photoPreviewRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
+  const acknowledgementRef = useRef<HTMLDivElement | null>(null);
   const [docData, setDocData] = useState<DocData | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [showAcknowledgement, setShowAcknowledgement] = useState(true);
@@ -640,6 +653,9 @@ export const ApplicantAdmissionView = ({
   );
   const [acknowledged] = useState(true);
   const [signature] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [stayingInHostel, setStayingInHostel] = useState("");
+  const [guardianRelation, setGuardianRelation] = useState("");
   const { data: departments } = useAdmissionDepartments();
 
   const { data: admissionConstants } = useAdmissionConstants();
@@ -789,6 +805,8 @@ export const ApplicantAdmissionView = ({
     formData.set("scholarship", scholarshipEnabled ? "true" : "false");
     formData.set("nationality", selectedNationality);
     formData.set("counsellingRound", selectedCounsellingRound);
+    formData.set("stayingInHostel", stayingInHostel);
+    formData.set("guardianRelation", guardianRelation);
     formData.set(
       "hasClass12",
       admissionBasedOn === "CLASS_12_PUC" ? "true" : "false"
@@ -1175,6 +1193,24 @@ export const ApplicantAdmissionView = ({
     return "";
   };
 
+  const downloadAcknowledgement = async () => {
+    const node = acknowledgementRef.current;
+    if (!node) {
+      toast.error("Could not render the acknowledgement.");
+      return;
+    }
+    try {
+      setIsGeneratingPdf(true);
+      await renderNodeToPdf(node, "admission-acknowledgement.pdf");
+      toast.success("Acknowledgement downloaded.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to generate acknowledgement. Please try again.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const checkStepValid = (step: StepKey) => {
     const section = sectionRefs.current[step];
 
@@ -1278,6 +1314,31 @@ export const ApplicantAdmissionView = ({
       return;
     }
 
+    if (step === "education" && admissionBasedOn === "CLASS_12_PUC") {
+      const percentage = Number(pcmPercentage);
+      if (pcmPercentage && percentage <= 40) {
+        toast.error("PCM aggregate must be greater than 40% to continue.");
+        return;
+      }
+    }
+
+    if (step === "parent" && stayingInHostel === "yes") {
+      const guardianInputs = formRef.current?.querySelector(
+        'input[name="guardianName"]'
+      ) as HTMLInputElement | null;
+      const guardianMobile = formRef.current?.querySelector(
+        'input[name="guardianNumber"]'
+      ) as HTMLInputElement | null;
+      if (
+        !guardianInputs?.value.trim() ||
+        !guardianMobile?.value.trim() ||
+        !guardianRelation
+      ) {
+        toast.error("Please fill the Guardian details before proceeding.");
+        return;
+      }
+    }
+
     const invalid = findFirstInvalid(currentIndex);
 
     if (invalid) {
@@ -1342,6 +1403,27 @@ export const ApplicantAdmissionView = ({
     const input = document.getElementById("photo") as HTMLInputElement | null;
     if (input) {
       input.value = "";
+    }
+  };
+
+  const handleGuardianRelationChange = (value: string) => {
+    setGuardianRelation(value);
+
+    if (value === "Father" || value === "Mother") {
+      const prefix = value === "Father" ? "father" : "mother";
+      const readValue = (name: string) =>
+        formRef.current
+          ?.querySelector<HTMLInputElement>(`input[name="${name}"]`)
+          ?.value?.trim() ?? "";
+      setGuardianDefaults({
+        name: readValue(`${prefix}Name`),
+        occupation: readValue(`${prefix}Occupation`),
+        email: readValue(`${prefix}Email`),
+      });
+      setGuardianFixed(true);
+    } else {
+      setGuardianDefaults({ name: "", occupation: "", email: "" });
+      setGuardianFixed(false);
     }
   };
 
@@ -1496,6 +1578,23 @@ export const ApplicantAdmissionView = ({
     setFatherAnnualIncome(String(a.fatherAnnualIncome ?? ""));
     setMotherAnnualIncome(String(a.motherAnnualIncome ?? ""));
     setGuardianAnnualIncome(String(a.guardianAnnualIncome ?? ""));
+
+    if (a.hostel != null) {
+      setStayingInHostel(a.hostel ? "yes" : "no");
+    }
+
+    if (a.guardianRelation) {
+      setGuardianRelation(String(a.guardianRelation));
+      if (a.guardianRelation === "Father" || a.guardianRelation === "Mother") {
+        const prefix = a.guardianRelation === "Father" ? "father" : "mother";
+        setGuardianDefaults({
+          name: String(a[`${prefix}Name`] ?? ""),
+          occupation: String(a[`${prefix}Occupation`] ?? ""),
+          email: String(a[`${prefix}Email`] ?? ""),
+        });
+        setGuardianFixed(true);
+      }
+    }
 
     setSelectedMode(a.modeOfAdmission ?? "KCET");
     setSelectedDepartment(String(a.departmentId ?? ""));
@@ -1889,10 +1988,7 @@ export const ApplicantAdmissionView = ({
         </div>
 
         <div className="border-border border-b">
-          <Tabs
-            value={activeStep}
-            onValueChange={(value) => handleTabChange(value as StepKey)}
-          >
+          <Tabs value={activeStep} onValueChange={handleTabChange}>
             <TabsList className="flex w-full flex-wrap gap-1 md:gap-2">
               {VISIBLE_STEPS.map((step, index) => (
                 <TabsTrigger
@@ -2193,7 +2289,7 @@ export const ApplicantAdmissionView = ({
                 />
               </div>
               <div className="md:col-span-2">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   {/* Scholarship */}
                   <div className="flex shrink-0 items-center gap-3">
                     <Label htmlFor="scholarship" className="whitespace-nowrap">
@@ -2217,14 +2313,8 @@ export const ApplicantAdmissionView = ({
                   </div>
 
                   {/* SSP ID */}
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <Label
-                      htmlFor="sspId"
-                      className="shrink-0 whitespace-nowrap"
-                    >
-                      SSP ID
-                    </Label>
-
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="sspId">SSP ID</Label>
                     <Input
                       id="sspId"
                       name="sspId"
@@ -2232,7 +2322,7 @@ export const ApplicantAdmissionView = ({
                       placeholder="Scholarship SSP ID"
                       disabled={!scholarshipEnabled}
                       aria-disabled={!scholarshipEnabled}
-                      className="flex-1"
+                      className="w-full"
                     />
                   </div>
                 </div>
@@ -2852,8 +2942,7 @@ export const ApplicantAdmissionView = ({
 
                   <div className="space-y-2">
                     <Label htmlFor="nri">NRI Citizen *</Label>
-                    <input
-                      type="hidden"
+                    <Select
                       name="nri"
                       value={nriEnabled ? "true" : "false"}
                     />
@@ -2870,10 +2959,10 @@ export const ApplicantAdmissionView = ({
                       </SelectContent>
                     </Select>
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="disability">Disability Status *</Label>
-                    <input
-                      type="hidden"
+                    <Select
                       name="disability"
                       value={disabilityEnabled ? "true" : "false"}
                     />
@@ -2904,8 +2993,7 @@ export const ApplicantAdmissionView = ({
                     <Label htmlFor="economicallyBackward">
                       Economically Backward Status *
                     </Label>
-                    <input
-                      type="hidden"
+                    <Select
                       name="economicallyBackward"
                       value={economicallyBackwardEnabled ? "true" : "false"}
                     />
@@ -3293,8 +3381,7 @@ export const ApplicantAdmissionView = ({
                 <Label htmlFor="studiedKannadaIn10th">
                   Studied Kannada in 10th? *
                 </Label>
-                <input
-                  type="hidden"
+                <Select
                   name="studiedKannadaIn10th"
                   value={studiedKannadaEnabled ? "true" : "false"}
                 />
@@ -3849,6 +3936,24 @@ export const ApplicantAdmissionView = ({
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="lg:col-span-2">
+              <Label htmlFor="stayingInHostel">Staying in Hostel? *</Label>
+              <Select
+                name="stayingInHostel"
+                value={stayingInHostel}
+                onValueChange={setStayingInHostel}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <ParentMemberCard
               title="Father's Details"
               memberKey="father"

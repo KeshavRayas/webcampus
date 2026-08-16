@@ -41,11 +41,18 @@ export const createUserSchema = z.object({
   role: z.string(),
 });
 
-export const UpdateAdminUserSchema = createUserSchema.pick({
-  name: true,
-  email: true,
-  username: true,
-});
+export const UpdateAdminUserSchema = createUserSchema
+  .pick({
+    name: true,
+    email: true,
+    username: true,
+  })
+  .extend({
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .optional(),
+  });
 
 export const UpdateUserProfileSchema = z.object({
   username: z.string().min(1, "Username is required"),

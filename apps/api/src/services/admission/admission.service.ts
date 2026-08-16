@@ -680,12 +680,15 @@ export class AdmissionService {
         primaryEmail,
       });
 
-      const admission = await db.admission.findUnique({
+      const admission = await db.admission.findFirst({
         where: {
           primaryEmail,
         },
         include: {
           semester: true,
+        },
+        orderBy: {
+          createdAt: "desc",
         },
       });
 
@@ -1011,9 +1014,10 @@ export class AdmissionService {
       throw new Error("Semester and department are required");
     }
 
-    const existingAdmission = await db.admission.findUnique({
+    const existingAdmission = await db.admission.findFirst({
       where: { primaryEmail },
       select: { id: true },
+      orderBy: { createdAt: "desc" },
     });
 
     try {
@@ -1048,9 +1052,10 @@ export class AdmissionService {
         filledById
       );
     } catch (error) {
-      const createdAdmission = await db.admission.findUnique({
+      const createdAdmission = await db.admission.findFirst({
         where: { primaryEmail },
         select: { id: true, status: true },
+        orderBy: { createdAt: "desc" },
       });
 
       if (createdAdmission && createdAdmission.status === "PENDING") {
@@ -1061,13 +1066,34 @@ export class AdmissionService {
   }
 
   static async approveAdmission(
-    params: AdmissionActionParamType
+    params: AdmissionActionParamType,
+    feeDetails?: { feePaid?: number; feeReceiptNumber?: string }
   ): Promise<BaseResponse<unknown>> {
     try {
-      return await AdmissionService.updateAdmissionStatus(
-        params.id,
-        "APPROVED"
-      );
+      const feePaid = feeDetails?.feePaid;
+      const feeReceiptNumber = feeDetails?.feeReceiptNumber?.trim();
+
+      if (feeReceiptNumber && !feePaid) {
+        throw new Error(
+          "Fee Paid amount is required when a receipt is provided"
+        );
+      }
+
+      await db.admission.update({
+        where: { id: params.id },
+        data: {
+          status: "APPROVED",
+          ...(feePaid !== undefined ? { feePaid } : {}),
+          ...(feeReceiptNumber ? { feeReceiptNumber } : {}),
+          feeStatus: feePaid !== undefined || Boolean(feeReceiptNumber),
+        },
+      });
+
+      return {
+        status: "success",
+        message: "Admission approved successfully",
+        data: { id: params.id, status: "APPROVED" },
+      };
     } catch (error) {
       logger.error("Failed to approve admission", error);
       throw new Error(
@@ -1215,11 +1241,27 @@ export class AdmissionService {
       const result = await db.$transaction(async (tx) => {
         const admission = await tx.admission.findUnique({
           where: { id },
-          select: { id: true, status: true },
+          select: {
+            id: true,
+            status: true,
+            posted: true,
+            studentId: true,
+            primaryEmail: true,
+          },
         });
 
         if (!admission) {
           throw new Error("Admission not found");
+        }
+
+        if (admission.status === "CANCELLED") {
+          throw new Error("Admission has already been cancelled");
+        }
+
+        if (admission.posted || admission.studentId) {
+          throw new Error(
+            "Cannot cancel an admission that has already been posted"
+          );
         }
 
         const existingCancellation = await tx.cancelledAdmissions.findUnique({
@@ -1234,6 +1276,7 @@ export class AdmissionService {
           data: {
             admissionId: id,
             reason,
+            description: data.description?.trim() || null,
             cancelledById,
           },
           include: {
@@ -1248,6 +1291,28 @@ export class AdmissionService {
           where: { id },
           data: { status: "CANCELLED" },
         });
+
+        // Free up the applicant email so a new applicant can be created with it,
+        // while keeping the user record for audit by appending a timestamp.
+        const applicantUser = await tx.user.findFirst({
+          where: { email: admission.primaryEmail, role: "applicant" },
+          select: { id: true, email: true },
+        });
+
+        if (applicantUser) {
+          const atIndex = applicantUser.email.lastIndexOf("@");
+          const localPart =
+            atIndex >= 0
+              ? applicantUser.email.slice(0, atIndex)
+              : applicantUser.email;
+          const domain = atIndex >= 0 ? applicantUser.email.slice(atIndex) : "";
+          const suffixedEmail = `${localPart}-cancelled-${Date.now()}${domain}`;
+
+          await tx.user.update({
+            where: { id: applicantUser.id },
+            data: { email: suffixedEmail },
+          });
+        }
 
         return cancellation;
       });
@@ -1550,5 +1615,204 @@ export class AdmissionService {
         error instanceof Error ? error.message : "Failed to port students"
       );
     }
+  }
+
+  static async portAdmission(
+    id: string,
+    headers: IncomingHttpHeaders
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const admission = await db.admission.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          applicationId: true,
+          departmentId: true,
+          tempUsn: true,
+          studentId: true,
+          nameAsPer10th: true,
+          primaryEmail: true,
+          photo: true,
+          semesterId: true,
+          status: true,
+        },
+      });
+
+      if (!admission) {
+        throw new Error("Admission not found");
+      }
+
+      if (admission.status !== "APPROVED") {
+        throw new Error("Only approved admissions can be posted");
+      }
+
+      if (admission.studentId) {
+        throw new Error("Admission has already been posted");
+      }
+
+      const [semester, department] = await Promise.all([
+        db.semester.findUnique({
+          where: { id: admission.semesterId },
+          select: {
+            id: true,
+            programType: true,
+            semesterNumber: true,
+            academicTerm: { select: { id: true, type: true, year: true } },
+          },
+        }),
+        db.department.findUnique({
+          where: { id: admission.departmentId },
+          select: { id: true, name: true, code: true },
+        }),
+      ]);
+
+      if (!semester) {
+        throw new Error("Semester not found");
+      }
+
+      if (!department) {
+        throw new Error("Department not found");
+      }
+
+      const resolved = await AdmissionService.resolveApplicantUsersForPort(
+        [admission.primaryEmail],
+        headers
+      );
+      const userId = resolved.userIdByApplicationId.get(
+        AdmissionService.normalizeApplicationId(admission.primaryEmail)
+      );
+
+      if (!userId) {
+        throw new Error(
+          `Applicant user not found for application ID ${admission.applicationId}`
+        );
+      }
+
+      const fullName = AdmissionService.getStudentFullName(admission);
+
+      if (!fullName) {
+        throw new Error("Student full name is missing");
+      }
+
+      const result = await db.$transaction(async (tx) => {
+        const existingStudent = await tx.student.findFirst({
+          where: {
+            OR: [{ userId }, { usn: admission.tempUsn || "NO_USN" }],
+          },
+          select: { id: true, usn: true },
+        });
+
+        if (existingStudent) {
+          await tx.admission.update({
+            where: { id: admission.id },
+            data: {
+              tempUsn: existingStudent.usn,
+              studentId: existingStudent.id,
+              posted: true,
+            },
+          });
+
+          await tx.user.update({
+            where: { id: userId },
+            data: {
+              role: "student",
+              name: fullName,
+              displayUsername: fullName,
+              username: existingStudent.usn,
+              email: admission.primaryEmail,
+              image: admission.photo ?? undefined,
+            },
+          });
+
+          return { studentId: existingStudent.id, usn: existingStudent.usn };
+        }
+
+        const finalUsn =
+          admission.tempUsn?.trim() ||
+          (await AdmissionService.generateTempUsnWithClient(
+            tx,
+            admission.semesterId,
+            department.code
+          ));
+
+        const createdStudent = await tx.student.create({
+          data: {
+            userId,
+            usn: finalUsn,
+            departmentName: department.name,
+            currentSemester: semester.semesterNumber,
+            academicYear: semester.academicTerm.year,
+            semesterId: semester.id,
+            semesterNumber: semester.semesterNumber,
+            programType: semester.programType,
+            academicTermId: semester.academicTerm.id,
+            academicTermType: semester.academicTerm.type,
+            academicTermYear: semester.academicTerm.year,
+            academicTermLabel: `${semester.academicTerm.type.toUpperCase()} ${semester.academicTerm.year}`,
+          },
+          select: { id: true },
+        });
+
+        await tx.admission.update({
+          where: { id: admission.id },
+          data: {
+            tempUsn: finalUsn,
+            studentId: createdStudent.id,
+            posted: true,
+          },
+        });
+
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            role: "student",
+            name: fullName,
+            displayUsername: fullName,
+            username: finalUsn,
+            email: admission.primaryEmail,
+            image: admission.photo ?? undefined,
+          },
+        });
+
+        return { studentId: createdStudent.id, usn: finalUsn };
+      });
+
+      return {
+        status: "success",
+        message: "Admission posted successfully",
+        data: result,
+      };
+    } catch (error) {
+      logger.error("Failed to port admission", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to port admission"
+      );
+    }
+  }
+
+  static async getFeeStructure(input: {
+    departmentId: string;
+    modeOfAdmission: string;
+    categoryAllotted?: string;
+    quota?: string;
+  }): Promise<BaseResponse<unknown>> {
+    const fee = await db.feeStructure.findFirst({
+      where: {
+        departmentId: input.departmentId,
+        modeOfAdmission: input.modeOfAdmission,
+        ...(input.categoryAllotted
+          ? { categoryAllotted: input.categoryAllotted }
+          : {}),
+        ...(input.quota ? { quota: input.quota } : {}),
+      },
+      select: { feeAmount: true },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    return {
+      status: "success",
+      message: "Fee structure fetched successfully",
+      data: { feeAmount: fee?.feeAmount ?? 0 },
+    };
   }
 }

@@ -19,9 +19,9 @@ import {
 import { Input } from "@webcampus/ui/components/input";
 import React, { useEffect, useRef, useState } from "react";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
-import { useFinanceUsers } from "./use-finance-users";
+import { useAccountsUsers } from "./use-accounts-users";
 
-type CreateFinanceUserFormValues = {
+type CreateAccountsUserFormValues = {
   name: string;
   email: string;
   username: string;
@@ -29,8 +29,8 @@ type CreateFinanceUserFormValues = {
   photo?: File;
 };
 
-export const FinanceForm = () => {
-  const { form, onSubmit, isCreating } = useFinanceUsers();
+export const AccountsForm = () => {
+  const { form, onSubmit, isCreating } = useAccountsUsers();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -72,7 +72,7 @@ export const FinanceForm = () => {
     }
   };
 
-  const handleCreateSubmit = async (values: CreateFinanceUserFormValues) => {
+  const handleCreateSubmit = async (values: CreateAccountsUserFormValues) => {
     try {
       await onSubmit(values);
       setIsCreateOpen(false);
@@ -95,7 +95,7 @@ export const FinanceForm = () => {
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Create Finance User</DialogTitle>
+          <DialogTitle>Create Accounts User</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -124,7 +124,7 @@ export const FinanceForm = () => {
                 <FormItem>
                   <FormLabel>Username *</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., finance.manager" {...field} />
+                    <Input placeholder="e.g., accounts.manager" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -140,7 +140,7 @@ export const FinanceForm = () => {
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="finance@webcampus.edu"
+                      placeholder="accounts@webcampus.edu"
                       {...field}
                     />
                   </FormControl>
@@ -158,7 +158,7 @@ export const FinanceForm = () => {
                   <FormControl>
                     <Input
                       type="password"
-                      placeholder="Minimum 6 characters"
+                      placeholder="Minimum 8 characters"
                       {...field}
                     />
                   </FormControl>
@@ -169,7 +169,7 @@ export const FinanceForm = () => {
 
             <UserPhotoUpload
               label="Profile Photo"
-              personName={form.watch("name") || "Finance User"}
+              personName={form.watch("name") || "Accounts User"}
               previewUrl={photoPreview}
               selectedFileName={photoFile?.name || null}
               onChange={handlePhotoChange}

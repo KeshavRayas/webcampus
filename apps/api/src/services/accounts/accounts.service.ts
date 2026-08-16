@@ -1,12 +1,12 @@
 import { randomUUID } from "crypto";
 import { db, Prisma } from "@webcampus/db";
 import type {
-  AddFinancePaymentInput,
-  FinanceStudentSearchQuery,
-  UpsertFinanceInput,
-} from "@webcampus/schemas/finance";
+  AccountsStudentSearchQuery,
+  AddAccountsPaymentInput,
+  UpsertAccountsInput,
+} from "@webcampus/schemas/accounts";
 
-export type FinanceGroup = "trustee" | "accounts";
+export type AccountsGroup = "trustee" | "accounts";
 
 const studentInclude = {
   user: { select: { name: true, email: true } },
@@ -14,10 +14,10 @@ const studentInclude = {
   admission: true,
 } satisfies Prisma.StudentInclude;
 
-type FinanceStudent = Prisma.StudentGetPayload<{
+type AccountsStudent = Prisma.StudentGetPayload<{
   include: typeof studentInclude;
 }>;
-type FinanceRecord = {
+type AccountsRecord = {
   id: string;
   studentId: string;
   academicYear: string;
@@ -25,9 +25,9 @@ type FinanceRecord = {
   createdAt: Date;
   updatedAt: Date;
 };
-type FinancePayment = {
+type AccountsPayment = {
   id: string;
-  financeId: string;
+  accountsId: string;
   amount: number;
   paidAt: Date;
   reference: string | null;
@@ -35,29 +35,29 @@ type FinancePayment = {
   createdAt: Date;
 };
 
-async function loadFinance(studentId: string, academicYear?: string) {
-  const records = await db.$queryRaw<FinanceRecord[]>(Prisma.sql`
-    SELECT * FROM "Finance" WHERE "studentId" = ${studentId}
+async function loadAccounts(studentId: string, academicYear?: string) {
+  const records = await db.$queryRaw<AccountsRecord[]>(Prisma.sql`
+    SELECT * FROM "Accounts" WHERE "studentId" = ${studentId}
     ${academicYear ? Prisma.sql`AND "academicYear" = ${academicYear}` : Prisma.empty}
     ORDER BY "updatedAt" DESC LIMIT 1
   `);
-  const finance = records[0] ?? null;
-  if (!finance) return null;
-  const payments = await db.$queryRaw<FinancePayment[]>(Prisma.sql`
-    SELECT * FROM "FinancePayment" WHERE "financeId" = ${finance.id} ORDER BY "paidAt" DESC
+  const accounts = records[0] ?? null;
+  if (!accounts) return null;
+  const payments = await db.$queryRaw<AccountsPayment[]>(Prisma.sql`
+    SELECT * FROM "AccountsPayment" WHERE "accountsId" = ${accounts.id} ORDER BY "paidAt" DESC
   `);
-  return { ...finance, payments };
+  return { ...accounts, payments };
 }
 
 function toStudentDetails(
-  student: FinanceStudent,
-  finance: Awaited<ReturnType<typeof loadFinance>>
+  student: AccountsStudent,
+  accounts: Awaited<ReturnType<typeof loadAccounts>>
 ) {
   const admission = student.admission;
   const amountPaid =
-    finance?.payments.reduce((total, payment) => total + payment.amount, 0) ??
+    accounts?.payments.reduce((total, payment) => total + payment.amount, 0) ??
     0;
-  const actualDemand = finance?.finalFee ?? 0;
+  const actualDemand = accounts?.finalFee ?? 0;
   const remainingBalance = Math.max(actualDemand - amountPaid, 0);
 
   return {
@@ -79,10 +79,10 @@ function toStudentDetails(
     previousBranch:
       admission?.diplomaBranch ?? admission?.class12thBranch ?? null,
     previousQuota: null,
-    finance: finance
+    accounts: accounts
       ? {
-          id: finance.id,
-          academicYear: finance.academicYear,
+          id: accounts.id,
+          academicYear: accounts.academicYear,
           actualDemand,
           amountPaid,
           remainingBalance,
@@ -92,14 +92,14 @@ function toStudentDetails(
               : amountPaid > 0
                 ? "PARTIALLY_PAID"
                 : "UNPAID",
-          payments: finance.payments,
+          payments: accounts.payments,
         }
       : null,
   };
 }
 
-export class FinanceService {
-  static async searchStudents(query: FinanceStudentSearchQuery) {
+export class AccountsService {
+  static async searchStudents(query: AccountsStudentSearchQuery) {
     const groupWhere: Prisma.StudentWhereInput =
       query.group === "trustee"
         ? { admission: { is: { quota: "MANAGEMENT" } } }
@@ -140,7 +140,7 @@ export class FinanceService {
 
     const details = await Promise.all(
       students.map(async (student) =>
-        toStudentDetails(student, await loadFinance(student.id))
+        toStudentDetails(student, await loadAccounts(student.id))
       )
     );
     return {
@@ -161,41 +161,41 @@ export class FinanceService {
       message: "Student details fetched successfully",
       data: toStudentDetails(
         student,
-        await loadFinance(student.id, academicYear)
+        await loadAccounts(student.id, academicYear)
       ),
     };
   }
 
-  static async saveFee(studentId: string, input: UpsertFinanceInput) {
+  static async saveFee(studentId: string, input: UpsertAccountsInput) {
     await this.ensureStudent(studentId);
     const id = randomUUID();
     const now = new Date();
-    const records = await db.$queryRaw<FinanceRecord[]>(Prisma.sql`
-      INSERT INTO "Finance" ("id", "studentId", "academicYear", "finalFee", "createdAt", "updatedAt")
+    const records = await db.$queryRaw<AccountsRecord[]>(Prisma.sql`
+      INSERT INTO "Accounts" ("id", "studentId", "academicYear", "finalFee", "createdAt", "updatedAt")
       VALUES (${id}, ${studentId}, ${input.academicYear}, ${input.finalFee}, ${now}, ${now})
       ON CONFLICT ("studentId", "academicYear") DO UPDATE
       SET "finalFee" = EXCLUDED."finalFee", "updatedAt" = EXCLUDED."updatedAt"
       RETURNING *
     `);
-    const finance = records[0];
+    const accounts = records[0];
     return {
       status: "success" as const,
       message: "Fee details saved successfully",
-      data: finance,
+      data: accounts,
     };
   }
 
-  static async addPayment(financeId: string, input: AddFinancePaymentInput) {
-    const records = await db.$queryRaw<FinanceRecord[]>(
-      Prisma.sql`SELECT * FROM "Finance" WHERE "id" = ${financeId} LIMIT 1`
+  static async addPayment(accountsId: string, input: AddAccountsPaymentInput) {
+    const records = await db.$queryRaw<AccountsRecord[]>(
+      Prisma.sql`SELECT * FROM "Accounts" WHERE "id" = ${accountsId} LIMIT 1`
     );
-    const finance = records[0];
-    if (!finance) throw new Error("Finance record not found");
+    const accounts = records[0];
+    if (!accounts) throw new Error("Accounts record not found");
     const paymentId = randomUUID();
     const paidAt = input.paidAt ?? new Date();
-    const payments = await db.$queryRaw<FinancePayment[]>(Prisma.sql`
-      INSERT INTO "FinancePayment" ("id", "financeId", "amount", "paidAt", "reference", "remarks", "createdAt")
-      VALUES (${paymentId}, ${financeId}, ${input.amount}, ${paidAt}, ${input.reference || null}, ${input.remarks || null}, ${new Date()})
+    const payments = await db.$queryRaw<AccountsPayment[]>(Prisma.sql`
+      INSERT INTO "AccountsPayment" ("id", "accountsId", "amount", "paidAt", "reference", "remarks", "createdAt")
+      VALUES (${paymentId}, ${accountsId}, ${input.amount}, ${paidAt}, ${input.reference || null}, ${input.remarks || null}, ${new Date()})
       RETURNING *
     `);
     const payment = payments[0];

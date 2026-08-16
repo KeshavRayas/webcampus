@@ -40,6 +40,12 @@ import {
 
 type UpdateAdmissionUserFormValues = z.infer<typeof UpdateAdmissionUserSchema>;
 
+const editAdmissionUserSchema = UpdateAdmissionUserSchema.extend({
+  password: z.string().optional().or(z.literal("")),
+});
+
+type EditAdmissionUserFormValues = z.infer<typeof editAdmissionUserSchema>;
+
 export const AdminAdmissionUsersActions = ({
   user,
 }: {
@@ -56,16 +62,16 @@ export const AdminAdmissionUsersActions = ({
   const { updateUser, isUpdating, photoFile, setPhotoFile } =
     useAdmissionUserUpdate();
 
-  const editForm = useForm<UpdateAdmissionUserFormValues>({
-    resolver: zodResolver(UpdateAdmissionUserSchema),
+  const editForm = useForm<EditAdmissionUserFormValues>({
+    resolver: zodResolver(editAdmissionUserSchema),
     defaultValues: {
       name: user.name,
       username: user.username || "",
       email: user.email,
+      password: "",
     },
   });
 
-  console.log(editForm.formState);
   const replacePhotoPreview = (file: File | null) => {
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
@@ -92,13 +98,14 @@ export const AdminAdmissionUsersActions = ({
       name: user.name,
       username: user.username || "",
       email: user.email,
+      password: "",
     });
 
     setPhotoFile(null);
     replacePhotoPreview(null);
   };
 
-  const handleEditSubmit = async (data: UpdateAdmissionUserFormValues) => {
+  const handleEditSubmit = async (data: EditAdmissionUserFormValues) => {
     if (!photoFile) {
       editForm.setError("root", {
         message: "Please upload a profile photo.",
@@ -107,9 +114,13 @@ export const AdminAdmissionUsersActions = ({
     }
 
     try {
+      const payload = { ...data } as UpdateAdmissionUserFormValues;
+      if (!payload.password) {
+        delete payload.password;
+      }
       await updateUser({
         id: user.id,
-        data,
+        data: payload,
         photoFile,
       });
       setIsEditOpen(false);
@@ -219,6 +230,25 @@ export const AdminAdmissionUsersActions = ({
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={editForm.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        {...field}
+                        placeholder="Leave blank to keep current password"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <UserPhotoUpload
                 label="Profile Photo*"
                 personName={editForm.watch("name") || "Admission User"}

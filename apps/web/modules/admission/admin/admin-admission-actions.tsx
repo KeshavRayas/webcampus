@@ -16,16 +16,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@webcampus/ui/components/dialog";
-import { FileDown, Loader2, Pencil, RefreshCw } from "lucide-react";
+import { FileDown, Loader2, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { AdmissionAcknowledgement } from "../applicant/admission-acknowledgement";
 import {
   AdmissionDocument,
   type DocData,
 } from "../applicant/admission-document";
 import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { AdmissionResponse } from "./admin-admission-columns";
+import { usePortAdmission } from "./use-port-admission";
 
 const getStatusVariant = (status: AdmissionResponse["status"]) => {
   switch (status) {
@@ -305,10 +307,18 @@ export const AdminAdmissionActions = ({
     role === "admin" || role === "admission" || role === "admission-instructor";
 
   const isPending = admission.status === "PENDING";
+  const [open, setOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [docData, setDocData] = useState<DocData | null>(null);
-  const [isDocReady, setIsDocReady] = useState(false);
+  const [confirmPort, setConfirmPort] = useState(false);
   const documentRef = useRef<HTMLDivElement | null>(null);
+  const acknowledgementRef = useRef<HTMLDivElement | null>(null);
+  const { portAdmission, isPorting } = usePortAdmission();
+
+  const canPort = role === "admin" || role === "admission";
+  const alreadyPorted = Boolean(admission.student || admission.posted);
+  const canShowPort =
+    canPort && admission.status === "APPROVED" && !alreadyPorted;
 
   // Compute Full Name
   const fullName =
@@ -332,22 +342,17 @@ export const AdminAdmissionActions = ({
     router.push(`${path}?${params.toString()}`);
   };
 
-  const handleUpdateDocument = async () => {
-    try {
+  const handleOpenChange = (value: boolean) => {
+    setOpen(value);
+    setConfirmPort(false);
+    if (value && !docData) {
       setDocData(buildDocData(admission));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      await new Promise((resolve) => setTimeout(resolve, 60));
-      const node = documentRef.current;
-      if (!node) return;
-      setIsDocReady(true);
-    } catch {
-      // Silent: never surface errors from Update.
     }
   };
 
   const handleDownloadPdf = async () => {
     const node = documentRef.current;
-    if (!node || !isDocReady) return;
+    if (!node) return;
     setIsGeneratingPdf(true);
     try {
       await renderNodeToPdf(
@@ -362,9 +367,26 @@ export const AdminAdmissionActions = ({
     }
   };
 
+  const handleDownloadAcknowledgement = async () => {
+    const node = acknowledgementRef.current;
+    if (!node) return;
+    setIsGeneratingPdf(true);
+    try {
+      await renderNodeToPdf(
+        node,
+        `admission-acknowledgement-${admission.applicationId ?? "application"}.pdf`
+      );
+      toast.success("Acknowledgement PDF downloaded.");
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-1">
-      <Dialog>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">
             <Pencil className="mr-2 h-3.5 w-3.5" />
@@ -421,7 +443,6 @@ export const AdminAdmissionActions = ({
                   </div>
                   <DataField label="Temporary USN" value={admission.tempUsn} />
                   <DataField label="USN" value={admission.student?.usn} />
-                  <DataField label="Unique ID" value={admission.uniqueId} />
                 </div>
               </div>
 
@@ -429,27 +450,14 @@ export const AdminAdmissionActions = ({
                 <div className="mb-6 flex flex-wrap items-center gap-3">
                   {canEdit && (
                     <Button size="sm" onClick={openFillForm}>
-                      Fill / Edit Application
+                      Edit Application
                     </Button>
                   )}
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => void handleUpdateDocument()}
-                    disabled={isPending}
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Update
-                  </Button>
-                  <Button
-                    size="sm"
                     onClick={() => void handleDownloadPdf()}
-                    disabled={isGeneratingPdf || isPending || !isDocReady}
-                    title={
-                      isDocReady
-                        ? "Download the verification PDF"
-                        : "Click Update first to prepare the document"
-                    }
+                    disabled={isGeneratingPdf || isPending}
                   >
                     {isGeneratingPdf ? (
                       <>
@@ -459,10 +467,40 @@ export const AdminAdmissionActions = ({
                     ) : (
                       <>
                         <FileDown className="mr-2 h-4 w-4" />
-                        Download
+                        Download Form PDF
                       </>
                     )}
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleDownloadAcknowledgement()}
+                    disabled={isGeneratingPdf || isPending}
+                  >
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Download Acknowledgement
+                  </Button>
+                  {canShowPort && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isPorting}
+                      onClick={() => {
+                        if (!confirmPort) {
+                          setConfirmPort(true);
+                          return;
+                        }
+                        setConfirmPort(false);
+                        portAdmission({ id: admission.id });
+                      }}
+                    >
+                      {isPorting
+                        ? "Posting..."
+                        : confirmPort
+                          ? "Confirm Post?"
+                          : "Post to Students"}
+                    </Button>
+                  )}
                 </div>
 
                 {isPending ? (
@@ -954,11 +992,15 @@ export const AdminAdmissionActions = ({
 
       {docData && (
         <div
-          ref={documentRef}
           className="pointer-events-none absolute left-[-10000px] top-0"
           aria-hidden="true"
         >
-          <AdmissionDocument data={docData ?? {}} />
+          <div ref={documentRef}>
+            <AdmissionDocument data={docData ?? {}} />
+          </div>
+          <div ref={acknowledgementRef}>
+            <AdmissionAcknowledgement data={docData ?? {}} />
+          </div>
         </div>
       )}
     </div>

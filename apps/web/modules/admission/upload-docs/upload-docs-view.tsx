@@ -16,16 +16,12 @@ import { DataTable } from "@webcampus/ui/components/data-table";
 import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { getAdmissionFullName } from "../admin/admin-admission-columns";
 import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import { uploadDocsColumns, UploadDocsResponse } from "./upload-docs-columns";
-import {
-  UploadDocsReportDocument,
-  type UploadDocsReportData,
-} from "./upload-docs-report-document";
 
 const ADMISSION_STATUSES = [
   "PENDING",
@@ -77,11 +73,6 @@ export function UploadDocsView() {
 
   const [appliedFilters, setAppliedFilters] =
     useState<UploadDocumentFilters>(initialFilters);
-
-  const [reportData, setReportData] = useState<UploadDocsReportData | null>(
-    null
-  );
-  const reportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const nextFilters = getFiltersFromSearchParams(searchParams, EMPTY_FILTERS);
@@ -406,8 +397,6 @@ export function UploadDocsView() {
             onReset={resetFilters}
             dialogTitle="Advanced Filters"
             dialogDescription="Filter admission documents by email, application ID, status, mode, and date range."
-            onGenerateReport={generateReportPdf}
-            reportButtonLabel="Generate Upload Documents Report PDF"
           />
         </div>
 
@@ -438,15 +427,6 @@ export function UploadDocsView() {
             <DataTable columns={uploadDocsColumns} data={filteredDocuments} />
           </div>
         )}
-      </div>
-
-      <div
-        className="pointer-events-none absolute left-[-10000px] top-0"
-        aria-hidden="true"
-      >
-        <div ref={reportRef}>
-          {reportData ? <UploadDocsReportDocument data={reportData} /> : null}
-        </div>
       </div>
     </div>
   );

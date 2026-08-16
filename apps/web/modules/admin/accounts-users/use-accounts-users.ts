@@ -1,14 +1,17 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import axios, { AxiosError } from "axios";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
+import { AccountsUser } from "./accounts-types";
 
-type CreateFinanceUserFormValues = {
+export const accountsUsersQueryKey = ["admin-accounts-users"];
+
+type CreateAccountsUserFormValues = {
   name: string;
   email: string;
   username: string;
@@ -16,7 +19,7 @@ type CreateFinanceUserFormValues = {
   photo?: File;
 };
 
-const createFinanceUserSchema = z.object({
+const createAccountsUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
   username: z.string().min(1, "Username is required"),
@@ -24,12 +27,29 @@ const createFinanceUserSchema = z.object({
   photo: z.instanceof(File).optional(),
 });
 
-export const useFinanceUsers = () => {
+export const useAccountsUsersQuery = () => {
+  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+
+  return useQuery({
+    queryKey: accountsUsersQueryKey,
+    queryFn: async () => {
+      const response = await axios.get<{
+        status: string;
+        data: AccountsUser[];
+      }>(`${NEXT_PUBLIC_API_BASE_URL}/admin/accounts`, {
+        withCredentials: true,
+      });
+      return response.data.data;
+    },
+  });
+};
+
+export const useAccountsUsers = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
-  const form = useForm<CreateFinanceUserFormValues>({
-    resolver: zodResolver(createFinanceUserSchema),
+  const form = useForm<CreateAccountsUserFormValues>({
+    resolver: zodResolver(createAccountsUserSchema),
     defaultValues: {
       name: "",
       email: "",
@@ -42,7 +62,7 @@ export const useFinanceUsers = () => {
   const { mutateAsync: create, isPending: isCreating } = useMutation({
     mutationFn: async (formData: FormData) => {
       const response = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/finance`,
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/accounts`,
         formData,
         {
           withCredentials: true,
@@ -52,18 +72,18 @@ export const useFinanceUsers = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-finance-users"] });
-      toast.success("Finance user created successfully");
+      queryClient.invalidateQueries({ queryKey: accountsUsersQueryKey });
+      toast.success("Accounts user created successfully");
       form.reset();
     },
     onError: (error: AxiosError<{ message?: string }>) => {
       toast.error(
-        error.response?.data?.message || "Failed to create Finance user"
+        error.response?.data?.message || "Failed to create Accounts user"
       );
     },
   });
 
-  const onSubmit = async (data: CreateFinanceUserFormValues) => {
+  const onSubmit = async (data: CreateAccountsUserFormValues) => {
     try {
       const formData = new FormData();
 
@@ -77,7 +97,7 @@ export const useFinanceUsers = () => {
         formData.append("photo", data.photo);
       }
 
-      formData.append("role", "finance");
+      formData.append("role", "accounts");
 
       await create(formData);
     } catch {
@@ -88,7 +108,7 @@ export const useFinanceUsers = () => {
   return { form, onSubmit, isCreating };
 };
 
-export const useFinanceUserEdit = () => {
+export const useAccountsUserEdit = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
@@ -101,7 +121,7 @@ export const useFinanceUserEdit = () => {
       formData: FormData;
     }) => {
       const response = await axios.patch(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/finance/${id}`,
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/accounts/${id}`,
         formData,
         {
           withCredentials: true,
@@ -111,12 +131,12 @@ export const useFinanceUserEdit = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-finance-users"] });
-      toast.success("Finance user updated successfully");
+      queryClient.invalidateQueries({ queryKey: accountsUsersQueryKey });
+      toast.success("Accounts user updated successfully");
     },
     onError: (error: AxiosError<{ message?: string }>) => {
       toast.error(
-        error.response?.data?.message || "Failed to update Finance user"
+        error.response?.data?.message || "Failed to update Accounts user"
       );
     },
   });
@@ -124,25 +144,25 @@ export const useFinanceUserEdit = () => {
   return { onEdit, isEditing };
 };
 
-export const useFinanceUserDelete = () => {
+export const useAccountsUserDelete = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const { mutateAsync: onDelete, isPending: isDeleting } = useMutation({
     mutationFn: async (id: string) => {
       const response = await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/finance/${id}`,
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/accounts/${id}`,
         { withCredentials: true }
       );
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-finance-users"] });
-      toast.success("Finance user deleted successfully");
+      queryClient.invalidateQueries({ queryKey: accountsUsersQueryKey });
+      toast.success("Accounts user deleted successfully");
     },
     onError: (error: AxiosError<{ message?: string }>) => {
       toast.error(
-        error.response?.data?.message || "Failed to delete Finance user"
+        error.response?.data?.message || "Failed to delete Accounts user"
       );
     },
   });

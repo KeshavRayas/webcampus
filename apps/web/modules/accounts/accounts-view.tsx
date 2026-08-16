@@ -287,7 +287,7 @@ const OPTIONAL_FEE_ITEMS: MandatoryFeeItem[] = [
   },
 ];
 
-export function FinanceView() {
+export function AccountsView() {
   const [activeTab, setActiveTab] = useState<TabType>("search_student");
 
   // Comment Modal state
@@ -1125,7 +1125,7 @@ export function FinanceView() {
         {activeTab === "reports" && (
           <div className="rounded-lg border bg-white p-12 text-center text-gray-500 shadow-sm">
             <h2 className="mb-2 text-base font-bold text-gray-700">
-              Finance Reports & Analytics
+              Accounts Reports & Analytics
             </h2>
             <p className="text-sm">
               Generate fee collection reports, pending balance sheets, and audit

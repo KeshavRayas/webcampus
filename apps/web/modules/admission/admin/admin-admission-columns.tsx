@@ -25,6 +25,8 @@ export type AdmissionResponse = {
       name: string;
     };
   } | null;
+  studentId?: string | null;
+  posted?: boolean;
   cancellation?: {
     reason: string;
     cancelledAt: string;

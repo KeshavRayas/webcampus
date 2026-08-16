@@ -46,7 +46,7 @@ export const CoeView = () => {
     <div className="space-y-8">
       <div className="bg-card text-card-foreground space-y-4 rounded-lg border p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold tracking-tight">COE Users</h3>
+          <h3 className="text-xl font-semibold tracking-tight">COE</h3>
           <CoeForm />
         </div>
 

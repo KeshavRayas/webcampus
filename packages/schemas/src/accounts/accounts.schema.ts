@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const FinanceStudentSearchQuerySchema = z.object({
+export const AccountsStudentSearchQuerySchema = z.object({
   query: z
     .string()
     .trim()
@@ -8,12 +8,12 @@ export const FinanceStudentSearchQuerySchema = z.object({
   group: z.enum(["trustee", "accounts"]).optional(),
 });
 
-export const UpsertFinanceSchema = z.object({
+export const UpsertAccountsSchema = z.object({
   academicYear: z.string().trim().min(1, "Academic year is required"),
   finalFee: z.coerce.number().min(0, "Final fee cannot be negative"),
 });
 
-export const AddFinancePaymentSchema = z.object({
+export const AddAccountsPaymentSchema = z.object({
   amount: z.coerce
     .number()
     .positive("Payment amount must be greater than zero"),
@@ -22,8 +22,8 @@ export const AddFinancePaymentSchema = z.object({
   paidAt: z.coerce.date().optional(),
 });
 
-export type FinanceStudentSearchQuery = z.infer<
-  typeof FinanceStudentSearchQuerySchema
+export type AccountsStudentSearchQuery = z.infer<
+  typeof AccountsStudentSearchQuerySchema
 >;
-export type UpsertFinanceInput = z.infer<typeof UpsertFinanceSchema>;
-export type AddFinancePaymentInput = z.infer<typeof AddFinancePaymentSchema>;
+export type UpsertAccountsInput = z.infer<typeof UpsertAccountsSchema>;
+export type AddAccountsPaymentInput = z.infer<typeof AddAccountsPaymentSchema>;
