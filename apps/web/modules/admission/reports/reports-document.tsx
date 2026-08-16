@@ -1,4 +1,5 @@
 import { COLLEGE } from "../applicant/admission-document";
+import { FilterSummaryItem } from "./reports-types";
 
 export type ReportColumnMeta = {
   key: string;
@@ -10,6 +11,8 @@ export type ReportDocumentData = {
   generatedAt: string;
   total: number;
   summary?: string;
+  filters?: FilterSummaryItem[];
+  statistics?: FilterSummaryItem[];
   columns: ReportColumnMeta[];
   rows: string[][];
 };
@@ -47,6 +50,34 @@ export function AdmissionReportsDocument({
         <span>Total: {data.total}</span>
         {data.summary ? <span>{data.summary}</span> : null}
       </div>
+
+      {data.filters && data.filters.length > 0 ? (
+        <div className="ar-filters">
+          <span className="ar-filters-title">Applied Filters</span>
+          <span className="ar-filters-list">
+            {data.filters.map((filter, index) => (
+              <span key={filter.label}>
+                {filter.label}: {filter.value}
+                {index < data.filters!.length - 1 ? " · " : ""}
+              </span>
+            ))}
+          </span>
+        </div>
+      ) : null}
+
+      {data.statistics && data.statistics.length > 0 ? (
+        <div className="ar-filters">
+          <span className="ar-filters-title">Statistics</span>
+          <span className="ar-filters-list">
+            {data.statistics.map((stat, index) => (
+              <span key={stat.label}>
+                {stat.label}: {stat.value}
+                {index < data.statistics!.length - 1 ? " · " : ""}
+              </span>
+            ))}
+          </span>
+        </div>
+      ) : null}
 
       <div className="ar-panel">
         <div className="overflow-hidden">
@@ -96,7 +127,10 @@ export function AdmissionReportsDocument({
         .ar-tagline { margin: 2px 0 0; font-size: 11px; color: #5b6b7c; }
         .ar-address { margin: 2px 0 0; font-size: 11px; color: #5b6b7c; }
         .ar-title { font-size: 15px; font-weight: 700; text-align: center; text-transform: uppercase; letter-spacing: 2px; margin: 6px 0 12px; color: #1f3a5f; }
-        .ar-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; font-size: 11px; color: #5b6b7c; margin-bottom: 10px; }
+        .ar-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; font-size: 11px; color: #5b6b7c; margin-bottom: 8px; }
+        .ar-filters { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 10.5px; color: #374151; border: 1px solid #b9c8d8; background: #f4f8fc; border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; }
+        .ar-filters-title { font-weight: 700; color: #35608f; }
+        .ar-filters-list { flex: 1; }
         .ar-panel { border: 1px solid #b9c8d8; background: #fff; margin-bottom: 14px; }
         .ar-table { width: 100%; border-collapse: collapse; }
         .ar-table th, .ar-table td { border: 1px solid #b9c8d8; padding: 5px 7px; text-align: left; font-size: 10.5px; }

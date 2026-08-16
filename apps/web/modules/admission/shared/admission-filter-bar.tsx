@@ -14,7 +14,7 @@ import {
   FilterBuilder,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import { FileDown, FilterIcon } from "lucide-react";
+import { FileDown, FileSpreadsheet, FilterIcon } from "lucide-react";
 import { useState } from "react";
 
 export const ADMISSION_FILTER_ALL_VALUE = "__all__";
@@ -31,6 +31,8 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   dialogDescription = "Use advanced filters to narrow down the results.",
   onGenerateReport,
   reportButtonLabel = "Generate Report PDF",
+  onGenerateExcel,
+  reportExcelButtonLabel = "Generate Report Excel",
   fieldToggles,
   onToggleField,
 }: {
@@ -45,6 +47,8 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   dialogDescription?: string;
   onGenerateReport?: () => void;
   reportButtonLabel?: string;
+  onGenerateExcel?: () => void;
+  reportExcelButtonLabel?: string;
   fieldToggles?: Record<string, boolean>;
   onToggleField?: (columnKey: string) => void;
 }) {
@@ -115,6 +119,13 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
           <Button type="button" variant="outline" onClick={onGenerateReport}>
             <FileDown className="mr-2 h-4 w-4" />
             {reportButtonLabel}
+          </Button>
+        )}
+
+        {onGenerateExcel && (
+          <Button type="button" variant="outline" onClick={onGenerateExcel}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            {reportExcelButtonLabel}
           </Button>
         )}
       </div>

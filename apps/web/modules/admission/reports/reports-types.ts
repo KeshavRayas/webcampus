@@ -129,8 +129,7 @@ export const getBaseReportColumns = (
       {
         key: "feePaid",
         label: "Fee Paid (₹)",
-        value: (admission) =>
-          admission.feePaid != null ? String(admission.feePaid) : "-",
+        value: (admission) => formatIndianCurrency(admission.feePaid),
       },
       {
         key: "feeStatus",
@@ -158,6 +157,11 @@ export const getBaseReportColumns = (
         label: "Cancelled On",
         value: (admission) =>
           formatReportDate(admission.cancellation?.cancelledAt),
+      },
+      {
+        key: "cancellationDetails",
+        label: "Cancellation Details",
+        value: (admission) => admission.cancellation?.description || "-",
       }
     );
   }
@@ -235,3 +239,210 @@ export const getReportColumns = (
   ...getBaseReportColumns(reportType),
   ...getAvailableReportColumns().filter((column) => selection[column.key]),
 ];
+
+export const formatIndianCurrency = (amount: number | null | undefined) => {
+  if (amount == null || Number.isNaN(amount)) return "₹0";
+  return `₹${amount.toLocaleString("en-IN")}`;
+};
+
+export const splitFilterValues = (value?: string): string[] =>
+  value
+    ? value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
+
+const joinValues = (values: string[]) => values.join(", ");
+
+export const cancellationStatusLabel = (status: string) =>
+  status === "CANCELLED" ? "Cancelled Admissions" : "Active Admissions";
+
+export const feeStatusLabel = (status: string) =>
+  status === "true" ? "Paid" : "Unpaid";
+
+export type FilterSummaryItem = { label: string; value: string };
+
+export type ReportFilterContext = {
+  terms: Array<{
+    id: string;
+    type: string;
+    year: string;
+    Semester?: Array<{
+      id: string;
+      programType: string;
+      semesterNumber: number;
+    }>;
+  }>;
+  departments: Array<{ id: string; name: string }>;
+};
+
+export const buildAppliedFilterSummary = (
+  filters: AdmissionReportFilters,
+  context: ReportFilterContext
+): FilterSummaryItem[] => {
+  const items: FilterSummaryItem[] = [];
+
+  const term = context.terms.find((t) => t.id === filters.academicTerm);
+  if (term) {
+    items.push({
+      label: "AT",
+      value: `${term.type.toUpperCase()} ${term.year}`,
+    });
+    const semester = term.Semester?.find((s) => s.id === filters.semester);
+    if (semester) {
+      items.push({
+        label: "SEM",
+        value: `${semester.programType} - Semester ${semester.semesterNumber}`,
+      });
+    }
+  }
+
+  const departmentValues = splitFilterValues(filters.department);
+  if (departmentValues.length) {
+    const departmentLabels = departmentValues.map(
+      (id) => context.departments.find((d) => d.id === id)?.name ?? id
+    );
+    items.push({ label: "DEP", value: joinValues(departmentLabels) });
+  }
+
+  if (filters.search) items.push({ label: "Search", value: filters.search });
+  if (filters.status)
+    items.push({
+      label: "Status",
+      value: joinValues(splitFilterValues(filters.status)),
+    });
+  if (filters.mode)
+    items.push({
+      label: "Mode of Admission",
+      value: joinValues(splitFilterValues(filters.mode)),
+    });
+  if (filters.categoryClaimed)
+    items.push({
+      label: "Category Claimed",
+      value: joinValues(splitFilterValues(filters.categoryClaimed)),
+    });
+  if (filters.categoryAllotted)
+    items.push({
+      label: "Category Allotted",
+      value: joinValues(splitFilterValues(filters.categoryAllotted)),
+    });
+  if (filters.quota)
+    items.push({
+      label: "Quota",
+      value: joinValues(splitFilterValues(filters.quota)),
+    });
+
+  if (filters.createdFrom || filters.createdTo) {
+    const range = [
+      filters.createdFrom && formatReportDate(filters.createdFrom),
+      filters.createdTo && formatReportDate(filters.createdTo),
+    ]
+      .filter(Boolean)
+      .join(" – ");
+    if (range) items.push({ label: "Date", value: range });
+  }
+
+  if (filters.admissionType)
+    items.push({
+      label: "Admission Type",
+      value: joinValues(
+        splitFilterValues(filters.admissionType).map(admissionTypeLabel)
+      ),
+    });
+  if (filters.admissionBasedOn)
+    items.push({
+      label: "Qualification",
+      value: joinValues(
+        splitFilterValues(filters.admissionBasedOn).map(qualificationLabel)
+      ),
+    });
+  if (filters.hostel)
+    items.push({
+      label: "Hostel",
+      value: joinValues(
+        splitFilterValues(filters.hostel).map((value) =>
+          value === "true" ? "Yes" : "No"
+        )
+      ),
+    });
+  if (filters.round)
+    items.push({
+      label: "Round",
+      value: joinValues(splitFilterValues(filters.round)),
+    });
+  if (filters.cancellationStatus)
+    items.push({
+      label: "Cancellation Status",
+      value: joinValues(
+        splitFilterValues(filters.cancellationStatus).map(
+          cancellationStatusLabel
+        )
+      ),
+    });
+  if (filters.cancellationReason)
+    items.push({
+      label: "Cancellation Reason",
+      value: joinValues(
+        splitFilterValues(filters.cancellationReason).map(
+          cancellationReasonLabel
+        )
+      ),
+    });
+  if (filters.feeStatus)
+    items.push({
+      label: "Fee Status",
+      value: joinValues(
+        splitFilterValues(filters.feeStatus).map(feeStatusLabel)
+      ),
+    });
+
+  return items;
+};
+
+export type ReportStat = { label: string; value: string };
+
+export const buildReportStatistics = (
+  reportType: ReportType,
+  rows: AdmissionResponse[]
+): ReportStat[] => {
+  const statusCount = (status: AdmissionResponse["status"]) =>
+    rows.filter((admission) => admission.status === status).length;
+
+  const stats: ReportStat[] = [
+    { label: "No. of Students", value: String(rows.length) },
+  ];
+
+  if (reportType === "fee") {
+    const paid = rows.filter(
+      (admission) => admission.feeStatus === true
+    ).length;
+    const totalCollected = rows.reduce(
+      (sum, admission) => sum + (admission.feePaid ?? 0),
+      0
+    );
+    stats.push({
+      label: "Total Fees Collected",
+      value: formatIndianCurrency(totalCollected),
+    });
+    stats.push({ label: "Paid", value: String(paid) });
+    stats.push({ label: "Unpaid", value: String(rows.length - paid) });
+  }
+
+  if (reportType === "cancellation") {
+    const cancelled = statusCount("CANCELLED");
+    stats.push({ label: "Cancelled", value: String(cancelled) });
+    stats.push({ label: "Active", value: String(rows.length - cancelled) });
+  }
+
+  if (reportType === "admission") {
+    stats.push({ label: "Approved", value: String(statusCount("APPROVED")) });
+    stats.push({
+      label: "Pending/Submitted",
+      value: String(statusCount("PENDING") + statusCount("SUBMITTED")),
+    });
+    stats.push({ label: "Rejected", value: String(statusCount("REJECTED")) });
+  }
+
+  return stats;
+};

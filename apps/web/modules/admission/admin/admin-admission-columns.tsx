@@ -29,6 +29,7 @@ export type AdmissionResponse = {
   posted?: boolean;
   cancellation?: {
     reason: string;
+    description?: string | null;
     cancelledAt: string;
   } | null;
   filledBy: {

@@ -31,11 +31,14 @@ import {
 } from "./reports-document";
 import {
   ADMISSION_BASED_ON_OPTIONS,
+  buildAppliedFilterSummary,
+  buildReportStatistics,
   CANCELLATION_REASON_VALUES,
   CANCELLATION_STATUS_VALUES,
   cancellationReasonLabel,
   createEmptyReportColumnSelection,
   EMPTY_REPORT_FILTERS,
+  formatIndianCurrency,
   getReportColumns,
   HOSTEL_OPTIONS,
   type AdmissionReportFilters,
@@ -123,6 +126,21 @@ const flattenCategories = (map?: Record<string, string[]>) => {
 const toOptions = (values: readonly string[]) =>
   values.map((value) => ({ label: value, value }));
 
+const downloadCSV = (filename: string, rows: string[][]) => {
+  const csvContent = rows
+    .map((row) => row.map((cell) => `"${cell}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 const buildReportSummary = (
   reportType: ReportType,
   rows: AdmissionResponse[]
@@ -134,7 +152,11 @@ const buildReportSummary = (
     const paid = rows.filter(
       (admission) => admission.feeStatus === true
     ).length;
-    return `Paid: ${paid} · Unpaid: ${rows.length - paid}`;
+    const totalCollected = rows.reduce(
+      (sum, admission) => sum + (admission.feePaid ?? 0),
+      0
+    );
+    return `Total Students: ${rows.length} · Total Fees Collected: ${formatIndianCurrency(totalCollected)} · Paid: ${paid} · Unpaid: ${rows.length - paid}`;
   }
 
   if (reportType === "cancellation") {
@@ -445,6 +467,12 @@ export function AdmissionReportView({
     placeholderData: keepPreviousData,
   });
 
+  const { data: statsRows } = useQuery({
+    queryKey: ["admission-report-stats", reportType, appliedFilters],
+    queryFn: () => fetchAllReportRows(appliedFilters),
+    placeholderData: keepPreviousData,
+  });
+
   const total = data?.total ?? 0;
   const maxPage = Math.max(Math.ceil(total / pageSize) - 1, 0);
 
@@ -453,6 +481,16 @@ export function AdmissionReportView({
   }, [page, maxPage]);
 
   const rows = data?.items ?? [];
+
+  const filterSummary = useMemo(
+    () => buildAppliedFilterSummary(appliedFilters, { terms, departments }),
+    [appliedFilters, terms, departments]
+  );
+
+  const statistics = useMemo(
+    () => buildReportStatistics(reportType, statsRows ?? []),
+    [reportType, statsRows]
+  );
 
   const reportColumns = useMemo(
     () => getReportColumns(reportType, columnSelection),
@@ -520,6 +558,11 @@ export function AdmissionReportView({
         generatedAt: new Date().toLocaleString(),
         total: rows.length,
         summary: buildReportSummary(reportType, rows),
+        filters: buildAppliedFilterSummary(appliedFilters, {
+          terms,
+          departments,
+        }),
+        statistics: buildReportStatistics(reportType, rows),
         columns: columns.map((column) => ({
           key: column.key,
           label: column.label,
@@ -528,6 +571,48 @@ export function AdmissionReportView({
           columns.map((column) => column.value(admission))
         ),
       });
+    } catch {
+      toast.error("Failed to fetch data for the report.");
+    } finally {
+      generatingRef.current = false;
+    }
+  };
+
+  const generateReportExcel = async () => {
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    try {
+      const rows = await fetchAllReportRows(appliedFilters);
+      if (rows.length === 0) {
+        toast.error("No records to include in the report.");
+        return;
+      }
+
+      const columns = getReportColumns(reportType, columnSelection);
+      const csvRows: string[][] = [
+        [REPORT_TITLES[reportType]],
+        [`Generated: ${new Date().toLocaleString()}`],
+        [],
+        ...buildAppliedFilterSummary(appliedFilters, {
+          terms,
+          departments,
+        }).map((item) => [`${item.label}: ${item.value}`]),
+        [],
+        ...buildReportStatistics(reportType, rows).map((stat) => [
+          `${stat.label}: ${stat.value}`,
+        ]),
+        [],
+        columns.map((column) => column.label),
+        ...rows.map((admission) =>
+          columns.map((column) => column.value(admission))
+        ),
+      ];
+
+      downloadCSV(
+        `${reportType}-report-${new Date().toISOString().slice(0, 10)}.csv`,
+        csvRows
+      );
+      toast.success(`${REPORT_TITLES[reportType]} Excel downloaded.`);
     } catch {
       toast.error("Failed to fetch data for the report.");
     } finally {
@@ -572,6 +657,8 @@ export function AdmissionReportView({
             dialogDescription={REPORT_DIALOG_DESCRIPTIONS[reportType]}
             onGenerateReport={generateReportPdf}
             reportButtonLabel={`Generate ${REPORT_TITLES[reportType]} PDF`}
+            onGenerateExcel={generateReportExcel}
+            reportExcelButtonLabel={`Generate ${REPORT_TITLES[reportType]} Excel`}
             fieldToggles={columnSelection}
             onToggleField={toggleColumn}
           />
@@ -590,6 +677,38 @@ export function AdmissionReportView({
           {isFetching && (
             <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
           )}
+        </div>
+
+        {filterSummary.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {filterSummary.map((item) => (
+              <div
+                key={item.label}
+                className="bg-muted text-muted-foreground rounded-md border px-3 py-1.5 text-sm"
+              >
+                <span className="text-foreground font-semibold">
+                  {item.label}:
+                </span>{" "}
+                {item.value}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {statistics.map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-card text-card-foreground rounded-lg border p-4"
+            >
+              <div className="text-muted-foreground text-xs font-medium uppercase">
+                {stat.label}
+              </div>
+              <div className="mt-1 text-xl font-bold tracking-tight">
+                {stat.value}
+              </div>
+            </div>
+          ))}
         </div>
 
         <DataTable
