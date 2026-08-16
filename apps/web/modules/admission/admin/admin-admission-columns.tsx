@@ -186,6 +186,29 @@ export type AdmissionResponse = {
   uniqueId?: string | null;
 };
 
+export type AdmissionNameSource = {
+  student?: { user?: { name?: string | null } } | null;
+  firstName?: string | null;
+  middleName?: string | null;
+  lastName?: string | null;
+  nameAsPer10th?: string | null;
+};
+
+export const getAdmissionFullName = (admission: AdmissionNameSource) => {
+  const studentName = admission.student?.user?.name?.trim();
+  const admissionName = [
+    admission.firstName,
+    admission.middleName,
+    admission.lastName,
+    admission.nameAsPer10th,
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(" ")
+    .trim();
+
+  return studentName || admissionName || "-";
+};
+
 const emailColumn: ColumnDef<AdmissionResponse> = {
   accessorKey: "primaryEmail",
   header: "College Email",
@@ -228,32 +251,27 @@ const filledByColumn: ColumnDef<AdmissionResponse> = {
   ),
 };
 
+const nameColumn: ColumnDef<AdmissionResponse> = {
+  id: "name",
+  header: "Name",
+  cell: ({ row }) => (
+    <div className="font-medium">{getAdmissionFullName(row.original)}</div>
+  ),
+};
+
+const actionsColumn: ColumnDef<AdmissionResponse> = {
+  id: "actions",
+  header: "Actions",
+  cell: ({ row }) => <AdminAdmissionActions admission={row.original} />,
+};
+
 export const getAdminAdmissionColumns = (
   showViewDetails: boolean,
   showFilledBy = true
 ): ColumnDef<AdmissionResponse>[] => [
+  nameColumn,
   emailColumn,
   createdAtColumn,
   ...(showFilledBy ? [filledByColumn] : []),
-  ...(showViewDetails
-    ? [
-        {
-          id: "name",
-          header: "Name",
-          cell: ({ row }: { row: { original: AdmissionResponse } }) => {
-            const studentName = row.original.student?.user?.name?.trim();
-            const admissionName = row.original.nameAsPer10th?.trim();
-
-            return <div>{studentName || admissionName || "-"}</div>;
-          },
-        },
-        {
-          id: "actions",
-          header: "Actions",
-          cell: ({ row }: { row: { original: AdmissionResponse } }) => (
-            <AdminAdmissionActions admission={row.original} />
-          ),
-        } satisfies ColumnDef<AdmissionResponse>,
-      ]
-    : []),
+  ...(showViewDetails ? [actionsColumn] : []),
 ];

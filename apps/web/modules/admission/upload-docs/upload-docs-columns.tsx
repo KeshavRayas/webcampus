@@ -2,6 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@webcampus/ui/components/badge";
+import { getAdmissionFullName } from "../admin/admin-admission-columns";
 import { UploadDocsActions } from "./upload-docs-actions";
 
 export type UploadDocsResponse = {
@@ -19,6 +20,13 @@ export type UploadDocsResponse = {
       name: string;
     };
   } | null;
+
+  filledBy: {
+    id: string;
+    name: string;
+    email: string;
+    role?: string | null;
+  };
 
   photo?: string | null;
   aadharCard?: string | null;
@@ -58,13 +66,17 @@ export const uploadDocsColumns: ColumnDef<UploadDocsResponse>[] = [
   {
     id: "name",
     header: "Name",
-    cell: ({ row }) => {
-      const studentName = row.original.student?.user?.name?.trim();
+    cell: ({ row }) => (
+      <div className="font-medium">{getAdmissionFullName(row.original)}</div>
+    ),
+  },
 
-      const admissionName = row.original.nameAsPer10th?.trim();
-
-      return <div>{studentName || admissionName || "-"}</div>;
-    },
+  {
+    accessorKey: "primaryEmail",
+    header: "College Email",
+    cell: ({ row }) => (
+      <div className="font-medium">{row.original.primaryEmail}</div>
+    ),
   },
 
   {

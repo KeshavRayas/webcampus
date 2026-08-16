@@ -14,7 +14,7 @@ import {
   FilterBuilder,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import { FileDown, FilterIcon } from "lucide-react";
+import { FilterIcon } from "lucide-react";
 import { useState } from "react";
 
 export const ADMISSION_FILTER_ALL_VALUE = "__all__";
@@ -29,8 +29,9 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   allValue = ADMISSION_FILTER_ALL_VALUE,
   dialogTitle = "Advanced Filters",
   dialogDescription = "Use advanced filters to narrow down the results.",
-  onGenerateReport,
-  reportButtonLabel = "Generate Report PDF",
+  // Report generation is disabled for now.
+  // onGenerateReport,
+  // reportButtonLabel = "Generate Report PDF",
 }: {
   simpleFields: FilterFieldConfig<TFilters>[];
   advancedFields: FilterFieldConfig<TFilters>[];
@@ -41,6 +42,7 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   allValue?: string;
   dialogTitle?: string;
   dialogDescription?: string;
+  /** Report generation is disabled for now (button is hidden). */
   onGenerateReport?: () => void;
   reportButtonLabel?: string;
 }) {
@@ -80,18 +82,20 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
               <FilterIcon className="h-4 w-4" />
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-xl md:max-w-2xl">
             <DialogHeader>
               <DialogTitle>{dialogTitle}</DialogTitle>
               <DialogDescription>{dialogDescription}</DialogDescription>
             </DialogHeader>
-            <FilterBuilder
-              fields={advancedFields}
-              draftFilters={draftFilters}
-              onDraftChange={onDraftChange}
-              allValue={allValue}
-              className="grid-cols-1 sm:grid-cols-2"
-            />
+            <div className="max-h-[65dvh] overflow-y-auto pr-1">
+              <FilterBuilder
+                fields={advancedFields}
+                draftFilters={draftFilters}
+                onDraftChange={onDraftChange}
+                allValue={allValue}
+                className="grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2"
+              />
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleReset}>
                 Reset Filters
@@ -103,12 +107,15 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
           </DialogContent>
         </Dialog>
 
-        {onGenerateReport && (
-          <Button type="button" variant="outline" onClick={onGenerateReport}>
-            <FileDown className="mr-2 h-4 w-4" />
-            {reportButtonLabel}
-          </Button>
-        )}
+        {/*
+          Report generation is disabled for now.
+          {onGenerateReport && (
+            <Button type="button" variant="outline" onClick={onGenerateReport}>
+              <FileDown className="mr-2 h-4 w-4" />
+              {reportButtonLabel}
+            </Button>
+          )}
+        */}
       </div>
     </div>
   );

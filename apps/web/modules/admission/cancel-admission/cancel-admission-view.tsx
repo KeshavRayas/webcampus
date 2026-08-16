@@ -18,7 +18,10 @@ import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { AdmissionResponse } from "../admin/admin-admission-columns";
+import {
+  AdmissionResponse,
+  getAdmissionFullName,
+} from "../admin/admin-admission-columns";
 import {
   AdmissionsReportDocument,
   type AdmissionsReportData,
@@ -54,6 +57,8 @@ type CancelAdmissionFilters = {
   mode: string;
   admissionType: string;
   email: string;
+  name: string;
+  filledBy: string;
   createdFrom: string;
   createdTo: string;
   cancellationStatus: CancellationStatus | "";
@@ -68,6 +73,8 @@ const EMPTY_FILTERS: CancelAdmissionFilters = {
   mode: "",
   admissionType: "",
   email: "",
+  name: "",
+  filledBy: "",
   createdFrom: "",
   createdTo: "",
   cancellationStatus: "",
@@ -103,9 +110,16 @@ export function CancelAdmissionView() {
   );
   const nestedSemesters = selectedTerm?.Semester || [];
 
+  const semesterOptions = nestedSemesters.filter(
+    (semester) =>
+      (semester.programType === "UG" &&
+        (semester.semesterNumber === 1 || semester.semesterNumber === 3)) ||
+      (semester.programType === "PG" && semester.semesterNumber === 1)
+  );
+
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: nestedSemesters,
+    semesters: semesterOptions,
     departments,
   });
 
@@ -116,6 +130,41 @@ export function CancelAdmissionView() {
     setDraftFilters((current) => ({ ...current, [key]: value }));
   };
 
+  const queryFilters = {
+    academicTerm: appliedFilters.academicTerm,
+    semester: appliedFilters.semester,
+    applicationId: appliedFilters.applicationId,
+    status: appliedFilters.status,
+    mode: appliedFilters.mode,
+    admissionType: appliedFilters.admissionType,
+    createdFrom: appliedFilters.createdFrom,
+    createdTo: appliedFilters.createdTo,
+  };
+  const query = createFilterQueryString(queryFilters);
+  const { data, isFetching, isLoading } = useQuery({
+    queryKey: ["cancel-admissions", appliedFilters],
+    queryFn: async () => {
+      const response = await fetchAdmissions(query);
+      return response;
+    },
+  });
+
+  const filledByOptions = useMemo(() => {
+    const byId = new Map<string, { label: string; value: string }>();
+    (data ?? []).forEach((admission) => {
+      if (admission.filledBy?.id) {
+        byId.set(admission.filledBy.id, {
+          value: admission.filledBy.id,
+          label:
+            admission.filledBy.name || admission.filledBy.email || "Unknown",
+        });
+      }
+    });
+    return Array.from(byId.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+  }, [data]);
+
   const simpleFilterFields: FilterFieldConfig<CancelAdmissionFilters>[] = [
     {
       key: "academicTerm",
@@ -124,7 +173,7 @@ export function CancelAdmissionView() {
       placeholder: "All terms",
       allOptionLabel: "All terms",
       options: terms.map((term) => ({
-        label: `${term.type} ${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
     },
@@ -136,7 +185,7 @@ export function CancelAdmissionView() {
         ? "All semesters"
         : "Select term first",
       allOptionLabel: "All semesters",
-      options: nestedSemesters.map((semester) => ({
+      options: semesterOptions.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
@@ -144,6 +193,13 @@ export function CancelAdmissionView() {
   ];
 
   const advancedFilterFields: FilterFieldConfig<CancelAdmissionFilters>[] = [
+    {
+      key: "name",
+      label: "Name",
+      type: "text",
+      placeholder: "Search by name",
+      inputId: "cancel-name",
+    },
     {
       key: "email",
       label: "Email",
@@ -157,6 +213,14 @@ export function CancelAdmissionView() {
       type: "text",
       placeholder: "Search application ID",
       inputId: "cancel-application-id",
+    },
+    {
+      key: "filledBy",
+      label: "Filled By",
+      type: "select",
+      placeholder: "All",
+      allOptionLabel: "All",
+      options: filledByOptions,
     },
     {
       key: "createdFrom",
@@ -232,25 +296,6 @@ export function CancelAdmissionView() {
     },
   ];
 
-  const queryFilters = {
-    academicTerm: appliedFilters.academicTerm,
-    semester: appliedFilters.semester,
-    applicationId: appliedFilters.applicationId,
-    status: appliedFilters.status,
-    mode: appliedFilters.mode,
-    admissionType: appliedFilters.admissionType,
-    createdFrom: appliedFilters.createdFrom,
-    createdTo: appliedFilters.createdTo,
-  };
-  const query = createFilterQueryString(queryFilters);
-  const { data, isFetching, isLoading } = useQuery({
-    queryKey: ["cancel-admissions", appliedFilters],
-    queryFn: async () => {
-      const response = await fetchAdmissions(query);
-      return response;
-    },
-  });
-
   const filteredAdmissions = useMemo(() => {
     let admissions = data ?? [];
 
@@ -258,6 +303,19 @@ export function CancelAdmissionView() {
     if (email) {
       admissions = admissions.filter((admission) =>
         admission.primaryEmail.toLowerCase().includes(email)
+      );
+    }
+
+    const name = appliedFilters.name.trim().toLowerCase();
+    if (name) {
+      admissions = admissions.filter((admission) =>
+        getAdmissionFullName(admission).toLowerCase().includes(name)
+      );
+    }
+
+    if (appliedFilters.filledBy) {
+      admissions = admissions.filter(
+        (admission) => admission.filledBy?.id === appliedFilters.filledBy
       );
     }
 
@@ -290,6 +348,8 @@ export function CancelAdmissionView() {
     appliedFilters.cancellationReason,
     appliedFilters.cancellationStatus,
     appliedFilters.email,
+    appliedFilters.name,
+    appliedFilters.filledBy,
     data,
   ]);
 
@@ -316,20 +376,6 @@ export function CancelAdmissionView() {
     router.replace(pathname, { scroll: false });
   };
 
-  const getFullName = (admission: AdmissionResponse) => {
-    const studentName = admission.student?.user?.name?.trim();
-    const admissionName = [
-      admission.firstName,
-      admission.middleName,
-      admission.lastName,
-      admission.nameAsPer10th,
-    ]
-      .filter((value): value is string => Boolean(value?.trim()))
-      .join(" ");
-
-    return studentName || admissionName || "-";
-  };
-
   const generateReportPdf = () => {
     const rows = filteredAdmissions;
     if (rows.length === 0) {
@@ -349,7 +395,7 @@ export function CancelAdmissionView() {
       rejected: statusCount("REJECTED"),
       rows: rows.map((admission) => ({
         applicationId: admission.applicationId || "-",
-        name: getFullName(admission),
+        name: getAdmissionFullName(admission),
         email: admission.primaryEmail || "-",
         status: admission.status || "-",
         branch: admission.department?.name || "-",

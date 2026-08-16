@@ -36,6 +36,7 @@ import { FileDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { getAdmissionFullName } from "../admin/admin-admission-columns";
 import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { ApplicantAdmissionView } from "../applicant/applicant-admission-view";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
@@ -64,6 +65,8 @@ type FeePaymentFilters = {
   mode: string;
   admissionType: string;
   email: string;
+  name: string;
+  filledBy: string;
   createdFrom: string;
   createdTo: string;
 };
@@ -77,6 +80,8 @@ const EMPTY_FILTERS: FeePaymentFilters = {
   mode: "",
   admissionType: "",
   email: "",
+  name: "",
+  filledBy: "",
   createdFrom: "",
   createdTo: "",
 };
@@ -228,9 +233,16 @@ const FeePaymentStaffView = () => {
   const selectedTerm = terms.find((t) => t.id === draftFilters.academicTerm);
   const nestedSemesters = selectedTerm?.Semester || [];
 
+  const semesterOptions = nestedSemesters.filter(
+    (semester) =>
+      (semester.programType === "UG" &&
+        (semester.semesterNumber === 1 || semester.semesterNumber === 3)) ||
+      (semester.programType === "PG" && semester.semesterNumber === 1)
+  );
+
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: nestedSemesters,
+    semesters: semesterOptions,
     departments,
   });
 
@@ -250,6 +262,76 @@ const FeePaymentStaffView = () => {
     }));
   };
 
+  const query = createFilterQueryString(
+    (() => {
+      const apiFilters: Omit<FeePaymentFilters, "email"> = {
+        ...appliedFilters,
+      };
+      return apiFilters;
+    })()
+  );
+  const { data, isFetching, isLoading } = useQuery({
+    queryKey: ["fee-payments", appliedFilters],
+    queryFn: async () => {
+      const response = await apiClient.get<BaseResponse<FeePaymentResponse[]>>(
+        `/admission${query ? `?${query}` : ""}`,
+        { withCredentials: true }
+      );
+      if (response.data.status === "error") {
+        throw new Error(response.data.message);
+      }
+      return response.data.data ?? [];
+    },
+  });
+
+  const admissions = useMemo(() => {
+    let rows = data ?? [];
+    const email = appliedFilters.email.trim().toLowerCase();
+    if (email) {
+      rows = rows.filter((admission) =>
+        admission.primaryEmail?.toLowerCase().includes(email)
+      );
+    }
+    const name = appliedFilters.name.trim().toLowerCase();
+    if (name) {
+      rows = rows.filter((admission) =>
+        getAdmissionFullName(admission).toLowerCase().includes(name)
+      );
+    }
+    if (appliedFilters.filledBy) {
+      rows = rows.filter(
+        (admission) => admission.filledBy?.id === appliedFilters.filledBy
+      );
+    }
+    return rows;
+  }, [
+    data,
+    appliedFilters.email,
+    appliedFilters.name,
+    appliedFilters.filledBy,
+  ]);
+
+  const filledByOptions = useMemo(() => {
+    const byId = new Map<string, { label: string; value: string }>();
+    (data ?? []).forEach((admission) => {
+      if (admission.filledBy?.id) {
+        byId.set(admission.filledBy.id, {
+          value: admission.filledBy.id,
+          label:
+            admission.filledBy.name || admission.filledBy.email || "Unknown",
+        });
+      }
+    });
+    return Array.from(byId.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+  }, [data]);
+
+  const summary = useMemo(
+    () => buildFeePaymentSummary(admissions),
+    [admissions]
+  );
+
   const simpleFilterFields: FilterFieldConfig<FeePaymentFilters>[] = [
     {
       key: "academicTerm",
@@ -258,7 +340,7 @@ const FeePaymentStaffView = () => {
       placeholder: "All terms",
       allOptionLabel: "All terms",
       options: terms.map((term) => ({
-        label: `${term.type} ${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
     },
@@ -270,7 +352,7 @@ const FeePaymentStaffView = () => {
         ? "All semesters"
         : "Select term first",
       allOptionLabel: "All semesters",
-      options: nestedSemesters.map((semester) => ({
+      options: semesterOptions.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
@@ -278,6 +360,13 @@ const FeePaymentStaffView = () => {
   ];
 
   const advancedFilterFields: FilterFieldConfig<FeePaymentFilters>[] = [
+    {
+      key: "name",
+      label: "Name",
+      type: "text",
+      placeholder: "Search by name",
+      inputId: "fee-payment-name",
+    },
     {
       key: "email",
       label: "Email",
@@ -291,6 +380,14 @@ const FeePaymentStaffView = () => {
       type: "text",
       placeholder: "Search application ID",
       inputId: "fee-payment-application-id",
+    },
+    {
+      key: "filledBy",
+      label: "Filled By",
+      type: "select",
+      placeholder: "All",
+      allOptionLabel: "All",
+      options: filledByOptions,
     },
     {
       key: "createdFrom",
@@ -346,41 +443,6 @@ const FeePaymentStaffView = () => {
       })),
     },
   ];
-
-  const query = createFilterQueryString(
-    (() => {
-      const apiFilters: Omit<FeePaymentFilters, "email"> = {
-        ...appliedFilters,
-      };
-      return apiFilters;
-    })()
-  );
-  const { data, isFetching, isLoading } = useQuery({
-    queryKey: ["fee-payments", appliedFilters],
-    queryFn: async () => {
-      const response = await apiClient.get<BaseResponse<FeePaymentResponse[]>>(
-        `/admission${query ? `?${query}` : ""}`,
-        { withCredentials: true }
-      );
-      if (response.data.status === "error") {
-        throw new Error(response.data.message);
-      }
-      return response.data.data ?? [];
-    },
-  });
-
-  const admissions = useMemo(() => {
-    const email = appliedFilters.email.trim().toLowerCase();
-    if (!email) return data ?? [];
-    return (data ?? []).filter((admission) =>
-      admission.primaryEmail?.toLowerCase().includes(email)
-    );
-  }, [data, appliedFilters.email]);
-
-  const summary = useMemo(
-    () => buildFeePaymentSummary(admissions),
-    [admissions]
-  );
 
   const applyFilters = () => {
     if (
@@ -562,27 +624,20 @@ const FeePaymentStaffView = () => {
   const columns = useMemo(() => {
     const baseColumns = [
       {
-        id: "studentName",
-        header: "Student",
-        cell: ({ row }: { row: { original: FeePaymentResponse } }) => {
-          const studentName = row.original.student?.user?.name?.trim();
-          const admissionName = row.original.nameAsPer10th?.trim();
-
-          return (
-            <div>
-              <div className="font-medium">
-                {studentName || admissionName || "-"}
-              </div>
-              <div className="text-muted-foreground text-xs">
-                {row.original.primaryEmail}
-              </div>
-            </div>
-          );
-        },
+        id: "name",
+        header: "Name",
+        cell: ({ row }: { row: { original: FeePaymentResponse } }) => (
+          <div className="font-medium">
+            {getAdmissionFullName(row.original)}
+          </div>
+        ),
       },
       {
-        accessorKey: "applicationId",
-        header: "Application ID",
+        id: "email",
+        header: "Email",
+        cell: ({ row }: { row: { original: FeePaymentResponse } }) => (
+          <div>{row.original.primaryEmail}</div>
+        ),
       },
       {
         accessorKey: "status",
@@ -626,27 +681,27 @@ const FeePaymentStaffView = () => {
 
           return (
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                onClick={() => handleOpenPay(admission)}
-                disabled={!canPay || isPaying}
-                title={
-                  !canPay
-                    ? "Application must be submitted before payment"
-                    : undefined
-                }
-              >
-                {isPaying ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : isPaid ? (
-                  "Approved"
-                ) : (
-                  "Pay Now"
-                )}
-              </Button>
+              {!isPaid && (
+                <Button
+                  size="sm"
+                  onClick={() => handlePay(admission.id)}
+                  disabled={!canPay || isPaying}
+                  title={
+                    !canPay
+                      ? "Application must be submitted before payment"
+                      : undefined
+                  }
+                >
+                  {isPaying ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Pay Now"
+                  )}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -689,29 +744,6 @@ const FeePaymentStaffView = () => {
             onGenerateReport={generateReportPdf}
             reportButtonLabel="Generate Fee Report PDF"
           />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <div className="bg-muted/30 rounded-md border p-3">
-            <p className="text-muted-foreground text-sm">Total</p>
-            <p className="text-xl font-semibold">{summary.total}</p>
-          </div>
-          <div className="bg-muted/30 rounded-md border p-3">
-            <p className="text-muted-foreground text-sm">Paid</p>
-            <p className="text-xl font-semibold">{summary.paid}</p>
-          </div>
-          <div className="bg-muted/30 rounded-md border p-3">
-            <p className="text-muted-foreground text-sm">Unpaid</p>
-            <p className="text-xl font-semibold">{summary.unpaid}</p>
-          </div>
-          <div className="bg-muted/30 rounded-md border p-3">
-            <p className="text-muted-foreground text-sm">Approved</p>
-            <p className="text-xl font-semibold">{summary.approved}</p>
-          </div>
-          <div className="bg-muted/30 rounded-md border p-3">
-            <p className="text-muted-foreground text-sm">Pending Review</p>
-            <p className="text-xl font-semibold">{summary.pending}</p>
-          </div>
         </div>
 
         <div className="flex items-center justify-between gap-3">
