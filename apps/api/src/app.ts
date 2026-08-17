@@ -17,6 +17,7 @@ import fileRouter from "./routers/file-management/file.router";
 import hodRouter from "./routers/hod/hod.router";
 import studentRouter from "./routers/student/student-domain.router";
 import supportRouter from "./routers/support/support.router";
+import trustAuthRouter from "./routers/trust/trust-auth.router";
 import verificationRouter from "./routers/verification/verification.router";
 
 const app: Express = express();
@@ -46,6 +47,8 @@ app.use("/coe", coeRouter);
 app.use("/faculty", facultyRouter);
 
 app.use("/accounts", accountsRouter);
+
+app.use("/trust", trustAuthRouter);
 
 app.use("/support", supportRouter);
 

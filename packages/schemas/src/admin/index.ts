@@ -1,6 +1,7 @@
 export * from "./archive.schema";
 export * from "./admission-user.schema";
 export * from "./accounts-user.schema";
+export * from "./trust-user.schema";
 export * from "./course-assignment.schema";
 export * from "./course.schema";
 export * from "./freeze.schema";

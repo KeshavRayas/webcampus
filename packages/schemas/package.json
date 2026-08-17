@@ -12,6 +12,7 @@
     "./student": "./src/student/index.ts",
     "./coe": "./src/coe/index.ts",
     "./accounts": "./src/accounts/index.ts",
+    "./trust": "./src/trust/index.ts",
     "./support": "./src/support/index.ts",
     "./common": "./src/common.schemas.ts",
     "./constants": "./src/constants/index.ts"

@@ -15,6 +15,7 @@ import RegistrationWindowRouter from "@webcampus/api/src/routers/admin/registrat
 import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
 import StudentProfileRouter from "@webcampus/api/src/routers/admin/student-profile.router";
 import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
+import TrustRouter from "@webcampus/api/src/routers/admin/trust.router";
 import UserRouter from "@webcampus/api/src/routers/admin/user.router";
 import WhatsAppRouter from "@webcampus/api/src/routers/admin/whatsapp.router";
 import { Router } from "express";
@@ -27,6 +28,7 @@ const router: Router = Router();
 router.use("/user", UserRouter);
 router.use("/coe", CoeRouter);
 router.use("/accounts", AccountsRouter);
+router.use("/trust", TrustRouter);
 router.use("/admission-users", AdmissionUserRouter);
 
 router.use("/department", DepartmentRouter);

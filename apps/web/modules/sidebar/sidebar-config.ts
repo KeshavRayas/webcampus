@@ -65,6 +65,7 @@ export const sidebarConfig: Record<Role, SidebarData> = {
             { name: "Admission Users", url: "/admin/admission-users" },
             { name: "COE", url: "/admin/coe" },
             { name: "Accounts", url: "/admin/accounts" },
+            { name: "Trust", url: "/admin/trust" },
           ],
         },
         {
