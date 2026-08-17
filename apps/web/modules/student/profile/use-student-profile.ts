@@ -12,6 +12,7 @@ export type StudentProfilePayload = {
   id: string;
   usn: string;
   currentSemester: number;
+  semesterId?: string | null;
   academicYear: string;
   departmentName: string;
   programType?: "UG" | "PG" | null;

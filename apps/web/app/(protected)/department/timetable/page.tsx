@@ -1,0 +1,238 @@
+"use client";
+
+import { apiClient } from "@/lib/api-client";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
+import { TimetableList } from "@/modules/timetable/timetable-list";
+import {
+  useDepartmentTimetable,
+  useTimetableTemplate,
+} from "@/modules/timetable/use-timetable";
+import { Button } from "@webcampus/ui/components/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@webcampus/ui/components/card";
+import { Input } from "@webcampus/ui/components/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@webcampus/ui/components/select";
+import { useState } from "react";
+
+type Slot = { label: string; startTime: string; endTime: string };
+type ImportResult = {
+  valid: boolean;
+  errors: Array<{ cell: string; message: string }>;
+  entries: unknown[];
+};
+
+const defaultSlots: Slot[] = [
+  { label: "09:00-10:00", startTime: "09:00", endTime: "10:00" },
+  { label: "10:00-11:00", startTime: "10:00", endTime: "11:00" },
+  { label: "11:15-12:15", startTime: "11:15", endTime: "12:15" },
+];
+
+export default function DepartmentTimetablePage() {
+  const terms = useAcademicTerms();
+  const semesters = terms.data?.flatMap((term) => term.Semester ?? []) ?? [];
+  const [semesterId, setSemesterId] = useState("");
+  const [slots, setSlots] = useState<Slot[]>(defaultSlots);
+  const [file, setFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  useTimetableTemplate(semesterId);
+  const timetable = useDepartmentTimetable(undefined, semesterId);
+
+  const saveSlots = async () => {
+    await apiClient.put(`/timetable/template/${semesterId}`, { slots });
+  };
+
+  const downloadWorkbook = async () => {
+    const response = await apiClient.get("/timetable/excel/template", {
+      params: { semesterId, slots: JSON.stringify(slots) },
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(response.data);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "timetable-template.xlsx";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const validateWorkbook = async () => {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("semesterId", semesterId);
+    formData.append("slots", JSON.stringify(slots));
+    const response = await apiClient.post<{ data: ImportResult }>(
+      "/timetable/excel/validate",
+      formData
+    );
+    setImportResult(response.data.data);
+  };
+
+  return (
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Department timetable</h1>
+        <p className="text-muted-foreground text-sm">
+          Configure semester timings, download a workbook, and upload section
+          schedules.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Term, semester and section</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Select value={semesterId} onValueChange={setSemesterId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select semester" />
+            </SelectTrigger>
+            <SelectContent>
+              {semesters.map((semester) => (
+                <SelectItem key={semester.id} value={semester.id}>
+                  {semester.programType} · Semester {semester.semesterNumber}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {semesterId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Semester timing template</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {slots.map((slot, index) => (
+              <div
+                className="grid gap-2 sm:grid-cols-4"
+                key={`${slot.label}-${index}`}
+              >
+                <Input
+                  value={slot.label}
+                  placeholder="Column label"
+                  onChange={(event) =>
+                    setSlots((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, label: event.target.value }
+                          : item
+                      )
+                    )
+                  }
+                />
+                <Input
+                  type="time"
+                  value={slot.startTime}
+                  onChange={(event) =>
+                    setSlots((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, startTime: event.target.value }
+                          : item
+                      )
+                    )
+                  }
+                />
+                <Input
+                  type="time"
+                  value={slot.endTime}
+                  onChange={(event) =>
+                    setSlots((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index
+                          ? { ...item, endTime: event.target.value }
+                          : item
+                      )
+                    )
+                  }
+                />
+                <Button
+                  variant="destructive"
+                  onClick={() =>
+                    setSlots((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index)
+                    )
+                  }
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  setSlots((current) => [
+                    ...current,
+                    { label: "", startTime: "", endTime: "" },
+                  ])
+                }
+              >
+                Add timing
+              </Button>
+              <Button onClick={saveSlots}>Save timings</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {semesterId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Excel timetable import</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-muted-foreground text-sm">
+              Enter course codes in the timetable cells. The Course Reference
+              sheet lists valid codes and names.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" onClick={downloadWorkbook}>
+                Download Excel template
+              </Button>
+              <Input
+                className="max-w-xs"
+                type="file"
+                accept=".xlsx"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+              <Button disabled={!file} onClick={validateWorkbook}>
+                Validate upload
+              </Button>
+            </div>
+            {importResult && (
+              <div className="rounded-lg border p-3">
+                <p className="font-medium">
+                  {importResult.valid
+                    ? `${importResult.entries.length} entries ready for import`
+                    : `${importResult.errors.length} errors found`}
+                </p>
+                {importResult.errors.map((error) => (
+                  <p
+                    className="text-destructive text-sm"
+                    key={`${error.cell}-${error.message}`}
+                  >
+                    {error.cell}: {error.message}
+                  </p>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <TimetableList entries={timetable.data ?? []} title="Existing entries" />
+    </div>
+  );
+}
