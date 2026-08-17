@@ -177,7 +177,8 @@ export class TimetableService {
     semesterId: string,
     departmentId?: string,
     sectionId?: string,
-    facultyId?: string
+    facultyId?: string,
+    status?: "DRAFT" | "PUBLISHED" | "ARCHIVED"
   ) {
     const where: TimetableWhere = { semesterId };
     if (departmentId) {
@@ -188,6 +189,9 @@ export class TimetableService {
     }
     if (facultyId) {
       where.facultyId = facultyId;
+    }
+    if (status) {
+      where.status = status;
     }
 
     return prisma.timetableEntry.findMany({
@@ -277,7 +281,26 @@ export class TimetableService {
     semesterId?: string,
     dayOfWeek?: string
   ) {
-    const where: TimetableWhere = { facultyId };
+    const labAssignments = await prisma.courseAssignment.findMany({
+      where: {
+        facultyId,
+        assignmentType: "LAB",
+        ...(semesterId ? { section: { semesterId } } : {}),
+      },
+      select: { courseId: true, sectionId: true },
+    });
+
+    const where: TimetableWhere = {
+      OR: [
+        { facultyId },
+        ...labAssignments.map((assignment) => ({
+          classType: "LAB",
+          courseId: assignment.courseId,
+          sectionId: assignment.sectionId,
+        })),
+      ],
+      status: "PUBLISHED",
+    };
     if (semesterId) {
       where.semesterId = semesterId;
     }
@@ -294,6 +317,7 @@ export class TimetableService {
           },
         },
         course: true,
+        faculty: { include: { user: { select: { name: true } } } },
         department: true,
         section: true,
       },
@@ -301,7 +325,11 @@ export class TimetableService {
     });
   }
 
-  static async getTodayEntries(semesterId: string, facultyId?: string) {
+  static async getTodayEntries(
+    semesterId: string,
+    facultyId?: string,
+    sectionId?: string
+  ) {
     const today = new Date();
     const dayOfWeek = today
       .toLocaleDateString("en-US", { weekday: "long" })
@@ -313,16 +341,38 @@ export class TimetableService {
       | "FRIDAY"
       | "SATURDAY";
 
+    const where: TimetableWhere = {
+      semesterId,
+      dayOfWeek,
+      status: "PUBLISHED",
+    };
+    if (sectionId) {
+      where.sectionId = sectionId;
+    }
+    if (facultyId) {
+      const labAssignments = await prisma.courseAssignment.findMany({
+        where: {
+          facultyId,
+          assignmentType: "LAB",
+          section: { semesterId },
+        },
+        select: { courseId: true, sectionId: true },
+      });
+      where.OR = [
+        { facultyId },
+        ...labAssignments.map((assignment) => ({
+          classType: "LAB",
+          courseId: assignment.courseId,
+          sectionId: assignment.sectionId,
+        })),
+      ];
+    }
+
     return prisma.timetableEntry.findMany({
-      where: {
-        semesterId,
-        ...(facultyId ? { facultyId } : {}),
-        dayOfWeek,
-        status: "PUBLISHED",
-      },
+      where,
       include: {
         course: true,
-        faculty: true,
+        faculty: { include: { user: { select: { name: true } } } },
         section: true,
       },
       orderBy: [{ startTime: "asc" }],
@@ -467,6 +517,7 @@ export class TimetableService {
             };
             sectionId: string;
             section: { id: string; name: string };
+            assignmentType: "THEORY" | "LAB";
           }>;
           [key: string]: unknown;
         }) => ({
@@ -477,6 +528,7 @@ export class TimetableService {
             shortName: assignment.faculty.shortName,
             sectionId: assignment.sectionId,
             sectionName: assignment.section?.name,
+            assignmentType: assignment.assignmentType,
           })),
         })
       ),
@@ -496,6 +548,109 @@ export class TimetableService {
       where: { departmentId_semesterId: { departmentId, semesterId } },
       create: { departmentId, semesterId, slots },
       update: { slots },
+    });
+  }
+
+  static async getSlotsForSection(
+    semesterId: string,
+    sectionId?: string
+  ): Promise<Slot[]> {
+    let departmentId: string | undefined;
+    if (sectionId) {
+      const section = await prisma.section.findUnique({
+        where: { id: sectionId },
+        select: { departmentId: true },
+      });
+      departmentId = section?.departmentId;
+    }
+    const template = await prisma.timetableTemplate.findFirst({
+      where: { semesterId, ...(departmentId ? { departmentId } : {}) },
+      select: { slots: true },
+    });
+    return (template?.slots ?? []) as Slot[];
+  }
+
+  static async importEntries(
+    departmentId: string,
+    semesterId: string,
+    entries: Array<{
+      courseId: string;
+      dayOfWeek: CreateTimetableEntryDTO["dayOfWeek"];
+      startTime: string;
+      endTime: string;
+      sectionId?: string;
+      classType: "LECTURE" | "LAB";
+    }>
+  ): Promise<{ createdCount: number; createdCodes: string[] }> {
+    const resolved: Array<{
+      courseId: string;
+      dayOfWeek: CreateTimetableEntryDTO["dayOfWeek"];
+      startTime: string;
+      endTime: string;
+      sectionId?: string;
+      classType: "LECTURE" | "LAB";
+      facultyId: string;
+      academicYear: string;
+    }> = [];
+    const errors: string[] = [];
+
+    for (const entry of entries) {
+      const assignmentType = entry.classType === "LAB" ? "LAB" : "THEORY";
+      const assignments = await prisma.courseAssignment.findMany({
+        where: {
+          departmentId,
+          courseId: entry.courseId,
+          sectionId: entry.sectionId,
+          assignmentType,
+        },
+        orderBy: [{ batchId: "asc" }],
+        select: { facultyId: true, academicYear: true },
+      });
+      const assignment = assignments[0];
+      if (!assignment) {
+        errors.push(
+          `No ${assignmentType} faculty assigned for course ${entry.courseId} in section ${entry.sectionId ?? "unspecified"}`
+        );
+        continue;
+      }
+      resolved.push({
+        ...entry,
+        facultyId: assignment.facultyId,
+        academicYear: assignment.academicYear,
+      });
+    }
+
+    if (errors.length) {
+      throw new Error(`Timetable import aborted:\n- ${errors.join("\n- ")}`);
+    }
+
+    return prisma.$transaction(async (tx) => {
+      await tx.timetableEntry.deleteMany({
+        where: { departmentId, semesterId },
+      });
+
+      const createdCodes: string[] = [];
+      for (const entry of resolved) {
+        const created = await tx.timetableEntry.create({
+          data: {
+            academicYear: entry.academicYear,
+            semesterId,
+            departmentId,
+            courseId: entry.courseId,
+            facultyId: entry.facultyId,
+            roomNumber: "",
+            dayOfWeek: entry.dayOfWeek,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+            classType: entry.classType,
+            sectionId: entry.sectionId,
+            status: "PUBLISHED",
+          },
+        });
+        createdCodes.push(created.courseId);
+      }
+
+      return { createdCount: createdCodes.length, createdCodes };
     });
   }
 }

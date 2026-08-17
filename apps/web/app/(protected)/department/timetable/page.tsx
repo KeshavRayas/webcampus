@@ -1,12 +1,13 @@
 "use client";
 
-import { apiClient } from "@/lib/api-client";
+import { apiClient, getApiErrorMessage } from "@/lib/api-client";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { TimetableList } from "@/modules/timetable/timetable-list";
 import {
   useDepartmentTimetable,
   useTimetableTemplate,
 } from "@/modules/timetable/use-timetable";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Card,
@@ -23,6 +24,7 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { useState } from "react";
+import { toast } from "react-toastify";
 
 type Slot = {
   id: string;
@@ -45,16 +47,29 @@ const defaultSlots: Slot[] = [
 export default function DepartmentTimetablePage() {
   const terms = useAcademicTerms();
   const semesters = terms.data?.flatMap((term) => term.Semester ?? []) ?? [];
+  const queryClient = useQueryClient();
   const [semesterId, setSemesterId] = useState("");
   const [slots, setSlots] = useState<Slot[]>(defaultSlots);
   const [file, setFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importing, setImporting] = useState(false);
   const [canSave, setCanSave] = useState(true);
   useTimetableTemplate(semesterId);
-  const timetable = useDepartmentTimetable(undefined, semesterId);
+
+  const { data: departmentId } = useQuery({
+    queryKey: ["department-info"],
+    queryFn: async () => {
+      const response = await apiClient.get<{
+        status: string;
+        data?: { id?: string };
+      }>("/department/section/department-info");
+      return response.data.data?.id ?? "";
+    },
+  });
+
+  const timetable = useDepartmentTimetable(departmentId, semesterId);
 
   const saveSlots = async () => {
-    setCanSave(false);
     const invalid = slots.some(
       (slot) =>
         !slot.label ||
@@ -63,20 +78,46 @@ export default function DepartmentTimetablePage() {
         slot.startTime >= slot.endTime
     );
     if (invalid) {
-      setCanSave(true);
-      alert(
+      toast.error(
         "Each time slot must have a label and valid start/end times (start < end)."
       );
       return;
     }
+    setCanSave(false);
     try {
       await apiClient.put(`/timetable/template/${semesterId}`, { slots });
-      setCanSave(true);
-    } catch {
-      setCanSave(true);
-      alert(
-        "Failed to save timetable template. Please check the input and try again."
+      toast.success("Timetable template saved successfully");
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Failed to save timetable template")
       );
+    } finally {
+      setCanSave(true);
+    }
+  };
+
+  const importEntries = async () => {
+    if (!importResult || !importResult.valid) return;
+    setImporting(true);
+    try {
+      await apiClient.post("/timetable/excel/import", {
+        semesterId,
+        entries: importResult.entries,
+      });
+      setImportResult(null);
+      toast.success(
+        `${importResult.entries.length} entries imported successfully`
+      );
+      void queryClient.invalidateQueries({
+        queryKey: ["department-timetable"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["timetable-template"] });
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Failed to import timetable entries")
+      );
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -259,6 +300,17 @@ export default function DepartmentTimetablePage() {
                     {error.cell}: {error.message}
                   </p>
                 ))}
+                {importResult.valid && (
+                  <Button
+                    variant="default"
+                    onClick={importEntries}
+                    disabled={importing}
+                  >
+                    {importing
+                      ? "Importing..."
+                      : `Import ${importResult.entries.length} entries`}
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>

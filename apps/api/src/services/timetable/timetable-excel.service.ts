@@ -2,12 +2,20 @@ import ExcelJS from "exceljs";
 import { TimetableService } from "./timetable.service";
 
 type Slot = { label: string; startTime: string; endTime: string };
+type FacultyReference = {
+  id: string;
+  name: string;
+  sectionId: string;
+  assignmentType: "THEORY" | "LAB";
+};
 type CourseReference = {
   id: string;
   code: string;
   name: string;
-  handlingFaculty?: Array<{ name: string; sectionId: string }>;
+  hasLaboratoryComponent?: boolean;
+  handlingFaculty?: FacultyReference[];
 };
+type ReferenceRow = { code: string; name: string; faculty: string };
 const days = [
   "MONDAY",
   "TUESDAY",
@@ -17,14 +25,63 @@ const days = [
   "SATURDAY",
 ];
 
+const buildReferenceRows = (
+  courses: CourseReference[],
+  sectionId?: string
+): ReferenceRow[] => {
+  const rows: ReferenceRow[] = [];
+  for (const course of courses) {
+    const handling =
+      course.handlingFaculty?.filter(
+        (faculty) => !sectionId || faculty.sectionId === sectionId
+      ) ?? [];
+    const theoryFaculty = handling.filter(
+      (faculty) => faculty.assignmentType === "THEORY"
+    );
+    const labFaculty = handling.filter(
+      (faculty) => faculty.assignmentType === "LAB"
+    );
+
+    if (course.hasLaboratoryComponent) {
+      if (theoryFaculty.length) {
+        rows.push({
+          code: course.code,
+          name: course.name,
+          faculty: theoryFaculty.map((faculty) => faculty.name).join(", "),
+        });
+      }
+      rows.push({
+        code: `${course.code} Lab`,
+        name: course.name,
+        faculty:
+          labFaculty.map((faculty) => faculty.name).join(", ") ||
+          "Not assigned",
+      });
+    } else {
+      rows.push({
+        code: course.code,
+        name: course.name,
+        faculty:
+          theoryFaculty.map((faculty) => faculty.name).join(", ") ||
+          "Not assigned",
+      });
+    }
+  }
+  return rows;
+};
+
 export class TimetableExcelService {
   static async template(semesterId: string, slots: Slot[]) {
     const reference = await TimetableService.getTemplateData(semesterId);
+    const courses = reference.courses as unknown as CourseReference[];
     const workbook = new ExcelJS.Workbook();
     const instructions = workbook.addWorksheet("Instructions");
     instructions.addRow(["TIMETABLE IMPORT INSTRUCTIONS"]);
     instructions.addRow([
       "Select a course code in each timetable cell. Leave cells blank where there is no class.",
+    ]);
+    instructions.addRow([
+      "Courses with a laboratory component appear as '<CODE> Lab'. Enter '<CODE> Lab' for lab sessions and the plain code for theory sessions.",
     ]);
     instructions.addRow([
       "Do not rename section sheets or change the day/time headers.",
@@ -34,12 +91,9 @@ export class TimetableExcelService {
     ]);
     instructions.addRow([]);
     instructions.addRow(["Course Code", "Course Name", "Handling Faculty"]);
-    (reference.courses as unknown as CourseReference[]).forEach((course) => {
-      const facultyNames =
-        course.handlingFaculty?.map((faculty) => faculty.name).join(", ") ||
-        "Not assigned";
-      instructions.addRow([course.code, course.name, facultyNames]);
-    });
+    buildReferenceRows(courses).forEach((row) =>
+      instructions.addRow([row.code, row.name, row.faculty])
+    );
 
     for (const section of reference.sections as Array<{
       id: string;
@@ -51,14 +105,9 @@ export class TimetableExcelService {
       days.forEach((day) => sheet.addRow([day, ...slots.map(() => "")]));
       sheet.addRow([]);
       sheet.addRow(["Course Code", "Course Name", "Handling Faculty"]);
-      (reference.courses as unknown as CourseReference[]).forEach((course) => {
-        const facultyNames =
-          course.handlingFaculty
-            ?.filter((faculty) => faculty.sectionId === section.id)
-            .map((faculty) => faculty.name)
-            .join(", ") || "Not assigned";
-        sheet.addRow([course.code, course.name, facultyNames]);
-      });
+      buildReferenceRows(courses, section.id).forEach((row) =>
+        sheet.addRow([row.code, row.name, row.faculty])
+      );
     }
     return workbook.xlsx.writeBuffer();
   }
@@ -97,24 +146,25 @@ export class TimetableExcelService {
           const day = String(row.getCell(1).value ?? "").toUpperCase();
           if (!days.includes(day)) return;
           slots.forEach((slot, index) => {
-            const value = String(row.getCell(index + 2).value ?? "")
-              .trim()
-              .toUpperCase();
-            if (!value) return;
-            const course = codeMap.get(value) as
+            const raw = String(row.getCell(index + 2).value ?? "").trim();
+            const isLab = /\s+lab$/i.test(raw);
+            const code = raw.replace(/\s+lab$/i, "").toUpperCase();
+            if (!code) return;
+            const course = codeMap.get(code) as
               | { id: string; code: string }
               | undefined;
             if (!course) {
               errors.push({
                 sheet: sheet.name,
                 cell: row.getCell(index + 2).address,
-                message: `Unknown course code ${value}`,
+                message: `Unknown course code ${raw}`,
               });
               return;
             }
             entries.push({
               courseId: course.id,
               courseCode: course.code,
+              classType: isLab ? "LAB" : "LECTURE",
               dayOfWeek: day,
               startTime: slot.startTime,
               endTime: slot.endTime,

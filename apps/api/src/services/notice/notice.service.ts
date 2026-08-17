@@ -21,9 +21,19 @@ export class NoticeService {
   static async listForStudent(userId: string) {
     const student = await prisma.student.findUnique({
       where: { userId },
-      select: { departmentName: true },
+      select: { id: true, departmentName: true },
     });
     if (!student) return [];
+
+    const latestSection = await prisma.studentSection.findFirst({
+      where: { studentId: student.id },
+      orderBy: { semester: "desc" },
+      select: { section: { select: { departmentId: true } } },
+    });
+    if (latestSection?.section?.departmentId) {
+      return this.listAudience(latestSection.section.departmentId, "STUDENTS");
+    }
+
     return this.listAudienceByDepartmentName(
       student.departmentName,
       "STUDENTS"

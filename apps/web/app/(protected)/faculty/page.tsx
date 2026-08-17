@@ -1,10 +1,10 @@
 "use client";
 
-import { apiClient } from "@/lib/api-client";
 import { useFacultyNotices } from "@/modules/notices/use-notices";
-import { useFacultyTimetable } from "@/modules/timetable/use-timetable";
-import { useQuery } from "@tanstack/react-query";
-import type { BaseResponse } from "@webcampus/types/api";
+import {
+  useFacultyCurrentSemester,
+  useFacultyTodayTimetable,
+} from "@/modules/timetable/use-timetable";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -13,35 +13,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@webcampus/ui/components/card";
-import {
-  CalendarDays,
-  ClipboardCheck,
-  FileQuestion,
-  Users,
-} from "lucide-react";
 import Link from "next/link";
 
-type Course = {
-  id: string;
-  course?: { code?: string; name?: string } | null;
-  code?: string;
-  name?: string;
-};
-
 export default function FacultyDashboardPage() {
-  const courses = useQuery({
-    queryKey: ["faculty-dashboard-courses"],
-    queryFn: async () => {
-      const response = (
-        await apiClient.get<BaseResponse<Course[]>>("/faculty/handling/courses")
-      ).data;
-      return response.status === "success" ? (response.data ?? []) : [];
-    },
-  });
-  const timetable = useFacultyTimetable();
+  const { currentSemesterId } = useFacultyCurrentSemester();
+  const timetable = useFacultyTodayTimetable(currentSemesterId);
   const notices = useFacultyNotices();
-  const courseCount = courses.data?.length ?? 0;
   const classCount = timetable.data?.length ?? 0;
+  const scheduleReady = Boolean(currentSemesterId);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
@@ -55,32 +34,6 @@ export default function FacultyDashboardPage() {
         <p className="text-muted-foreground text-sm">
           Your teaching schedule and pending academic work
         </p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          {
-            title: "Today's classes",
-            value: timetable.isLoading ? "..." : classCount,
-            icon: CalendarDays,
-          },
-          { title: "Attendance pending", value: "View", icon: ClipboardCheck },
-          {
-            title: "Courses handled",
-            value: courses.isLoading ? "..." : courseCount,
-            icon: Users,
-          },
-          { title: "Papers pending", value: "View", icon: FileQuestion },
-        ].map(({ title, value, icon: Icon }) => (
-          <Card key={title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{title}</CardTitle>
-              <Icon className="text-muted-foreground size-4" />
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold">{value}</p>
-            </CardContent>
-          </Card>
-        ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -107,7 +60,9 @@ export default function FacultyDashboardPage() {
             ))}
             {!timetable.isLoading && !classCount && (
               <p className="text-muted-foreground text-sm">
-                No timetable entries available.
+                {scheduleReady
+                  ? "No classes scheduled for today."
+                  : "Loading semester…"}
               </p>
             )}
             <Button asChild className="mt-2" variant="outline">

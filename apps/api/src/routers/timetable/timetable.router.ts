@@ -1,3 +1,4 @@
+import { resolveFacultyIdForUser } from "@webcampus/api/src/services/faculty/resolve-faculty-for-user";
 import { TimetableExcelService } from "@webcampus/api/src/services/timetable/timetable-excel.service";
 import { TimetableService } from "@webcampus/api/src/services/timetable/timetable.service";
 import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
@@ -22,7 +23,12 @@ router.get(
   protect({ role: "student", permissions: {} }),
   async (req, res) => {
     const semesterId = requestParams(req).semesterId!;
-    const entries = await TimetableService.getTodayEntries(semesterId);
+    const sectionId = req.query.sectionId as string | undefined;
+    const entries = await TimetableService.getTodayEntries(
+      semesterId,
+      undefined,
+      sectionId
+    );
     res.json({
       status: "success",
       data: entries,
@@ -36,10 +42,22 @@ router.get(
   protect({ role: "student", permissions: {} }),
   async (req, res) => {
     const semesterId = requestParams(req).semesterId!;
-    const entries = await TimetableService.getEntriesBySemester(semesterId);
+    const sectionId = req.query.sectionId as string | undefined;
+    const entries = await TimetableService.getEntriesBySemester(
+      semesterId,
+      undefined,
+      sectionId,
+      undefined,
+      "PUBLISHED"
+    );
+    const slots = await TimetableService.getSlotsForSection(
+      semesterId,
+      sectionId
+    );
     res.json({
       status: "success",
       data: entries,
+      slots,
     });
   }
 );
@@ -88,16 +106,29 @@ router.get(
   "/faculty/today/:semesterId",
   protect({ role: "faculty", permissions: {} }),
   async (req, res) => {
-    const semesterId = requestParams(req).semesterId!;
-    const facultyId = undefined;
-    const entries = await TimetableService.getTodayEntries(
-      semesterId,
-      facultyId
-    );
-    res.json({
-      status: "success",
-      data: entries,
-    });
+    try {
+      const semesterId = requestParams(req).semesterId!;
+      const userId = req.requestContext?.userId;
+      if (!userId) {
+        res.status(401).json({ status: "error", message: "Unauthorized" });
+        return;
+      }
+      const facultyId = await resolveFacultyIdForUser(userId);
+      const entries = await TimetableService.getTodayEntries(
+        semesterId,
+        facultyId
+      );
+      res.json({
+        status: "success",
+        data: entries,
+      });
+    } catch (error) {
+      res.status(403).json({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Faculty profile not found",
+      });
+    }
   }
 );
 
@@ -106,22 +137,29 @@ router.get(
   "/faculty/weekly/:semesterId",
   protect({ role: "faculty", permissions: {} }),
   async (req, res) => {
-    const semesterId = requestParams(req).semesterId!;
-    const facultyId = undefined;
-    if (!facultyId) {
-      res
-        .status(403)
-        .json({ status: "error", message: "Faculty profile not found" });
-      return;
+    try {
+      const semesterId = requestParams(req).semesterId!;
+      const userId = req.requestContext?.userId;
+      if (!userId) {
+        res.status(401).json({ status: "error", message: "Unauthorized" });
+        return;
+      }
+      const facultyId = await resolveFacultyIdForUser(userId);
+      const entries = await TimetableService.getEntriesByFaculty(
+        facultyId,
+        semesterId
+      );
+      res.json({
+        status: "success",
+        data: entries,
+      });
+    } catch (error) {
+      res.status(403).json({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Faculty profile not found",
+      });
     }
-    const entries = await TimetableService.getEntriesByFaculty(
-      facultyId,
-      semesterId
-    );
-    res.json({
-      status: "success",
-      data: entries,
-    });
   }
 );
 
@@ -273,12 +311,10 @@ router.put(
       const semesterId = String(requestParams(req).semesterId);
       const slots = req.body?.slots;
       if (!Array.isArray(slots) || !slots.length)
-        return res
-          .status(400)
-          .json({
-            status: "error",
-            message: "At least one time slot is required",
-          });
+        return res.status(400).json({
+          status: "error",
+          message: "At least one time slot is required",
+        });
       const invalid = slots.some(
         (slot) =>
           !slot?.label ||
@@ -287,13 +323,10 @@ router.put(
           slot.startTime >= slot.endTime
       );
       if (invalid)
-        return res
-          .status(400)
-          .json({
-            status: "error",
-            message:
-              "Each time slot must have a label and valid start/end times",
-          });
+        return res.status(400).json({
+          status: "error",
+          message: "Each time slot must have a label and valid start/end times",
+        });
       return res.json({
         status: "success",
         data: await TimetableService.saveTemplate(
@@ -303,15 +336,13 @@ router.put(
         ),
       });
     } catch (error) {
-      return res
-        .status(400)
-        .json({
-          status: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to save timetable template",
-        });
+      return res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to save timetable template",
+      });
     }
   }
 );
@@ -324,12 +355,10 @@ router.get(
       const semesterId = String(req.query.semesterId ?? "");
       const slots = JSON.parse(String(req.query.slots ?? "[]"));
       if (!semesterId || !Array.isArray(slots) || !slots.length)
-        return res
-          .status(400)
-          .json({
-            status: "error",
-            message: "semesterId and slots are required",
-          });
+        return res.status(400).json({
+          status: "error",
+          message: "semesterId and slots are required",
+        });
       const buffer = await TimetableExcelService.template(semesterId, slots);
       res.setHeader(
         "Content-Type",
@@ -341,15 +370,13 @@ router.get(
       );
       return res.send(buffer);
     } catch (error) {
-      return res
-        .status(400)
-        .json({
-          status: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to generate timetable template",
-        });
+      return res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to generate timetable template",
+      });
     }
   }
 );
@@ -364,26 +391,66 @@ router.post(
       const slots = JSON.parse(String(req.body?.slots ?? "[]"));
       const file = req.file;
       if (!semesterId || !file?.buffer || !Array.isArray(slots))
-        return res
-          .status(400)
-          .json({
-            status: "error",
-            message: "semesterId, slots and file are required",
-          });
+        return res.status(400).json({
+          status: "error",
+          message: "semesterId, slots and file are required",
+        });
       return res.json({
         status: "success",
         data: await TimetableExcelService.parse(file.buffer, semesterId, slots),
       });
     } catch (error) {
-      return res
-        .status(400)
-        .json({
+      return res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to validate timetable workbook",
+      });
+    }
+  }
+);
+
+router.post(
+  "/excel/import",
+  protect({ role: "department", permissions: {} }),
+  async (req, res) => {
+    try {
+      const context = await getDepartmentRequestContext(req);
+      const { semesterId, entries } = req.body as {
+        semesterId: string;
+        entries: Array<{
+          courseId: string;
+          dayOfWeek: import("@webcampus/api/src/services/timetable/timetable.service").CreateTimetableEntryDTO["dayOfWeek"];
+          startTime: string;
+          endTime: string;
+          sectionId?: string;
+          classType: "LECTURE" | "LAB";
+        }>;
+      };
+      if (!semesterId || !Array.isArray(entries) || !entries.length) {
+        return res.status(400).json({
           status: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to validate timetable workbook",
+          message: "semesterId and entries are required",
         });
+      }
+      const result = await TimetableService.importEntries(
+        context.departmentId,
+        semesterId,
+        entries
+      );
+      res.json({
+        status: "success",
+        data: result,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to import timetable entries",
+      });
     }
   }
 );

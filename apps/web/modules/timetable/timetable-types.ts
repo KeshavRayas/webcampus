@@ -18,6 +18,12 @@ export type TimetableEntry = {
   section?: { name?: string } | null;
 };
 
+export type TimetableSlot = {
+  label: string;
+  startTime: string;
+  endTime: string;
+};
+
 export type TimetableResponse = {
   status: "success" | "error";
   data?: TimetableEntry[];

@@ -1,24 +1,54 @@
 "use client";
 
 import { apiClient } from "@/lib/api-client";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BaseResponse } from "@webcampus/types/api";
-import type { TimetableEntry, TimetableTemplate } from "./timetable-types";
+import type {
+  TimetableEntry,
+  TimetableSlot,
+  TimetableTemplate,
+} from "./timetable-types";
 
 const unwrap = (response: BaseResponse<TimetableEntry[]>) => {
   if (response.status !== "success") throw new Error(response.message);
   return response.data ?? [];
 };
 
-export const useStudentTimetable = (semesterId?: string) =>
+export const useStudentTimetable = (semesterId?: string, sectionId?: string) =>
   useQuery({
-    queryKey: ["student-timetable", semesterId],
-    enabled: Boolean(semesterId),
+    queryKey: ["student-timetable", semesterId, sectionId],
+    enabled: Boolean(semesterId) && Boolean(sectionId),
+    queryFn: async () => {
+      const response = (
+        await apiClient.get<{
+          status: string;
+          data?: TimetableEntry[];
+          slots?: TimetableSlot[];
+          message?: string;
+        }>(`/timetable/weekly/${semesterId}`, { params: { sectionId } })
+      ).data;
+      if (response.status !== "success") throw new Error(response.message);
+      return {
+        entries: response.data ?? [],
+        slots: response.slots ?? [],
+      };
+    },
+  });
+
+export const useStudentTodayTimetable = (
+  semesterId?: string,
+  sectionId?: string
+) =>
+  useQuery({
+    queryKey: ["student-timetable-today", semesterId, sectionId],
+    enabled: Boolean(semesterId) && Boolean(sectionId),
     queryFn: async () =>
       unwrap(
         (
           await apiClient.get<BaseResponse<TimetableEntry[]>>(
-            `/timetable/weekly/${semesterId}`
+            `/timetable/today/${semesterId}`,
+            { params: { sectionId } }
           )
         ).data
       ),
@@ -38,13 +68,39 @@ export const useFacultyTimetable = (semesterId?: string) =>
       ),
   });
 
+export const useFacultyTodayTimetable = (semesterId?: string) =>
+  useQuery({
+    queryKey: ["faculty-timetable-today", semesterId],
+    enabled: Boolean(semesterId),
+    queryFn: async () =>
+      unwrap(
+        (
+          await apiClient.get<BaseResponse<TimetableEntry[]>>(
+            `/timetable/faculty/today/${semesterId}`
+          )
+        ).data
+      ),
+  });
+
+export const useFacultyCurrentSemester = () => {
+  const terms = useAcademicTerms();
+  const currentTerm = terms.data?.find((term) => term.isCurrent);
+  const currentSemesters = currentTerm?.Semester ?? [];
+  const allSemesters = terms.data?.flatMap((term) => term.Semester ?? []) ?? [];
+  return {
+    terms,
+    currentSemesterId: currentSemesters[0]?.id ?? allSemesters[0]?.id,
+    isLoading: terms.isLoading,
+  };
+};
+
 export const useDepartmentTimetable = (
   departmentId?: string,
   semesterId?: string
 ) =>
   useQuery({
     queryKey: ["department-timetable", departmentId, semesterId],
-    enabled: Boolean(departmentId),
+    enabled: Boolean(departmentId) && Boolean(semesterId),
     queryFn: async () =>
       unwrap(
         (
