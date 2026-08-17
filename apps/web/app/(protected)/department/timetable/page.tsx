@@ -24,7 +24,12 @@ import {
 } from "@webcampus/ui/components/select";
 import { useState } from "react";
 
-type Slot = { label: string; startTime: string; endTime: string };
+type Slot = {
+  id: string;
+  label: string;
+  startTime: string;
+  endTime: string;
+};
 type ImportResult = {
   valid: boolean;
   errors: Array<{ cell: string; message: string }>;
@@ -32,9 +37,9 @@ type ImportResult = {
 };
 
 const defaultSlots: Slot[] = [
-  { label: "09:00-10:00", startTime: "09:00", endTime: "10:00" },
-  { label: "10:00-11:00", startTime: "10:00", endTime: "11:00" },
-  { label: "11:15-12:15", startTime: "11:15", endTime: "12:15" },
+  { id: "slot-0", label: "09:00-10:00", startTime: "09:00", endTime: "10:00" },
+  { id: "slot-1", label: "10:00-11:00", startTime: "10:00", endTime: "11:00" },
+  { id: "slot-2", label: "11:15-12:15", startTime: "11:15", endTime: "12:15" },
 ];
 
 export default function DepartmentTimetablePage() {
@@ -44,11 +49,35 @@ export default function DepartmentTimetablePage() {
   const [slots, setSlots] = useState<Slot[]>(defaultSlots);
   const [file, setFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [canSave, setCanSave] = useState(true);
   useTimetableTemplate(semesterId);
   const timetable = useDepartmentTimetable(undefined, semesterId);
 
   const saveSlots = async () => {
-    await apiClient.put(`/timetable/template/${semesterId}`, { slots });
+    setCanSave(false);
+    const invalid = slots.some(
+      (slot) =>
+        !slot.label ||
+        !slot.startTime ||
+        !slot.endTime ||
+        slot.startTime >= slot.endTime
+    );
+    if (invalid) {
+      setCanSave(true);
+      alert(
+        "Each time slot must have a label and valid start/end times (start < end)."
+      );
+      return;
+    }
+    try {
+      await apiClient.put(`/timetable/template/${semesterId}`, { slots });
+      setCanSave(true);
+    } catch {
+      setCanSave(true);
+      alert(
+        "Failed to save timetable template. Please check the input and try again."
+      );
+    }
   };
 
   const downloadWorkbook = async () => {
@@ -113,18 +142,15 @@ export default function DepartmentTimetablePage() {
             <CardTitle>Semester timing template</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {slots.map((slot, index) => (
-              <div
-                className="grid gap-2 sm:grid-cols-4"
-                key={`${slot.label}-${index}`}
-              >
+            {slots.map((slot) => (
+              <div className="grid gap-2 sm:grid-cols-4" key={slot.id}>
                 <Input
                   value={slot.label}
                   placeholder="Column label"
                   onChange={(event) =>
                     setSlots((current) =>
-                      current.map((item, itemIndex) =>
-                        itemIndex === index
+                      current.map((item) =>
+                        item.id === slot.id
                           ? { ...item, label: event.target.value }
                           : item
                       )
@@ -136,8 +162,8 @@ export default function DepartmentTimetablePage() {
                   value={slot.startTime}
                   onChange={(event) =>
                     setSlots((current) =>
-                      current.map((item, itemIndex) =>
-                        itemIndex === index
+                      current.map((item) =>
+                        item.id === slot.id
                           ? { ...item, startTime: event.target.value }
                           : item
                       )
@@ -149,8 +175,8 @@ export default function DepartmentTimetablePage() {
                   value={slot.endTime}
                   onChange={(event) =>
                     setSlots((current) =>
-                      current.map((item, itemIndex) =>
-                        itemIndex === index
+                      current.map((item) =>
+                        item.id === slot.id
                           ? { ...item, endTime: event.target.value }
                           : item
                       )
@@ -161,7 +187,7 @@ export default function DepartmentTimetablePage() {
                   variant="destructive"
                   onClick={() =>
                     setSlots((current) =>
-                      current.filter((_, itemIndex) => itemIndex !== index)
+                      current.filter((item) => item.id !== slot.id)
                     )
                   }
                 >
@@ -175,13 +201,20 @@ export default function DepartmentTimetablePage() {
                 onClick={() =>
                   setSlots((current) => [
                     ...current,
-                    { label: "", startTime: "", endTime: "" },
+                    {
+                      id: `slot-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                      label: "",
+                      startTime: "",
+                      endTime: "",
+                    },
                   ])
                 }
               >
                 Add timing
               </Button>
-              <Button onClick={saveSlots}>Save timings</Button>
+              <Button disabled={!canSave} variant="default" onClick={saveSlots}>
+                Save timings
+              </Button>
             </div>
           </CardContent>
         </Card>
