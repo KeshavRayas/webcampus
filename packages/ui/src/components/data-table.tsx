@@ -6,6 +6,7 @@ import {
   getCoreRowModel,
   getPaginationRowModel,
   PaginationState,
+  Row,
   Updater,
   useReactTable,
 } from "@tanstack/react-table";
@@ -28,6 +29,10 @@ interface DataTableProps<TData, TValue> {
   pageSize?: number;
   totalRows?: number;
   onPaginationChange?: (page: number, pageSize: number) => void;
+  enableRowSelection?: boolean | ((row: Row<TData>) => boolean);
+  rowSelection?: Record<string, boolean>;
+  onRowSelectionChange?: (selection: Record<string, boolean>) => void;
+  getRowId?: (row: TData) => string;
 }
 
 export function DataTable<TData, TValue>({
@@ -38,19 +43,34 @@ export function DataTable<TData, TValue>({
   pageSize = 10,
   totalRows = 0,
   onPaginationChange,
+  enableRowSelection,
+  rowSelection,
+  onRowSelectionChange,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getRowId,
+    enableRowSelection,
+    state: {
+      ...(rowSelection ? { rowSelection } : {}),
+      ...(manualPagination
+        ? { pagination: { pageIndex: page, pageSize } }
+        : {}),
+    },
+    onRowSelectionChange: (updater: Updater<Record<string, boolean>>) => {
+      if (!onRowSelectionChange) return;
+      const next =
+        typeof updater === "function" ? updater(rowSelection ?? {}) : updater;
+      onRowSelectionChange(next);
+    },
     ...(manualPagination
       ? {
           manualPagination: true,
           rowCount: totalRows,
           pageCount: Math.max(Math.ceil(totalRows / pageSize), 1),
-          state: {
-            pagination: { pageIndex: page, pageSize },
-          },
           onPaginationChange: (updater: Updater<PaginationState>) => {
             const next =
               typeof updater === "function"

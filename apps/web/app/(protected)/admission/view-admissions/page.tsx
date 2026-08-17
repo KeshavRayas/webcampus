@@ -1,4 +1,4 @@
-import { AdminAdmissionView } from "@/modules/admission/admin/admin-admission-view";
+import { AdmissionView } from "@/modules/admission/admin/admission-view";
 import React, { Suspense } from "react";
 
 export default function ViewAdmissionsPage() {
@@ -14,7 +14,7 @@ export default function ViewAdmissionsPage() {
         </p>
       </div>
       <Suspense>
-        <AdminAdmissionView hideAddForm showFilters />
+        <AdmissionView hideAddForm showFilters />
       </Suspense>
     </div>
   );

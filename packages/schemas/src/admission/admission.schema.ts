@@ -46,6 +46,7 @@ export const AdmissionActionParamSchema = z.object({
 
 export const PortStudentsSchema = z.object({
   semesterId: z.string().uuid("Invalid semester ID"),
+  admissionIds: z.array(z.string().uuid("Invalid admission ID")).optional(),
 });
 
 export const ChangeAdmissionModeSchema = z

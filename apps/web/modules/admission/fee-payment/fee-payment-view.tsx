@@ -49,6 +49,7 @@ const ADMISSION_STATUSES = [
   "SUBMITTED",
   "APPROVED",
   "REJECTED",
+  "PORTED",
 ] as const;
 
 type FeePaymentFilters = {

@@ -60,7 +60,9 @@ export const cancelAdmissionColumns: ColumnDef<AdmissionResponse>[] = [
             ? "secondary"
             : status === "CANCELLED"
               ? "destructive"
-              : "outline";
+              : status === "PORTED"
+                ? "default"
+                : "outline";
 
       return <Badge variant={variant}>{status}</Badge>;
     },
