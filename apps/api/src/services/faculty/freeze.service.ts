@@ -291,6 +291,11 @@ export const assertFreezeOwnership = (input: {
   }
 };
 
+type BulkFreezeTarget = {
+  courseAssignmentId?: string | null;
+  electiveBatchFacultyId?: string | null;
+};
+
 export class FreezeService {
   static async getFreezeForCourseAssignment(
     courseAssignmentId: string
@@ -714,86 +719,160 @@ export class FreezeService {
   static async bulkFreeze(
     departmentId: string | undefined,
     semesterId: string,
+    targets: BulkFreezeTarget[],
     username?: string | null,
     displayUsername?: string | null
   ): Promise<number> {
-    const count = await db.$transaction(async (tx) => {
-      const where: Prisma.CourseAssignmentWhereInput = {
-        ...(departmentId ? { departmentId } : {}),
-        section: { semesterId },
-      };
-      const assignments = await tx.courseAssignment.findMany({
-        where,
-        select: { id: true, courseId: true },
-      });
+    const result = await db.$transaction(async (tx) => {
+      const courseIds = new Set<string>();
+      let processed = 0;
 
-      // TODO: optimize with updateMany for large bulk operations
-      for (const assignment of assignments) {
-        await tx.freeze.upsert({
-          where: { courseAssignmentId: assignment.id },
-          create: {
-            courseAssignmentId: assignment.id,
-            adminFrozen: true,
-            adminFrozenAt: new Date(),
-            frozenByRole: "ADMIN",
-            frozenByUsername: username ?? null,
-            frozenByDisplay: displayUsername ?? null,
-          },
-          update: {
-            adminFrozen: true,
-            adminFrozenAt: new Date(),
-            frozenByRole: "ADMIN",
-            frozenByUsername: username ?? null,
-            frozenByDisplay: displayUsername ?? null,
-          },
-        });
+      for (const target of targets) {
+        if (target.courseAssignmentId) {
+          const assignment = await tx.courseAssignment.findFirst({
+            where: {
+              id: target.courseAssignmentId,
+              ...(departmentId ? { departmentId } : {}),
+              section: { semesterId },
+            },
+            select: { id: true, courseId: true },
+          });
+          if (!assignment) continue;
+
+          await tx.freeze.upsert({
+            where: { courseAssignmentId: assignment.id },
+            create: {
+              courseAssignmentId: assignment.id,
+              adminFrozen: true,
+              adminFrozenAt: new Date(),
+              frozenByRole: "ADMIN",
+              frozenByUsername: username ?? null,
+              frozenByDisplay: displayUsername ?? null,
+            },
+            update: {
+              adminFrozen: true,
+              adminFrozenAt: new Date(),
+              frozenByRole: "ADMIN",
+              frozenByUsername: username ?? null,
+              frozenByDisplay: displayUsername ?? null,
+            },
+          });
+          courseIds.add(assignment.courseId);
+          processed++;
+          continue;
+        }
+
+        if (target.electiveBatchFacultyId) {
+          const assignment = await tx.electiveBatchFaculty.findFirst({
+            where: {
+              id: target.electiveBatchFacultyId,
+              course: {
+                semesterId,
+                approvalStatus: FACULTY_COURSE_STATUS,
+                ...(departmentId ? { departmentId } : {}),
+              },
+            },
+            select: { id: true, courseId: true },
+          });
+          if (!assignment) continue;
+
+          await tx.freeze.upsert({
+            where: { electiveBatchFacultyId: assignment.id },
+            create: {
+              electiveBatchFacultyId: assignment.id,
+              adminFrozen: true,
+              adminFrozenAt: new Date(),
+              frozenByRole: "ADMIN",
+              frozenByUsername: username ?? null,
+              frozenByDisplay: displayUsername ?? null,
+            },
+            update: {
+              adminFrozen: true,
+              adminFrozenAt: new Date(),
+              frozenByRole: "ADMIN",
+              frozenByUsername: username ?? null,
+              frozenByDisplay: displayUsername ?? null,
+            },
+          });
+          courseIds.add(assignment.courseId);
+          processed++;
+        }
       }
 
-      return assignments;
+      return { courseIds: [...courseIds], processed };
     });
 
-    const courseIds = [...new Set(count.map((a) => a.courseId))];
-    for (const courseId of courseIds) {
+    for (const courseId of result.courseIds) {
       await recomputeCourseMarks(courseId);
     }
 
-    return count.length;
+    return result.processed;
   }
 
   static async bulkUnfreeze(
     departmentId: string | undefined,
-    semesterId: string
+    semesterId: string,
+    targets: BulkFreezeTarget[]
   ): Promise<number> {
     return db.$transaction(async (tx) => {
-      const where: Prisma.CourseAssignmentWhereInput = {
-        ...(departmentId ? { departmentId } : {}),
-        section: { semesterId },
+      let processed = 0;
+      const updateData = {
+        adminFrozen: false,
+        adminFrozenAt: null,
+        hodFrozen: false,
+        hodFrozenAt: null,
+        facultyFrozen: false,
+        facultyFrozenAt: null,
+        frozenByRole: null,
+        frozenByUsername: null,
+        frozenByDisplay: null,
       };
-      const assignments = await tx.courseAssignment.findMany({
-        where,
-        select: { id: true },
-      });
 
-      // TODO: optimize with updateMany for large bulk operations
-      for (const assignment of assignments) {
-        await tx.freeze.upsert({
-          where: { courseAssignmentId: assignment.id },
-          create: { courseAssignmentId: assignment.id },
-          update: {
-            adminFrozen: false,
-            adminFrozenAt: null,
-            hodFrozen: false,
-            hodFrozenAt: null,
-            facultyFrozen: false,
-            facultyFrozenAt: null,
-            frozenByRole: null,
-            frozenByUsername: null,
-            frozenByDisplay: null,
-          },
-        });
+      for (const target of targets) {
+        if (target.courseAssignmentId) {
+          const assignment = await tx.courseAssignment.findFirst({
+            where: {
+              id: target.courseAssignmentId,
+              ...(departmentId ? { departmentId } : {}),
+              section: { semesterId },
+            },
+            select: { id: true },
+          });
+          if (!assignment) continue;
+
+          await tx.freeze.upsert({
+            where: { courseAssignmentId: assignment.id },
+            create: { courseAssignmentId: assignment.id },
+            update: updateData,
+          });
+          processed++;
+          continue;
+        }
+
+        if (target.electiveBatchFacultyId) {
+          const assignment = await tx.electiveBatchFaculty.findFirst({
+            where: {
+              id: target.electiveBatchFacultyId,
+              course: {
+                semesterId,
+                approvalStatus: FACULTY_COURSE_STATUS,
+                ...(departmentId ? { departmentId } : {}),
+              },
+            },
+            select: { id: true },
+          });
+          if (!assignment) continue;
+
+          await tx.freeze.upsert({
+            where: { electiveBatchFacultyId: assignment.id },
+            create: { electiveBatchFacultyId: assignment.id },
+            update: updateData,
+          });
+          processed++;
+        }
       }
 
-      return assignments.length;
+      return processed;
     });
   }
 }

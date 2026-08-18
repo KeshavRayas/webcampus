@@ -210,11 +210,26 @@ type DbElectiveArgs = {
   take?: number;
 };
 
+type AcademicTermRecord = {
+  id: string;
+  year: string;
+  type: "odd" | "even";
+};
+
+type SemesterRecord = {
+  id: string;
+  academicTermId: string;
+  programType: "UG" | "PG";
+  semesterNumber: number;
+};
+
 const facultyByUserId: Record<string, string> = {
   "user-1": "faculty-1",
   "user-2": "faculty-2",
 };
 
+let academicTerms: AcademicTermRecord[] = [];
+let semesters: SemesterRecord[] = [];
 let assignments: AssignmentRecord[] = [];
 let students: StudentRecord[] = [];
 let electiveRecords: ElectiveBatchFacultyRecord[] = [];
@@ -482,6 +497,12 @@ const studentMatchesWhere = (
 };
 
 const dbMock = {
+  academicTerm: {
+    findMany: async () => academicTerms,
+  },
+  semester: {
+    findMany: async () => semesters,
+  },
   faculty: {
     findUnique: async ({ where }: DbFindUniqueArgs) => {
       if (!where.userId) {
@@ -679,6 +700,24 @@ describe("FacultyHandlingService", () => {
   beforeEach(() => {
     lastAssignmentWhere = null;
     electiveRecords = [];
+    academicTerms = [
+      { id: "term-1", year: "2025-26", type: "odd" },
+      { id: "term-2", year: "2026", type: "odd" },
+    ];
+    semesters = [
+      {
+        id: "semester-1",
+        academicTermId: "term-1",
+        programType: "UG",
+        semesterNumber: 3,
+      },
+      {
+        id: "semester-2",
+        academicTermId: "term-2",
+        programType: "UG",
+        semesterNumber: 1,
+      },
+    ];
 
     assignments = [
       {
@@ -1366,6 +1405,39 @@ describe("FacultyHandlingService", () => {
     expect(
       response.data.batches.some(
         (batch) => batch.isElective === true && batch.name === "G-001"
+      )
+    ).toBe(true);
+  });
+
+  it("includes all academic terms from the AcademicTerm table in LAB filter options", async () => {
+    academicTerms = [
+      { id: "term-even-2026", year: "2026", type: "even" },
+      { id: "term-odd-2026", year: "2026", type: "odd" },
+      { id: "term-odd-2025", year: "2025-26", type: "odd" },
+    ];
+
+    const { FacultyHandlingService } = await import("../handling.service");
+
+    const response = await FacultyHandlingService.getFilterOptions(
+      "user-1",
+      "LAB"
+    );
+
+    expect(response.status).toBe("success");
+    if (response.status === "error" || !response.data) {
+      throw new Error("Expected success response with data");
+    }
+    expect(response.data.academicTerms.map((term) => term.id)).toEqual([
+      "term-odd-2026",
+      "term-even-2026",
+      "term-odd-2025",
+    ]);
+    expect(
+      response.data.semesters.some(
+        (semester) =>
+          semester.academicTermId === "term-2" &&
+          semester.programType === "UG" &&
+          semester.semesterNumber === 1
       )
     ).toBe(true);
   });

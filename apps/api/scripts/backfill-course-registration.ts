@@ -386,7 +386,7 @@ async function main() {
   const studentSections = await db.studentSection.findMany({
     include: {
       student: {
-        select: { departmentName: true },
+        select: { departmentName: true, programType: true },
       },
       section: {
         select: {
@@ -524,7 +524,7 @@ async function main() {
   const toCreate = [...candidateMap.values()];
   const toCreateCount = toCreate.length;
 
-  // ══ PE / OE elective phase ═══════════════════════════════════════
+  // ══ PE / OE / PW registration phase ══════════════════════════════
   const semesterIdsInScope = [
     ...new Set(studentSections.map((ss) => ss.section.semesterId)),
   ];
@@ -536,7 +536,7 @@ async function main() {
     semesterIdsInScope.length > 0
       ? await db.course.findMany({
           where: {
-            courseType: { in: ["PE", "OE"] },
+            courseType: { in: ["PE", "OE", "PW"] },
             semesterId: { in: semesterIdsInScope },
             approvalStatus: "APPROVED",
           },
@@ -551,6 +551,9 @@ async function main() {
             studentsPerBatch: true,
             openElectiveEligibility: true,
             semesterId: true,
+            department: {
+              select: { name: true },
+            },
             semester: {
               select: { academicTermId: true, semesterNumber: true },
             },
@@ -582,6 +585,7 @@ async function main() {
 
   const peCourses = electiveCourses.filter((c) => c.courseType === "PE");
   const oeCourses = electiveCourses.filter((c) => c.courseType === "OE");
+  const pwCourses = electiveCourses.filter((c) => c.courseType === "PW");
   const electiveCourseIds = electiveCourses.map((c) => c.id);
   const electiveCourseById = new Map(electiveCourses.map((c) => [c.id, c]));
 
@@ -612,6 +616,7 @@ async function main() {
   // ── Existing elective registrations to exclude ───────────────────
   const existingPeForStudent = new Set<string>();
   const existingOeForStudent = new Set<string>();
+  const existingPwForStudent = new Set<string>();
 
   if (electiveCourseIds.length > 0) {
     const existingRegs = await db.courseRegistration.findMany({
@@ -627,7 +632,10 @@ async function main() {
       if (!course) continue;
       const semKey = `${reg.studentId}::${course.semesterId}`;
       if (course.courseType === "PE") existingPeForStudent.add(semKey);
-      else existingOeForStudent.add(semKey);
+      else if (course.courseType === "OE") existingOeForStudent.add(semKey);
+      else if (course.courseType === "PW") {
+        existingPwForStudent.add(`${reg.studentId}::${reg.courseId}`);
+      }
     }
   }
 
@@ -648,14 +656,17 @@ async function main() {
   const electiveStats = {
     peCourses: peCourses.length,
     oeCourses: oeCourses.length,
+    pwCourses: pwCourses.length,
     peRegistered: 0,
     oeRegistered: 0,
+    pwRegistered: 0,
     peSkippedAlready: 0,
     peSkippedFull: 0,
     peSkippedNoFaculty: 0,
     oeSkippedAlready: 0,
     oeSkippedFull: 0,
     oeSkippedNoFaculty: 0,
+    pwSkippedAlready: 0,
     batchMappings: 0,
     facultyMappings: 0,
     versionBumps: 0,
@@ -711,7 +722,7 @@ async function main() {
     courseId: string;
     semesterId: string;
     academicTermId: string;
-    courseType: "PE" | "OE";
+    courseType: "PE" | "OE" | "PW";
     electiveBatchId?: string;
     academicYear: string;
   };
@@ -788,7 +799,7 @@ async function main() {
       courseId: course.id,
       semesterId,
       academicTermId,
-      courseType: course.courseType as "PE" | "OE",
+      courseType: course.courseType as "PE" | "OE" | "PW",
       electiveBatchId: batch?.id,
       academicYear,
     });
@@ -804,7 +815,7 @@ async function main() {
     }
   };
 
-  // ── Build PE / OE candidates ─────────────────────────────────────
+  // ── Build PE / OE / PW candidates ───────────────────────────────
   for (const [, group] of sectionGroups) {
     const sectionInfo = sectionData.get(group[0]!.sectionId);
     if (!sectionInfo) continue;
@@ -890,6 +901,44 @@ async function main() {
           electiveStats.oeSkippedFull += 1;
         }
       }
+
+      // PW courses are mandatory for every matching student. Registration is
+      // intentionally independent of project-group and faculty mapping.
+      const pwEligible = pwCourses.filter((course) => {
+        if (course.semesterId !== semesterId) return false;
+        const isFirstYearUg =
+          ss.student.programType === "UG" &&
+          [1, 2].includes(course.semester.semesterNumber);
+        if (
+          !isFirstYearUg &&
+          course.department.name !== studentDepartmentName
+        ) {
+          return false;
+        }
+        return (
+          course.cycle === "NONE" ||
+          (sectionCycle != null &&
+            sectionCycle !== "NONE" &&
+            sectionCycle === course.cycle)
+        );
+      });
+
+      for (const pwCourse of pwEligible) {
+        const pwKey = `${studentId}::${pwCourse.id}`;
+        if (existingPwForStudent.has(pwKey)) {
+          electiveStats.pwSkippedAlready += 1;
+          continue;
+        }
+
+        queueCandidate(
+          studentId,
+          pwCourse,
+          undefined,
+          semesterId,
+          academicTermId,
+          groupAcademicYear
+        );
+      }
     }
   }
 
@@ -898,6 +947,9 @@ async function main() {
   ).length;
   electiveStats.oeRegistered = electiveCandidates.filter(
     (c) => c.courseType === "OE"
+  ).length;
+  electiveStats.pwRegistered = electiveCandidates.filter(
+    (c) => c.courseType === "PW"
   ).length;
   electiveStats.facultyMappings = facultyRowByBatch.size;
 
@@ -908,6 +960,7 @@ async function main() {
     console.log(`----------------------------------------`);
     console.log(`PE courses eligible      : ${electiveStats.peCourses}`);
     console.log(`OE courses eligible      : ${electiveStats.oeCourses}`);
+    console.log(`PW courses eligible      : ${electiveStats.pwCourses}`);
     console.log(
       `Elective mapping (--em)  : ${ELECTIVE_MAPPING ? "on" : "off"}`
     );
@@ -923,6 +976,8 @@ async function main() {
     console.log(
       `  skipped (no faculty)   : ${electiveStats.oeSkippedNoFaculty}`
     );
+    console.log(`PW candidates            : ${electiveStats.pwRegistered}`);
+    console.log(`  skipped (already)      : ${electiveStats.pwSkippedAlready}`);
     if (created) {
       console.log(
         `Registrations created    : ${electiveStats.createdRegistrations}`
@@ -1001,7 +1056,7 @@ async function main() {
     }
   }
 
-  // ── Execute PE / OE registrations ────────────────────────────────
+  // ── Execute PE / OE / PW registrations ───────────────────────────
   for (let i = 0; i < electiveCandidates.length; i += BATCH_SIZE) {
     const batch = electiveCandidates.slice(i, i + BATCH_SIZE);
     try {
@@ -1032,7 +1087,7 @@ async function main() {
               regRows.length - regResult.count;
           }
 
-          // OE always maps a batch; PE only when --em on
+          // OE always maps a batch; PE maps one only when --em is on.
           const assignments = regRows
             .filter(
               (c) =>

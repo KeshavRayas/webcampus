@@ -10,6 +10,7 @@ export type MessageChannel = "WHATSAPP" | "SMS";
 
 export type MessageRecipientType = "STUDENT" | "PARENT";
 export type MessageScope = "STUDENT" | "PARENT" | "BOTH";
+export type MaxMarksSource = "ASSESSMENT" | "THEORY" | "LAB" | "AAT" | "CIE";
 export type MessageFieldSource =
   | "STUDENT_NAME"
   | "USN"
@@ -21,6 +22,8 @@ export type MessageFieldSource =
   | "SUBJECT_NAME"
   | "CIE_MARKS"
   | "CIE_MAX"
+  | "CIE_NUMBER"
+  | "CIE_MARKS_DETAILS"
   | "FEE_DEMAND"
   | "AMOUNT_PAID"
   | "BALANCE"
@@ -127,6 +130,7 @@ export type SendConfig = {
   studentTemplateId?: string;
   parentTemplateId?: string;
   cieNumber?: number;
+  maxMarksSource?: MaxMarksSource;
   subjectIds?: string[];
   studentIds?: string[];
   adHocData?: {

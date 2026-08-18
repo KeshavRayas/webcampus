@@ -50,6 +50,15 @@ export type AttendanceWindowFilters = {
   semesterId: string;
 };
 
+export type AttendanceWindowTarget = {
+  courseAssignmentId?: string | null;
+  electiveBatchFacultyId?: string | null;
+};
+
+export type AttendanceWindowBulkPayload = AttendanceWindowFilters & {
+  targets: AttendanceWindowTarget[];
+};
+
 export const useAttendanceWindows = (
   filters: AttendanceWindowFilters,
   enabled: boolean
@@ -90,7 +99,7 @@ export const useBulkFreezeAttendanceWindows = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: AttendanceWindowFilters) => {
+    mutationFn: async (payload: AttendanceWindowBulkPayload) => {
       return axios.post<BaseResponse<{ updated: number }>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/attendance-windows/freeze`,
         payload,
@@ -114,7 +123,7 @@ export const useBulkUnfreezeAttendanceWindows = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: AttendanceWindowFilters) => {
+    mutationFn: async (payload: AttendanceWindowBulkPayload) => {
       return axios.post<BaseResponse<{ updated: number }>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/attendance-windows/unfreeze`,
         payload,

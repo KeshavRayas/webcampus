@@ -14,9 +14,11 @@ import {
 } from "./routers/feedback.router";
 import financeRouter from "./routers/finance/finance.router";
 import hodRouter from "./routers/hod/hod.router";
+import noticeRouter from "./routers/notice/notice.router";
 import fileRouter from "./routers/shared/file.router";
 import studentRouter from "./routers/student/student-domain.router";
 import supportRouter from "./routers/support/support.router";
+import timetableRouter from "./routers/timetable/timetable.router";
 import verificationRouter from "./routers/verification/verification.router";
 
 const app: Express = express();
@@ -40,6 +42,9 @@ app.use("/admin", adminRouter);
 app.use("/hod", hodRouter);
 
 app.use("/department", DepartmentRouter);
+
+app.use("/timetable", timetableRouter);
+app.use("/notices", noticeRouter);
 
 app.use("/coe", coeRouter);
 

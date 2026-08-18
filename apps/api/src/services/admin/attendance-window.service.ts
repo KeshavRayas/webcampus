@@ -153,6 +153,7 @@ export class AttendanceWindowService {
       const updated = await FreezeService.bulkFreeze(
         payload.departmentId,
         payload.semesterId,
+        payload.targets,
         username,
         displayUsername
       );
@@ -179,7 +180,8 @@ export class AttendanceWindowService {
 
       const updated = await FreezeService.bulkUnfreeze(
         payload.departmentId,
-        payload.semesterId
+        payload.semesterId,
+        payload.targets
       );
 
       return {

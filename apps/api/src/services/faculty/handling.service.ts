@@ -861,6 +861,17 @@ export class FacultyHandlingService {
       const facultyId =
         await FacultyHandlingService.getFacultyIdByUserId(userId);
 
+      const dbTerms = await db.academicTerm.findMany();
+
+      const dbSemesters = await db.semester.findMany({
+        select: {
+          id: true,
+          academicTermId: true,
+          programType: true,
+          semesterNumber: true,
+        },
+      });
+
       const assignments = await db.courseAssignment.findMany({
         where: {
           facultyId,
@@ -955,10 +966,6 @@ export class FacultyHandlingService {
         isBatchManagedCourse(row.course.courseType)
       );
 
-      const termMap = new Map<
-        string,
-        { id: string; year: string; type: "odd" | "even" }
-      >();
       const semesterMap = new Map<
         string,
         {
@@ -992,23 +999,16 @@ export class FacultyHandlingService {
         { id: string; name: string; courseId: string; isElective: boolean }
       >();
 
-      for (const assignment of assignments) {
-        const semester = assignment.course.semester;
-        const academicTerm = semester.academicTerm;
-
-        termMap.set(academicTerm.id, {
-          id: academicTerm.id,
-          year: academicTerm.year,
-          type: academicTerm.type,
-        });
-
+      for (const semester of dbSemesters) {
         semesterMap.set(semester.id, {
           id: semester.id,
-          academicTermId: academicTerm.id,
+          academicTermId: semester.academicTermId,
           programType: semester.programType,
           semesterNumber: semester.semesterNumber,
         });
+      }
 
+      for (const assignment of assignments) {
         sectionMap.set(assignment.section.id, {
           id: assignment.section.id,
           name: assignment.section.name,
@@ -1036,20 +1036,6 @@ export class FacultyHandlingService {
 
       for (const row of batchManagedRows) {
         const semester = row.course.semester;
-        const academicTerm = semester.academicTerm;
-
-        termMap.set(academicTerm.id, {
-          id: academicTerm.id,
-          year: academicTerm.year,
-          type: academicTerm.type,
-        });
-
-        semesterMap.set(semester.id, {
-          id: semester.id,
-          academicTermId: academicTerm.id,
-          programType: semester.programType,
-          semesterNumber: semester.semesterNumber,
-        });
 
         sectionMap.set(row.electiveBatch.id, {
           id: row.electiveBatch.id,
@@ -1074,23 +1060,29 @@ export class FacultyHandlingService {
         });
       }
 
-      const academicTerms = Array.from(termMap.values()).sort((a, b) => {
-        const yearComparison = b.year.localeCompare(a.year, undefined, {
-          numeric: true,
-          sensitivity: "base",
+      const academicTerms = dbTerms
+        .map((term) => ({
+          id: term.id,
+          year: term.year,
+          type: term.type,
+        }))
+        .sort((a, b) => {
+          const yearComparison = b.year.localeCompare(a.year, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          });
+
+          if (yearComparison !== 0) {
+            return yearComparison;
+          }
+
+          const termPriority: Record<"odd" | "even", number> = {
+            odd: 0,
+            even: 1,
+          };
+
+          return termPriority[a.type] - termPriority[b.type];
         });
-
-        if (yearComparison !== 0) {
-          return yearComparison;
-        }
-
-        const termPriority: Record<"odd" | "even", number> = {
-          odd: 0,
-          even: 1,
-        };
-
-        return termPriority[a.type] - termPriority[b.type];
-      });
 
       const termOrder = new Map(
         academicTerms.map((term, index) => [term.id, index])

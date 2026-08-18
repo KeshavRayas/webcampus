@@ -206,6 +206,16 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: UserSearch,
         },
         {
+          name: "Timetable",
+          url: "/department/timetable",
+          icon: CalendarDays,
+        },
+        {
+          name: "Notices",
+          url: "/department/notices",
+          icon: FileText,
+        },
+        {
           name: "Courses",
           url: "/department/courses",
           icon: Library,
@@ -291,6 +301,16 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/student/profile",
           icon: User,
         },
+        {
+          name: "Timetable",
+          url: "/student/timetable",
+          icon: CalendarDays,
+        },
+        {
+          name: "Notices",
+          url: "/student/notices",
+          icon: FileText,
+        },
       ],
     },
     navSecondary,
@@ -345,6 +365,16 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Profile",
           url: "/faculty/profile",
           icon: User,
+        },
+        {
+          name: "Timetable",
+          url: "/faculty/timetable",
+          icon: CalendarDays,
+        },
+        {
+          name: "Notices",
+          url: "/faculty/notices",
+          icon: FileText,
         },
         {
           name: "Academics",

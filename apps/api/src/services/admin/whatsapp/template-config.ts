@@ -22,6 +22,8 @@ export const CATEGORY_FIELD_SOURCES: Record<
     "SUBJECT_NAME",
     "CIE_MARKS",
     "CIE_MAX",
+    "CIE_NUMBER",
+    "CIE_MARKS_DETAILS",
   ],
   BALANCE_FEE: [
     ...COMMON_FIELD_SOURCES,
@@ -50,6 +52,8 @@ export const FIELD_SOURCE_LABELS: Record<MessageFieldSource, string> = {
   SUBJECT_NAME: "Subject Name",
   CIE_MARKS: "CIE Marks",
   CIE_MAX: "CIE Max Marks",
+  CIE_NUMBER: "CIE Number",
+  CIE_MARKS_DETAILS: "CIE Marks Details",
   FEE_DEMAND: "Fee Demand",
   AMOUNT_PAID: "Amount Paid",
   BALANCE: "Balance",
