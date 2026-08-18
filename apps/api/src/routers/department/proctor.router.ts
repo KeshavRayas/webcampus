@@ -12,5 +12,6 @@ router.put("/:id", ProctorController.assignFaculty);
 router.delete("/:id", ProctorController.deleteGroup);
 router.get("/students", ProctorController.getStudents);
 router.post("/assign-students", ProctorController.assignStudents);
+router.post("/generate", ProctorController.generateGroups);
 
 export default router;

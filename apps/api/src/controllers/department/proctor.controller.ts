@@ -3,6 +3,7 @@ import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { Request, Response } from "express";
+import { ProctorService } from "../../services/department/proctor.service";
 
 export class ProctorController {
   static async getAllGroups(req: Request, res: Response): Promise<void> {
@@ -26,8 +27,17 @@ export class ProctorController {
         return;
       }
 
+      const { semesterId } = req.query as { semesterId?: string };
+
+      const where: Record<string, unknown> = {
+        departmentId: requestContext.departmentId,
+      };
+      if (semesterId) {
+        where.semesterId = semesterId;
+      }
+
       const groups = await db.proctorGroup.findMany({
-        where: { departmentId: requestContext.departmentId },
+        where,
         include: { faculty: true, _count: { select: { students: true } } },
         orderBy: { groupNumber: "asc" },
       });
@@ -55,7 +65,7 @@ export class ProctorController {
     try {
       const requestContext = await getDepartmentRequestContext(req);
       const { db } = await import("@webcampus/db");
-      const { groupNumber } = req.body;
+      const { groupNumber, semesterId } = req.body;
 
       if (!groupNumber) {
         sendResponse({
@@ -76,12 +86,12 @@ export class ProctorController {
         ? groupNumber.toString().toUpperCase()
         : `PR-${groupNumber}`;
 
-      const existing = await db.proctorGroup.findUnique({
+      // Because semesterId might be null, we find using where
+      const existing = await db.proctorGroup.findFirst({
         where: {
-          departmentId_groupNumber: {
-            departmentId: requestContext.departmentId,
-            groupNumber: formattedGroupNumber,
-          },
+          departmentId: requestContext.departmentId,
+          semesterId: semesterId || null,
+          groupNumber: formattedGroupNumber,
         },
       });
 
@@ -99,6 +109,7 @@ export class ProctorController {
       const group = await db.proctorGroup.create({
         data: {
           departmentId: requestContext.departmentId,
+          semesterId: semesterId || null,
           groupNumber: formattedGroupNumber,
         },
       });
@@ -300,6 +311,61 @@ export class ProctorController {
         res,
         status: "error",
         message: ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: 500,
+        error,
+      });
+    }
+  }
+
+  static async generateGroups(req: Request, res: Response): Promise<void> {
+    try {
+      const requestContext = await getDepartmentRequestContext(req);
+      const { semesterId, studentsPerGroup, action } = req.body as {
+        semesterId?: string;
+        studentsPerGroup?: unknown;
+        action?: unknown;
+      };
+
+      const spg = Number(studentsPerGroup);
+      if (
+        !semesterId ||
+        !Number.isInteger(spg) ||
+        spg < 1 ||
+        (action !== "generate" && action !== "regenerate")
+      ) {
+        sendResponse({
+          res,
+          status: "error",
+          statusCode: 400,
+          message:
+            "semesterId, studentsPerGroup (integer >= 1), and action (generate|regenerate) are required.",
+          error: new Error("Missing/invalid parameters"),
+        });
+        return;
+      }
+
+      const result = await ProctorService.generateProctorGroups({
+        departmentId: requestContext.departmentId,
+        departmentName: requestContext.departmentName || "",
+        semesterId,
+        studentsPerGroup: spg,
+        action: action as "generate" | "regenerate",
+      });
+
+      sendResponse({
+        res,
+        status: "success",
+        statusCode: 200,
+        message: result.message,
+        data: result.data,
+      });
+    } catch (error) {
+      logger.error({ error });
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
         statusCode: 500,
         error,
       });

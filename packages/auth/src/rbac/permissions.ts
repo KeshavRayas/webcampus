@@ -58,6 +58,7 @@ export const roles = {
     feedback: ["create", "read"],
   }),
   faculty: ac.newRole({
+    user: [],
     attendance: ["create"],
     freeze: ["read", "lock"],
     semester: ["read"],
