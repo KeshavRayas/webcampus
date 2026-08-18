@@ -37,6 +37,7 @@ import {
   useBulkUnfreezeAttendanceWindows,
   useFreezeAssignment,
   useUnfreezeAssignment,
+  type AttendanceWindowBulkPayload,
   type AttendanceWindowFilters,
   type AttendanceWindowRow,
 } from "./use-attendance-windows";
@@ -122,11 +123,12 @@ export const AttendanceWindowsView = () => {
     useBulkFreezeAttendanceWindows();
   const { mutate: bulkUnfreeze, isPending: isUnfreezing } =
     useBulkUnfreezeAttendanceWindows();
-  const { mutate: freezeAssignment, isPending: isRowMutating } =
+  const { mutate: freezeAssignment, isPending: isRowFreezing } =
     useFreezeAssignment();
-  const { mutate: unfreezeAssignment } = useUnfreezeAssignment();
+  const { mutate: unfreezeAssignment, isPending: isRowUnfreezing } =
+    useUnfreezeAssignment();
 
-  const isRowLocked = isRowMutating;
+  const isRowLocked = isRowFreezing || isRowUnfreezing;
 
   const filteredWindows = useMemo(() => {
     if (!debouncedSearch) return windows;
@@ -177,37 +179,39 @@ export const AttendanceWindowsView = () => {
 
   const isMutating = isFreezing || isUnfreezing;
 
+  const bulkPayload = (): AttendanceWindowBulkPayload => ({
+    academicTermId: appliedFilters.academicTermId,
+    semesterId: appliedFilters.semesterId,
+    ...(appliedFilters.departmentId
+      ? { departmentId: appliedFilters.departmentId }
+      : {}),
+    targets: filteredWindows.map((row) =>
+      row.courseAssignmentId
+        ? { courseAssignmentId: row.courseAssignmentId }
+        : { electiveBatchFacultyId: row.electiveBatchFacultyId }
+    ),
+  });
+
   const handleBulkFreezeClick = () => {
-    if (!appliedFilters.departmentId) {
+    if (!appliedFilters.departmentId && !debouncedSearch) {
       confirmActionRef.current = "freeze";
       setConfirmOpen(true);
       return;
     }
-    bulkFreeze({
-      academicTermId: appliedFilters.academicTermId,
-      semesterId: appliedFilters.semesterId,
-      departmentId: appliedFilters.departmentId,
-    });
+    bulkFreeze(bulkPayload());
   };
 
   const handleBulkUnfreezeClick = () => {
-    if (!appliedFilters.departmentId) {
+    if (!appliedFilters.departmentId && !debouncedSearch) {
       confirmActionRef.current = "unfreeze";
       setConfirmOpen(true);
       return;
     }
-    bulkUnfreeze({
-      academicTermId: appliedFilters.academicTermId,
-      semesterId: appliedFilters.semesterId,
-      departmentId: appliedFilters.departmentId,
-    });
+    bulkUnfreeze(bulkPayload());
   };
 
   const confirmBulkAction = () => {
-    const payload = {
-      academicTermId: appliedFilters.academicTermId,
-      semesterId: appliedFilters.semesterId,
-    };
+    const payload = bulkPayload();
     if (confirmActionRef.current === "freeze") {
       bulkFreeze(payload);
     } else {
@@ -478,9 +482,7 @@ export const AttendanceWindowsView = () => {
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-3">
                             <Switch
-                              checked={
-                                row.freeze.displayState === "LOCKED_BY_ADMIN"
-                              }
+                              checked={row.freeze.displayState !== "OPEN"}
                               onCheckedChange={(checked) => {
                                 if (checked) {
                                   handleRowFreeze(row);
@@ -491,7 +493,7 @@ export const AttendanceWindowsView = () => {
                               disabled={isRowLocked}
                             />
                             <span className="text-sm">
-                              {row.freeze.displayState === "LOCKED_BY_ADMIN"
+                              {row.freeze.displayState !== "OPEN"
                                 ? "Frozen"
                                 : "Unfrozen"}
                             </span>

@@ -18,17 +18,16 @@ export const AdminFreezeParamsSchema = freezeTarget;
 
 export const AdminUnfreezeParamsSchema = freezeTarget;
 
-export const AdminBulkFreezeSchema = z.object({
+const adminBulkFreezeFields = {
   departmentId: z.string().uuid().optional(),
   academicTermId: z.string().uuid(),
   semesterId: z.string().uuid(),
-});
+  targets: z.array(freezeTarget).min(1),
+};
 
-export const AdminBulkUnfreezeSchema = z.object({
-  departmentId: z.string().uuid().optional(),
-  academicTermId: z.string().uuid(),
-  semesterId: z.string().uuid(),
-});
+export const AdminBulkFreezeSchema = z.object(adminBulkFreezeFields);
+
+export const AdminBulkUnfreezeSchema = z.object(adminBulkFreezeFields);
 
 export const AdminAttendanceWindowFiltersSchema = z.object({
   departmentId: z.string().uuid().optional(),

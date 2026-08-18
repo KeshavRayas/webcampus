@@ -5,7 +5,6 @@ import {
   peCourseCapacity,
 } from "../src/services/shared/pe-capacity.service";
 import { strategyFor } from "../src/services/student/registration-strategies";
-import { pickLeastOccupiedBatch } from "./backfill-course-registration.utils";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 
@@ -387,7 +386,7 @@ async function main() {
   const studentSections = await db.studentSection.findMany({
     include: {
       student: {
-        select: { departmentName: true },
+        select: { departmentName: true, programType: true },
       },
       section: {
         select: {
@@ -525,7 +524,7 @@ async function main() {
   const toCreate = [...candidateMap.values()];
   const toCreateCount = toCreate.length;
 
-  // ══ PE / OE elective phase ═══════════════════════════════════════
+  // ══ PE / OE / PW registration phase ══════════════════════════════
   const semesterIdsInScope = [
     ...new Set(studentSections.map((ss) => ss.section.semesterId)),
   ];
@@ -550,9 +549,11 @@ async function main() {
             cycle: true,
             numberOfBatches: true,
             studentsPerBatch: true,
-            projectGroupingScope: true,
             openElectiveEligibility: true,
             semesterId: true,
+            department: {
+              select: { name: true },
+            },
             semester: {
               select: { academicTermId: true, semesterNumber: true },
             },
@@ -561,7 +562,6 @@ async function main() {
                 id: true,
                 name: true,
                 sortOrder: true,
-                sectionId: true,
                 facultyAssignment: {
                   select: {
                     facultyId: true,
@@ -667,8 +667,6 @@ async function main() {
     oeSkippedFull: 0,
     oeSkippedNoFaculty: 0,
     pwSkippedAlready: 0,
-    pwSkippedFull: 0,
-    pwSkippedNoFaculty: 0,
     batchMappings: 0,
     facultyMappings: 0,
     versionBumps: 0,
@@ -788,25 +786,6 @@ async function main() {
     return null;
   };
 
-  const pickPwBatch = (
-    course: ElectiveCourse,
-    sectionId: string
-  ): ElectiveBatchRow | undefined => {
-    const eligibleBatches = course.electiveBatches.filter((batch) => {
-      const isInScope =
-        course.projectGroupingScope === "DEPARTMENT_WIDE"
-          ? batch.sectionId === null
-          : batch.sectionId === sectionId;
-      return isInScope;
-    });
-
-    return pickLeastOccupiedBatch(
-      eligibleBatches,
-      batchAssignmentCount,
-      course.studentsPerBatch ?? 0
-    );
-  };
-
   const queueCandidate = (
     studentId: string,
     course: ElectiveCourse,
@@ -820,7 +799,7 @@ async function main() {
       courseId: course.id,
       semesterId,
       academicTermId,
-      courseType: course.courseType as "PE" | "OE",
+      courseType: course.courseType as "PE" | "OE" | "PW",
       electiveBatchId: batch?.id,
       academicYear,
     });
@@ -923,12 +902,19 @@ async function main() {
         }
       }
 
-      // PW courses are mandatory for every matching student. Unlike PE/OE,
-      // every eligible PW course is registered, then assigned to a valid
-      // project group using the least-occupied group first.
+      // PW courses are mandatory for every matching student. Registration is
+      // intentionally independent of project-group and faculty mapping.
       const pwEligible = pwCourses.filter((course) => {
         if (course.semesterId !== semesterId) return false;
-        if (course.departmentName !== studentDepartmentName) return false;
+        const isFirstYearUg =
+          ss.student.programType === "UG" &&
+          [1, 2].includes(course.semester.semesterNumber);
+        if (
+          !isFirstYearUg &&
+          course.department.name !== studentDepartmentName
+        ) {
+          return false;
+        }
         return (
           course.cycle === "NONE" ||
           (sectionCycle != null &&
@@ -944,21 +930,10 @@ async function main() {
           continue;
         }
 
-        const batch = pickPwBatch(pwCourse, group[0]!.sectionId);
-        if (!batch) {
-          electiveStats.pwSkippedFull += 1;
-          continue;
-        }
-
-        if (!resolveFacultyForBatch(batch, pwCourse, groupAcademicYear)) {
-          electiveStats.pwSkippedNoFaculty += 1;
-          continue;
-        }
-
         queueCandidate(
           studentId,
           pwCourse,
-          batch,
+          undefined,
           semesterId,
           academicTermId,
           groupAcademicYear
@@ -1003,10 +978,6 @@ async function main() {
     );
     console.log(`PW candidates            : ${electiveStats.pwRegistered}`);
     console.log(`  skipped (already)      : ${electiveStats.pwSkippedAlready}`);
-    console.log(`  skipped (full)         : ${electiveStats.pwSkippedFull}`);
-    console.log(
-      `  skipped (no faculty)   : ${electiveStats.pwSkippedNoFaculty}`
-    );
     if (created) {
       console.log(
         `Registrations created    : ${electiveStats.createdRegistrations}`
@@ -1116,14 +1087,11 @@ async function main() {
               regRows.length - regResult.count;
           }
 
-          // OE and PW always map a batch; PE maps one only when --em is on.
+          // OE always maps a batch; PE maps one only when --em is on.
           const assignments = regRows
             .filter(
               (c) =>
-                (c.courseType === "OE" ||
-                  c.courseType === "PW" ||
-                  ELECTIVE_MAPPING) &&
-                c.electiveBatchId
+                (c.courseType === "OE" || ELECTIVE_MAPPING) && c.electiveBatchId
             )
             .map((c) => ({
               courseId: c.courseId,
