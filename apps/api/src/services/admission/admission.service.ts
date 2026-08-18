@@ -48,56 +48,49 @@ export class AdmissionService {
     return value.trim().toLowerCase();
   }
 
-  private static applicantEmailFromApplicationId(
-    applicationId: string
-  ): string {
-    return `${AdmissionService.normalizeApplicationId(applicationId)}@applicant.local`;
+  private static applicantUsernameFromEmail(email: string): string {
+    return (
+      AdmissionService.normalizeApplicationId(email).split("@")[0] ?? email
+    );
   }
 
   private static async resolveApplicantUsersForPort(
-    applicationIds: string[],
+    primaryEmails: string[],
     headers: IncomingHttpHeaders
   ): Promise<{
-    userIdByApplicationId: Map<string, string>;
+    userIdByPrimaryEmail: Map<string, string>;
     autoCreatedUsers: number;
   }> {
-    const normalizedApplicationIds = Array.from(
+    const normalizedPrimaryEmails = Array.from(
       new Set(
-        applicationIds
-          .map((applicationId) =>
-            AdmissionService.normalizeApplicationId(applicationId)
+        primaryEmails
+          .map((primaryEmail) =>
+            AdmissionService.normalizeApplicationId(primaryEmail)
           )
-          .filter((applicationId) => applicationId.length > 0)
+          .filter((primaryEmail) => primaryEmail.length > 0)
       )
     );
 
-    const userIdByApplicationId = new Map<string, string>();
-    if (normalizedApplicationIds.length === 0) {
-      return { userIdByApplicationId, autoCreatedUsers: 0 };
+    const userIdByPrimaryEmail = new Map<string, string>();
+    if (normalizedPrimaryEmails.length === 0) {
+      return { userIdByPrimaryEmail, autoCreatedUsers: 0 };
     }
 
     const existingUsers = await db.user.findMany({
       where: {
         OR: [
-          ...normalizedApplicationIds.map((applicationId) => ({
+          ...normalizedPrimaryEmails.map((primaryEmail) => ({
             username: {
-              equals: applicationId,
+              equals: primaryEmail,
               mode: "insensitive" as const,
             },
           })),
-          ...normalizedApplicationIds.map((applicationId) => ({
+          ...normalizedPrimaryEmails.map((primaryEmail) => ({
             email: {
-              equals: applicationId,
+              equals: primaryEmail,
               mode: "insensitive" as const,
             },
           })),
-          {
-            email: {
-              in: normalizedApplicationIds.map((applicationId) =>
-                AdmissionService.applicantEmailFromApplicationId(applicationId)
-              ),
-            },
-          },
         ],
       },
       select: {
@@ -113,37 +106,23 @@ export class AdmissionService {
         : null;
       if (
         normalizedUsername &&
-        normalizedApplicationIds.includes(normalizedUsername)
+        normalizedPrimaryEmails.includes(normalizedUsername)
       ) {
-        userIdByApplicationId.set(normalizedUsername, user.id);
+        userIdByPrimaryEmail.set(normalizedUsername, user.id);
         continue;
       }
 
       const normalizedEmail = user.email.trim().toLowerCase();
-      if (normalizedApplicationIds.includes(normalizedEmail)) {
-        userIdByApplicationId.set(normalizedEmail, user.id);
-        continue;
-      }
-
-      if (!normalizedEmail.endsWith("@applicant.local")) {
-        continue;
-      }
-
-      const emailApplicationId = normalizedEmail.replace(
-        "@applicant.local",
-        ""
-      );
-      if (normalizedApplicationIds.includes(emailApplicationId)) {
-        userIdByApplicationId.set(emailApplicationId, user.id);
+      if (normalizedPrimaryEmails.includes(normalizedEmail)) {
+        userIdByPrimaryEmail.set(normalizedEmail, user.id);
       }
     }
 
-    const missingApplicationIds = normalizedApplicationIds.filter(
-      (applicationId) => !userIdByApplicationId.has(applicationId)
+    const missingPrimaryEmails = normalizedPrimaryEmails.filter(
+      (primaryEmail) => !userIdByPrimaryEmail.has(primaryEmail)
     );
 
     let autoCreatedUsers = 0;
-
     for (const applicationId of missingApplicationIds) {
       // Porting receives the applicant's primary email, so auto-created users
       // must mirror what `createShell` generates: name "Applicant", email =
@@ -163,7 +142,7 @@ export class AdmissionService {
       try {
         const createResponse = await userService.create();
         if (createResponse.status === "success" && createResponse.data?.id) {
-          userIdByApplicationId.set(applicationId, createResponse.data.id);
+          userIdByPrimaryEmail.set(primaryEmail, createResponse.data.id);
           autoCreatedUsers += 1;
           continue;
         }
@@ -176,7 +155,7 @@ export class AdmissionService {
           OR: [
             {
               username: {
-                equals: applicationId,
+                equals: normalizedUsername,
                 mode: "insensitive",
               },
             },
@@ -209,25 +188,25 @@ export class AdmissionService {
       });
 
       if (fallbackUser?.id) {
-        userIdByApplicationId.set(applicationId, fallbackUser.id);
+        userIdByPrimaryEmail.set(primaryEmail, fallbackUser.id);
         continue;
       }
     }
 
-    const unresolvedApplicationIds = normalizedApplicationIds.filter(
-      (applicationId) => !userIdByApplicationId.has(applicationId)
+    const unresolvedPrimaryEmails = normalizedPrimaryEmails.filter(
+      (primaryEmail) => !userIdByPrimaryEmail.has(primaryEmail)
     );
 
-    if (unresolvedApplicationIds.length > 0) {
+    if (unresolvedPrimaryEmails.length > 0) {
       throw new Error(
-        `Unable to resolve applicant user(s) for application ID(s): ${unresolvedApplicationIds
-          .map((applicationId) => applicationId.toUpperCase())
+        `Unable to resolve applicant user(s) for email(s): ${unresolvedPrimaryEmails
+          .map((primaryEmail) => primaryEmail.toUpperCase())
           .join(", ")}`
       );
     }
 
     return {
-      userIdByApplicationId,
+      userIdByPrimaryEmail,
       autoCreatedUsers,
     };
   }
@@ -1332,21 +1311,20 @@ export class AdmissionService {
 
         return left.primaryEmail.localeCompare(right.primaryEmail);
       });
-
       const unportedApplicationIds = approvedUnportedAdmissions.map(
         (admission) => admission.primaryEmail
       );
 
-      let userIdByApplicationId = new Map<string, string>();
+      let userIdByPrimaryEmail = new Map<string, string>();
       let autoCreatedUsers = 0;
 
-      if (unportedApplicationIds.length > 0) {
+      if (unportedPrimaryEmails.length > 0) {
         const resolvedApplicantUsers =
           await AdmissionService.resolveApplicantUsersForPort(
-            unportedApplicationIds,
+            unportedPrimaryEmails,
             headers
           );
-        userIdByApplicationId = resolvedApplicantUsers.userIdByApplicationId;
+        userIdByPrimaryEmail = resolvedApplicantUsers.userIdByPrimaryEmail;
         autoCreatedUsers = resolvedApplicantUsers.autoCreatedUsers;
       }
 
@@ -1356,7 +1334,7 @@ export class AdmissionService {
 
       for (const admission of approvedUnportedAdmissions) {
         try {
-          const userId = userIdByApplicationId.get(
+          const userId = userIdByPrimaryEmail.get(
             AdmissionService.normalizeApplicationId(admission.primaryEmail)
           );
           if (!userId) {

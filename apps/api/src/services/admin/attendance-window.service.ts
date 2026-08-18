@@ -68,6 +68,8 @@ export class AttendanceWindowService {
   ): AdminAttendanceWindowRow {
     return {
       courseAssignmentId: row.courseAssignmentId,
+      electiveBatchFacultyId: row.electiveBatchFacultyId,
+      isElective: row.isElective,
       courseCode: row.courseCode,
       courseName: row.courseName,
       department: row.department,
@@ -151,6 +153,7 @@ export class AttendanceWindowService {
       const updated = await FreezeService.bulkFreeze(
         payload.departmentId,
         payload.semesterId,
+        payload.targets,
         username,
         displayUsername
       );
@@ -177,7 +180,8 @@ export class AttendanceWindowService {
 
       const updated = await FreezeService.bulkUnfreeze(
         payload.departmentId,
-        payload.semesterId
+        payload.semesterId,
+        payload.targets
       );
 
       return {
@@ -195,18 +199,81 @@ export class AttendanceWindowService {
   }
 
   static async freezeAssignment(
-    courseAssignmentId: string,
+    input: {
+      courseAssignmentId?: string | null;
+      electiveBatchFacultyId?: string | null;
+    },
     username?: string | null,
     displayUsername?: string | null
   ): Promise<BaseResponse<AdminAttendanceWindowRow>> {
     try {
       const freeze = await FreezeService.freeze(
-        courseAssignmentId,
+        input,
         "admin",
         username,
         displayUsername
       );
 
+      if (input.electiveBatchFacultyId) {
+        const electiveAssignment = await db.electiveBatchFaculty.findUnique({
+          where: { id: input.electiveBatchFacultyId },
+          include: {
+            course: {
+              select: {
+                code: true,
+                name: true,
+                department: { select: { id: true, name: true } },
+              },
+            },
+            faculty: { select: { shortName: true } },
+            electiveBatch: { select: { name: true } },
+          },
+        });
+
+        if (!electiveAssignment) {
+          throw new Error("Elective batch faculty assignment not found");
+        }
+
+        const hod = await db.hod.findFirst({
+          where: {
+            departmentName: electiveAssignment.course.department?.name ?? "",
+          },
+          select: {
+            user: { select: { name: true, username: true } },
+          },
+        });
+
+        return {
+          status: "success",
+          message: "Attendance window locked",
+          data: {
+            courseAssignmentId: null,
+            electiveBatchFacultyId: electiveAssignment.id,
+            isElective: true,
+            courseCode: electiveAssignment.course.code,
+            courseName: electiveAssignment.course.name,
+            department: electiveAssignment.course.department?.name ?? "",
+            hodName: hod?.user?.name ?? null,
+            hodUsername: hod?.user?.username ?? null,
+            facultyName: electiveAssignment.faculty.shortName,
+            semester: electiveAssignment.semester,
+            sectionName: electiveAssignment.electiveBatch.name,
+            batchName: null,
+            assignmentType: "THEORY",
+            freeze: {
+              displayState: freeze.displayState,
+              lockedBy: freeze.lockedBy,
+              frozenAt: freeze.frozenAt,
+              message: freeze.message,
+              frozenByRole: freeze.frozenBy.frozenByRole,
+              frozenByUsername: freeze.frozenBy.frozenByUsername,
+              frozenByDisplay: freeze.frozenBy.frozenByDisplay,
+            },
+          },
+        };
+      }
+
+      const courseAssignmentId = input.courseAssignmentId ?? "";
       const assignment = await db.courseAssignment.findUnique({
         where: { id: courseAssignmentId },
         include: {
@@ -234,6 +301,8 @@ export class AttendanceWindowService {
         message: "Attendance window locked",
         data: {
           courseAssignmentId: assignment.id,
+          electiveBatchFacultyId: null,
+          isElective: false,
           courseCode: assignment.course.code,
           courseName: assignment.course.name,
           department: assignment.department.name,
@@ -264,12 +333,73 @@ export class AttendanceWindowService {
     }
   }
 
-  static async unfreezeAssignment(
-    courseAssignmentId: string
-  ): Promise<BaseResponse<AdminAttendanceWindowRow>> {
+  static async unfreezeAssignment(input: {
+    courseAssignmentId?: string | null;
+    electiveBatchFacultyId?: string | null;
+  }): Promise<BaseResponse<AdminAttendanceWindowRow>> {
     try {
-      const freeze = await FreezeService.unfreeze(courseAssignmentId, "admin");
+      const freeze = await FreezeService.unfreeze(input, "admin");
 
+      if (input.electiveBatchFacultyId) {
+        const electiveAssignment = await db.electiveBatchFaculty.findUnique({
+          where: { id: input.electiveBatchFacultyId },
+          include: {
+            course: {
+              select: {
+                code: true,
+                name: true,
+                department: { select: { id: true, name: true } },
+              },
+            },
+            faculty: { select: { shortName: true } },
+            electiveBatch: { select: { name: true } },
+          },
+        });
+
+        if (!electiveAssignment) {
+          throw new Error("Elective batch faculty assignment not found");
+        }
+
+        const hod = await db.hod.findFirst({
+          where: {
+            departmentName: electiveAssignment.course.department?.name ?? "",
+          },
+          select: {
+            user: { select: { name: true, username: true } },
+          },
+        });
+
+        return {
+          status: "success",
+          message: "Attendance window reopened",
+          data: {
+            courseAssignmentId: null,
+            electiveBatchFacultyId: electiveAssignment.id,
+            isElective: true,
+            courseCode: electiveAssignment.course.code,
+            courseName: electiveAssignment.course.name,
+            department: electiveAssignment.course.department?.name ?? "",
+            hodName: hod?.user?.name ?? null,
+            hodUsername: hod?.user?.username ?? null,
+            facultyName: electiveAssignment.faculty.shortName,
+            semester: electiveAssignment.semester,
+            sectionName: electiveAssignment.electiveBatch.name,
+            batchName: null,
+            assignmentType: "THEORY",
+            freeze: {
+              displayState: freeze.displayState,
+              lockedBy: freeze.lockedBy,
+              frozenAt: freeze.frozenAt,
+              message: freeze.message,
+              frozenByRole: freeze.frozenBy.frozenByRole,
+              frozenByUsername: freeze.frozenBy.frozenByUsername,
+              frozenByDisplay: freeze.frozenBy.frozenByDisplay,
+            },
+          },
+        };
+      }
+
+      const courseAssignmentId = input.courseAssignmentId ?? "";
       const assignment = await db.courseAssignment.findUnique({
         where: { id: courseAssignmentId },
         include: {
@@ -297,6 +427,8 @@ export class AttendanceWindowService {
         message: "Attendance window reopened",
         data: {
           courseAssignmentId: assignment.id,
+          electiveBatchFacultyId: null,
+          isElective: false,
           courseCode: assignment.course.code,
           courseName: assignment.course.name,
           department: assignment.department.name,

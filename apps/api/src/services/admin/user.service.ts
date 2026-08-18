@@ -306,6 +306,7 @@ export class UserService {
           name: this.body.name,
           role: this.body.role as Role,
         },
+        headers: fromNodeHeaders(this.headers),
       });
 
       createdUserId = user.id;
@@ -324,25 +325,40 @@ export class UserService {
       };
     } catch (error) {
       if (createdUserId) {
-        try {
-          await auth.api.removeUser({
-            headers: fromNodeHeaders(this.headers),
-            body: {
-              userId: createdUserId,
-            },
-          });
-        } catch (cleanupError) {
-          logger.warn(
-            "Failed to clean up auth user after admin API user creation failure",
-            {
-              createdUserId,
-              cleanupError,
-            }
-          );
-        }
+        await this.cleanupCreatedAuthUser(createdUserId);
       }
       logger.error("createUser via admin API failed:", error);
       throw new Error("Failed to create user via admin API.");
+    }
+  }
+
+  private async cleanupCreatedAuthUser(userId: string): Promise<void> {
+    try {
+      await auth.api.removeUser({
+        headers: fromNodeHeaders(this.headers),
+        body: {
+          userId,
+        },
+      });
+    } catch (removeUserError) {
+      logger.warn(
+        "auth.api.removeUser failed during cleanup, falling back to db.user.delete",
+        {
+          userId,
+          removeUserError,
+        }
+      );
+      try {
+        await db.user.delete({ where: { id: userId } });
+      } catch (deleteError) {
+        logger.warn(
+          "Failed to clean up auth user after admin API user creation failure",
+          {
+            userId,
+            deleteError,
+          }
+        );
+      }
     }
   }
 

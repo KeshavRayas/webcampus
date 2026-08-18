@@ -57,9 +57,7 @@ export const AdminFacultyView = () => {
         { withCredentials: true }
       );
       if (res.data.status === "success" && Array.isArray(res.data.data)) {
-        return res.data.data.filter((department) => {
-          return department.type !== "BASIC_SCIENCES";
-        });
+        return res.data.data;
       }
       return [] as DepartmentResponseDTO[];
     },

@@ -14,7 +14,8 @@ const getStatusCode = (error: unknown): number => {
   if (
     error.message === "Semester not found" ||
     error.message === "Academic Term not found" ||
-    error.message === "Course assignment not found"
+    error.message === "Course assignment not found" ||
+    error.message === "Elective batch faculty assignment not found"
   ) {
     return 404;
   }
@@ -135,10 +136,16 @@ export class FacultyAttendanceWindowController {
         headers: fromNodeHeaders(req.headers),
       });
 
-      const params = req.params as { courseAssignmentId: string };
+      const params = req.params as {
+        courseAssignmentId?: string;
+        electiveBatchFacultyId?: string;
+      };
       const response = await FacultyAttendanceWindowService.freezeAssignment(
         requestContext.userId,
-        params.courseAssignmentId,
+        {
+          courseAssignmentId: params.courseAssignmentId,
+          electiveBatchFacultyId: params.electiveBatchFacultyId,
+        },
         session?.user?.username,
         session?.user?.displayUsername
       );

@@ -20,6 +20,7 @@ export interface MarksCourseInfo {
   id: string;
   code: string;
   name: string;
+  courseType: string;
   semester: {
     id: string;
     semesterNumber: number;
@@ -41,6 +42,8 @@ export interface MarksSectionInfo {
 export interface MarksDashboardAssignment {
   course: MarksCourseInfo;
   section: MarksSectionInfo | null;
+  electiveBatchId: string | null;
+  electiveBatchName: string | null;
 }
 
 export const getMarksDashboardAssignments = async (): Promise<
@@ -60,11 +63,13 @@ export const getMarksDashboardAssignments = async (): Promise<
 export const downloadMarksTemplate = async (
   assessmentId: string,
   sectionId: string | undefined,
+  electiveBatchId: string | undefined,
   courseCode: string,
   assessmentTitle: string
 ): Promise<void> => {
   const params: Record<string, string> = {};
   if (sectionId) params.sectionId = sectionId;
+  if (electiveBatchId) params.electiveBatchId = electiveBatchId;
 
   const response = await apiClient.get(
     `/faculty/marks/assessments/${assessmentId}/marks/template`,
@@ -90,11 +95,13 @@ export const downloadMarksTemplate = async (
 export const uploadMarksExcel = async (
   assessmentId: string,
   sectionId: string | undefined,
+  electiveBatchId: string | undefined,
   file: File
 ): Promise<void> => {
   const formData = new FormData();
   formData.append("file", file);
   if (sectionId) formData.append("sectionId", sectionId);
+  if (electiveBatchId) formData.append("electiveBatchId", electiveBatchId);
 
   try {
     const response = await apiClient.post<BaseResponse<null>>(

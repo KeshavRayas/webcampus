@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { frontendEnv } from "@webcampus/common/env";
+import { courseTypeLabel } from "@webcampus/schemas/constants";
 import {
   CourseResponseDTO,
   CreateCourseDTO,
@@ -39,13 +40,6 @@ const COURSE_MODE_LABELS: Record<string, string> = {
   NON_INTEGRATED: "Non-Integrated",
   FINAL_SUMMARY: "Final Summary",
   NCMC: "NCMC",
-};
-
-const COURSE_TYPE_LABELS: Record<string, string> = {
-  PC: "Professional Core",
-  PE: "Professional Elective",
-  OE: "Open Elective",
-  NCMC: "Non-Credit Mandatory",
 };
 
 type CourseCycle = "PHYSICS" | "CHEMISTRY" | "NONE";
@@ -284,11 +278,7 @@ export const getAdminCoursesColumns = (
   {
     accessorKey: "courseType",
     header: "Type",
-    cell: ({ row }) => (
-      <div>
-        {COURSE_TYPE_LABELS[row.original.courseType] ?? row.original.courseType}
-      </div>
-    ),
+    cell: ({ row }) => <div>{courseTypeLabel(row.original.courseType)}</div>,
   },
   {
     id: "ltps",

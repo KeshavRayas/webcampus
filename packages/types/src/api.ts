@@ -58,6 +58,7 @@ export type FacultyHandlingAssignmentDTO = {
   batchName?: string;
   assignmentType: "THEORY" | "LAB";
   studentCount: number;
+  isElective?: boolean;
 };
 
 export type FacultyHandlingStudentDTO = {
@@ -86,6 +87,20 @@ export type FacultyHandlingFilterOptionsDTO = {
     id: string;
     name: string;
     semesterId: string;
+    isElectiveBatch?: boolean;
+  }[];
+  courses: {
+    id: string;
+    code: string;
+    name: string;
+    courseType: string;
+    semesterId: string;
+  }[];
+  batches: {
+    id: string;
+    name: string;
+    courseId: string;
+    isElective: boolean;
   }[];
 };
 

@@ -1,6 +1,9 @@
 import { logger } from "@webcampus/common/logger";
 import { Cycle, db } from "@webcampus/db";
 import { BaseResponse } from "@webcampus/types/api";
+import { assertBatchBelongsToCourse } from "../shared/batch-managed";
+import { FACULTY_COURSE_STATUS } from "../shared/course-approval";
+import { isBatchManagedCourse } from "../shared/course-kind";
 import { resolveHODDepartment } from "./resolve-hod-department";
 
 export class HODMarksReportService {
@@ -30,6 +33,29 @@ export class HODMarksReportService {
     courseId: string
   ) {
     const hod = await this.requireHODDepartment(userId);
+    const course = await db.course.findFirst({
+      where: { id: courseId, departmentId: hod.departmentId },
+      select: { courseType: true },
+    });
+    if (!course) {
+      throw new Error("Course not found in your department");
+    }
+
+    if (isBatchManagedCourse(course.courseType)) {
+      const electiveAssignment = await db.electiveBatchFaculty.findFirst({
+        where: {
+          electiveBatchId: sectionId,
+          courseId,
+          course: { departmentId: hod.departmentId },
+        },
+        select: { id: true },
+      });
+      if (!electiveAssignment) {
+        throw new Error("Section not found in your department");
+      }
+      return hod;
+    }
+
     const section = await db.section.findFirst({
       where: {
         id: sectionId,
@@ -98,6 +124,47 @@ export class HODMarksReportService {
   ): Promise<BaseResponse<unknown>> {
     await this.verifyCourseOwnership(userId, courseId);
     const hod = await this.requireHODDepartment(userId);
+    const course = await db.course.findFirst({
+      where: { id: courseId, departmentId: hod.departmentId },
+      select: { courseType: true },
+    });
+    if (!course) {
+      throw new Error("Course not found in your department");
+    }
+
+    if (isBatchManagedCourse(course.courseType)) {
+      const electiveAssignments = await db.electiveBatchFaculty.findMany({
+        where: {
+          courseId,
+          course: {
+            approvalStatus: FACULTY_COURSE_STATUS,
+            semesterId,
+            departmentId: hod.departmentId,
+          },
+        },
+        select: { electiveBatch: { select: { id: true, name: true } } },
+        orderBy: { electiveBatch: { name: "asc" } },
+      });
+      const seen = new Set<string>();
+      const sections: { id: string; name: string; isElectiveBatch: boolean }[] =
+        [];
+      for (const assignment of electiveAssignments) {
+        if (!seen.has(assignment.electiveBatch.id)) {
+          seen.add(assignment.electiveBatch.id);
+          sections.push({
+            id: assignment.electiveBatch.id,
+            name: assignment.electiveBatch.name,
+            isElectiveBatch: true,
+          });
+        }
+      }
+      return {
+        status: "success",
+        message: "Sections fetched",
+        data: sections,
+      };
+    }
+
     const sections = await db.section.findMany({
       where: {
         departmentId: hod.departmentId,
@@ -175,11 +242,15 @@ export class HODMarksReportService {
         where: {
           courseId,
           semesterId: course.semesterId,
-          student: {
-            studentSections: {
-              some: { sectionId },
-            },
-          },
+          ...(sectionId && !isBatchManagedCourse(course.courseType)
+            ? {
+                student: {
+                  studentSections: {
+                    some: { sectionId },
+                  },
+                },
+              }
+            : {}),
         },
         include: {
           student: {
@@ -194,9 +265,28 @@ export class HODMarksReportService {
         },
       });
 
-      const studentIds = registrations.map(
-        (registration) => registration.student.id
-      );
+      let studentIds: string[] = [];
+      let roster: { id: string; usn: string; user: { name: string } }[] = [];
+
+      if (isBatchManagedCourse(course.courseType) && sectionId) {
+        await assertBatchBelongsToCourse(courseId, sectionId);
+        const batchStudents = await db.electiveStudentAssignment.findMany({
+          where: { courseId, electiveBatchId: sectionId },
+          include: {
+            student: {
+              select: {
+                id: true,
+                usn: true,
+                user: { select: { name: true } },
+              },
+            },
+          },
+        });
+        roster = batchStudents.map((bs) => bs.student);
+      } else {
+        roster = registrations.map((r) => r.student);
+      }
+      studentIds = roster.map((s) => s.id);
       const assessmentIds = assessments.map((assessment) => assessment.id);
 
       const studentAssessments = await db.studentAssessment.findMany({
@@ -235,15 +325,15 @@ export class HODMarksReportService {
         ])
       );
 
-      const students = registrations.map((registration) => {
-        const markInfo = marksMap.get(registration.student.id) ?? {
+      const students = roster.map((student) => {
+        const markInfo = marksMap.get(student.id) ?? {
           cieTotal: null,
           status: "NOT_ELIGIBLE",
         };
 
         const assessmentScores = assessments.map((assessment) => {
           const studentAssessment = assessmentMap.get(
-            `${registration.student.id}_${assessment.id}`
+            `${student.id}_${assessment.id}`
           );
           return {
             assessmentId: assessment.id,
@@ -254,8 +344,8 @@ export class HODMarksReportService {
         });
 
         return {
-          usn: registration.student.usn,
-          name: registration.student.user.name,
+          usn: student.usn,
+          name: student.user.name,
           assessments: assessmentScores,
           cieTotal: markInfo.cieTotal,
           status: markInfo.status,

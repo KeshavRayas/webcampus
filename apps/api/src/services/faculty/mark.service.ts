@@ -168,6 +168,24 @@ export class Mark {
   }
 
   /**
+   * Narrows a faculty roster to the students assigned to one specific
+   * elective batch of a batch-managed (PE/OE) course. The faculty roster
+   * remains the source of truth for ownership; the batch only filters it.
+   */
+  private static async scopeRosterToElectiveBatch<
+    T extends { student: { id: string } },
+  >(roster: T[], courseId: string, electiveBatchId: string): Promise<T[]> {
+    const batchAssignments = await db.electiveStudentAssignment.findMany({
+      where: { courseId, electiveBatchId },
+      select: { studentId: true },
+    });
+    const batchStudentIds = new Set(
+      batchAssignments.map((assignment) => assignment.studentId)
+    );
+    return roster.filter((row) => batchStudentIds.has(row.student.id));
+  }
+
+  /**
    * Direct Mark creation — bypasses the assessment aggregate pipeline.
    * Does NOT call recomputeStudentMark, so cieTotal/status here will be
    * OVERWRITTEN the next time saveAssessmentMarks or freeze triggers
@@ -482,6 +500,7 @@ export class Mark {
               id: true,
               code: true,
               name: true,
+              courseType: true,
               semester: {
                 select: {
                   id: true,
@@ -514,6 +533,8 @@ export class Mark {
 
       const formattedAssignments = assignments.map((assignment) => ({
         ...assignment,
+        electiveBatchId: null,
+        electiveBatchName: null,
         course: {
           ...assignment.course,
           assessments: assignment.course.assessments.map((assessment) => ({
@@ -531,11 +552,18 @@ export class Mark {
           course: { approvalStatus: FACULTY_COURSE_STATUS },
         },
         select: {
+          electiveBatch: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           course: {
             select: {
               id: true,
               code: true,
               name: true,
+              courseType: true,
               semester: {
                 select: {
                   id: true,
@@ -567,6 +595,8 @@ export class Mark {
 
       const formattedPeAssignments = peAssignments.map((assignment) => ({
         section: null,
+        electiveBatchId: assignment.electiveBatch?.id ?? null,
+        electiveBatchName: assignment.electiveBatch?.name ?? null,
         course: {
           ...assignment.course,
           assessments: assignment.course.assessments.map((assessment) => ({
@@ -598,7 +628,8 @@ export class Mark {
   static async getAssessmentTemplateWithMarks(
     userId: string,
     assessmentId: string,
-    sectionId?: string
+    sectionId?: string,
+    electiveBatchId?: string
   ): Promise<BaseResponse<AssessmentWithStudentsType>> {
     try {
       const faculty = await db.faculty.findUnique({
@@ -648,6 +679,15 @@ export class Mark {
         false
       );
 
+      // Narrow the roster to a single elective batch when one is selected
+      const scopedStudents = electiveBatchId
+        ? await this.scopeRosterToElectiveBatch(
+            courseStudents,
+            assessment.courseId,
+            electiveBatchId
+          )
+        : courseStudents;
+
       // Get existing student assessments and marks
       const existingAssessments = await db.studentAssessment.findMany({
         where: {
@@ -667,7 +707,7 @@ export class Mark {
         existingAssessments.map((a) => [a.studentId, a])
       );
 
-      const students = courseStudents.map((reg) => {
+      const students = scopedStudents.map((reg) => {
         const studentAssess = assessmentMap.get(reg.student.id);
         const questionMarks: Record<string, number> = {};
         if (studentAssess?.questionMarks) {
@@ -909,7 +949,8 @@ export class Mark {
   static async generateMarksTemplate(
     userId: string,
     assessmentId: string,
-    sectionId?: string
+    sectionId?: string,
+    electiveBatchId?: string
   ): Promise<Buffer> {
     const faculty = await db.faculty.findUnique({
       where: { userId },
@@ -955,6 +996,14 @@ export class Mark {
       true
     );
 
+    const scopedRoster = electiveBatchId
+      ? await this.scopeRosterToElectiveBatch(
+          roster,
+          assessment.courseId,
+          electiveBatchId
+        )
+      : roster;
+
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Marks Entry");
 
@@ -978,7 +1027,7 @@ export class Mark {
     ]);
     headerRow.font = { bold: true };
 
-    roster.forEach((reg) => {
+    scopedRoster.forEach((reg) => {
       const rosterRow = worksheet.addRow([
         reg.student.usn,
         reg.student.user.name,
@@ -1051,6 +1100,7 @@ export class Mark {
     userId: string,
     assessmentId: string,
     sectionId: string | undefined,
+    electiveBatchId: string | undefined,
     fileBuffer: Buffer
   ): Promise<BaseResponse<null>> {
     const faculty = await db.faculty.findUnique({
@@ -1076,7 +1126,7 @@ export class Mark {
     );
 
     const isBatchManaged = isBatchManagedCourse(assessment.course.courseType);
-    const roster = await this.getFacultyCourseStudents(
+    const facultyRoster = await this.getFacultyCourseStudents(
       faculty.id,
       assessment.courseId,
       assessment.course.courseType,
@@ -1085,6 +1135,13 @@ export class Mark {
       db,
       false
     );
+    const roster = electiveBatchId
+      ? await this.scopeRosterToElectiveBatch(
+          facultyRoster,
+          assessment.courseId,
+          electiveBatchId
+        )
+      : facultyRoster;
     const studentIdByUsn = new Map(
       roster.map((r) => [r.student.usn, r.student.id])
     );
@@ -1376,14 +1433,40 @@ export class Mark {
       const registrations = await this.getFacultyCourseStudents(
         faculty.id,
         courseId,
-        isBatchManaged ? "PE" : null,
+        isBatchManaged ? (courseTypeRow?.courseType ?? "PE") : null,
         course.semesterId,
         sectionId,
         db,
         false
       );
 
-      const studentIds = registrations.map((r) => r.student.id);
+      let roster = registrations;
+      if (isBatchManaged && sectionId) {
+        const ownedBatch = await db.electiveBatchFaculty.findFirst({
+          where: {
+            courseId,
+            facultyId: faculty.id,
+            electiveBatchId: sectionId,
+            course: { approvalStatus: FACULTY_COURSE_STATUS },
+          },
+          select: { id: true },
+        });
+
+        if (!ownedBatch) {
+          throw new Error(
+            "Selected batch is not assigned to this faculty for this course"
+          );
+        }
+
+        const batchStudents = await db.electiveStudentAssignment.findMany({
+          where: { courseId, electiveBatchId: sectionId },
+          select: { studentId: true },
+        });
+        const batchStudentIds = new Set(batchStudents.map((s) => s.studentId));
+        roster = registrations.filter((r) => batchStudentIds.has(r.student.id));
+      }
+
+      const studentIds = roster.map((r) => r.student.id);
 
       const studentAssessments = await db.studentAssessment.findMany({
         where: {
@@ -1425,7 +1508,7 @@ export class Mark {
         ])
       );
 
-      const students: MarksReportDTO["students"] = registrations.map((reg) => {
+      const students: MarksReportDTO["students"] = roster.map((reg) => {
         const markInfo = marksMap.get(reg.student.id) ?? {
           cieTotal: null,
           status: "NOT_ELIGIBLE",
@@ -1542,6 +1625,7 @@ export class Mark {
               id: true,
               code: true,
               name: true,
+              courseType: true,
               semesterId: true,
             },
           },
@@ -1559,9 +1643,11 @@ export class Mark {
         id: a.course.id,
         code: a.course.code,
         name: a.course.name,
+        courseType: a.course.courseType,
         sectionId: a.section.id,
         sectionName: a.section.name,
         semesterId: a.course.semesterId,
+        isElectiveBatch: false,
       }));
 
       const peAssignments = await db.electiveBatchFaculty.findMany({
@@ -1575,22 +1661,31 @@ export class Mark {
               id: true,
               code: true,
               name: true,
+              courseType: true,
               semesterId: true,
+            },
+          },
+          electiveBatch: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },
       });
 
-      const peCourses = peAssignments.map((a) => ({
+      const peCourseRows = peAssignments.map((a) => ({
         id: a.course.id,
         code: a.course.code,
         name: a.course.name,
-        sectionId: "",
-        sectionName: "",
+        courseType: a.course.courseType,
         semesterId: a.course.semesterId,
+        sectionId: a.electiveBatch.id,
+        sectionName: a.electiveBatch.name,
+        isElectiveBatch: true,
       }));
 
-      const allCourses = [...courses, ...peCourses];
+      const allCourses = [...courses, ...peCourseRows];
       const courseIds = [...new Set(allCourses.map((c) => c.id))];
       const assessmentsRaw = await db.assessmentTemplate.findMany({
         where: { courseId: { in: courseIds } },

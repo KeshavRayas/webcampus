@@ -1,12 +1,22 @@
 import { z } from "zod";
 
-export const HODFreezeParamsSchema = z.object({
-  courseAssignmentId: z.string().uuid(),
-});
+const freezeTarget = z
+  .object({
+    courseAssignmentId: z.string().uuid().optional(),
+    electiveBatchFacultyId: z.string().uuid().optional(),
+  })
+  .refine(
+    (val) =>
+      Boolean(val.courseAssignmentId) !== Boolean(val.electiveBatchFacultyId),
+    {
+      message:
+        "Exactly one of courseAssignmentId or electiveBatchFacultyId is required",
+    }
+  );
 
-export const HODUnfreezeParamsSchema = z.object({
-  courseAssignmentId: z.string().uuid(),
-});
+export const HODFreezeParamsSchema = freezeTarget;
+
+export const HODUnfreezeParamsSchema = freezeTarget;
 
 export const HODAttendanceWindowFreezeSchema = z.object({
   displayState: z.enum([
@@ -24,7 +34,9 @@ export const HODAttendanceWindowFreezeSchema = z.object({
 });
 
 export const HODAttendanceWindowRowSchema = z.object({
-  courseAssignmentId: z.string().uuid(),
+  courseAssignmentId: z.string().uuid().nullable(),
+  electiveBatchFacultyId: z.string().uuid().nullable(),
+  isElective: z.boolean(),
   courseCode: z.string(),
   courseName: z.string(),
   department: z.string(),

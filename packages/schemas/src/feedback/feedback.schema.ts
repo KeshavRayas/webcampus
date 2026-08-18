@@ -74,18 +74,30 @@ export const FeedbackRoundUpdateSchema = z
     message: "End time must be after start time",
   });
 
-export const FeedbackSubmissionSchema = z.object({
-  courseAssignmentId: z.string().uuid(),
-  feedbackRoundId: z.string().uuid(),
-  answers: z
-    .array(
-      z.object({
-        questionId: z.string().uuid(),
-        score: FeedbackScoreSchema,
-      })
-    )
-    .length(10),
-});
+export const FeedbackSubmissionSchema = z
+  .object({
+    courseAssignmentId: z.string().uuid().optional(),
+    electiveBatchFacultyId: z.string().uuid().optional(),
+    feedbackRoundId: z.string().uuid(),
+    answers: z
+      .array(
+        z.object({
+          questionId: z.string().uuid(),
+          score: FeedbackScoreSchema,
+        })
+      )
+      .length(10),
+  })
+  .refine(
+    (value) =>
+      Boolean(value.courseAssignmentId) !==
+      Boolean(value.electiveBatchFacultyId),
+    {
+      path: ["electiveBatchFacultyId"],
+      message:
+        "Exactly one of courseAssignmentId or electiveBatchFacultyId is required",
+    }
+  );
 
 export const FeedbackReportQuerySchema = z.object({
   academicTermId: z.string().uuid().optional(),

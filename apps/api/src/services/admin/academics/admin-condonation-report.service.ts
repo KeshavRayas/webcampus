@@ -1,6 +1,8 @@
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import { BaseResponse } from "@webcampus/types/api";
+import { assertBatchBelongsToCourse } from "../../shared/batch-managed";
+import { isBatchManagedCourse } from "../../shared/course-kind";
 
 export class AdminCondonationReportService {
   static async getCondonationReport(
@@ -23,29 +25,47 @@ export class AdminCondonationReportService {
       if (!course) {
         throw new Error("Course not found");
       }
+      const isBatchManaged = isBatchManagedCourse(course.courseType);
+      if (isBatchManaged && sectionId) {
+        await assertBatchBelongsToCourse(courseId, sectionId);
+      }
 
-      const studentSections = await db.studentSection.findMany({
-        where: {
-          ...(sectionId
-            ? { sectionId }
-            : { section: { courses: { some: { courseId } } } }),
-          ...(batchId
-            ? { student: { batches: { some: { id: batchId } } } }
-            : {}),
-        },
-        include: {
-          student: {
-            include: { user: true, attendances: { where: { courseId } } },
-          },
-        },
-      });
+      const studentSections = isBatchManaged
+        ? await db.electiveStudentAssignment.findMany({
+            where: {
+              courseId,
+              ...(sectionId ? { electiveBatchId: sectionId } : {}),
+            },
+            include: {
+              student: {
+                include: { user: true, attendances: { where: { courseId } } },
+              },
+            },
+          })
+        : await db.studentSection.findMany({
+            where: {
+              ...(sectionId
+                ? { sectionId }
+                : { section: { courses: { some: { courseId } } } }),
+              ...(batchId
+                ? { student: { batches: { some: { id: batchId } } } }
+                : {}),
+            },
+            include: {
+              student: {
+                include: { user: true, attendances: { where: { courseId } } },
+              },
+            },
+          });
 
       const classSessions = await db.classSession.findMany({
-        where: {
-          courseId,
-          ...(sectionId ? { sectionId } : {}),
-          ...(batchId ? { batchId } : {}),
-        },
+        where: isBatchManaged
+          ? { courseId, ...(sectionId ? { electiveBatchId: sectionId } : {}) }
+          : {
+              courseId,
+              ...(sectionId ? { sectionId } : {}),
+              ...(batchId ? { batchId } : {}),
+            },
         select: { id: true },
       });
 

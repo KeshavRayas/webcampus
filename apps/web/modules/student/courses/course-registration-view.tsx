@@ -7,6 +7,7 @@ import {
   useSubmitCourseRegistration,
 } from "@/modules/student/courses/use-course-registration";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { courseTypeLabel } from "@webcampus/schemas/constants";
 import { Alert, AlertDescription } from "@webcampus/ui/components/alert";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -193,7 +194,9 @@ export const CourseRegistrationView = () => {
                           <tr key={course.id} className="border-t">
                             <td className="px-3 py-2">{course.code}</td>
                             <td className="px-3 py-2">{course.name}</td>
-                            <td className="px-3 py-2">{course.courseType}</td>
+                            <td className="px-3 py-2">
+                              {courseTypeLabel(course.courseType)}
+                            </td>
                             <td className="px-3 py-2">{course.ltp}</td>
                             <td className="px-3 py-2">{course.totalCredits}</td>
                           </tr>

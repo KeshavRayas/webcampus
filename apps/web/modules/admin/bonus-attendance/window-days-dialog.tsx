@@ -48,8 +48,9 @@ export const WindowDaysDialog = ({
               : "Set Bonus Attendance Days"}
           </DialogTitle>
           <DialogDescription>
-            Specify how many days into the future faculty can take attendance
-            when this window is open.
+            Faculty can take attendance for this many days starting from the day
+            the window is opened. The window auto-closes once those days have
+            elapsed.
           </DialogDescription>
         </DialogHeader>
 

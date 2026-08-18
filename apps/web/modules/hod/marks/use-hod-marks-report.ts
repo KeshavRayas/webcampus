@@ -75,7 +75,11 @@ export const useHODMarksSections = (
           withCredentials: true,
         }
       );
-      return res.data.data as { id: string; name: string }[];
+      return res.data.data as {
+        id: string;
+        name: string;
+        isElectiveBatch?: boolean;
+      }[];
     },
     enabled: !!courseId,
   });

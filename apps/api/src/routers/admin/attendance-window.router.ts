@@ -48,7 +48,7 @@ router.post(
 );
 
 router.post(
-  "/:courseAssignmentId/freeze",
+  "/course-assignment/:courseAssignmentId/freeze",
   validateRequest(AdminFreezeParamsSchema, "params"),
   protect({
     role: "admin",
@@ -60,7 +60,31 @@ router.post(
 );
 
 router.post(
-  "/:courseAssignmentId/unfreeze",
+  "/course-assignment/:courseAssignmentId/unfreeze",
+  validateRequest(AdminUnfreezeParamsSchema, "params"),
+  protect({
+    role: "admin",
+    permissions: {
+      freeze: ["lock"],
+    },
+  }),
+  AttendanceWindowController.unfreezeAssignment
+);
+
+router.post(
+  "/elective-batch/:electiveBatchFacultyId/freeze",
+  validateRequest(AdminFreezeParamsSchema, "params"),
+  protect({
+    role: "admin",
+    permissions: {
+      freeze: ["lock"],
+    },
+  }),
+  AttendanceWindowController.freezeAssignment
+);
+
+router.post(
+  "/elective-batch/:electiveBatchFacultyId/unfreeze",
   validateRequest(AdminUnfreezeParamsSchema, "params"),
   protect({
     role: "admin",

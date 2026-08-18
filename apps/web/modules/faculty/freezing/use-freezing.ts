@@ -27,7 +27,10 @@ export type FreezingFreeze = {
 };
 
 export type FreezingRow = {
-  courseAssignmentId: string;
+  courseAssignmentId: string | null;
+  electiveBatchFacultyId: string | null;
+  isElective: boolean;
+  domain: "section" | "group";
   courseCode: string;
   courseName: string;
   sectionId: string;
@@ -41,6 +44,7 @@ export type FreezingFilters = {
   academicTermId: string;
   semesterId: string;
   sectionId?: string;
+  electiveBatchId?: string;
 };
 
 export const useFreezingWindows = (
@@ -75,7 +79,11 @@ export const useFreezingWindows = (
   });
 };
 
-export type FacultySection = { id: string; name: string };
+export type FacultySection = {
+  id: string;
+  name: string;
+  domain: "section" | "group";
+};
 
 export const useFacultySections = (
   semesterId: string | undefined,
@@ -123,14 +131,22 @@ export const useBulkFreezeWindows = () => {
   });
 };
 
+export type FreezeTarget = {
+  courseAssignmentId?: string | null;
+  electiveBatchFacultyId?: string | null;
+};
+
 export const useFreezeAssignment = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (courseAssignmentId: string) => {
+    mutationFn: async (target: FreezeTarget) => {
+      const path = target.courseAssignmentId
+        ? `/faculty/attendance-windows/course-assignment/${target.courseAssignmentId}/freeze`
+        : `/faculty/attendance-windows/elective-batch/${target.electiveBatchFacultyId ?? ""}/freeze`;
       const res = await axios.post<BaseResponse<FreezingRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/attendance-windows/${courseAssignmentId}/freeze`,
+        `${NEXT_PUBLIC_API_BASE_URL}${path}`,
         {},
         { withCredentials: true }
       );

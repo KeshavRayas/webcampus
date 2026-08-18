@@ -234,7 +234,7 @@ const toSessionDto = (session: {
     timingEndTime: session.timingEndTime,
     courseCode: session.Course.code,
     courseName: session.Course.name,
-    sectionName: session.electiveBatch?.name ?? session.Section?.name ?? "PE",
+    sectionName: session.electiveBatch?.name ?? session.Section?.name ?? "",
     createdAt: session.createdAt.toISOString(),
   };
 };
@@ -272,7 +272,7 @@ const toSessionDtoFromScalars = (
     courseCode: courseMeta?.code ?? session.courseId,
     courseName: courseMeta?.name ?? "Unknown Course",
     sectionName:
-      electiveBatchMeta?.name ?? sectionMeta?.name ?? session.sectionId ?? "PE",
+      electiveBatchMeta?.name ?? sectionMeta?.name ?? session.sectionId ?? "",
     createdAt: session.createdAt.toISOString(),
   };
 };
@@ -960,6 +960,7 @@ export class FacultyAttendanceSessionService {
             academicTermId: assignmentContext!.academicTermId,
             semesterId: assignmentContext!.semesterId,
             isOpen: true,
+            expiresAt: { gt: new Date() },
             OR: [
               { departmentId: assignmentContext!.departmentId },
               { cycle: assignmentContext!.cycle as Cycle },
@@ -973,12 +974,17 @@ export class FacultyAttendanceSessionService {
           throw new Error("Cannot take attendance for future dates.");
         }
 
-        const maxAllowedDate = new Date(today);
-        maxAllowedDate.setUTCDate(maxAllowedDate.getUTCDate() + window.days);
+        const windowOpenDate = window.openedAt
+          ? toSessionDateUtc(window.openedAt)
+          : today;
+        const maxAllowedDate = new Date(windowOpenDate);
+        maxAllowedDate.setUTCDate(
+          maxAllowedDate.getUTCDate() + (window.days - 1)
+        );
 
         if (sessionDate.getTime() > maxAllowedDate.getTime()) {
           throw new Error(
-            `Cannot take attendance beyond ${window.days} days in the future.`
+            `Cannot take attendance beyond ${maxAllowedDate.toISOString().split("T")[0]}.`
           );
         }
       }

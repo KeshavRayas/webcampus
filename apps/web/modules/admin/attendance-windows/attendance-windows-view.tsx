@@ -37,6 +37,7 @@ import {
   useBulkUnfreezeAttendanceWindows,
   useFreezeAssignment,
   useUnfreezeAssignment,
+  type AttendanceWindowBulkPayload,
   type AttendanceWindowFilters,
   type AttendanceWindowRow,
 } from "./use-attendance-windows";
@@ -122,11 +123,12 @@ export const AttendanceWindowsView = () => {
     useBulkFreezeAttendanceWindows();
   const { mutate: bulkUnfreeze, isPending: isUnfreezing } =
     useBulkUnfreezeAttendanceWindows();
-  const { mutate: freezeAssignment, isPending: isRowMutating } =
+  const { mutate: freezeAssignment, isPending: isRowFreezing } =
     useFreezeAssignment();
-  const { mutate: unfreezeAssignment } = useUnfreezeAssignment();
+  const { mutate: unfreezeAssignment, isPending: isRowUnfreezing } =
+    useUnfreezeAssignment();
 
-  const isRowLocked = isRowMutating;
+  const isRowLocked = isRowFreezing || isRowUnfreezing;
 
   const filteredWindows = useMemo(() => {
     if (!debouncedSearch) return windows;
@@ -159,47 +161,57 @@ export const AttendanceWindowsView = () => {
     return sorted;
   }, [filteredWindows]);
 
-  const handleRowFreeze = (courseAssignmentId: string) => {
-    freezeAssignment(courseAssignmentId);
+  const handleRowFreeze = (row: AttendanceWindowRow) => {
+    freezeAssignment(
+      row.courseAssignmentId
+        ? { courseAssignmentId: row.courseAssignmentId }
+        : { electiveBatchFacultyId: row.electiveBatchFacultyId }
+    );
   };
 
-  const handleRowUnfreeze = (courseAssignmentId: string) => {
-    unfreezeAssignment(courseAssignmentId);
+  const handleRowUnfreeze = (row: AttendanceWindowRow) => {
+    unfreezeAssignment(
+      row.courseAssignmentId
+        ? { courseAssignmentId: row.courseAssignmentId }
+        : { electiveBatchFacultyId: row.electiveBatchFacultyId }
+    );
   };
 
   const isMutating = isFreezing || isUnfreezing;
 
+  const bulkPayload = (): AttendanceWindowBulkPayload => ({
+    academicTermId: appliedFilters.academicTermId,
+    semesterId: appliedFilters.semesterId,
+    ...(appliedFilters.departmentId
+      ? { departmentId: appliedFilters.departmentId }
+      : {}),
+    targets: filteredWindows.map((row) =>
+      row.courseAssignmentId
+        ? { courseAssignmentId: row.courseAssignmentId }
+        : { electiveBatchFacultyId: row.electiveBatchFacultyId }
+    ),
+  });
+
   const handleBulkFreezeClick = () => {
-    if (!appliedFilters.departmentId) {
+    if (!appliedFilters.departmentId && !debouncedSearch) {
       confirmActionRef.current = "freeze";
       setConfirmOpen(true);
       return;
     }
-    bulkFreeze({
-      academicTermId: appliedFilters.academicTermId,
-      semesterId: appliedFilters.semesterId,
-      departmentId: appliedFilters.departmentId,
-    });
+    bulkFreeze(bulkPayload());
   };
 
   const handleBulkUnfreezeClick = () => {
-    if (!appliedFilters.departmentId) {
+    if (!appliedFilters.departmentId && !debouncedSearch) {
       confirmActionRef.current = "unfreeze";
       setConfirmOpen(true);
       return;
     }
-    bulkUnfreeze({
-      academicTermId: appliedFilters.academicTermId,
-      semesterId: appliedFilters.semesterId,
-      departmentId: appliedFilters.departmentId,
-    });
+    bulkUnfreeze(bulkPayload());
   };
 
   const confirmBulkAction = () => {
-    const payload = {
-      academicTermId: appliedFilters.academicTermId,
-      semesterId: appliedFilters.semesterId,
-    };
+    const payload = bulkPayload();
     if (confirmActionRef.current === "freeze") {
       bulkFreeze(payload);
     } else {
@@ -268,11 +280,9 @@ export const AttendanceWindowsView = () => {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h3 className="text-xl font-semibold tracking-tight">
-          Attendance Windows
-        </h3>
+        <h3 className="text-xl font-semibold tracking-tight">Freezing</h3>
         <p className="text-muted-foreground text-sm">
-          Lock attendance updates for a department in the active term.
+          Freeze attendance for courses in a department for the active term.
         </p>
       </div>
 
@@ -346,7 +356,7 @@ export const AttendanceWindowsView = () => {
             <AlertDialogDescription>
               You are about to{" "}
               {confirmActionRef.current === "freeze" ? "freeze" : "unfreeze"}{" "}
-              attendance windows for <strong>all departments</strong> in{" "}
+              courses for <strong>all departments</strong> in{" "}
               <strong>{appliedSemesterLabelRef.current}</strong> (
               {filteredWindows.length} rows affected). This action cannot be
               undone. Are you sure you want to proceed?
@@ -365,18 +375,18 @@ export const AttendanceWindowsView = () => {
 
       {!windowsQueryEnabled ? (
         <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
-          Select Academic Term and Semester, then apply filters to load
-          attendance windows.
+          Select Academic Term and Semester, then apply filters to load freeze
+          data.
         </div>
       ) : isLoading ? (
         <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
-          Loading attendance windows...
+          Loading freeze data...
         </div>
       ) : isError ? (
         <div className="text-destructive rounded-lg border p-8 text-center text-sm">
           {error instanceof Error
             ? error.message
-            : "Failed to load attendance windows"}
+            : "Failed to load freeze data"}
         </div>
       ) : windows.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
@@ -411,7 +421,7 @@ export const AttendanceWindowsView = () => {
                             )}
                           </div>
                           <span className="text-muted-foreground text-sm font-normal">
-                            {rows.length} window
+                            {rows.length} course
                             {rows.length !== 1 ? "s" : ""}
                           </span>
                         </div>
@@ -427,7 +437,9 @@ export const AttendanceWindowsView = () => {
                   </TableHeader>
                   <TableBody>
                     {rows.map((row) => (
-                      <TableRow key={`${deptName}-${row.courseAssignmentId}`}>
+                      <TableRow
+                        key={`${deptName}-${row.courseAssignmentId ?? row.electiveBatchFacultyId}`}
+                      >
                         <TableCell className="font-medium">
                           <div className="space-y-1">
                             <div className="text-sm font-semibold">
@@ -439,7 +451,10 @@ export const AttendanceWindowsView = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">{row.sectionName}</div>
+                          <div className="text-sm">
+                            {row.sectionName}
+                            {row.isElective ? " (Elective)" : ""}
+                          </div>
                           <div className="text-muted-foreground text-xs">
                             {row.assignmentType}
                             {row.batchName
@@ -467,20 +482,18 @@ export const AttendanceWindowsView = () => {
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-3">
                             <Switch
-                              checked={
-                                row.freeze.displayState === "LOCKED_BY_ADMIN"
-                              }
+                              checked={row.freeze.displayState !== "OPEN"}
                               onCheckedChange={(checked) => {
                                 if (checked) {
-                                  handleRowFreeze(row.courseAssignmentId);
+                                  handleRowFreeze(row);
                                   return;
                                 }
-                                handleRowUnfreeze(row.courseAssignmentId);
+                                handleRowUnfreeze(row);
                               }}
                               disabled={isRowLocked}
                             />
                             <span className="text-sm">
-                              {row.freeze.displayState === "LOCKED_BY_ADMIN"
+                              {row.freeze.displayState !== "OPEN"
                                 ? "Frozen"
                                 : "Unfrozen"}
                             </span>

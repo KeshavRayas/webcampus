@@ -69,7 +69,6 @@ export class DepartmentService {
       if (!user.data?.id) {
         throw new Error("Failed to create department user");
       }
-
       createdAuthUserId = user.data.id;
 
       const { generateFileName, uploadToS3, sanitizeForS3 } = await import(

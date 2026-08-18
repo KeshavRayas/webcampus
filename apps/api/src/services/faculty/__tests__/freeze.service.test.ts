@@ -6,6 +6,7 @@ import { describe, expect, it } from "bun:test";
 import {
   assertCanManageFreezeWindow,
   assertCanMutateAttendance,
+  assertFreezeOwnership,
   canRoleManageFreezeWindow,
   canRoleMutateAttendance,
   resolveFreezeState,
@@ -216,5 +217,53 @@ describe("assertCanManageFreezeWindow", () => {
     expect(() =>
       assertCanManageFreezeWindow("department", adminLock, "unfreeze")
     ).toThrow("Forbidden: locked by admin");
+  });
+});
+
+describe("assertFreezeOwnership", () => {
+  it("accepts exactly one PC ownership path", () => {
+    expect(() =>
+      assertFreezeOwnership({ courseAssignmentId: "pc-1" })
+    ).not.toThrow();
+  });
+
+  it("accepts exactly one elective ownership path", () => {
+    expect(() =>
+      assertFreezeOwnership({ electiveBatchFacultyId: "ebf-1" })
+    ).not.toThrow();
+  });
+
+  it("throws when both ownership keys are set", () => {
+    expect(() =>
+      assertFreezeOwnership({
+        courseAssignmentId: "pc-1",
+        electiveBatchFacultyId: "ebf-1",
+      })
+    ).toThrow(
+      "Freeze must reference exactly one ownership path (courseAssignmentId XOR electiveBatchFacultyId)."
+    );
+  });
+
+  it("throws when neither ownership key is set", () => {
+    expect(() => assertFreezeOwnership({})).toThrow(
+      "Freeze must reference exactly one ownership path (courseAssignmentId XOR electiveBatchFacultyId)."
+    );
+  });
+
+  it("treats null and undefined keys as unset", () => {
+    expect(() => assertFreezeOwnership({ courseAssignmentId: null })).toThrow(
+      "Freeze must reference exactly one ownership path (courseAssignmentId XOR electiveBatchFacultyId)."
+    );
+    expect(() =>
+      assertFreezeOwnership({ courseAssignmentId: undefined })
+    ).toThrow(
+      "Freeze must reference exactly one ownership path (courseAssignmentId XOR electiveBatchFacultyId)."
+    );
+    expect(() =>
+      assertFreezeOwnership({
+        courseAssignmentId: null,
+        electiveBatchFacultyId: "ebf-1",
+      })
+    ).not.toThrow();
   });
 });

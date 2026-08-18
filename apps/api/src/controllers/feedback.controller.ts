@@ -128,11 +128,13 @@ export class FeedbackController {
         typeof req.query.semesterId === "string"
           ? req.query.semesterId
           : undefined;
+      const courseId =
+        typeof req.query.courseId === "string" ? req.query.courseId : undefined;
       reply(
         res,
         await FeedbackService.getFilterOptions(
           await resolveFeedbackScope(userId(req), role as never),
-          { academicTermId, semesterId }
+          { academicTermId, semesterId, courseId }
         ),
         "Feedback filters fetched successfully"
       );

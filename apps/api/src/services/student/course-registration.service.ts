@@ -396,7 +396,7 @@ export class CourseRegistration {
       const courses = await this.getApprovedInstanceCourses(student);
 
       const coreCourses = courses.filter(
-        (course) => course.courseType === "PC" || course.courseType === "NCMC"
+        (course) => course.courseType !== "PE" && course.courseType !== "OE"
       );
       const professionalElectives = courses.filter(
         (course) => course.courseType === "PE"

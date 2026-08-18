@@ -441,7 +441,7 @@ export class PeCapacityService {
       where: { id: courseId },
       select: { courseType: true, code: true },
     });
-    if (!course || course.courseType !== "PE") {
+    if (!course || (course.courseType !== "PE" && course.courseType !== "PW")) {
       return;
     }
     const [facultyOk, electiveOk] = await Promise.all([
@@ -450,7 +450,7 @@ export class PeCapacityService {
     ]);
     if (!facultyOk || !electiveOk) {
       throw new Error(
-        `PE course ${course.code} requires both faculty mapping and elective student mapping before attendance, marks, or hall tickets.`
+        `${course.courseType === "PW" ? "Project / Mini-Project (PW)" : "PE"} course ${course.code} requires both faculty mapping and student mapping before attendance, marks, or hall tickets.`
       );
     }
   }

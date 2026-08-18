@@ -16,6 +16,8 @@ type BonusAttendanceWindowWithRelations = {
   cycle: "PHYSICS" | "CHEMISTRY" | "NONE" | null;
   days: number;
   isOpen: boolean;
+  openedAt: Date | null;
+  expiresAt: Date | null;
   academicTerm: Pick<AcademicTerm, "type" | "year">;
   semester: Pick<Semester, "semesterNumber" | "programType">;
   department: Pick<Department, "id" | "code" | "name"> | null;
@@ -33,6 +35,8 @@ export interface BonusAttendanceWindowListItem {
   cycle: "PHYSICS" | "CHEMISTRY" | null;
   days: number;
   isOpen: boolean;
+  openedAt: Date | null;
+  expiresAt: Date | null;
   instanceName: string;
 }
 
@@ -74,6 +78,8 @@ export class BonusAttendanceWindowService {
           : null,
       days: window.days,
       isOpen: window.isOpen,
+      openedAt: window.openedAt,
+      expiresAt: window.expiresAt,
       instanceName: `${academicTermLabel} - Sem ${window.semester.semesterNumber} - ${BonusAttendanceWindowService.getWindowScopeLabel(window)}`,
     };
   }
@@ -240,9 +246,24 @@ export class BonusAttendanceWindowService {
     isOpen: boolean
   ): Promise<BaseResponse<BonusAttendanceWindowListItem>> {
     try {
+      const existing = await db.bonusAttendanceWindow.findUnique({
+        where: { id },
+        select: { id: true, days: true },
+      });
+
+      if (!existing) {
+        throw new Error("Bonus attendance window not found");
+      }
+
+      const now = new Date();
       const updated = await db.bonusAttendanceWindow.update({
         where: { id },
-        data: { isOpen },
+        data: {
+          isOpen,
+          ...(isOpen
+            ? { openedAt: now, expiresAt: this.addDays(now, existing.days) }
+            : { openedAt: null, expiresAt: null }),
+        },
         include: {
           academicTerm: { select: { type: true, year: true } },
           semester: { select: { semesterNumber: true, programType: true } },
@@ -256,6 +277,10 @@ export class BonusAttendanceWindowService {
         data: this.mapWindowToListItem(updated),
       };
     } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+
       logger.error("Failed to toggle bonus attendance window", error);
       throw new Error("Failed to toggle bonus attendance window");
     }
@@ -268,7 +293,7 @@ export class BonusAttendanceWindowService {
     try {
       const existing = await db.bonusAttendanceWindow.findUnique({
         where: { id },
-        select: { id: true },
+        select: { id: true, openedAt: true },
       });
 
       if (!existing) {
@@ -277,7 +302,12 @@ export class BonusAttendanceWindowService {
 
       const updated = await db.bonusAttendanceWindow.update({
         where: { id },
-        data: { days },
+        data: {
+          days,
+          ...(existing.openedAt
+            ? { expiresAt: this.addDays(existing.openedAt, days) }
+            : {}),
+        },
         include: {
           academicTerm: { select: { type: true, year: true } },
           semester: { select: { semesterNumber: true, programType: true } },
@@ -298,5 +328,11 @@ export class BonusAttendanceWindowService {
       logger.error("Failed to update bonus attendance window", error);
       throw new Error("Failed to update bonus attendance window");
     }
+  }
+
+  private static addDays(date: Date, days: number): Date {
+    const result = new Date(date);
+    result.setUTCDate(result.getUTCDate() + days);
+    return result;
   }
 }

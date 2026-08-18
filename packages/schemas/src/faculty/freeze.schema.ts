@@ -55,9 +55,19 @@ export const FreezeFiltersSchema = z.object({
   semesterId: z.string().uuid().optional(),
 });
 
-export const FreezeParamsSchema = z.object({
-  courseAssignmentId: z.string().uuid(),
-});
+export const FreezeParamsSchema = z
+  .object({
+    courseAssignmentId: z.string().uuid().optional(),
+    electiveBatchFacultyId: z.string().uuid().optional(),
+  })
+  .refine(
+    (val) =>
+      Boolean(val.courseAssignmentId) !== Boolean(val.electiveBatchFacultyId),
+    {
+      message:
+        "Exactly one of courseAssignmentId or electiveBatchFacultyId is required",
+    }
+  );
 
 export const FacultySectionQuerySchema = z.object({
   semesterId: z.string().uuid(),
@@ -83,7 +93,10 @@ export const FacultyAttendanceWindowFreezeSchema = z.object({
 });
 
 export const FacultyAttendanceWindowRowSchema = z.object({
-  courseAssignmentId: z.string().uuid(),
+  courseAssignmentId: z.string().uuid().nullable(),
+  electiveBatchFacultyId: z.string().uuid().nullable(),
+  isElective: z.boolean(),
+  domain: z.enum(["section", "group"]),
   courseCode: z.string(),
   courseName: z.string(),
   sectionId: z.string().uuid(),
@@ -97,6 +110,7 @@ export const FacultyBulkFreezeSchema = z.object({
   academicTermId: z.string().uuid(),
   semesterId: z.string().uuid(),
   sectionId: z.string().uuid().optional(),
+  electiveBatchId: z.string().uuid().optional(),
 });
 
 export type ToggleFreezeParamsType = z.infer<typeof ToggleFreezeParamsSchema>;

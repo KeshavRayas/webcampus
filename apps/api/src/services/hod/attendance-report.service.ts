@@ -1,6 +1,9 @@
 import { logger } from "@webcampus/common/logger";
 import { Cycle, db } from "@webcampus/db";
 import { BaseResponse } from "@webcampus/types/api";
+import { assertBatchBelongsToCourse } from "../shared/batch-managed";
+import { FACULTY_COURSE_STATUS } from "../shared/course-approval";
+import { isBatchManagedCourse } from "../shared/course-kind";
 
 export class HODAttendanceReportService {
   private static async resolveHODDepartment(userId: string) {
@@ -77,6 +80,45 @@ export class HODAttendanceReportService {
     cycle?: string
   ): Promise<BaseResponse<unknown>> {
     const hod = await this.resolveHODDepartment(userId);
+    const course = await db.course.findFirst({
+      where: { id: courseId, departmentId: hod.departmentId },
+      select: { courseType: true },
+    });
+    if (!course) throw new Error("Course not found in your department");
+
+    if (isBatchManagedCourse(course.courseType)) {
+      const electiveAssignments = await db.electiveBatchFaculty.findMany({
+        where: {
+          courseId,
+          course: {
+            approvalStatus: FACULTY_COURSE_STATUS,
+            semesterId,
+            departmentId: hod.departmentId,
+          },
+        },
+        select: { electiveBatch: { select: { id: true, name: true } } },
+        orderBy: { electiveBatch: { name: "asc" } },
+      });
+      const seen = new Set<string>();
+      const sections: { id: string; name: string; isElectiveBatch: boolean }[] =
+        [];
+      for (const assignment of electiveAssignments) {
+        if (!seen.has(assignment.electiveBatch.id)) {
+          seen.add(assignment.electiveBatch.id);
+          sections.push({
+            id: assignment.electiveBatch.id,
+            name: assignment.electiveBatch.name,
+            isElectiveBatch: true,
+          });
+        }
+      }
+      return {
+        status: "success",
+        message: "Sections fetched",
+        data: sections,
+      };
+    }
+
     const sections = await db.section.findMany({
       where: {
         departmentId: hod.departmentId,
@@ -108,24 +150,39 @@ export class HODAttendanceReportService {
       });
       if (!course) throw new Error("Course not found in your department");
 
+      const isBatchManaged = isBatchManagedCourse(course.courseType);
+      if (isBatchManaged) {
+        await assertBatchBelongsToCourse(courseId, sectionId);
+      }
+
       // Fetch Students
       // FIX 1: Filter batchId through the student relation, as StudentSection lacks a batchId field
-      const studentSections = await db.studentSection.findMany({
-        where: {
-          sectionId,
-          ...(batchId
-            ? { student: { batches: { some: { id: batchId } } } }
-            : {}),
-        },
-        include: { student: { include: { user: true } } },
-      });
+      const studentSections = isBatchManaged
+        ? await db.electiveStudentAssignment.findMany({
+            where: { courseId, electiveBatchId: sectionId },
+            include: { student: { include: { user: true } } },
+          })
+        : await db.studentSection.findMany({
+            where: {
+              sectionId,
+              ...(batchId
+                ? { student: { batches: { some: { id: batchId } } } }
+                : {}),
+            },
+            include: { student: { include: { user: true } } },
+          });
 
       // Fetch Sessions
       // FIX 2: Use db.classSession instead of db.attendanceSession
-      const sessions = await db.classSession.findMany({
-        where: { courseId, sectionId, ...(batchId ? { batchId } : {}) },
-        orderBy: { sessionDate: "asc" },
-      });
+      const sessions = isBatchManaged
+        ? await db.classSession.findMany({
+            where: { courseId, electiveBatchId: sectionId },
+            orderBy: { sessionDate: "asc" },
+          })
+        : await db.classSession.findMany({
+            where: { courseId, sectionId, ...(batchId ? { batchId } : {}) },
+            orderBy: { sessionDate: "asc" },
+          });
 
       // Fetch Attendance Records
       const attendanceRecords = await db.attendanceRecord.findMany({

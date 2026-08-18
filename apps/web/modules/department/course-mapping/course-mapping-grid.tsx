@@ -9,11 +9,24 @@ import {
 } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@webcampus/ui/components/select";
 import { Combobox } from "@webcampus/ui/molecules/combobox";
 import axios, { AxiosError } from "axios";
 import { CheckCircle2, Download, Loader2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import {
+  ALL_SECTIONS,
+  filterMappingsBySection,
+  getSectionOptions,
+  SectionFilterMapping,
+} from "./section-filter";
 
 interface SectionData {
   id: string;
@@ -42,11 +55,7 @@ type SectionMappingState = {
   labFacultyByBatch: { batchName: string; facultyId: string | null }[];
 };
 
-type PeBatchMappingState = {
-  electiveBatchId: string;
-  electiveBatchName: string;
-  facultyId: string | null;
-};
+type PeBatchMappingState = SectionFilterMapping;
 
 const DEFAULT_BATCHES = ["L1", "L2", "L3", "L4"];
 
@@ -61,7 +70,13 @@ export const CourseMappingGrid = ({
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isPe = course.courseType === "PE" || course.courseType === "OE";
+  const isBatchManaged =
+    course.courseType === "PE" ||
+    course.courseType === "OE" ||
+    course.courseType === "PW";
+  const isPw = course.courseType === "PW";
+  const isDepartmentWidePw =
+    isPw && course.projectGroupingScope === "DEPARTMENT_WIDE";
 
   const isVisuallyLocked = isLocked && !isAdmin;
   const isSuperEdit = isLocked && isAdmin;
@@ -87,7 +102,7 @@ export const CourseMappingGrid = ({
         ? res.data.data
         : [];
     },
-    enabled: !!semesterId && !isPe,
+    enabled: !!semesterId && !isBatchManaged,
   });
 
   const sections = useMemo(() => rawSections ?? [], [rawSections]);
@@ -147,12 +162,23 @@ export const CourseMappingGrid = ({
 
   const [mappings, setMappings] = useState<SectionMappingState[]>([]);
   const [peMappings, setPeMappings] = useState<PeBatchMappingState[]>([]);
+  const [sectionFilter, setSectionFilter] = useState(ALL_SECTIONS);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showReasonDialog, setShowReasonDialog] = useState(false);
 
+  const sectionOptions = useMemo(() => {
+    if (!isPw || course.projectGroupingScope !== "WITHIN_SECTION") return [];
+    return getSectionOptions(peMappings);
+  }, [isPw, course.projectGroupingScope, peMappings]);
+
+  const visiblePeMappings = useMemo(
+    () => filterMappingsBySection(peMappings, sectionFilter),
+    [peMappings, sectionFilter]
+  );
+
   useEffect(() => {
-    if (isPe) {
+    if (isBatchManaged) {
       if (loadingExisting) return;
       setPeMappings(
         existingMappings
@@ -160,7 +186,9 @@ export const CourseMappingGrid = ({
           .map((m) => ({
             electiveBatchId: m.electiveBatchId!,
             electiveBatchName: m.electiveBatchName ?? "",
-            facultyId: m.facultyId || null,
+            sectionName: m.sectionName ?? null,
+            facultyId: m.facultyId || m.proposedFacultyId || null,
+            proposedFacultyId: m.proposedFacultyId || null,
           }))
       );
       return;
@@ -194,7 +222,13 @@ export const CourseMappingGrid = ({
     });
 
     setMappings(initialState);
-  }, [isPe, sections, existingMappings, loadingSections, loadingExisting]);
+  }, [
+    isBatchManaged,
+    sections,
+    existingMappings,
+    loadingSections,
+    loadingExisting,
+  ]);
 
   const updateTheory = (sectionId: string, facultyId: string | null) => {
     setMappings((prev) =>
@@ -314,7 +348,7 @@ export const CourseMappingGrid = ({
 
   const saveMutation = useMutation({
     mutationFn: async (reason?: string) => {
-      const payload: Record<string, unknown> = isPe
+      const payload: Record<string, unknown> = isBatchManaged
         ? {
             courseId: course.id,
             semesterId,
@@ -382,7 +416,11 @@ export const CourseMappingGrid = ({
     saveMutation.mutate(reason);
   };
 
-  if (loadingFaculty || loadingExisting || (!isPe && loadingSections)) {
+  if (
+    loadingFaculty ||
+    loadingExisting ||
+    (!isBatchManaged && loadingSections)
+  ) {
     return (
       <div className="text-muted-foreground flex items-center justify-center p-12">
         <Loader2 className="size-8 animate-spin" />
@@ -390,63 +428,109 @@ export const CourseMappingGrid = ({
     );
   }
 
-  if (isPe) {
+  if (isBatchManaged) {
     return (
       <div className="space-y-6">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">
-            Elective Batch Faculty Assignments
+            {isPw
+              ? "Project Group Faculty Assignments"
+              : "Elective Batch Faculty Assignments"}
           </h3>
-          {lastSaved && (
-            <span className="text-muted-foreground flex items-center gap-1 text-xs">
-              <CheckCircle2 className="size-3.5" /> Saved {lastSaved}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {sectionOptions.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs">Section</span>
+                <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                  <SelectTrigger size="sm" className="min-w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_SECTIONS}>All Sections</SelectItem>
+                    {sectionOptions.map((sectionName) => (
+                      <SelectItem key={sectionName} value={sectionName}>
+                        {sectionName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {lastSaved && (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                <CheckCircle2 className="size-3.5" /> Saved {lastSaved}
+              </span>
+            )}
+          </div>
         </div>
+        {isDepartmentWidePw && (
+          <p className="text-muted-foreground text-xs">
+            Proposed balanced distribution shown below. Review or override any
+            assignment, then save Course Mapping to commit.
+          </p>
+        )}
         {peMappings.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No elective batches configured for this batch-managed course.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-muted border-b font-medium">
-                <tr>
-                  <th className="border-border min-w-40 border-r px-4 py-3">
-                    Elective Batch
-                  </th>
-                  <th className="px-4 py-3">Faculty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {peMappings.map((row) => (
-                  <tr key={row.electiveBatchId} className="border-t">
-                    <td className="border-border border-r px-4 py-3 font-medium">
-                      {row.electiveBatchName}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Combobox
-                        options={facultyOptions}
-                        value={row.facultyId}
-                        onValueChange={(value) =>
-                          setPeMappings((prev) =>
-                            prev.map((m) =>
-                              m.electiveBatchId === row.electiveBatchId
-                                ? { ...m, facultyId: value }
-                                : m
-                            )
-                          )
-                        }
-                        placeholder="Select faculty"
-                        disabled={isVisuallyLocked}
-                        className="min-w-50 w-full"
-                      />
-                    </td>
+          <>
+            {sectionOptions.length > 0 && sectionFilter !== ALL_SECTIONS && (
+              <p className="text-muted-foreground text-xs">
+                Showing {visiblePeMappings.length} of {peMappings.length} groups
+                for {sectionFilter}.
+              </p>
+            )}
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-muted border-b font-medium">
+                  <tr>
+                    <th className="border-border min-w-40 border-r px-4 py-3">
+                      {isPw ? "Group" : "Elective Batch"}
+                    </th>
+                    {isPw && (
+                      <th className="border-border border-r px-4 py-3">
+                        Section
+                      </th>
+                    )}
+                    <th className="px-4 py-3">Faculty</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {visiblePeMappings.map((row) => (
+                    <tr key={row.electiveBatchId} className="border-t">
+                      <td className="border-border border-r px-4 py-3 font-medium">
+                        {row.electiveBatchName}
+                      </td>
+                      {isPw && (
+                        <td className="border-border border-r px-4 py-3">
+                          {row.sectionName ?? "—"}
+                        </td>
+                      )}
+                      <td className="px-4 py-3">
+                        <Combobox
+                          options={facultyOptions}
+                          value={row.facultyId}
+                          onValueChange={(value) =>
+                            setPeMappings((prev) =>
+                              prev.map((m) =>
+                                m.electiveBatchId === row.electiveBatchId
+                                  ? { ...m, facultyId: value }
+                                  : m
+                              )
+                            )
+                          }
+                          placeholder="Select faculty"
+                          disabled={isVisuallyLocked}
+                          className="min-w-50 w-full"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
         <div className="flex justify-end">
           <Button
@@ -456,7 +540,7 @@ export const CourseMappingGrid = ({
             {saveMutation.isPending ? (
               <Loader2 className="mr-2 size-4 animate-spin" />
             ) : null}
-            Save Batch Mapping
+            Save {isPw ? "Project Group Mapping" : "Batch Mapping"}
           </Button>
         </div>
       </div>

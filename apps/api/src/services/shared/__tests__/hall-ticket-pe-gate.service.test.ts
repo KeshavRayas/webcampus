@@ -24,6 +24,14 @@ const dbMock = {
   semester: {
     findUnique: async () => ({ id: "sem-1" }),
   },
+  student: {
+    findUnique: async () => ({
+      id: "s1",
+      programType: "UG",
+      user: { name: "Alice", image: null },
+      admission: { photo: null },
+    }),
+  },
 };
 
 mock.module("@webcampus/db", () => ({ db: dbMock, Prisma: {} }));
@@ -86,7 +94,7 @@ describe("hall-ticket PE completeness gate", () => {
     expect(await hallTicketService.isStudentPeReady("s1", "term-1")).toBe(true);
   });
 
-  it("list excludes a frozen student whose PE mapping is incomplete", async () => {
+  it("list flags a frozen student whose PE mapping is incomplete with a block reason", async () => {
     eligMock.findEligibleStudents.mockImplementation(async () => [
       FROZEN_STUDENT,
     ]);
@@ -95,7 +103,10 @@ describe("hall-ticket PE completeness gate", () => {
     });
 
     const result = await hallTicketService.list({ academicTermId: "term-1" });
-    expect(result).toEqual([]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.studentId).toBe("s1");
+    expect(result[0]?.peReady).toBe(false);
+    expect(result[0]?.blockReason).toBe("PE course mapping is not complete");
   });
 
   it("list includes a frozen student when PE mapping is complete", async () => {
@@ -130,5 +141,64 @@ describe("hall-ticket PE completeness gate", () => {
     });
 
     expect(await hallTicketService.getData("s1", "term-1")).toBeNull();
+  });
+});
+
+describe("hall-ticket PW PDF gate", () => {
+  beforeEach(() => {
+    gateMock.mockImplementation(async () => {});
+    eligMock.getCourseEligibility.mockImplementation(
+      async () => FROZEN_STUDENT
+    );
+    dbMock.courseRegistration.findMany = async () => [
+      { courseId: "course-pe" },
+    ];
+  });
+
+  it("generatePdfHtml succeeds for a fully ready PW course", async () => {
+    dbMock.courseRegistration.findMany = async () => [
+      { courseId: "course-pw" },
+    ];
+
+    const html = await hallTicketService.generatePdfHtml("s1", "term-1");
+    expect(html).toContain("<html>");
+  });
+
+  it("generatePdfHtml is blocked when a PW course is not downstream ready", async () => {
+    dbMock.courseRegistration.findMany = async () => [
+      { courseId: "course-pw" },
+    ];
+    gateMock.mockImplementation(async () => {
+      throw new Error(GATE_MESSAGE);
+    });
+
+    expect(async () =>
+      hallTicketService.generatePdfHtml("s1", "term-1")
+    ).toThrow(GATE_MESSAGE);
+  });
+
+  it("generatePdfHtml still succeeds for a ready PE course", async () => {
+    const html = await hallTicketService.generatePdfHtml("s1", "term-1");
+    expect(html).toContain("<html>");
+  });
+
+  it("generatePdfHtml is blocked for an incomplete PE course", async () => {
+    gateMock.mockImplementation(async () => {
+      throw new Error(GATE_MESSAGE);
+    });
+
+    expect(async () =>
+      hallTicketService.generatePdfHtml("s1", "term-1")
+    ).toThrow(GATE_MESSAGE);
+  });
+
+  it("generatePdfHtml does not consult the downstream gate for OE", async () => {
+    dbMock.courseRegistration.findMany = async () => [];
+    gateMock.mockImplementation(async () => {
+      throw new Error(GATE_MESSAGE);
+    });
+
+    const html = await hallTicketService.generatePdfHtml("s1", "term-1");
+    expect(html).toContain("<html>");
   });
 });

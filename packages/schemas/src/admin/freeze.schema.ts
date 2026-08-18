@@ -1,24 +1,33 @@
 import { z } from "zod";
 
-export const AdminFreezeParamsSchema = z.object({
-  courseAssignmentId: z.string().uuid(),
-});
+const freezeTarget = z
+  .object({
+    courseAssignmentId: z.string().uuid().optional(),
+    electiveBatchFacultyId: z.string().uuid().optional(),
+  })
+  .refine(
+    (val) =>
+      Boolean(val.courseAssignmentId) !== Boolean(val.electiveBatchFacultyId),
+    {
+      message:
+        "Exactly one of courseAssignmentId or electiveBatchFacultyId is required",
+    }
+  );
 
-export const AdminUnfreezeParamsSchema = z.object({
-  courseAssignmentId: z.string().uuid(),
-});
+export const AdminFreezeParamsSchema = freezeTarget;
 
-export const AdminBulkFreezeSchema = z.object({
+export const AdminUnfreezeParamsSchema = freezeTarget;
+
+const adminBulkFreezeFields = {
   departmentId: z.string().uuid().optional(),
   academicTermId: z.string().uuid(),
   semesterId: z.string().uuid(),
-});
+  targets: z.array(freezeTarget).min(1),
+};
 
-export const AdminBulkUnfreezeSchema = z.object({
-  departmentId: z.string().uuid().optional(),
-  academicTermId: z.string().uuid(),
-  semesterId: z.string().uuid(),
-});
+export const AdminBulkFreezeSchema = z.object(adminBulkFreezeFields);
+
+export const AdminBulkUnfreezeSchema = z.object(adminBulkFreezeFields);
 
 export const AdminAttendanceWindowFiltersSchema = z.object({
   departmentId: z.string().uuid().optional(),
@@ -42,7 +51,9 @@ export const AdminAttendanceWindowFreezeSchema = z.object({
 });
 
 export const AdminAttendanceWindowRowSchema = z.object({
-  courseAssignmentId: z.string().uuid(),
+  courseAssignmentId: z.string().uuid().nullable(),
+  electiveBatchFacultyId: z.string().uuid().nullable(),
+  isElective: z.boolean(),
   courseCode: z.string(),
   courseName: z.string(),
   department: z.string(),

@@ -179,12 +179,24 @@ export const CreateOrOpenFacultyAttendanceSessionSchema = z
     }
   });
 
-export const FacultyAttendanceSessionStudentsQuerySchema = z.object({
-  courseId: z.uuid("Invalid course ID"),
-  sectionId: z.uuid("Invalid section ID").optional(),
-  batchId: z.uuid("Invalid batch ID").optional(),
-  electiveBatchId: z.uuid("Invalid elective batch ID").optional(),
-});
+export const FacultyAttendanceSessionStudentsQuerySchema = z
+  .object({
+    courseId: z.uuid("Invalid course ID"),
+    sectionId: z.uuid("Invalid section ID").optional(),
+    batchId: z.uuid("Invalid batch ID").optional(),
+    electiveBatchId: z.uuid("Invalid elective batch ID").optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasSection = Boolean(data.sectionId);
+    const hasElectiveBatch = Boolean(data.electiveBatchId);
+    if (hasSection && hasElectiveBatch) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Provide either sectionId (for section-based courses) or electiveBatchId (for Professional/Open Electives), not both",
+      });
+    }
+  });
 
 export const FacultyAttendanceSessionDetailQuerySchema = z.object({
   sessionId: z.uuid("Invalid session ID"),
@@ -245,11 +257,38 @@ export const FacultyAttendanceFilterOptionsResponseSchema = z.object({
   ),
 });
 
-export const FacultyAttendanceDetailedReportQuerySchema = z.object({
-  courseId: z.uuid("Invalid course ID"),
-  sectionId: z.uuid("Invalid section ID"),
-  batchId: z.uuid("Invalid batch ID").optional(),
-});
+export const FacultyAttendanceDetailedReportQuerySchema = z
+  .object({
+    courseId: z.uuid("Invalid course ID"),
+    sectionId: z.uuid("Invalid section ID").optional(),
+    batchId: z.uuid("Invalid batch ID").optional(),
+    electiveBatchId: z.uuid("Invalid elective batch ID").optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasSection = Boolean(data.sectionId);
+    const hasElectiveBatch = Boolean(data.electiveBatchId);
+    if (hasSection && hasElectiveBatch) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Provide either sectionId (for section-based courses) or electiveBatchId (for Professional/Open Electives), not both",
+      });
+    }
+    if (!hasSection && !hasElectiveBatch) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Either sectionId or electiveBatchId is required for the detailed attendance report",
+      });
+    }
+    if (data.batchId && hasElectiveBatch) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "batchId (lab) and electiveBatchId cannot be combined for the detailed attendance report",
+      });
+    }
+  });
 
 export const FacultyAttendanceSessionResponseSchema = z.object({
   id: z.string(),

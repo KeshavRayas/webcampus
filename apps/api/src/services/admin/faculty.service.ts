@@ -33,6 +33,35 @@ export class AdminFacultyService {
     let uploadedImageUrl: string | null = null;
 
     try {
+      const existingEmailUser = await db.user.findFirst({
+        where: { email: request.email.toLowerCase() },
+        select: { id: true },
+      });
+      if (existingEmailUser) {
+        throw new Error("A user with this email already exists");
+      }
+
+      const normalizedUsername = request.username?.trim().toLowerCase();
+      if (normalizedUsername) {
+        const existingUsernameUser = await db.user.findFirst({
+          where: { username: normalizedUsername },
+          select: { id: true },
+        });
+        if (existingUsernameUser) {
+          throw new Error("A user with this username already exists");
+        }
+      }
+
+      if (request.employeeId) {
+        const existingEmployeeIdFaculty = await db.faculty.findFirst({
+          where: { employeeId: request.employeeId },
+          select: { id: true },
+        });
+        if (existingEmployeeIdFaculty) {
+          throw new Error("A faculty with this employee ID already exists");
+        }
+      }
+
       // 1. Create the global auth user
       const userService = new UserService({
         request: {
@@ -130,22 +159,10 @@ export class AdminFacultyService {
       }
 
       if (createdAuthUserId) {
-        try {
-          await auth.api.removeUser({
-            headers: fromNodeHeaders(request.headers),
-            body: {
-              userId: createdAuthUserId,
-            },
-          });
-        } catch (cleanupError) {
-          logger.warn(
-            "Failed to clean up auth user after faculty create failure",
-            {
-              createdAuthUserId,
-              cleanupError,
-            }
-          );
-        }
+        await AdminFacultyService.cleanupCreatedAuthUser(
+          createdAuthUserId,
+          request.headers
+        );
       }
 
       if (
@@ -155,7 +172,43 @@ export class AdminFacultyService {
         throw new Error("Faculty already exists");
       }
       logger.error("Failed to create faculty", error);
+      if (error instanceof Error) {
+        throw new Error(error.message);
+      }
       throw new Error("Failed to create faculty");
+    }
+  }
+
+  private static async cleanupCreatedAuthUser(
+    userId: string,
+    headers: IncomingHttpHeaders
+  ): Promise<void> {
+    try {
+      await auth.api.removeUser({
+        headers: fromNodeHeaders(headers),
+        body: {
+          userId,
+        },
+      });
+    } catch (removeUserError) {
+      logger.warn(
+        "auth.api.removeUser failed during cleanup, falling back to db.user.delete",
+        {
+          userId,
+          removeUserError,
+        }
+      );
+      try {
+        await db.user.delete({ where: { id: userId } });
+      } catch (deleteError) {
+        logger.warn(
+          "Failed to clean up auth user after faculty create failure",
+          {
+            userId,
+            deleteError,
+          }
+        );
+      }
     }
   }
 
@@ -214,6 +267,7 @@ export class AdminFacultyService {
             select: {
               id: true,
               image: true,
+              name: true,
               email: true,
               username: true,
               name: true,

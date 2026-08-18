@@ -342,7 +342,7 @@ export const AttendanceWindowsView = () => {
                   <TableBody>
                     {rows.map((row) => (
                       <TableRow
-                        key={`${sectionName}-${row.courseAssignmentId}`}
+                        key={`${sectionName}-${row.courseAssignmentId ?? row.electiveBatchFacultyId}`}
                       >
                         <TableCell className="font-medium">
                           <div className="space-y-1">
@@ -355,7 +355,10 @@ export const AttendanceWindowsView = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">{row.sectionName}</div>
+                          <div className="text-sm">
+                            {row.sectionName}
+                            {row.isElective ? " (Elective)" : ""}
+                          </div>
                           <div className="text-muted-foreground text-xs">
                             {row.assignmentType}
                             {row.batchName
@@ -386,7 +389,17 @@ export const AttendanceWindowsView = () => {
                               isRowMutating
                             }
                             onClick={() => {
-                              freezeAssignment(row.courseAssignmentId);
+                              freezeAssignment(
+                                row.courseAssignmentId
+                                  ? {
+                                      courseAssignmentId:
+                                        row.courseAssignmentId,
+                                    }
+                                  : {
+                                      electiveBatchFacultyId:
+                                        row.electiveBatchFacultyId,
+                                    }
+                              );
                             }}
                           >
                             {row.freeze.displayState === "OPEN"

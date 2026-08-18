@@ -21,6 +21,7 @@ import { Router } from "express";
 import { getSections } from "../../controllers/admin/section.controller";
 import facultyRouter from "./faculty.router";
 import HallTicketRouter from "./hall-ticket.router";
+import ProjectMappingRouter from "./project-mapping.router";
 
 const router: Router = Router();
 
@@ -46,6 +47,8 @@ router.use("/course", AdminCourseRouter);
 router.use("/course-assignment", AdminCourseAssignmentRouter);
 
 router.use("/elective-mapping", ElectiveMappingRouter);
+
+router.use("/project-mapping", ProjectMappingRouter);
 
 router.use("/audit", AuditRouter);
 

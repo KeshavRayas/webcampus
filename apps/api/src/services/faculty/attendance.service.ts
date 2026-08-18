@@ -283,20 +283,25 @@ export class Attendance {
 
   static async getDetailedReport(
     courseId: string,
-    sectionId: string,
-    batchId?: string
+    sectionId?: string,
+    batchId?: string,
+    electiveBatchId?: string
   ): Promise<BaseResponse<FacultyAttendanceDetailedReportDTO>> {
     try {
       const sessionWhere: {
         courseId: string;
-        sectionId: string;
+        sectionId?: string;
         batchId?: string;
+        electiveBatchId?: string;
       } = {
         courseId,
-        sectionId,
+        ...(sectionId ? { sectionId } : {}),
       };
       if (batchId) {
         sessionWhere.batchId = batchId;
+      }
+      if (electiveBatchId) {
+        sessionWhere.electiveBatchId = electiveBatchId;
       }
 
       const sessions = await db.classSession.findMany({
@@ -317,33 +322,65 @@ export class Attendance {
       });
       if (!course) throw new Error("Course not found");
 
-      const registrations = await db.courseRegistration.findMany({
-        where: buildRegistrationWhere({
-          courseId,
-          semesterId: course.semesterId,
-          academicTermId: course.semester.academicTermId,
-          sectionId,
-          batchId: batchId ?? undefined,
-        }),
-        orderBy: {
-          student: {
-            usn: "asc",
+      let registrations: Array<{
+        student: {
+          id: string;
+          usn: string;
+          user: { name: string };
+        };
+      }> = [];
+      if (electiveBatchId) {
+        const assignments = await db.electiveStudentAssignment.findMany({
+          where: { courseId, electiveBatchId },
+          orderBy: {
+            student: {
+              usn: "asc",
+            },
           },
-        },
-        select: {
-          student: {
-            select: {
-              id: true,
-              usn: true,
-              user: {
-                select: {
-                  name: true,
+          select: {
+            student: {
+              select: {
+                id: true,
+                usn: true,
+                user: {
+                  select: {
+                    name: true,
+                  },
                 },
               },
             },
           },
-        },
-      });
+        });
+        registrations = assignments.map((a) => ({ student: a.student }));
+      } else {
+        registrations = await db.courseRegistration.findMany({
+          where: buildRegistrationWhere({
+            courseId,
+            semesterId: course.semesterId,
+            academicTermId: course.semester.academicTermId,
+            sectionId: sectionId ?? "",
+            batchId: batchId ?? undefined,
+          }),
+          orderBy: {
+            student: {
+              usn: "asc",
+            },
+          },
+          select: {
+            student: {
+              select: {
+                id: true,
+                usn: true,
+                user: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
 
       if (!sessions.length || !registrations.length) {
         return {

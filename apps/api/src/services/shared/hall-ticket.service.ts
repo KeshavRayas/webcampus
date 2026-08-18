@@ -91,7 +91,11 @@ export const hallTicketService = {
     academicTermId: string
   ): Promise<string[]> {
     const regs = await db.courseRegistration.findMany({
-      where: { studentId, academicTermId, course: { courseType: "PE" } },
+      where: {
+        studentId,
+        academicTermId,
+        course: { courseType: { in: ["PE", "PW"] } },
+      },
       select: { courseId: true },
     });
     return regs.map((r) => r.courseId);
@@ -131,6 +135,7 @@ export const hallTicketService = {
       academicTermId?: string;
       semesterId?: string;
       sectionId?: string;
+      cycle?: "PHYSICS" | "CHEMISTRY";
       search?: string;
     } = {}
   ): Promise<HallTicketWithAcademics[]> {
@@ -138,7 +143,7 @@ export const hallTicketService = {
     if (!academicTermId) return [];
 
     logger.info(
-      `[HallTicket] list filters: academicTermId=${academicTermId} semesterId=${rest.semesterId ?? "(none)"} departmentId=${rest.departmentId ?? "(none)"} sectionId=${rest.sectionId ?? "(none)"} search=${rest.search ?? "(none)"}`
+      `[HallTicket] list filters: academicTermId=${academicTermId} semesterId=${rest.semesterId ?? "(none)"} departmentId=${rest.departmentId ?? "(none)"} sectionId=${rest.sectionId ?? "(none)"} cycle=${rest.cycle ?? "(none)"} search=${rest.search ?? "(none)"}`
     );
 
     const eligibleStudents = await academicEligibility.findEligibleStudents({
@@ -422,7 +427,7 @@ export const hallTicketService = {
       where: {
         studentId,
         academicTermId,
-        course: { courseType: "PE" },
+        course: { courseType: { in: ["PE", "PW"] } },
       },
       select: { courseId: true },
     });

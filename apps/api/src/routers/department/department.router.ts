@@ -4,6 +4,7 @@ import ElectiveMappingRouter from "@webcampus/api/src/routers/department/electiv
 import DepartmentFacultyRouter from "@webcampus/api/src/routers/department/faculty.router";
 import DepartmentHODRouter from "@webcampus/api/src/routers/department/hod.router";
 import DepartmentProctorRouter from "@webcampus/api/src/routers/department/proctor.router";
+import ProjectMappingRouter from "@webcampus/api/src/routers/department/project-mapping.router";
 import DepartmentSectionAssignmentRouter from "@webcampus/api/src/routers/department/section-assignment.router";
 import DepartmentSectionRouter from "@webcampus/api/src/routers/department/section.router";
 import DepartmentStudentRouter from "@webcampus/api/src/routers/department/student.router";
@@ -16,6 +17,8 @@ router.use("/course", DepartmentCourseRouter);
 router.use("/course-assignment", DepartmentCourseAssignmentRouter);
 
 router.use("/elective-mapping", ElectiveMappingRouter);
+
+router.use("/project-mapping", ProjectMappingRouter);
 
 router.use("/faculty", DepartmentFacultyRouter);
 

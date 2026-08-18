@@ -4,6 +4,7 @@ import {
   findCourseAssignments,
   type CourseAssignmentWithFreeze,
 } from "./course-assignment.service";
+import { isBatchManagedCourse } from "./course-kind";
 
 export type CourseEligibilityItem = {
   courseAssignmentId: string;
@@ -40,6 +41,7 @@ export type EligibilityFilters = {
   semesterId?: string;
   departmentId?: string;
   sectionId?: string;
+  cycle?: "PHYSICS" | "CHEMISTRY";
   search?: string;
 };
 
@@ -125,9 +127,13 @@ function buildCourseReason(
     attendanceEligible: boolean;
     eligible: boolean;
   },
-  freeze: FreezeFlags | null
+  freeze: FreezeFlags | null,
+  batchManaged: boolean
 ): string | null {
   if (!eligibility.isFrozen) {
+    if (batchManaged) {
+      return "Elective batch not assigned or no faculty mapped to batch";
+    }
     return freeze
       ? "Not frozen by faculty/HOD/admin"
       : "No course assignment or freeze record found";
@@ -183,7 +189,7 @@ export const academicEligibility = {
 
     const courseIds = registrations.map((r) => r.courseId);
 
-    const [marks, theoryAttendance] = await Promise.all([
+    const [marks, theoryAttendance, electiveAssignments] = await Promise.all([
       db.mark.findMany({
         where: { studentId, courseId: { in: courseIds } },
         select: { courseId: true, cieTotal: true, status: true },
@@ -192,11 +198,23 @@ export const academicEligibility = {
         where: { studentId, courseId: { in: courseIds }, batchId: null },
         select: { courseId: true, percentage: true, condonationStatus: true },
       }),
+      db.electiveStudentAssignment.findMany({
+        where: { studentId, courseId: { in: courseIds } },
+        select: {
+          courseId: true,
+          electiveBatch: {
+            select: { facultyAssignment: { select: { facultyId: true } } },
+          },
+        },
+      }),
     ]);
 
     const marksMap = new Map(marks.map((m) => [m.courseId, m]));
     const theoryAttendanceMap = new Map(
       theoryAttendance.map((a) => [a.courseId, a])
+    );
+    const electiveAssignmentMap = new Map(
+      electiveAssignments.map((e) => [e.courseId, e])
     );
     const batchAttendanceMap = await this.buildStudentBatchAttendance(
       studentId,
@@ -276,7 +294,17 @@ export const academicEligibility = {
         sectionIdFor(reg.semesterId),
         reg.courseId
       );
-      const freeze = assignment?.freezes ?? null;
+      const batchManaged = isBatchManagedCourse(reg.course.courseType);
+      let freeze: FreezeFlags | null = null;
+      if (batchManaged) {
+        const esa = electiveAssignmentMap.get(reg.courseId);
+        freeze =
+          esa && esa.electiveBatch.facultyAssignment
+            ? { facultyFrozen: true, hodFrozen: true, adminFrozen: true }
+            : null;
+      } else {
+        freeze = assignment?.freezes ?? null;
+      }
       const eligibility = computeCourseEligibility(mark, attendance, freeze);
 
       const actualAssignmentId = assignment?.id ?? reg.id;
@@ -292,7 +320,7 @@ export const academicEligibility = {
         cieTotal: mark?.cieTotal ?? null,
         attendancePercentage: attendance?.percentage ?? null,
         ...eligibility,
-        reason: buildCourseReason(eligibility, freeze),
+        reason: buildCourseReason(eligibility, freeze, batchManaged),
       });
     }
 
@@ -317,16 +345,25 @@ export const academicEligibility = {
   async findEligibleStudents(
     filters: EligibilityFilters
   ): Promise<StudentEligibility[]> {
-    const { academicTermId, semesterId, departmentId, sectionId, search } =
-      filters;
+    const {
+      academicTermId,
+      semesterId,
+      departmentId,
+      sectionId,
+      cycle,
+      search,
+    } = filters;
 
     const whereRegistrations: Record<string, unknown> = { academicTermId };
     if (semesterId) whereRegistrations.semesterId = semesterId;
 
     const studentWhere: Record<string, unknown> = {};
     if (departmentId) studentWhere.department = { id: departmentId };
-    if (sectionId) {
-      studentWhere.studentSections = { some: { sectionId } };
+    const sectionScope: Record<string, unknown> = {};
+    if (sectionId) sectionScope.sectionId = sectionId;
+    if (cycle) sectionScope.section = { cycle };
+    if (Object.keys(sectionScope).length > 0) {
+      studentWhere.studentSections = { some: sectionScope };
     }
     if (search) {
       studentWhere.OR = [
@@ -380,6 +417,20 @@ export const academicEligibility = {
       studentIds,
       allCourseIds,
       theoryAttendanceMap
+    );
+
+    const electiveAssignments = await db.electiveStudentAssignment.findMany({
+      where: { studentId: { in: studentIds }, courseId: { in: allCourseIds } },
+      select: {
+        studentId: true,
+        courseId: true,
+        electiveBatch: {
+          select: { facultyAssignment: { select: { facultyId: true } } },
+        },
+      },
+    });
+    const electiveAssignmentMap = new Map(
+      electiveAssignments.map((e) => [`${e.studentId}_${e.courseId}`, e])
     );
 
     const studentSectionInfo = new Map<
@@ -481,7 +532,17 @@ export const academicEligibility = {
             assignmentMap.get(key) ?? batchAssignmentMap.get(key) ?? null;
         }
 
-        const freeze = assignment?.freezes ?? null;
+        const batchManaged = isBatchManagedCourse(reg.course.courseType);
+        let freeze: FreezeFlags | null = null;
+        if (batchManaged) {
+          const esa = electiveAssignmentMap.get(`${sid}_${reg.courseId}`);
+          freeze =
+            esa && esa.electiveBatch.facultyAssignment
+              ? { facultyFrozen: true, hodFrozen: true, adminFrozen: true }
+              : null;
+        } else {
+          freeze = assignment?.freezes ?? null;
+        }
         const eligibility = computeCourseEligibility(mark, attendance, freeze);
         const actualAssignmentId = assignment?.id ?? reg.id;
 
@@ -497,7 +558,7 @@ export const academicEligibility = {
           cieTotal: mark?.cieTotal ?? null,
           attendancePercentage: attendance?.percentage ?? null,
           ...eligibility,
-          reason: buildCourseReason(eligibility, freeze),
+          reason: buildCourseReason(eligibility, freeze, batchManaged),
         });
       }
 

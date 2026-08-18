@@ -6,6 +6,10 @@ export const coeService = {
       where: {
         hodFrozen: true,
         adminFrozen: true,
+        OR: [
+          { courseAssignmentId: { not: null } },
+          { electiveBatchFacultyId: { not: null } },
+        ],
       },
       include: {
         courseAssignment: {
@@ -17,6 +21,15 @@ export const coeService = {
             section: true,
           },
         },
+        electiveBatchFaculty: {
+          include: {
+            course: true,
+            faculty: {
+              include: { user: true },
+            },
+            electiveBatch: true,
+          },
+        },
       },
     });
   },
@@ -25,12 +38,22 @@ export const coeService = {
     return db.freeze.findMany({
       where: {
         finalFrozen: true,
+        OR: [
+          { courseAssignmentId: { not: null } },
+          { electiveBatchFacultyId: { not: null } },
+        ],
       },
       include: {
         courseAssignment: {
           include: {
             course: true,
             section: true,
+          },
+        },
+        electiveBatchFaculty: {
+          include: {
+            course: true,
+            electiveBatch: true,
           },
         },
       },
