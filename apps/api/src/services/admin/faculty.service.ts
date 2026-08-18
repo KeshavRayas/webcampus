@@ -33,6 +33,35 @@ export class AdminFacultyService {
     let uploadedImageUrl: string | null = null;
 
     try {
+      const existingEmailUser = await db.user.findFirst({
+        where: { email: request.email.toLowerCase() },
+        select: { id: true },
+      });
+      if (existingEmailUser) {
+        throw new Error("A user with this email already exists");
+      }
+
+      const normalizedUsername = request.username?.trim().toLowerCase();
+      if (normalizedUsername) {
+        const existingUsernameUser = await db.user.findFirst({
+          where: { username: normalizedUsername },
+          select: { id: true },
+        });
+        if (existingUsernameUser) {
+          throw new Error("A user with this username already exists");
+        }
+      }
+
+      if (request.employeeId) {
+        const existingEmployeeIdFaculty = await db.faculty.findFirst({
+          where: { employeeId: request.employeeId },
+          select: { id: true },
+        });
+        if (existingEmployeeIdFaculty) {
+          throw new Error("A faculty with this employee ID already exists");
+        }
+      }
+
       // 1. Create the global auth user
       const userService = new UserService({
         request: {
@@ -53,12 +82,18 @@ export class AdminFacultyService {
 
       createdAuthUserId = authUser.data.id;
 
-      const { generateFileName, uploadToS3 } = await import(
+      const department = await db.department.findUnique({
+        where: { id: request.departmentId },
+        select: { name: true },
+      });
+      const deptName = department?.name ?? "unknown";
+
+      const { generateFileName, uploadToS3, sanitizeForS3 } = await import(
         "@webcampus/api/src/utils/s3"
       );
       const imageFileName = generateFileName(
         request.imageFile.originalname,
-        "faculty_image_"
+        `faculty_${sanitizeForS3(deptName)}_${sanitizeForS3(request.name)}_`
       );
       const uploadResult = await uploadToS3(
         request.imageFile.buffer,
@@ -124,22 +159,10 @@ export class AdminFacultyService {
       }
 
       if (createdAuthUserId) {
-        try {
-          await auth.api.removeUser({
-            headers: fromNodeHeaders(request.headers),
-            body: {
-              userId: createdAuthUserId,
-            },
-          });
-        } catch (cleanupError) {
-          logger.warn(
-            "Failed to clean up auth user after faculty create failure",
-            {
-              createdAuthUserId,
-              cleanupError,
-            }
-          );
-        }
+        await AdminFacultyService.cleanupCreatedAuthUser(
+          createdAuthUserId,
+          request.headers
+        );
       }
 
       if (
@@ -149,7 +172,43 @@ export class AdminFacultyService {
         throw new Error("Faculty already exists");
       }
       logger.error("Failed to create faculty", error);
+      if (error instanceof Error) {
+        throw new Error(error.message);
+      }
       throw new Error("Failed to create faculty");
+    }
+  }
+
+  private static async cleanupCreatedAuthUser(
+    userId: string,
+    headers: IncomingHttpHeaders
+  ): Promise<void> {
+    try {
+      await auth.api.removeUser({
+        headers: fromNodeHeaders(headers),
+        body: {
+          userId,
+        },
+      });
+    } catch (removeUserError) {
+      logger.warn(
+        "auth.api.removeUser failed during cleanup, falling back to db.user.delete",
+        {
+          userId,
+          removeUserError,
+        }
+      );
+      try {
+        await db.user.delete({ where: { id: userId } });
+      } catch (deleteError) {
+        logger.warn(
+          "Failed to clean up auth user after faculty create failure",
+          {
+            userId,
+            deleteError,
+          }
+        );
+      }
     }
   }
 
@@ -208,6 +267,9 @@ export class AdminFacultyService {
             select: {
               id: true,
               image: true,
+              name: true,
+              email: true,
+              username: true,
             },
           },
         },
@@ -215,36 +277,6 @@ export class AdminFacultyService {
 
       if (!existingFaculty) {
         throw new Error("Faculty not found");
-      }
-
-      if (imageFile) {
-        const { deleteFromS3, generateFileName, uploadToS3 } = await import(
-          "@webcampus/api/src/utils/s3"
-        );
-        const nextImageFileName = generateFileName(
-          imageFile.originalname,
-          "faculty_image_"
-        );
-        const uploadResult = await uploadToS3(
-          imageFile.buffer,
-          nextImageFileName,
-          imageFile.mimetype
-        );
-
-        if (!uploadResult.success || !uploadResult.url) {
-          throw new Error("Failed to upload faculty image");
-        }
-
-        if (existingFaculty.user.image) {
-          await deleteFromS3(existingFaculty.user.image);
-        }
-
-        await db.user.update({
-          where: { id: existingFaculty.user.id },
-          data: {
-            image: uploadResult.url,
-          },
-        });
       }
 
       const nextUserData: {
@@ -266,11 +298,33 @@ export class AdminFacultyService {
         nextUserData.displayUsername = data.displayUsername;
       }
 
-      if (Object.keys(nextUserData).length > 0) {
-        await db.user.update({
-          where: { id: existingFaculty.user.id },
-          data: nextUserData,
+      if (
+        data.email !== undefined &&
+        data.email !== existingFaculty.user.email
+      ) {
+        const existingEmailUser = await db.user.findFirst({
+          where: { email: data.email, NOT: { id: existingFaculty.user.id } },
+          select: { id: true },
         });
+        if (existingEmailUser) {
+          throw new Error("A user with this email already exists");
+        }
+      }
+
+      if (
+        data.username !== undefined &&
+        data.username !== existingFaculty.user.username
+      ) {
+        const existingUsernameUser = await db.user.findFirst({
+          where: {
+            username: data.username,
+            NOT: { id: existingFaculty.user.id },
+          },
+          select: { id: true },
+        });
+        if (existingUsernameUser) {
+          throw new Error("A user with this username already exists");
+        }
       }
 
       const facultyData = { ...data } as Record<string, unknown>;
@@ -279,12 +333,92 @@ export class AdminFacultyService {
       delete facultyData.username;
       delete facultyData.displayUsername;
 
-      const faculty = await db.faculty.update({
-        where: { id },
-        data: facultyData,
+      if (
+        data.employeeId !== undefined &&
+        data.employeeId !== existingFaculty.employeeId
+      ) {
+        const existingEmployeeIdFaculty = await db.faculty.findFirst({
+          where: { employeeId: data.employeeId, NOT: { id } },
+          select: { id: true },
+        });
+        if (existingEmployeeIdFaculty) {
+          throw new Error("A faculty with this employee ID already exists");
+        }
+      }
+
+      let nextImageUrl: string | null = null;
+      if (imageFile) {
+        const department = await db.department.findUnique({
+          where: { id: existingFaculty.departmentId },
+          select: { name: true },
+        });
+        const deptName = department?.name ?? "unknown";
+
+        const { deleteFromS3, generateFileName, uploadToS3, sanitizeForS3 } =
+          await import("@webcampus/api/src/utils/s3");
+        const nextImageFileName = generateFileName(
+          imageFile.originalname,
+          `faculty_${sanitizeForS3(deptName)}_${sanitizeForS3(existingFaculty.user.name)}_`
+        );
+        const uploadResult = await uploadToS3(
+          imageFile.buffer,
+          nextImageFileName,
+          imageFile.mimetype
+        );
+
+        if (!uploadResult.success || !uploadResult.url) {
+          throw new Error("Failed to upload faculty image");
+        }
+
+        nextImageUrl = uploadResult.url;
+
+        if (existingFaculty.user.image) {
+          await deleteFromS3(existingFaculty.user.image);
+        }
+      }
+
+      let updatedFaculty: unknown;
+      await db.$transaction(async (tx) => {
+        if (nextImageUrl) {
+          await tx.user.update({
+            where: { id: existingFaculty.user.id },
+            data: {
+              image: nextImageUrl,
+            },
+          });
+        }
+
+        if (Object.keys(nextUserData).length > 0) {
+          await tx.user.update({
+            where: { id: existingFaculty.user.id },
+            data: nextUserData,
+          });
+        }
+
+        updatedFaculty = await tx.faculty.update({
+          where: { id },
+          data: facultyData,
+        });
       });
-      return { status: "success", message: "Faculty updated", data: faculty };
+
+      return {
+        status: "success",
+        message: "Faculty updated",
+        data: updatedFaculty,
+      };
     } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2002") {
+          throw new Error("Email, username, or employee ID is already in use");
+        }
+        if (error.code === "P2025") {
+          throw new Error("Faculty not found");
+        }
+      }
+      if (error instanceof Error) {
+        logger.error("Failed to update faculty", error);
+        throw new Error(error.message);
+      }
       logger.error("Failed to update faculty", error);
       throw new Error("Failed to update faculty");
     }
@@ -295,11 +429,17 @@ export class AdminFacultyService {
       // 1. Fetch the faculty record to check for HOD linkage and get userId
       const faculty = await db.faculty.findUnique({
         where: { id },
-        include: { hod: true },
+        include: { hod: true, user: { select: { image: true } } },
       });
 
       if (!faculty) {
         throw new Error("Faculty member not found");
+      }
+
+      // --- CLEANUP S3 ON DELETE ---
+      if (faculty.user.image) {
+        const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+        await deleteFromS3(faculty.user.image);
       }
 
       // 2. Safety Check: Prevent deletion if they are an active HOD

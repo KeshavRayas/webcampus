@@ -42,7 +42,7 @@ import {
   TabsTrigger,
 } from "@webcampus/ui/components/tabs";
 import { MoreHorizontal } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
@@ -78,6 +78,23 @@ const hodCreateSchema = z.object({
 
 type EditFormOutput = z.output<typeof editSchema>;
 
+const getEditFormDefaults = (
+  faculty: AdminFacultyResponse
+): EditFormOutput => ({
+  name: faculty.user.name || "",
+  email: faculty.user.email || "",
+  designation: faculty.designation as z.infer<typeof DesignationEnum>,
+  username: faculty.user.username || "",
+  displayUsername: faculty.user.displayUsername || faculty.user.name || "",
+  employeeId: faculty.employeeId || "",
+  staffType: faculty.staffType as z.infer<typeof StaffTypeEnum> | undefined,
+  dob: faculty.dob ? new Date(faculty.dob) : undefined,
+  dateOfJoining: faculty.dateOfJoining
+    ? new Date(faculty.dateOfJoining)
+    : undefined,
+  phoneNumber: faculty.phoneNumber || "",
+});
+
 export const AdminFacultyActions = ({
   faculty,
 }: {
@@ -110,21 +127,14 @@ export const AdminFacultyActions = ({
 
   const editForm = useForm<EditFormOutput>({
     resolver: zodResolver(editSchema) as Resolver<EditFormOutput>,
-    defaultValues: {
-      name: faculty.user.name || "",
-      email: faculty.user.email || "",
-      designation: faculty.designation as z.infer<typeof DesignationEnum>,
-      username: faculty.user.username || "",
-      displayUsername: faculty.user.displayUsername || faculty.user.name || "",
-      employeeId: faculty.employeeId || "",
-      staffType: faculty.staffType as z.infer<typeof StaffTypeEnum> | undefined,
-      dob: faculty.dob ? new Date(faculty.dob) : undefined,
-      dateOfJoining: faculty.dateOfJoining
-        ? new Date(faculty.dateOfJoining)
-        : undefined,
-      phoneNumber: faculty.phoneNumber || "",
-    },
+    defaultValues: getEditFormDefaults(faculty),
   });
+
+  useEffect(() => {
+    if (isEditOpen) {
+      editForm.reset(getEditFormDefaults(faculty));
+    }
+  }, [isEditOpen, faculty, editForm]);
 
   const hodCreateForm = useForm<z.infer<typeof hodCreateSchema>>({
     resolver: zodResolver(hodCreateSchema),

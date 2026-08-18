@@ -700,6 +700,9 @@ export const HodAttendanceReportView = () => {
       sections.map((section) => ({
         id: section.id,
         name: section.name,
+        label: section.isElectiveBatch
+          ? `${section.name} (Elective)`
+          : section.name,
         courseId: draftFilters.courseId,
       })),
     [sections, draftFilters.courseId]

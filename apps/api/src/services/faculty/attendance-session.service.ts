@@ -5,7 +5,7 @@ import {
 } from "@webcampus/api/src/services/faculty/freeze.service";
 import { buildRegistrationWhere } from "@webcampus/api/src/services/shared/registration-helper.service";
 import { logger } from "@webcampus/common/logger";
-import { db, type Prisma } from "@webcampus/db";
+import { db, type Cycle, type Prisma } from "@webcampus/db";
 import {
   CreateOrOpenFacultyAttendanceSessionType,
   DeleteFacultyAttendanceSessionParamsType,
@@ -42,6 +42,16 @@ type FacultyCourseSectionAssignmentContext = {
   academicYear: string;
   assignmentType: "THEORY" | "LAB";
   batchId: string | null;
+  semesterId: string;
+  academicTermId: string;
+  departmentId: string;
+  cycle: string;
+};
+
+type FacultyElectiveBatchContext = {
+  semester: number;
+  academicYear: string;
+  electiveBatchId: string;
   semesterId: string;
   academicTermId: string;
 };
@@ -186,8 +196,9 @@ const hasTimeOverlap = (
 const toSessionDto = (session: {
   id: string;
   courseId: string;
-  sectionId: string;
+  sectionId: string | null;
   batchId: string | null;
+  electiveBatchId: string | null;
   sessionDate: Date;
   timingCode: string;
   timingLabel: string;
@@ -200,16 +211,21 @@ const toSessionDto = (session: {
   };
   Section: {
     name: string;
-  };
+  } | null;
   Batch?: {
+    name: string;
+  } | null;
+  electiveBatch?: {
     name: string;
   } | null;
 }): FacultyAttendanceSessionDTO => {
   return {
     id: session.id,
     courseId: session.courseId,
-    sectionId: session.sectionId,
+    sectionId: session.sectionId ?? "",
     batchId: session.batchId ?? undefined,
+    electiveBatchId: session.electiveBatchId ?? undefined,
+    electiveBatchName: session.electiveBatch?.name ?? undefined,
     labBatchNumber: toLabBatchNumber(session.Batch?.name),
     sessionDate: session.sessionDate.toISOString(),
     timingCode: session.timingCode,
@@ -218,7 +234,7 @@ const toSessionDto = (session: {
     timingEndTime: session.timingEndTime,
     courseCode: session.Course.code,
     courseName: session.Course.name,
-    sectionName: session.Section.name,
+    sectionName: session.electiveBatch?.name ?? session.Section?.name ?? "",
     createdAt: session.createdAt.toISOString(),
   };
 };
@@ -227,8 +243,9 @@ const toSessionDtoFromScalars = (
   session: {
     id: string;
     courseId: string;
-    sectionId: string;
+    sectionId: string | null;
     batchId: string | null;
+    electiveBatchId: string | null;
     sessionDate: Date;
     timingCode: string;
     timingLabel: string;
@@ -237,13 +254,16 @@ const toSessionDtoFromScalars = (
     createdAt: Date;
   },
   courseMeta: { code: string; name: string } | undefined,
-  sectionMeta: { name: string } | undefined
+  sectionMeta: { name: string } | undefined,
+  electiveBatchMeta: { name: string } | undefined
 ): FacultyAttendanceSessionDTO => {
   return {
     id: session.id,
     courseId: session.courseId,
-    sectionId: session.sectionId,
+    sectionId: session.sectionId ?? "",
     batchId: session.batchId ?? undefined,
+    electiveBatchId: session.electiveBatchId ?? undefined,
+    electiveBatchName: electiveBatchMeta?.name,
     sessionDate: session.sessionDate.toISOString(),
     timingCode: session.timingCode,
     timingLabel: session.timingLabel,
@@ -251,7 +271,8 @@ const toSessionDtoFromScalars = (
     timingEndTime: session.timingEndTime,
     courseCode: courseMeta?.code ?? session.courseId,
     courseName: courseMeta?.name ?? "Unknown Course",
-    sectionName: sectionMeta?.name ?? session.sectionId,
+    sectionName:
+      electiveBatchMeta?.name ?? sectionMeta?.name ?? session.sectionId ?? "",
     createdAt: session.createdAt.toISOString(),
   };
 };
@@ -354,6 +375,12 @@ export class FacultyAttendanceSessionService {
             },
           },
         },
+        section: {
+          select: {
+            departmentId: true,
+            cycle: true,
+          },
+        },
       },
     });
 
@@ -370,7 +397,103 @@ export class FacultyAttendanceSessionService {
       batchId: assignment.batchId,
       semesterId: assignment.course.semesterId,
       academicTermId: assignment.course.semester.academicTermId,
+      departmentId: assignment.section.departmentId,
+      cycle: assignment.section.cycle,
     };
+  }
+
+  private static async getFacultyElectiveBatchContext(
+    facultyId: string,
+    courseId: string,
+    electiveBatchId: string
+  ): Promise<FacultyElectiveBatchContext> {
+    const assignment = await db.electiveBatchFaculty.findFirst({
+      where: {
+        facultyId,
+        courseId,
+        electiveBatchId,
+        course: {
+          approvalStatus: "APPROVED",
+        },
+      },
+      select: {
+        semester: true,
+        academicYear: true,
+        course: {
+          select: {
+            semesterId: true,
+            semester: {
+              select: {
+                academicTermId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!assignment) {
+      throw new Error(
+        "Forbidden: elective batch is not assigned to this faculty"
+      );
+    }
+
+    return {
+      semester: assignment.semester,
+      academicYear: assignment.academicYear,
+      electiveBatchId,
+      semesterId: assignment.course.semesterId,
+      academicTermId: assignment.course.semester.academicTermId,
+    };
+  }
+
+  private static async getElectiveBatchRosterStudentIds(
+    tx: Prisma.TransactionClient,
+    courseId: string,
+    electiveBatchId: string
+  ): Promise<{ studentId: string }[]> {
+    return tx.electiveStudentAssignment.findMany({
+      where: {
+        courseId,
+        electiveBatchId,
+      },
+      select: { studentId: true },
+    });
+  }
+
+  private static async getElectiveBatchRosterStudents(
+    tx: Prisma.TransactionClient,
+    courseId: string,
+    electiveBatchId: string
+  ): Promise<
+    {
+      studentId: string;
+      usn: string;
+      name: string;
+    }[]
+  > {
+    const assignments = await tx.electiveStudentAssignment.findMany({
+      where: {
+        courseId,
+        electiveBatchId,
+      },
+      orderBy: { student: { usn: "asc" } },
+      select: {
+        student: {
+          select: {
+            id: true,
+            usn: true,
+            user: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    return assignments.map((item) => ({
+      studentId: item.student.id,
+      usn: item.student.usn,
+      name: item.student.user.name,
+    }));
   }
 
   static async getSessionStudents(
@@ -379,43 +502,84 @@ export class FacultyAttendanceSessionService {
   ): Promise<BaseResponse<FacultyAttendanceSessionStudentsDTO>> {
     try {
       const facultyId = await this.getFacultyIdByUserId(userId);
-      const assignmentContext = await this.getFacultyCourseSectionContext(
-        facultyId,
-        query.courseId,
-        query.sectionId,
-        query.batchId
-      );
 
-      const students = await db.courseRegistration.findMany({
-        where: buildRegistrationWhere({
-          courseId: query.courseId,
-          semesterId: assignmentContext.semesterId,
-          academicTermId: assignmentContext.academicTermId,
-          sectionId: query.sectionId,
-          batchId:
-            assignmentContext.assignmentType === "LAB"
-              ? (assignmentContext.batchId ?? undefined)
-              : undefined,
-        }),
-        orderBy: { student: { usn: "asc" } },
-        select: {
-          student: {
-            select: {
-              id: true,
-              usn: true,
-              user: { select: { name: true } },
+      const isPeSession = Boolean(query.electiveBatchId);
+
+      let students: {
+        studentId: string;
+        usn: string;
+        name: string;
+      }[];
+
+      let attendanceFilter: {
+        batchId: string | null;
+        electiveBatchId?: string;
+      };
+
+      if (isPeSession) {
+        const assignmentContext = await this.getFacultyElectiveBatchContext(
+          facultyId,
+          query.courseId,
+          query.electiveBatchId as string
+        );
+
+        students = await this.getElectiveBatchRosterStudents(
+          db,
+          query.courseId,
+          query.electiveBatchId as string
+        );
+
+        attendanceFilter = {
+          batchId: null,
+          electiveBatchId: assignmentContext.electiveBatchId,
+        };
+      } else {
+        const assignmentContext = await this.getFacultyCourseSectionContext(
+          facultyId,
+          query.courseId,
+          query.sectionId as string,
+          query.batchId
+        );
+
+        const registrations = await db.courseRegistration.findMany({
+          where: buildRegistrationWhere({
+            courseId: query.courseId,
+            semesterId: assignmentContext.semesterId,
+            academicTermId: assignmentContext.academicTermId,
+            sectionId: query.sectionId as string,
+            batchId:
+              assignmentContext.assignmentType === "LAB"
+                ? (assignmentContext.batchId ?? undefined)
+                : undefined,
+          }),
+          orderBy: { student: { usn: "asc" } },
+          select: {
+            student: {
+              select: {
+                id: true,
+                usn: true,
+                user: { select: { name: true } },
+              },
             },
           },
-        },
-      });
+        });
 
-      const studentIds = students.map((item) => item.student.id);
+        students = registrations.map((item) => ({
+          studentId: item.student.id,
+          usn: item.student.usn,
+          name: item.student.user.name,
+        }));
+
+        attendanceFilter = { batchId: assignmentContext.batchId ?? null };
+      }
+
+      const studentIds = students.map((student) => student.studentId);
 
       const attendanceRecords = await db.attendance.findMany({
         where: {
           studentId: { in: studentIds },
           courseId: query.courseId,
-          batchId: assignmentContext.batchId ?? null, // Ensure lab vs theory split
+          ...attendanceFilter, // Ensure lab vs theory vs elective batch split
         },
         select: {
           studentId: true,
@@ -433,12 +597,12 @@ export class FacultyAttendanceSessionService {
         status: "success",
         message: "Session students retrieved successfully",
         data: {
-          students: students.map((item) => {
-            const attendance = attendanceMap.get(item.student.id);
+          students: students.map((student) => {
+            const attendance = attendanceMap.get(student.studentId);
             return {
-              studentId: item.student.id,
-              usn: item.student.usn,
-              name: item.student.user.name,
+              studentId: student.studentId,
+              usn: student.usn,
+              name: student.name,
               status: "PRESENT",
               previousAttendancePercentage:
                 attendance && attendance.total > 0
@@ -506,12 +670,32 @@ export class FacultyAttendanceSessionService {
         );
       }
 
+      const electiveBatchAssignments = await db.electiveBatchFaculty.findMany({
+        where: {
+          facultyId,
+          course: { approvalStatus: "APPROVED" },
+        },
+        select: {
+          course: { select: { id: true, code: true, name: true } },
+          electiveBatch: { select: { id: true, name: true } },
+        },
+      });
+
+      for (const assignment of electiveBatchAssignments) {
+        coursesMap.set(assignment.course.id, assignment.course);
+      }
+
       return {
         status: "success",
         message: "Attendance filter options retrieved successfully",
         data: {
           courses: Array.from(coursesMap.values()),
           sections: Array.from(sectionsMap.values()),
+          electiveBatches: electiveBatchAssignments.map((assignment) => ({
+            id: assignment.electiveBatch.id,
+            name: assignment.electiveBatch.name,
+            courseId: assignment.course.id,
+          })),
         },
       };
     } catch (error) {
@@ -533,6 +717,7 @@ export class FacultyAttendanceSessionService {
           Course: { select: { code: true, name: true } },
           Section: { select: { name: true } },
           Batch: { select: { name: true } },
+          electiveBatch: { select: { name: true } },
           AttendanceRecord: {
             select: {
               studentId: true,
@@ -556,7 +741,12 @@ export class FacultyAttendanceSessionService {
         where: {
           studentId: { in: studentIds },
           courseId: session.courseId,
-          batchId: session.batchId ?? null, // Ensure lab vs theory split
+          ...(session.electiveBatchId
+            ? {
+                batchId: null,
+                electiveBatchId: session.electiveBatchId,
+              }
+            : { batchId: session.batchId ?? null }), // Ensure lab vs theory vs elective batch split
         },
         select: {
           studentId: true,
@@ -598,8 +788,13 @@ export class FacultyAttendanceSessionService {
 
   private static async upsertAttendanceRecords(
     tx: Prisma.TransactionClient,
-    session: { id: string; courseId: string; batchId: string | null },
-    assignmentContext: FacultyCourseSectionAssignmentContext,
+    session: {
+      id: string;
+      courseId: string;
+      batchId: string | null;
+      electiveBatchId: string | null;
+    },
+    assignmentContext: FacultyCourseSectionAssignmentContext | null,
     payloadStudentStatuses: FacultyAttendanceStudentStatusInputType[],
     courseId: string,
     sectionId: string,
@@ -609,16 +804,28 @@ export class FacultyAttendanceSessionService {
     absentCount: number;
     presentCount: number;
   }> {
-    const enrolledStudents = await tx.courseRegistration.findMany({
-      where: buildRegistrationWhere({
+    const isPeSession = Boolean(session.electiveBatchId);
+
+    let enrolledStudents: { studentId: string }[];
+
+    if (isPeSession) {
+      enrolledStudents = await this.getElectiveBatchRosterStudentIds(
+        tx,
         courseId,
-        semesterId: assignmentContext.semesterId,
-        academicTermId: assignmentContext.academicTermId,
-        sectionId,
-        batchId: batchId ?? undefined,
-      }),
-      select: { studentId: true },
-    });
+        session.electiveBatchId as string
+      );
+    } else {
+      enrolledStudents = await tx.courseRegistration.findMany({
+        where: buildRegistrationWhere({
+          courseId,
+          semesterId: assignmentContext!.semesterId,
+          academicTermId: assignmentContext!.academicTermId,
+          sectionId,
+          batchId: batchId ?? undefined,
+        }),
+        select: { studentId: true },
+      });
+    }
 
     if (enrolledStudents.length === 0) {
       throw new Error("No students found in the selected section/batch");
@@ -654,6 +861,7 @@ export class FacultyAttendanceSessionService {
         sessionId: session.id,
         studentId: statusItem.studentId,
         batchId: session.batchId,
+        electiveBatchId: session.electiveBatchId,
         status: statusItem.status,
       })),
       skipDuplicates: true,
@@ -669,6 +877,7 @@ export class FacultyAttendanceSessionService {
           sessionId: session.id,
           studentId,
           batchId: session.batchId,
+          electiveBatchId: session.electiveBatchId,
           status,
         },
         update: { status, markedAt: new Date() },
@@ -698,38 +907,98 @@ export class FacultyAttendanceSessionService {
     payload: CreateOrOpenFacultyAttendanceSessionType
   ): Promise<BaseResponse<CreateOrOpenFacultyAttendanceSessionDTO>> {
     try {
-      const facultyId = await this.getFacultyIdByUserId(userId);
-      const assignmentContext = await this.getFacultyCourseSectionContext(
-        facultyId,
-        payload.courseId,
-        payload.sectionId,
-        payload.batchId
+      const { PeCapacityService } = await import(
+        "@webcampus/api/src/services/shared/pe-capacity.service"
       );
+      await PeCapacityService.assertPeDownstreamReady(payload.courseId);
 
-      const freezeCheck = await db.courseAssignment.findFirst({
-        where: {
-          courseId: payload.courseId,
-          sectionId: payload.sectionId,
-          batchId: payload.batchId ?? null,
+      const facultyId = await this.getFacultyIdByUserId(userId);
+      const isPeSession = Boolean(payload.electiveBatchId);
+
+      let assignmentContext: FacultyCourseSectionAssignmentContext | null =
+        null;
+
+      if (isPeSession) {
+        await this.getFacultyElectiveBatchContext(
           facultyId,
-        },
-        include: { freezes: true },
-      });
-      if (freezeCheck)
-        assertCanMutateAttendance(
-          "faculty",
-          resolveFreezeState(freezeCheck.freezes)
+          payload.courseId,
+          payload.electiveBatchId as string
         );
+      } else {
+        assignmentContext = await this.getFacultyCourseSectionContext(
+          facultyId,
+          payload.courseId,
+          payload.sectionId as string,
+          payload.batchId
+        );
+      }
+
+      if (!isPeSession) {
+        const freezeCheck = await db.courseAssignment.findFirst({
+          where: {
+            courseId: payload.courseId,
+            sectionId: payload.sectionId,
+            batchId: payload.batchId ?? null,
+            facultyId,
+          },
+          include: { freezes: true },
+        });
+        if (freezeCheck)
+          assertCanMutateAttendance(
+            "faculty",
+            resolveFreezeState(freezeCheck.freezes)
+          );
+      }
 
       const sessionDate = toSessionDateUtc(payload.sessionDate);
       const timing = getTimingWindow(payload);
+
+      const today = toSessionDateUtc(new Date());
+      if (!isPeSession && sessionDate.getTime() > today.getTime()) {
+        const window = await db.bonusAttendanceWindow.findFirst({
+          where: {
+            academicTermId: assignmentContext!.academicTermId,
+            semesterId: assignmentContext!.semesterId,
+            isOpen: true,
+            expiresAt: { gt: new Date() },
+            OR: [
+              { departmentId: assignmentContext!.departmentId },
+              { cycle: assignmentContext!.cycle as Cycle },
+              { departmentId: null, cycle: null },
+            ],
+          },
+          orderBy: { days: "desc" },
+        });
+
+        if (!window) {
+          throw new Error("Cannot take attendance for future dates.");
+        }
+
+        const windowOpenDate = window.openedAt
+          ? toSessionDateUtc(window.openedAt)
+          : today;
+        const maxAllowedDate = new Date(windowOpenDate);
+        maxAllowedDate.setUTCDate(
+          maxAllowedDate.getUTCDate() + (window.days - 1)
+        );
+
+        if (sessionDate.getTime() > maxAllowedDate.getTime()) {
+          throw new Error(
+            `Cannot take attendance beyond ${maxAllowedDate.toISOString().split("T")[0]}.`
+          );
+        }
+      }
 
       // Strict check: existing session → 409 conflict
       const existingSession = await db.classSession.findFirst({
         where: {
           courseId: payload.courseId,
-          sectionId: payload.sectionId,
-          batchId: payload.batchId ?? null,
+          ...(isPeSession
+            ? { electiveBatchId: payload.electiveBatchId, sectionId: null }
+            : {
+                sectionId: payload.sectionId,
+                batchId: payload.batchId ?? null,
+              }),
           sessionDate,
           timingCode: timing.code,
         },
@@ -745,11 +1014,17 @@ export class FacultyAttendanceSessionService {
       const potentialOverlaps = await db.classSession.findMany({
         where: {
           sessionDate,
-          OR: [{ facultyId }, { sectionId: payload.sectionId }],
+          OR: [
+            { facultyId },
+            isPeSession
+              ? { electiveBatchId: payload.electiveBatchId }
+              : { sectionId: payload.sectionId },
+          ],
         },
         select: {
           facultyId: true,
           sectionId: true,
+          electiveBatchId: true,
           timingLabel: true,
           timingStartTime: true,
           timingEndTime: true,
@@ -766,11 +1041,22 @@ export class FacultyAttendanceSessionService {
           )
         ) {
           if (
+            !isPeSession &&
             overlapSession.sectionId === payload.sectionId &&
             overlapSession.facultyId !== facultyId
           ) {
             throw new Error(
               `Section Overlap: Another faculty member is already conducting a session for this section at ${overlapSession.timingLabel}.`
+            );
+          }
+
+          if (
+            isPeSession &&
+            overlapSession.electiveBatchId === payload.electiveBatchId &&
+            overlapSession.facultyId !== facultyId
+          ) {
+            throw new Error(
+              `Elective Batch Overlap: Another faculty member is already conducting a session for this batch at ${overlapSession.timingLabel}.`
             );
           }
 
@@ -787,9 +1073,10 @@ export class FacultyAttendanceSessionService {
           data: {
             id: crypto.randomUUID(),
             courseId: payload.courseId,
-            sectionId: payload.sectionId,
+            sectionId: isPeSession ? null : payload.sectionId,
             facultyId,
-            batchId: payload.batchId ?? null,
+            batchId: isPeSession ? null : (payload.batchId ?? null),
+            electiveBatchId: isPeSession ? payload.electiveBatchId : null,
             sessionDate,
             timingCode: timing.code,
             timingLabel: timing.label,
@@ -800,6 +1087,7 @@ export class FacultyAttendanceSessionService {
             Course: { select: { code: true, name: true } },
             Section: { select: { name: true } },
             Batch: { select: { name: true } },
+            electiveBatch: { select: { name: true } },
           },
         });
 
@@ -809,7 +1097,7 @@ export class FacultyAttendanceSessionService {
           assignmentContext,
           payload.studentStatuses ?? [],
           payload.courseId,
-          payload.sectionId,
+          isPeSession ? "" : (payload.sectionId as string),
           payload.batchId
         );
 
@@ -849,6 +1137,7 @@ export class FacultyAttendanceSessionService {
           Course: { select: { code: true, name: true } },
           Section: { select: { name: true } },
           Batch: { select: { name: true } },
+          electiveBatch: { select: { name: true } },
         },
       });
 
@@ -860,36 +1149,61 @@ export class FacultyAttendanceSessionService {
         throw new Error("Forbidden: session not owned by faculty");
       }
 
-      const freezeCheck = await db.courseAssignment.findFirst({
-        where: {
-          courseId: existingSession.courseId,
-          sectionId: existingSession.sectionId,
-          batchId: existingSession.batchId,
-          facultyId,
-        },
-        include: { freezes: true },
-      });
+      const isPeSession = Boolean(existingSession.electiveBatchId);
+
+      const freezeCheck =
+        !isPeSession && existingSession.sectionId
+          ? await db.courseAssignment.findFirst({
+              where: {
+                courseId: existingSession.courseId,
+                sectionId: existingSession.sectionId,
+                batchId: existingSession.batchId,
+                facultyId,
+              },
+              include: { freezes: true },
+            })
+          : null;
       if (freezeCheck)
         assertCanMutateAttendance(
           "faculty",
           resolveFreezeState(freezeCheck.freezes)
         );
 
-      const assignmentContext = await this.getFacultyCourseSectionContext(
-        facultyId,
-        existingSession.courseId,
-        existingSession.sectionId,
-        existingSession.batchId ?? undefined
-      );
+      if (isPeSession) {
+        await this.getFacultyElectiveBatchContext(
+          facultyId,
+          existingSession.courseId,
+          existingSession.electiveBatchId as string
+        );
+      }
+
+      const sectionId = existingSession.sectionId ?? "";
+
+      const assignmentContext = isPeSession
+        ? null
+        : await this.getFacultyCourseSectionContext(
+            facultyId,
+            existingSession.courseId,
+            sectionId,
+            existingSession.batchId ?? undefined
+          );
 
       const operationResult = await db.$transaction(async (tx) => {
+        const { PeCapacityService } = await import(
+          "@webcampus/api/src/services/shared/pe-capacity.service"
+        );
+        await PeCapacityService.assertPeDownstreamReady(
+          existingSession.courseId,
+          tx
+        );
+
         const summary = await this.upsertAttendanceRecords(
           tx,
           existingSession,
           assignmentContext,
           studentStatuses ?? [],
           existingSession.courseId,
-          existingSession.sectionId,
+          sectionId,
           existingSession.batchId ?? undefined
         );
 
@@ -934,15 +1248,22 @@ export class FacultyAttendanceSessionService {
             "Forbidden: attendance session is not owned by this faculty"
           );
 
-        const freezeCheckDelete = await tx.courseAssignment.findFirst({
-          where: {
-            courseId: session.courseId,
-            sectionId: session.sectionId,
-            batchId: session.batchId,
-            facultyId,
-          },
-          include: { freezes: true },
-        });
+        const { PeCapacityService } = await import(
+          "@webcampus/api/src/services/shared/pe-capacity.service"
+        );
+        await PeCapacityService.assertPeDownstreamReady(session.courseId, tx);
+
+        const freezeCheckDelete = session.sectionId
+          ? await tx.courseAssignment.findFirst({
+              where: {
+                courseId: session.courseId,
+                sectionId: session.sectionId,
+                batchId: session.batchId,
+                facultyId,
+              },
+              include: { freezes: true },
+            })
+          : null;
 
         if (freezeCheckDelete) {
           assertCanMutateAttendance(
@@ -996,6 +1317,7 @@ export class FacultyAttendanceSessionService {
       if (query.courseId) where.courseId = query.courseId;
       if (query.sectionId) where.sectionId = query.sectionId;
       if (query.batchId) where.batchId = query.batchId;
+      if (query.electiveBatchId) where.electiveBatchId = query.electiveBatchId;
 
       if (query.sessionDate) {
         const dayStart = new Date(`${query.sessionDate}T00:00:00.000Z`);
@@ -1017,6 +1339,7 @@ export class FacultyAttendanceSessionService {
             Course: { select: { code: true, name: true } },
             Section: { select: { name: true } },
             Batch: { select: { name: true } },
+            electiveBatch: { select: { name: true } },
           },
         });
 
@@ -1033,6 +1356,7 @@ export class FacultyAttendanceSessionService {
             courseId: true,
             sectionId: true,
             batchId: true,
+            electiveBatchId: true,
             sessionDate: true,
             timingCode: true,
             timingLabel: true,
@@ -1056,8 +1380,15 @@ export class FacultyAttendanceSessionService {
               .filter(isNonEmptyString)
           )
         );
+        const uniqueElectiveBatchIds = Array.from(
+          new Set(
+            scalarSessions
+              .map((session) => session.electiveBatchId)
+              .filter(isNonEmptyString)
+          )
+        );
 
-        const [courses, sections] = await Promise.all([
+        const [courses, sections, electiveBatches] = await Promise.all([
           uniqueCourseIds.length > 0
             ? db.course.findMany({
                 where: { id: { in: uniqueCourseIds } },
@@ -1070,18 +1401,30 @@ export class FacultyAttendanceSessionService {
                 select: { id: true, name: true },
               })
             : Promise.resolve([]),
+          uniqueElectiveBatchIds.length > 0
+            ? db.electiveBatch.findMany({
+                where: { id: { in: uniqueElectiveBatchIds } },
+                select: { id: true, name: true },
+              })
+            : Promise.resolve([]),
         ]);
 
         const courseMap = new Map(courses.map((course) => [course.id, course]));
         const sectionMap = new Map(
           sections.map((section) => [section.id, section])
         );
+        const electiveBatchMap = new Map(
+          electiveBatches.map((batch) => [batch.id, batch])
+        );
 
         items = scalarSessions.map((session) =>
           toSessionDtoFromScalars(
             session,
             courseMap.get(session.courseId),
-            sectionMap.get(session.sectionId)
+            session.sectionId ? sectionMap.get(session.sectionId) : undefined,
+            session.electiveBatchId
+              ? electiveBatchMap.get(session.electiveBatchId)
+              : undefined
           )
         );
       }

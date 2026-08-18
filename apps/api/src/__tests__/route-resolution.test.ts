@@ -66,8 +66,14 @@ mock.module("@webcampus/db", () => ({
     },
   },
   PrismaClient: class PrismaClient {},
-  CourseApprovalStatus: {},
+  CourseApprovalStatus: {
+    APPROVED: "APPROVED",
+    PENDING: "PENDING",
+    DRAFT: "DRAFT",
+    NEEDS_REVISION: "NEEDS_REVISION",
+  },
   Cycle: {},
+  Designation: {},
 }));
 
 mock.module("@webcampus/common/logger", () => ({
@@ -207,6 +213,79 @@ describe("Route Resolution Tests", () => {
     });
   });
 
+  describe("/project-mapping routes", () => {
+    it("GET /department/project-mapping/:courseId resolves (not 404)", async () => {
+      const url = `${BASE_URL}/department/project-mapping/test-course`;
+      const res = await fetchWithTimeout(url, { method: "GET" });
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(600);
+      expect(res.status).not.toBe(404);
+    });
+
+    it("GET /admin/project-mapping/:courseId resolves (not 404)", async () => {
+      const url = `${BASE_URL}/admin/project-mapping/test-course`;
+      const res = await fetchWithTimeout(url, { method: "GET" });
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(600);
+      expect(res.status).not.toBe(404);
+    });
+
+    it("GET /department/project-mapping/:courseId does not shadow /save", async () => {
+      const url = `${BASE_URL}/department/project-mapping/save`;
+      const res = await fetchWithTimeout(url, { method: "GET" });
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(600);
+    });
+
+    const UUID = "00000000-0000-4000-8000-000000000001";
+    const UUID2 = "00000000-0000-4000-8000-000000000002";
+
+    const expectNotValidationError = async (url: string) => {
+      const res = await fetchWithTimeout(url, { method: "GET" });
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(600);
+      expect(res.status).not.toBe(404);
+      const body = await res.text();
+      expect(body).not.toContain("Validation Error");
+    };
+
+    it("GET /department/project-mapping/:courseId/groups resolves (params courseId, not 400 validation error)", async () => {
+      await expectNotValidationError(
+        `${BASE_URL}/department/project-mapping/${UUID}/groups`
+      );
+    });
+
+    it("GET /admin/project-mapping/:courseId/groups resolves (params courseId, not 400 validation error)", async () => {
+      await expectNotValidationError(
+        `${BASE_URL}/admin/project-mapping/${UUID}/groups`
+      );
+    });
+
+    it("GET /department/project-mapping/:courseId/groups/:groupId resolves (params courseId+groupId)", async () => {
+      await expectNotValidationError(
+        `${BASE_URL}/department/project-mapping/${UUID}/groups/${UUID2}`
+      );
+    });
+
+    it("GET /admin/project-mapping/:courseId/groups/:groupId resolves (params courseId+groupId)", async () => {
+      await expectNotValidationError(
+        `${BASE_URL}/admin/project-mapping/${UUID}/groups/${UUID2}`
+      );
+    });
+
+    it("GET /department/project-mapping/:courseId/excel/template resolves (params courseId, not 400 validation error)", async () => {
+      await expectNotValidationError(
+        `${BASE_URL}/department/project-mapping/${UUID}/excel/template`
+      );
+    });
+
+    it("GET /admin/project-mapping/:courseId/excel/template resolves (params courseId, not 400 validation error)", async () => {
+      await expectNotValidationError(
+        `${BASE_URL}/admin/project-mapping/${UUID}/excel/template`
+      );
+    });
+  });
+
   describe("/hod routes", () => {
     it("GET /hod/course-assignment resolves", async () => {
       const url = `${BASE_URL}/hod/course-assignment`;
@@ -324,6 +403,92 @@ describe("Route Resolution Tests", () => {
         expect(res.status).not.toBe(404);
         expect([401, 403]).toContain(res.status);
       }
+    });
+  });
+
+  describe("/faculty/attendance-windows freeze routes (distinct ownership domains)", () => {
+    const PC_FREEZE = `${BASE_URL}/faculty/attendance-windows/course-assignment/00000000-0000-0000-0000-000000000001/freeze`;
+    const ELECTIVE_FREEZE = `${BASE_URL}/faculty/attendance-windows/elective-batch/00000000-0000-0000-0000-000000000002/freeze`;
+
+    it("POST course-assignment/:id/freeze resolves (not 404)", async () => {
+      const res = await fetchWithTimeout(PC_FREEZE, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).not.toBe(404);
+    });
+
+    it("POST elective-batch/:id/freeze resolves (not 404) — regression: was unreachable before Option B", async () => {
+      const res = await fetchWithTimeout(ELECTIVE_FREEZE, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).not.toBe(404);
+    });
+
+    it("elective-batch route is NOT shadowed by course-assignment route", async () => {
+      const res = await fetchWithTimeout(ELECTIVE_FREEZE, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const text = await res.text();
+      expect(text).not.toContain("Course assignment not found");
+    });
+  });
+
+  describe("/admin/attendance-windows freeze routes (distinct ownership domains)", () => {
+    const PC_FREEZE = `${BASE_URL}/admin/attendance-windows/course-assignment/00000000-0000-0000-0000-000000000001/freeze`;
+    const PC_UNFREEZE = `${BASE_URL}/admin/attendance-windows/course-assignment/00000000-0000-0000-0000-000000000001/unfreeze`;
+    const ELECTIVE_FREEZE = `${BASE_URL}/admin/attendance-windows/elective-batch/00000000-0000-0000-0000-000000000002/freeze`;
+    const ELECTIVE_UNFREEZE = `${BASE_URL}/admin/attendance-windows/elective-batch/00000000-0000-0000-0000-000000000002/unfreeze`;
+
+    it("POST course-assignment/:id/freeze resolves (not 404)", async () => {
+      const res = await fetchWithTimeout(PC_FREEZE, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).not.toBe(404);
+    });
+
+    it("POST course-assignment/:id/unfreeze resolves (not 404)", async () => {
+      const res = await fetchWithTimeout(PC_UNFREEZE, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).not.toBe(404);
+    });
+
+    it("POST elective-batch/:id/freeze resolves (not 404) — regression: elective route must be reachable", async () => {
+      const res = await fetchWithTimeout(ELECTIVE_FREEZE, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).not.toBe(404);
+    });
+
+    it("POST elective-batch/:id/unfreeze resolves (not 404) — regression: elective route must be reachable", async () => {
+      const res = await fetchWithTimeout(ELECTIVE_UNFREEZE, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).not.toBe(404);
+    });
+
+    it("elective-batch route is NOT shadowed by course-assignment route", async () => {
+      const res = await fetchWithTimeout(ELECTIVE_FREEZE, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const text = await res.text();
+      expect(text).not.toContain("Course assignment not found");
     });
   });
 

@@ -29,6 +29,7 @@ export interface CourseEligibility {
   markEligible: boolean;
   attendanceEligible: boolean;
   eligible: boolean;
+  reason?: string | null;
 }
 
 export interface HallTicketData {
@@ -47,6 +48,7 @@ export interface HallTicketData {
   isSent: boolean;
   sentAt: string | null;
   sentBy: string | null;
+  verificationToken: string | null;
 }
 
 const unwrapSuccess = <T>(response: BaseResponse<T>) => {

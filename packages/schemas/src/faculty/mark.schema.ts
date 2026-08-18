@@ -154,9 +154,11 @@ export interface MarksReportFilterOptionsDTO {
     id: string;
     code: string;
     name: string;
+    courseType: string;
     sectionId: string;
     sectionName: string;
     semesterId: string;
+    isElectiveBatch: boolean;
   }>;
   assessments: Array<{
     id: string;

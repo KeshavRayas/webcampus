@@ -27,26 +27,48 @@ export class AttendanceAggregationService {
     tx: DbLike = db
   ): Promise<BaseResponse<AttendanceAggregateResult>> {
     try {
-      // 1. Discover all batches (Theory = null, Lab = uuid) this student is part of
+      // 1. Discover all (batchId, electiveBatchId) pairs this student is part of
       const existingAggregates = await tx.attendance.findMany({
         where: { studentId, courseId },
-        select: { batchId: true },
+        select: { batchId: true, electiveBatchId: true },
       });
 
       const activeRecords = await tx.attendanceRecord.findMany({
         where: { studentId, ClassSession: { courseId } },
-        select: { batchId: true },
-        distinct: ["batchId"],
+        select: { batchId: true, electiveBatchId: true },
+        distinct: ["batchId", "electiveBatchId"],
       });
 
-      const batchesToProcess = new Set([
-        ...existingAggregates.map((a) => a.batchId),
-        ...activeRecords.map((r) => r.batchId),
-      ]);
+      const pairKey = (
+        batchId: string | null,
+        electiveBatchId: string | null
+      ) => `${batchId ?? ""}|${electiveBatchId ?? ""}`;
 
-      // Fallback to processing Theory (null) if no records exist at all
-      if (batchesToProcess.size === 0) {
-        batchesToProcess.add(null);
+      const pairsToProcess = new Map<
+        string,
+        { batchId: string | null; electiveBatchId: string | null }
+      >();
+
+      const addPair = (
+        batchId: string | null,
+        electiveBatchId: string | null
+      ) => {
+        pairsToProcess.set(pairKey(batchId, electiveBatchId), {
+          batchId,
+          electiveBatchId,
+        });
+      };
+
+      for (const a of existingAggregates) {
+        addPair(a.batchId, a.electiveBatchId);
+      }
+      for (const r of activeRecords) {
+        addPair(r.batchId, r.electiveBatchId);
+      }
+
+      // Fallback to processing Theory (null/null) if no records exist at all
+      if (pairsToProcess.size === 0) {
+        addPair(null, null);
       }
 
       let lastResult: AttendanceAggregateResult = {
@@ -57,13 +79,14 @@ export class AttendanceAggregationService {
         condonationStatus: "NOT_REQUESTED",
       };
 
-      // 2. Aggregate each batch independently
-      for (const batchId of batchesToProcess) {
+      // 2. Aggregate each (batchId, electiveBatchId) pair independently
+      for (const { batchId, electiveBatchId } of pairsToProcess.values()) {
         const [total, present] = await Promise.all([
           tx.attendanceRecord.count({
             where: {
               studentId,
               batchId,
+              electiveBatchId,
               ClassSession: { courseId },
             },
           }),
@@ -71,6 +94,7 @@ export class AttendanceAggregationService {
             where: {
               studentId,
               batchId,
+              electiveBatchId,
               status: "PRESENT",
               ClassSession: { courseId },
             },
@@ -80,13 +104,14 @@ export class AttendanceAggregationService {
         const absent = total - present;
         const percentage = total > 0 ? (present / total) * 100 : 0;
 
-        // If a session was deleted and the batch is now empty, clean up the aggregate row
+        // If a session was deleted and the pair is now empty, clean up the aggregate row
         if (total === 0) {
           await tx.attendance.deleteMany({
             where: {
               studentId,
               courseId,
               batchId,
+              electiveBatchId,
             },
           });
           continue;
@@ -98,6 +123,7 @@ export class AttendanceAggregationService {
             studentId,
             courseId,
             batchId,
+            electiveBatchId,
           },
           select: {
             id: true,
@@ -120,6 +146,7 @@ export class AttendanceAggregationService {
               studentId,
               courseId,
               batchId,
+              electiveBatchId,
               total,
               present,
               absent,

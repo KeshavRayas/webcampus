@@ -6,6 +6,7 @@ export const getSections = async (req: Request, res: Response) => {
   try {
     const semesterId = req.query.semesterId as string | undefined;
     const departmentId = req.query.departmentId as string | undefined;
+    const cycle = req.query.cycle as string | undefined;
 
     if (!semesterId) {
       sendResponse({
@@ -20,10 +21,17 @@ export const getSections = async (req: Request, res: Response) => {
 
     const where: Record<string, unknown> = { semesterId };
     if (departmentId) where.departmentId = departmentId;
+    if (cycle) where.cycle = cycle;
 
     const sections = await db.section.findMany({
       where,
-      select: { id: true, name: true, departmentId: true, semesterId: true },
+      select: {
+        id: true,
+        name: true,
+        departmentId: true,
+        semesterId: true,
+        cycle: true,
+      },
       orderBy: { name: "asc" },
     });
 

@@ -58,6 +58,7 @@ export const roles = {
     feedback: ["create", "read"],
   }),
   faculty: ac.newRole({
+    user: [],
     attendance: ["create"],
     freeze: ["read", "lock"],
     semester: ["read"],
@@ -110,6 +111,12 @@ export const roles = {
     user: ["set-role"],
     department: ["read"],
     support: ["create", "read", "reply"],
+  }),
+  "admission-instructor": ac.newRole({
+    semester: ["read"],
+    admission: ["create", "read"],
+    user: ["set-role"],
+    department: ["read"],
   }),
 } satisfies Record<Role, unknown>;
 

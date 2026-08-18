@@ -3,32 +3,10 @@ import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { Request, Response } from "express";
-import { generateFileName, uploadToS3 } from "../../utils/s3";
 
 export class CoeController {
   static async createCoe(req: Request, res: Response): Promise<void> {
     try {
-      if (req.file) {
-        const fileName = generateFileName(req.file.originalname, "coe/photos/");
-        const s3Result = await uploadToS3(
-          req.file.buffer,
-          fileName,
-          req.file.mimetype
-        );
-
-        if (s3Result.success) {
-          req.body.photo = s3Result.url;
-        } else {
-          return sendResponse({
-            res,
-            status: "error",
-            message: "Failed to upload profile photo",
-            statusCode: 500,
-            error: new Error("S3 upload failed"),
-          });
-        }
-      }
-
       const response = await CoeService.create({
         ...req.body,
         headers: req.headers,

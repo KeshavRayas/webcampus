@@ -36,6 +36,7 @@ interface MarksReportShellProps {
   cycleOptions?: SelectOption[];
   showAssessmentFilter?: boolean;
   assessmentOptions?: SelectOption[];
+  sectionFilterLabel?: string;
   children?: React.ReactNode;
 }
 
@@ -60,6 +61,7 @@ export const MarksReportShell = ({
   cycleOptions = [],
   showAssessmentFilter = false,
   assessmentOptions = [],
+  sectionFilterLabel = "Section",
   children,
 }: MarksReportShellProps) => {
   const filterFields: FilterFieldConfig<MarksReportFilters>[] = useMemo(
@@ -114,11 +116,11 @@ export const MarksReportShell = ({
       },
       {
         key: "sectionId",
-        label: "Section",
+        label: sectionFilterLabel,
         type: "select",
         hideAllOption: true,
         placeholder: draftFilters.courseId
-          ? "Select section..."
+          ? `Select ${sectionFilterLabel.toLowerCase()}...`
           : "Select course first",
         options: sections,
       },
@@ -148,6 +150,7 @@ export const MarksReportShell = ({
       cycleOptions,
       showAssessmentFilter,
       assessmentOptions,
+      sectionFilterLabel,
     ]
   );
 

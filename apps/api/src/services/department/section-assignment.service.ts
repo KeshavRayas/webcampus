@@ -6,6 +6,7 @@ import {
   UpdateSectionAssignmentType,
 } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
+import { ProjectMappingService } from "./project-mapping.service";
 
 export class SectionAssignment {
   static async validateSameDepartment(studentId: string, sectionId: string) {
@@ -50,8 +51,22 @@ export class SectionAssignment {
         data.studentId,
         data.sectionId
       );
-      const assignment = await db.studentSection.create({
-        data,
+      const assignment = await db.$transaction(async (tx) => {
+        const created = await tx.studentSection.create({
+          data,
+        });
+        const section = await tx.section.findUnique({
+          where: { id: data.sectionId },
+          select: { departmentId: true, semesterId: true },
+        });
+        if (section) {
+          await ProjectMappingService.reconcileProjectGroupsForScope({
+            tx,
+            departmentId: section.departmentId,
+            semesterId: section.semesterId,
+          });
+        }
+        return created;
       });
 
       const response: BaseResponse<SectionAssignmentResponseType> = {
@@ -137,15 +152,50 @@ export class SectionAssignment {
     data: UpdateSectionAssignmentType
   ): Promise<BaseResponse<SectionAssignmentResponseType>> {
     try {
+      const existing = await db.studentSection.findUnique({ where: { id } });
+      if (!existing) throw new Error("Section assignment not found");
       if (data.sectionId) {
-        const existing = await db.studentSection.findUnique({ where: { id } });
-        if (!existing) throw new Error("Section assignment not found");
         await this.validateSameDepartment(existing.studentId, data.sectionId);
       }
 
-      const updated = await db.studentSection.update({
-        where: { id },
-        data,
+      const updated = await db.$transaction(async (tx) => {
+        const result = await tx.studentSection.update({
+          where: { id },
+          data,
+        });
+        const scopes = new Map<
+          string,
+          { departmentId: string; semesterId: string }
+        >();
+        const sectionIds = [
+          existing.sectionId,
+          data.sectionId ?? existing.sectionId,
+        ];
+        for (const sectionId of sectionIds) {
+          const section = await tx.section.findUnique({
+            where: { id: sectionId },
+            select: { departmentId: true, semesterId: true },
+          });
+          if (section) {
+            scopes.set(`${section.departmentId}:${section.semesterId}`, {
+              departmentId: section.departmentId,
+              semesterId: section.semesterId,
+            });
+          }
+        }
+        const orderedScopes = Array.from(scopes.values()).sort(
+          (a, b) =>
+            a.departmentId.localeCompare(b.departmentId) ||
+            a.semesterId.localeCompare(b.semesterId)
+        );
+        for (const scope of orderedScopes) {
+          await ProjectMappingService.reconcileProjectGroupsForScope({
+            tx,
+            departmentId: scope.departmentId,
+            semesterId: scope.semesterId,
+          });
+        }
+        return result;
       });
 
       const response: BaseResponse<SectionAssignmentResponseType> = {
@@ -163,7 +213,22 @@ export class SectionAssignment {
 
   static async delete(id: string): Promise<BaseResponse<void>> {
     try {
-      await db.studentSection.delete({ where: { id } });
+      const existing = await db.studentSection.findUnique({ where: { id } });
+      if (!existing) throw new Error("Section assignment not found");
+      await db.$transaction(async (tx) => {
+        await tx.studentSection.delete({ where: { id } });
+        const section = await tx.section.findUnique({
+          where: { id: existing.sectionId },
+          select: { departmentId: true, semesterId: true },
+        });
+        if (section) {
+          await ProjectMappingService.reconcileProjectGroupsForScope({
+            tx,
+            departmentId: section.departmentId,
+            semesterId: section.semesterId,
+          });
+        }
+      });
       const response: BaseResponse<void> = {
         status: "success",
         message: "Section assignment deleted successfully",

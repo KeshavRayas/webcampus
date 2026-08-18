@@ -81,6 +81,9 @@ export const StudentHallTicketView = () => {
         eligible: c.eligible,
         status: c.eligible ? ("ELIGIBLE" as const) : ("NOT_ELIGIBLE" as const),
       })),
+      qrPayload: hallTicketData.verificationToken
+        ? `WCHT_VERIFY:${hallTicketData.verificationToken}`
+        : undefined,
     };
   }, [hallTicketData, selectedTermId]);
 

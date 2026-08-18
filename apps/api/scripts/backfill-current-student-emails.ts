@@ -1,7 +1,10 @@
 import "dotenv/config";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
-import { normalizeStudentEmailToken } from "../src/services/admission/student-email";
+import {
+  normalizeStudentEmailToken,
+  splitStudentName,
+} from "../src/services/admission/student-email";
 
 type CurrentStudentRow = {
   id: string;
@@ -12,9 +15,7 @@ type CurrentStudentRow = {
   academicYear: string;
   admission: {
     applicationId: string;
-    firstName: string | null;
-    middleName: string | null;
-    lastName: string | null;
+    nameAsPer10th: string | null;
     semester: {
       academicTerm: {
         year: string;
@@ -32,11 +33,7 @@ const getSortableName = (student: CurrentStudentRow): string => {
     return "";
   }
 
-  return [admission.firstName, admission.middleName, admission.lastName]
-    .map((value) => value?.trim())
-    .filter((value): value is string => Boolean(value))
-    .join(" ")
-    .toLocaleLowerCase();
+  return admission.nameAsPer10th?.trim().toLocaleLowerCase() ?? "";
 };
 
 const getAcademicYearSuffix = (academicYear: string): string => {
@@ -59,7 +56,16 @@ const buildTargetEmail = (
   occupiedLocalParts: Set<string>
 ): string => {
   const admission = student.admission;
-  if (!admission?.firstName) {
+  if (!admission) {
+    throw new Error(
+      `Cannot backfill student ${student.id}: admission record is missing`
+    );
+  }
+
+  const { firstName, lastName, middleName } = splitStudentName(
+    admission.nameAsPer10th ?? ""
+  );
+  if (!firstName) {
     throw new Error(
       `Cannot backfill student ${student.id}: first name is missing`
     );
@@ -68,7 +74,7 @@ const buildTargetEmail = (
   const academicYear = admission.semester.academicTerm.year;
   const yearSuffix = getAcademicYearSuffix(academicYear);
   const departmentCode = normalizeStudentEmailToken(student.department.code);
-  const normalizedFirstName = normalizeStudentEmailToken(admission.firstName);
+  const normalizedFirstName = normalizeStudentEmailToken(firstName);
 
   if (!normalizedFirstName) {
     throw new Error(
@@ -85,8 +91,8 @@ const buildTargetEmail = (
   const disambiguators = Array.from(
     new Set(
       [
-        normalizeStudentEmailToken(admission.lastName ?? "").slice(0, 1),
-        normalizeStudentEmailToken(admission.middleName ?? "").slice(0, 1),
+        normalizeStudentEmailToken(lastName).slice(0, 1),
+        normalizeStudentEmailToken(middleName).slice(0, 1),
       ].filter((value) => Boolean(value))
     )
   );
@@ -179,9 +185,7 @@ export async function backfillCurrentStudentEmails(options?: {
       admission: {
         select: {
           applicationId: true,
-          firstName: true,
-          middleName: true,
-          lastName: true,
+          nameAsPer10th: true,
           semester: {
             select: {
               academicTerm: {

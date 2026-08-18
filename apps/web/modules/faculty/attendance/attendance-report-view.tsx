@@ -68,6 +68,9 @@ const parseSectionSelectionKey = (value: string) => {
   };
 };
 
+const isPeCourseSelection = (courseSelectionValue: string) =>
+  parseCourseSelectionKey(courseSelectionValue).batchId === "pe";
+
 const formatCourseDropdownLabel = (
   code: string,
   name: string,
@@ -186,11 +189,36 @@ export const AttendanceReportView = () => {
         code: assignment.courseCode,
       });
     }
+    const courses = attendanceFilterOptions?.courses ?? [];
+    const courseById = new Map(courses.map((course) => [course.id, course]));
+    for (const batch of attendanceFilterOptions?.electiveBatches ?? []) {
+      const course = courseById.get(batch.courseId);
+      if (!course) continue;
+      const selectionKey = toCourseSelectionKey(course.id, "pe");
+      if (optionsByKey.has(selectionKey)) continue;
+      optionsByKey.set(selectionKey, {
+        id: selectionKey,
+        name: course.name,
+        label: formatCourseDropdownLabel(course.code, course.name),
+        code: course.code,
+      });
+    }
     return Array.from(optionsByKey.values());
-  }, [assignmentOptions]);
+  }, [assignmentOptions, attendanceFilterOptions]);
 
   const sectionsForSelectedCourse = useMemo(() => {
     const selectedCourse = parseCourseSelectionKey(draftFilters.courseId);
+
+    if (selectedCourse.batchId === "pe") {
+      return (attendanceFilterOptions?.electiveBatches ?? [])
+        .filter((batch) => batch.courseId === selectedCourse.courseId)
+        .map((batch) => ({
+          id: batch.id,
+          name: batch.name,
+          courseId: batch.courseId,
+        }));
+    }
+
     const filteredAssignments = assignmentOptions.filter((assignment) => {
       if (!selectedCourse.courseId) return true;
       if (assignment.courseId !== selectedCourse.courseId) return false;
@@ -202,7 +230,7 @@ export const AttendanceReportView = () => {
       name: assignment.sectionName,
       courseId: assignment.courseId,
     }));
-  }, [assignmentOptions, draftFilters.courseId]);
+  }, [assignmentOptions, draftFilters.courseId, attendanceFilterOptions]);
   // -------------------------------
 
   const hasRequiredDraftFilters = useMemo(
@@ -249,9 +277,14 @@ export const AttendanceReportView = () => {
     {
       courseId:
         parseCourseSelectionKey(appliedFilters.courseId).courseId || undefined,
-      sectionId:
-        parseSectionSelectionKey(appliedFilters.sectionId).sectionId ||
-        undefined,
+      sectionId: isPeCourseSelection(appliedFilters.courseId)
+        ? undefined
+        : parseSectionSelectionKey(appliedFilters.sectionId).sectionId ||
+          undefined,
+      electiveBatchId: isPeCourseSelection(appliedFilters.courseId)
+        ? parseSectionSelectionKey(appliedFilters.sectionId).sectionId ||
+          undefined
+        : undefined,
       // batchId: parseCourseSelectionKey(appliedFilters.courseId).batchId,
       page: 1,
       limit: 10,
@@ -319,11 +352,17 @@ export const AttendanceReportView = () => {
     setIsLoadingDetailed(true);
 
     getFacultyAttendanceDetailedReport(
-      {
-        courseId: parseCourseSelectionKey(appliedFilters.courseId).courseId,
-        sectionId: parseSectionSelectionKey(appliedFilters.sectionId).sectionId,
-        // batchId: parseCourseSelectionKey(appliedFilters.courseId).batchId, // Uncomment when backend supports it
-      },
+      isPeCourseSelection(appliedFilters.courseId)
+        ? {
+            courseId: parseCourseSelectionKey(appliedFilters.courseId).courseId,
+            electiveBatchId: parseSectionSelectionKey(appliedFilters.sectionId)
+              .sectionId,
+          }
+        : {
+            courseId: parseCourseSelectionKey(appliedFilters.courseId).courseId,
+            sectionId: parseSectionSelectionKey(appliedFilters.sectionId)
+              .sectionId,
+          },
       controller.signal
     )
       .then((data) => {
@@ -752,6 +791,11 @@ export const AttendanceReportView = () => {
         semesters={filteredSemesters}
         courses={courseOptions}
         sections={sectionsForSelectedCourse}
+        sectionFilterLabel={
+          draftFilters.courseId && isPeCourseSelection(draftFilters.courseId)
+            ? "Group"
+            : "Section"
+        }
         hasRequiredFilters={hasRequiredDraftFilters}
         hasRunReport={hasRunReport}
         filtersChangedAfterRun={filtersChangedAfterRun}

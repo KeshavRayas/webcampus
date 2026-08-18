@@ -1,3 +1,4 @@
+import { PeCapacityService } from "@webcampus/api/src/services/shared/pe-capacity.service";
 import { logger } from "@webcampus/common/logger";
 import { AcademicTerm, db, Department, Semester } from "@webcampus/db";
 import {
@@ -245,6 +246,29 @@ export class RegistrationWindowService {
     isOpen: boolean
   ): Promise<BaseResponse<RegistrationWindowListItem>> {
     try {
+      const existing = await db.registrationWindow.findUnique({
+        where: { id },
+      });
+      if (!existing) {
+        throw new Error("Registration window not found");
+      }
+
+      if (isOpen) {
+        const blocked = await PeCapacityService.hasAttendanceOrMarksInScope({
+          departmentId: existing.departmentId,
+          semesterId: existing.semesterId,
+          cycle:
+            existing.cycle === "PHYSICS" || existing.cycle === "CHEMISTRY"
+              ? existing.cycle
+              : null,
+        });
+        if (blocked) {
+          throw new Error(
+            "Cannot reopen registration: attendance or marks have started for PE courses in this scope"
+          );
+        }
+      }
+
       const updated = await db.registrationWindow.update({
         where: { id },
         data: { isOpen },
@@ -261,6 +285,7 @@ export class RegistrationWindowService {
         data: this.mapWindowToListItem(updated),
       };
     } catch (error) {
+      if (error instanceof Error) throw error;
       logger.error("Failed to toggle registration window", error);
       throw new Error("Failed to toggle registration window");
     }

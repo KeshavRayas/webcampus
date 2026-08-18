@@ -46,13 +46,23 @@ type ManageSessionFilters = {
   sectionId: string;
 };
 
+type ElectiveBatchOption = {
+  id: string;
+  name: string;
+  courseId: string;
+};
+
 type AttendanceEditListProps = {
   filters: ManageSessionFilters;
   selectedCourseValue?: string;
   selectedSectionValue?: string;
+  selectedElectiveBatchId?: string;
+  isElective?: boolean;
+  electiveBatches?: ElectiveBatchOption[];
   onDateChange: (date: Date | undefined) => void;
   onCourseChange: (courseId: string) => void;
   onSectionChange: (sectionId: string) => void;
+  onElectiveBatchChange?: (id: string) => void;
   onApplyFilters: () => void;
   onClearFilters: () => void;
   courses: CourseOption[];
@@ -77,9 +87,13 @@ export const AttendanceEditList = ({
   filters,
   selectedCourseValue,
   selectedSectionValue,
+  selectedElectiveBatchId,
+  isElective = false,
+  electiveBatches = [],
   onDateChange,
   onCourseChange,
   onSectionChange,
+  onElectiveBatchChange,
   onApplyFilters,
   onClearFilters,
   courses,
@@ -162,25 +176,45 @@ export const AttendanceEditList = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="session-filter-section">Section</Label>
-              <Select
-                value={selectedSectionValue || filters.sectionId || undefined}
-                onValueChange={onSectionChange}
-              >
-                <SelectTrigger id="session-filter-section" className="w-full">
-                  <SelectValue placeholder="All sections" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sections.map((section) => (
-                    <SelectItem
-                      key={`${section.id}:${section.courseId}`}
-                      value={section.id}
-                    >
-                      {section.label ?? section.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="session-filter-section">
+                {isElective ? "Elective Batch" : "Section"}
+              </Label>
+              {isElective ? (
+                <Select
+                  value={selectedElectiveBatchId || undefined}
+                  onValueChange={(value) => onElectiveBatchChange?.(value)}
+                >
+                  <SelectTrigger id="session-filter-section" className="w-full">
+                    <SelectValue placeholder="All elective batches" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {electiveBatches.map((batch) => (
+                      <SelectItem key={batch.id} value={batch.id}>
+                        {batch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select
+                  value={selectedSectionValue || filters.sectionId || undefined}
+                  onValueChange={onSectionChange}
+                >
+                  <SelectTrigger id="session-filter-section" className="w-full">
+                    <SelectValue placeholder="All sections" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sections.map((section) => (
+                      <SelectItem
+                        key={`${section.id}:${section.courseId}`}
+                        value={section.id}
+                      >
+                        {section.label ?? section.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
@@ -225,7 +259,9 @@ export const AttendanceEditList = ({
                     {session.courseCode} - {session.courseName}
                   </p>
                   <p className="text-muted-foreground font-medium md:text-right">
-                    Section {session.sectionName}
+                    {session.electiveBatchName
+                      ? `Elective Batch ${session.electiveBatchName}`
+                      : `Section ${session.sectionName}`}
                   </p>
                   <p className="text-muted-foreground">
                     {dayjs(session.sessionDate).format("MMM D, YYYY")}

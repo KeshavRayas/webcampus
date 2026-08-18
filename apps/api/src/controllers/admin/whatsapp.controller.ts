@@ -54,6 +54,7 @@ export const createTemplate = async (req: Request, res: Response) => {
         category: data.category,
         recipientType: data.recipientType,
         externalTemplateId: data.externalTemplateId,
+        smsTemplateId: data.smsTemplateId ?? null,
         messageBody: data.messageBody,
         isActive: data.isActive,
         createdById,
@@ -103,6 +104,9 @@ export const updateTemplate = async (req: Request, res: Response) => {
           ...(data.recipientType ? { recipientType: data.recipientType } : {}),
           ...(data.externalTemplateId
             ? { externalTemplateId: data.externalTemplateId }
+            : {}),
+          ...(data.smsTemplateId !== undefined
+            ? { smsTemplateId: data.smsTemplateId }
             : {}),
           ...(data.messageBody ? { messageBody: data.messageBody } : {}),
           ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),

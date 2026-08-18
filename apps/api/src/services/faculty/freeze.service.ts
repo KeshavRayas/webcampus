@@ -2,6 +2,7 @@ import { db } from "@webcampus/db";
 import type { Freeze, FreezeActorRole, Prisma } from "@webcampus/db";
 import type { FreezeDisplayState } from "@webcampus/schemas/faculty";
 import type { Role } from "@webcampus/types/rbac";
+import { FACULTY_COURSE_STATUS } from "../shared/course-approval";
 import { recomputeCourseMarks } from "../shared/mark-sync.service";
 
 export type FrozenByInfo = {
@@ -240,7 +241,10 @@ export const assertCanManageFreezeWindow = (
 };
 
 export type FreezeWindowRow = {
-  courseAssignmentId: string;
+  courseAssignmentId: string | null;
+  electiveBatchFacultyId: string | null;
+  isElective: boolean;
+  domain: "section" | "group";
   courseCode: string;
   courseName: string;
   department: string;
@@ -274,6 +278,19 @@ export const ensureFreezeRowTx = async (
   });
 };
 
+export const assertFreezeOwnership = (input: {
+  courseAssignmentId?: string | null;
+  electiveBatchFacultyId?: string | null;
+}): void => {
+  const hasPc = Boolean(input.courseAssignmentId);
+  const hasElective = Boolean(input.electiveBatchFacultyId);
+  if (hasPc === hasElective) {
+    throw new Error(
+      "Freeze must reference exactly one ownership path (courseAssignmentId XOR electiveBatchFacultyId)."
+    );
+  }
+};
+
 export class FreezeService {
   static async getFreezeForCourseAssignment(
     courseAssignmentId: string
@@ -292,23 +309,46 @@ export class FreezeService {
     facultyId: string,
     semesterId: string
   ): Promise<FreezeWindowRow[]> {
-    const assignments = await db.courseAssignment.findMany({
-      where: {
-        facultyId,
-        section: { semesterId },
-      },
-      include: {
-        course: { select: { code: true, name: true } },
-        department: { select: { name: true } },
-        faculty: { select: { shortName: true } },
-        section: { select: { id: true, name: true } },
-        batch: { select: { name: true } },
-        freezes: true,
-      },
-    });
+    const [assignments, electiveAssignments] = await Promise.all([
+      db.courseAssignment.findMany({
+        where: {
+          facultyId,
+          section: { semesterId },
+        },
+        include: {
+          course: { select: { code: true, name: true } },
+          department: { select: { name: true } },
+          faculty: { select: { shortName: true } },
+          section: { select: { id: true, name: true } },
+          batch: { select: { name: true } },
+          freezes: true,
+        },
+      }),
+      db.electiveBatchFaculty.findMany({
+        where: {
+          facultyId,
+          course: { approvalStatus: FACULTY_COURSE_STATUS, semesterId },
+        },
+        include: {
+          course: {
+            select: {
+              code: true,
+              name: true,
+              department: { select: { name: true } },
+            },
+          },
+          faculty: { select: { shortName: true } },
+          electiveBatch: { select: { id: true, name: true } },
+          freeze: true,
+        },
+      }),
+    ]);
 
-    return assignments.map((assignment) => ({
+    const pcRows = assignments.map((assignment) => ({
       courseAssignmentId: assignment.id,
+      electiveBatchFacultyId: null,
+      isElective: false,
+      domain: "section" as const,
       courseCode: assignment.course.code,
       courseName: assignment.course.name,
       department: assignment.department.name,
@@ -320,6 +360,25 @@ export class FreezeService {
       assignmentType: assignment.assignmentType,
       freeze: resolveFreezeState(assignment.freezes),
     }));
+
+    const electiveRows = electiveAssignments.map((assignment) => ({
+      courseAssignmentId: null,
+      electiveBatchFacultyId: assignment.id,
+      isElective: true,
+      domain: "group" as const,
+      courseCode: assignment.course.code,
+      courseName: assignment.course.name,
+      department: assignment.course.department?.name ?? "",
+      facultyName: assignment.faculty.shortName,
+      semester: assignment.semester,
+      sectionId: assignment.electiveBatch.id,
+      sectionName: assignment.electiveBatch.name,
+      batchName: null,
+      assignmentType: "THEORY",
+      freeze: resolveFreezeState(assignment.freeze),
+    }));
+
+    return [...pcRows, ...electiveRows];
   }
 
   static async getFacultyAssignments(
@@ -343,6 +402,9 @@ export class FreezeService {
 
     return assignments.map((assignment) => ({
       courseAssignmentId: assignment.id,
+      electiveBatchFacultyId: null,
+      isElective: false,
+      domain: "section" as const,
       courseCode: assignment.course.code,
       courseName: assignment.course.name,
       department: assignment.department.name,
@@ -364,20 +426,43 @@ export class FreezeService {
       ...(departmentId ? { departmentId } : {}),
       section: { semesterId },
     };
-    const assignments = await db.courseAssignment.findMany({
-      where,
-      include: {
-        course: { select: { code: true, name: true } },
-        faculty: { select: { shortName: true } },
-        department: { select: { name: true } },
-        section: { select: { id: true, name: true } },
-        batch: { select: { name: true } },
-        freezes: true,
-      },
-    });
+    const [assignments, electiveAssignments] = await Promise.all([
+      db.courseAssignment.findMany({
+        where,
+        include: {
+          course: { select: { code: true, name: true } },
+          faculty: { select: { shortName: true } },
+          department: { select: { name: true } },
+          section: { select: { id: true, name: true } },
+          batch: { select: { name: true } },
+          freezes: true,
+        },
+      }),
+      db.electiveBatchFaculty.findMany({
+        where: {
+          ...(departmentId ? { course: { departmentId } } : {}),
+          course: { approvalStatus: FACULTY_COURSE_STATUS, semesterId },
+        },
+        include: {
+          course: {
+            select: {
+              code: true,
+              name: true,
+              department: { select: { name: true } },
+            },
+          },
+          faculty: { select: { shortName: true } },
+          electiveBatch: { select: { id: true, name: true } },
+          freeze: true,
+        },
+      }),
+    ]);
 
-    return assignments.map((assignment) => ({
+    const pcRows = assignments.map((assignment) => ({
       courseAssignmentId: assignment.id,
+      electiveBatchFacultyId: null,
+      isElective: false,
+      domain: "section" as const,
       courseCode: assignment.course.code,
       courseName: assignment.course.name,
       department: assignment.department.name,
@@ -389,14 +474,143 @@ export class FreezeService {
       assignmentType: assignment.assignmentType,
       freeze: resolveFreezeState(assignment.freezes),
     }));
+
+    const electiveRows = electiveAssignments.map((assignment) => ({
+      courseAssignmentId: null,
+      electiveBatchFacultyId: assignment.id,
+      isElective: true,
+      domain: "group" as const,
+      courseCode: assignment.course.code,
+      courseName: assignment.course.name,
+      department: assignment.course.department?.name ?? "",
+      facultyName: assignment.faculty.shortName,
+      semester: assignment.semester,
+      sectionId: assignment.electiveBatch.id,
+      sectionName: assignment.electiveBatch.name,
+      batchName: null,
+      assignmentType: "THEORY",
+      freeze: resolveFreezeState(assignment.freeze),
+    }));
+
+    return [...pcRows, ...electiveRows];
+  }
+
+  private static buildFreezeUpdateData(
+    role: Role,
+    username?: string | null,
+    displayUsername?: string | null
+  ): Partial<Freeze> {
+    const updateData: Partial<Freeze> = {};
+    if (role === "faculty") {
+      updateData.facultyFrozen = true;
+      updateData.facultyFrozenAt = new Date();
+    } else if (role === "department" || role === "hod") {
+      updateData.hodFrozen = true;
+      updateData.hodFrozenAt = new Date();
+    } else if (role === "admin") {
+      updateData.adminFrozen = true;
+      updateData.adminFrozenAt = new Date();
+    } else {
+      throw new Error(forbidden("invalid role for freeze"));
+    }
+
+    const resolveRole = (r: Role): FreezeActorRole | null => {
+      if (r === "faculty") return "FACULTY";
+      if (r === "department" || r === "hod") return "HOD";
+      if (r === "admin") return "ADMIN";
+      return null;
+    };
+
+    updateData.frozenByRole = resolveRole(role);
+    updateData.frozenByUsername = username ?? null;
+    updateData.frozenByDisplay = displayUsername ?? null;
+
+    return updateData;
+  }
+
+  private static buildUnfreezeUpdateData(role: Role): Partial<Freeze> {
+    const updateData: Partial<Freeze> = {};
+    if (role === "department" || role === "hod") {
+      updateData.hodFrozen = false;
+      updateData.hodFrozenAt = null;
+      updateData.facultyFrozen = false;
+      updateData.facultyFrozenAt = null;
+      updateData.frozenByRole = null;
+      updateData.frozenByUsername = null;
+      updateData.frozenByDisplay = null;
+    } else if (role === "admin") {
+      updateData.adminFrozen = false;
+      updateData.adminFrozenAt = null;
+      updateData.hodFrozen = false;
+      updateData.hodFrozenAt = null;
+      updateData.facultyFrozen = false;
+      updateData.facultyFrozenAt = null;
+      updateData.frozenByRole = null;
+      updateData.frozenByUsername = null;
+      updateData.frozenByDisplay = null;
+    } else {
+      throw new Error(forbidden("invalid role for unfreeze"));
+    }
+    return updateData;
   }
 
   static async freeze(
-    courseAssignmentId: string,
+    input: {
+      courseAssignmentId?: string | null;
+      electiveBatchFacultyId?: string | null;
+    },
     role: Role,
     username?: string | null,
     displayUsername?: string | null
   ): Promise<FreezeResolution> {
+    assertFreezeOwnership(input);
+    const updateData = this.buildFreezeUpdateData(
+      role,
+      username,
+      displayUsername
+    );
+
+    if (input.electiveBatchFacultyId) {
+      const electiveAssignment = await db.electiveBatchFaculty.findUnique({
+        where: { id: input.electiveBatchFacultyId },
+        select: {
+          id: true,
+          courseId: true,
+          course: { select: { approvalStatus: true } },
+        },
+      });
+      if (!electiveAssignment) {
+        throw new Error(notFound("Elective batch faculty assignment"));
+      }
+      if (electiveAssignment.course.approvalStatus !== FACULTY_COURSE_STATUS) {
+        throw new Error(forbidden("course is not approved for freezing"));
+      }
+
+      const result = await db.$transaction(async (tx) => {
+        const freeze = await tx.freeze.findUnique({
+          where: { electiveBatchFacultyId: electiveAssignment.id },
+        });
+        const resolution = resolveFreezeState(freeze);
+        assertCanManageFreezeWindow(role, resolution, "freeze");
+
+        const updated = await tx.freeze.upsert({
+          where: { electiveBatchFacultyId: electiveAssignment.id },
+          create: {
+            electiveBatchFacultyId: electiveAssignment.id,
+            ...updateData,
+          },
+          update: updateData,
+        });
+
+        return resolveFreezeState(updated);
+      });
+
+      await recomputeCourseMarks(electiveAssignment.courseId);
+
+      return result;
+    }
+
+    const courseAssignmentId = input.courseAssignmentId ?? "";
     const assignment = await db.courseAssignment.findUnique({
       where: { id: courseAssignmentId },
       select: { id: true, courseId: true },
@@ -411,31 +625,6 @@ export class FreezeService {
       });
       const resolution = resolveFreezeState(freeze);
       assertCanManageFreezeWindow(role, resolution, "freeze");
-
-      const updateData: Partial<Freeze> = {};
-      if (role === "faculty") {
-        updateData.facultyFrozen = true;
-        updateData.facultyFrozenAt = new Date();
-      } else if (role === "department" || role === "hod") {
-        updateData.hodFrozen = true;
-        updateData.hodFrozenAt = new Date();
-      } else if (role === "admin") {
-        updateData.adminFrozen = true;
-        updateData.adminFrozenAt = new Date();
-      } else {
-        throw new Error(forbidden("invalid role for freeze"));
-      }
-
-      const resolveRole = (r: Role): FreezeActorRole | null => {
-        if (r === "faculty") return "FACULTY";
-        if (r === "department" || r === "hod") return "HOD";
-        if (r === "admin") return "ADMIN";
-        return null;
-      };
-
-      updateData.frozenByRole = resolveRole(role);
-      updateData.frozenByUsername = username ?? null;
-      updateData.frozenByDisplay = displayUsername ?? null;
 
       const updated = await tx.freeze.upsert({
         where: { courseAssignmentId },
@@ -455,9 +644,45 @@ export class FreezeService {
   }
 
   static async unfreeze(
-    courseAssignmentId: string,
+    input: {
+      courseAssignmentId?: string | null;
+      electiveBatchFacultyId?: string | null;
+    },
     role: Role
   ): Promise<FreezeResolution> {
+    assertFreezeOwnership(input);
+    const updateData = this.buildUnfreezeUpdateData(role);
+
+    if (input.electiveBatchFacultyId) {
+      const electiveAssignment = await db.electiveBatchFaculty.findUnique({
+        where: { id: input.electiveBatchFacultyId },
+        select: { id: true },
+      });
+      if (!electiveAssignment) {
+        throw new Error(notFound("Elective batch faculty assignment"));
+      }
+
+      return db.$transaction(async (tx) => {
+        const freeze = await tx.freeze.findUnique({
+          where: { electiveBatchFacultyId: electiveAssignment.id },
+        });
+        const resolution = resolveFreezeState(freeze);
+        assertCanManageFreezeWindow(role, resolution, "unfreeze");
+
+        const updated = await tx.freeze.upsert({
+          where: { electiveBatchFacultyId: electiveAssignment.id },
+          create: {
+            electiveBatchFacultyId: electiveAssignment.id,
+            ...updateData,
+          },
+          update: updateData,
+        });
+
+        return resolveFreezeState(updated);
+      });
+    }
+
+    const courseAssignmentId = input.courseAssignmentId ?? "";
     const assignment = await db.courseAssignment.findUnique({
       where: { id: courseAssignmentId },
       select: { id: true },
@@ -472,29 +697,6 @@ export class FreezeService {
       });
       const resolution = resolveFreezeState(freeze);
       assertCanManageFreezeWindow(role, resolution, "unfreeze");
-
-      const updateData: Partial<Freeze> = {};
-      if (role === "department" || role === "hod") {
-        updateData.hodFrozen = false;
-        updateData.hodFrozenAt = null;
-        updateData.facultyFrozen = false;
-        updateData.facultyFrozenAt = null;
-        updateData.frozenByRole = null;
-        updateData.frozenByUsername = null;
-        updateData.frozenByDisplay = null;
-      } else if (role === "admin") {
-        updateData.adminFrozen = false;
-        updateData.adminFrozenAt = null;
-        updateData.hodFrozen = false;
-        updateData.hodFrozenAt = null;
-        updateData.facultyFrozen = false;
-        updateData.facultyFrozenAt = null;
-        updateData.frozenByRole = null;
-        updateData.frozenByUsername = null;
-        updateData.frozenByDisplay = null;
-      } else {
-        throw new Error(forbidden("invalid role for unfreeze"));
-      }
 
       const updated = await tx.freeze.upsert({
         where: { courseAssignmentId },

@@ -17,6 +17,16 @@ export const normalizeStudentEmailToken = (value: string): string => {
     .replace(/[^a-z0-9]/g, "");
 };
 
+export const splitStudentName = (
+  fullName: string
+): { firstName: string; middleName: string; lastName: string } => {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0] ?? "";
+  const middleName = parts.length > 2 ? parts.slice(1, -1).join(" ") : "";
+  const lastName = parts.length > 1 ? (parts[parts.length - 1] ?? "") : "";
+  return { firstName, middleName, lastName };
+};
+
 export const getStudentEmailYearSuffix = (academicYear: string): string => {
   const digits = academicYear.replace(/\D/g, "");
 

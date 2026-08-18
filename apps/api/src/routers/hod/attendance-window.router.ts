@@ -53,7 +53,7 @@ router.post(
 );
 
 router.post(
-  "/:courseAssignmentId/freeze",
+  "/course-assignment/:courseAssignmentId/freeze",
   validateRequest(HODFreezeParamsSchema, "params"),
   protect({
     role: "hod",
@@ -63,7 +63,27 @@ router.post(
 );
 
 router.post(
-  "/:courseAssignmentId/unfreeze",
+  "/course-assignment/:courseAssignmentId/unfreeze",
+  validateRequest(HODUnfreezeParamsSchema, "params"),
+  protect({
+    role: "hod",
+    permissions: { freeze: ["lock"] },
+  }),
+  HODAttendanceWindowController.unfreezeAssignment
+);
+
+router.post(
+  "/elective-batch/:electiveBatchFacultyId/freeze",
+  validateRequest(HODFreezeParamsSchema, "params"),
+  protect({
+    role: "hod",
+    permissions: { freeze: ["lock"] },
+  }),
+  HODAttendanceWindowController.freezeAssignment
+);
+
+router.post(
+  "/elective-batch/:electiveBatchFacultyId/unfreeze",
   validateRequest(HODUnfreezeParamsSchema, "params"),
   protect({
     role: "hod",

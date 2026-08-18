@@ -1,8 +1,7 @@
 let _seq = 0;
 
 export type MakeApplicantInput = {
-  firstName?: string;
-  lastName?: string;
+  name?: string;
   email?: string;
   phone?: string;
   dateOfBirth?: string;
@@ -25,8 +24,7 @@ export function makeApplicant(overrides: Partial<MakeApplicantInput> = {}) {
   _seq++;
   const seq = String(_seq).padStart(3, "0");
   return {
-    firstName: overrides.firstName ?? `Test${seq}`,
-    lastName: overrides.lastName ?? `Applicant${seq}`,
+    name: overrides.name ?? `Test${seq} Applicant${seq}`,
     email: overrides.email ?? `applicant${seq}@test.com`,
     phone: overrides.phone ?? `9876543${String(_seq).padStart(4, "0")}`,
     dateOfBirth: overrides.dateOfBirth ?? "2000-01-15",

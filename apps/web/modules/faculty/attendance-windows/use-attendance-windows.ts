@@ -27,7 +27,9 @@ export type AttendanceWindowFreeze = {
 };
 
 export type AttendanceWindowRow = {
-  courseAssignmentId: string;
+  courseAssignmentId: string | null;
+  electiveBatchFacultyId: string | null;
+  isElective: boolean;
   courseCode: string;
   courseName: string;
   sectionId: string;
@@ -125,14 +127,22 @@ export const useBulkFreezeAttendanceWindows = () => {
   });
 };
 
+export type FreezeTarget = {
+  courseAssignmentId?: string | null;
+  electiveBatchFacultyId?: string | null;
+};
+
 export const useFreezeAssignment = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (courseAssignmentId: string) => {
+    mutationFn: async (target: FreezeTarget) => {
+      const path = target.courseAssignmentId
+        ? `/faculty/attendance-windows/course-assignment/${target.courseAssignmentId}/freeze`
+        : `/faculty/attendance-windows/elective-batch/${target.electiveBatchFacultyId ?? ""}/freeze`;
       const res = await axios.post<BaseResponse<AttendanceWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/attendance-windows/${courseAssignmentId}/freeze`,
+        `${NEXT_PUBLIC_API_BASE_URL}${path}`,
         {},
         { withCredentials: true }
       );

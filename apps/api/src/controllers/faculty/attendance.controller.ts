@@ -178,11 +178,12 @@ export class AttendanceController {
     res: Response
   ): Promise<void> {
     try {
-      const { courseId, sectionId, batchId } = req.query;
+      const { courseId, sectionId, batchId, electiveBatchId } = req.query;
       const response = await Attendance.getDetailedReport(
         courseId,
         sectionId,
-        batchId
+        batchId,
+        electiveBatchId
       );
       if (response.status === "success") {
         sendResponse({

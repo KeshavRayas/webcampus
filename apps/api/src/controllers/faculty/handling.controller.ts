@@ -12,6 +12,7 @@ type FacultyHandlingQueryType = {
   semesterId?: string;
   sectionId?: string;
   batchId?: string;
+  courseId?: string;
   academicYear?: string;
   page?: number;
   limit?: number;

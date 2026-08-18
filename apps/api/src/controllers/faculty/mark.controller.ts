@@ -42,7 +42,8 @@ const getStatusCodeForError = (message: string): number => {
 export class MarkController {
   static async create(req: Request, res: Response): Promise<void> {
     try {
-      const response = await Mark.create(req.body);
+      const user = await resolveSessionUser(req);
+      const response = await Mark.create(req.body, user.id);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -150,7 +151,8 @@ export class MarkController {
     res: Response
   ): Promise<void> {
     try {
-      const response = await Mark.update(req.params.id, req.body);
+      const user = await resolveSessionUser(req);
+      const response = await Mark.update(req.params.id, req.body, user.id);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -193,7 +195,8 @@ export class MarkController {
     res: Response
   ): Promise<void> {
     try {
-      const response = await Mark.delete(req.params.id);
+      const user = await resolveSessionUser(req);
+      const response = await Mark.delete(req.params.id, user.id);
       if (response.status === "success") {
         sendResponse({
           res,
@@ -275,10 +278,12 @@ export class MarkController {
       const user = await resolveSessionUser(req);
 
       const sectionId = req.query.sectionId as string | undefined;
+      const electiveBatchId = req.query.electiveBatchId as string | undefined;
       const response = await Mark.getAssessmentTemplateWithMarks(
         user.id,
         req.params.assessmentId,
-        sectionId
+        sectionId,
+        electiveBatchId
       );
       if (response.status === "success") {
         sendResponse({
@@ -354,11 +359,13 @@ export class MarkController {
     try {
       const user = await resolveSessionUser(req);
       const sectionId = req.query.sectionId as string | undefined;
+      const electiveBatchId = req.query.electiveBatchId as string | undefined;
 
       const buffer = await Mark.generateMarksTemplate(
         user.id,
         req.params.assessmentId,
-        sectionId
+        sectionId,
+        electiveBatchId
       );
 
       res.setHeader(
@@ -391,12 +398,14 @@ export class MarkController {
     try {
       const user = await resolveSessionUser(req);
       const sectionId = req.body.sectionId as string | undefined;
+      const electiveBatchId = req.body.electiveBatchId as string | undefined;
       if (!req.file) throw new Error("No file uploaded");
 
       const response = await Mark.uploadMarksFromExcel(
         user.id,
         req.params.assessmentId,
         sectionId,
+        electiveBatchId,
         req.file.buffer
       );
 

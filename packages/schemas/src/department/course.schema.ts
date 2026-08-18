@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  COURSE_TYPES,
+  PROJECT_GROUPING_SCOPES,
+} from "../constants/course-types";
 
 const COURSE_MODES = [
   "INTEGRATED",
@@ -6,8 +10,12 @@ const COURSE_MODES = [
   "FINAL_SUMMARY",
   "NCMC",
 ] as const;
-const COURSE_TYPES = ["PC", "PE", "OE", "NCMC"] as const;
 const COURSE_CYCLES = ["PHYSICS", "CHEMISTRY", "NONE"] as const;
+const OPEN_ELECTIVE_ELIGIBILITIES = [
+  "ALL",
+  "ALL_EXCEPT_OWNER",
+  "CUSTOM",
+] as const;
 
 const BaseCourseSchema = z.object({
   code: z
@@ -56,8 +64,22 @@ const BaseCourseSchema = z.object({
   aatMaxMarks: z.number().int().min(0),
   aatEligibility: z.number().int().min(0).max(100).default(40),
 
-  allowFeedback: z.boolean().default(false),
+  allowFeedback: z.boolean().default(true),
   attendanceRequired: z.boolean().default(true),
+
+  // Program Elective (PE) batch configuration
+  numberOfBatches: z.number().int().min(1).optional(),
+  studentsPerBatch: z.number().int().min(1).optional(),
+  /** When decreasing numberOfBatches, caller must pick which batch IDs to remove */
+  electiveBatchesToRemove: z.array(z.string().uuid()).optional(),
+
+  // Open Elective (OE) visibility configuration
+  openElectiveEligibility: z.enum(OPEN_ELECTIVE_ELIGIBILITIES).optional(),
+  /** Departments allowed to register when openElectiveEligibility === "CUSTOM" */
+  eligibleDepartmentIds: z.array(z.string().uuid()).optional(),
+
+  // Project / Mini-Project (PW) grouping configuration
+  projectGroupingScope: z.enum(PROJECT_GROUPING_SCOPES).optional(),
 });
 
 const MODE_LOCKED_VALUES = {
@@ -179,6 +201,182 @@ const validateAssessmentBounds = (
     });
   }
 };
+
+const validatePeConfig = (
+  value: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+  strict = true
+) => {
+  const courseType = value.courseType as string | undefined;
+  if (courseType !== "PE") {
+    return;
+  }
+
+  const courseMode = value.courseMode as string | undefined;
+  if (courseMode !== undefined && courseMode !== "NON_INTEGRATED") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["courseMode"],
+      message: "Program Elective (PE) courses must use NON_INTEGRATED mode",
+    });
+  }
+
+  const numberOfBatches = value.numberOfBatches as number | undefined;
+  const studentsPerBatch = value.studentsPerBatch as number | undefined;
+
+  if (strict || numberOfBatches !== undefined) {
+    if (
+      numberOfBatches === undefined ||
+      !Number.isInteger(numberOfBatches) ||
+      numberOfBatches < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["numberOfBatches"],
+        message: "Number of batches is required for PE and must be at least 1",
+      });
+    }
+  }
+
+  if (strict || studentsPerBatch !== undefined) {
+    if (
+      studentsPerBatch === undefined ||
+      !Number.isInteger(studentsPerBatch) ||
+      studentsPerBatch < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["studentsPerBatch"],
+        message: "Students per batch is required for PE and must be at least 1",
+      });
+    }
+  }
+};
+
+const validateOeConfig = (
+  value: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+  strict = true
+) => {
+  const courseType = value.courseType as string | undefined;
+  if (courseType !== "OE") {
+    return;
+  }
+
+  const courseMode = value.courseMode as string | undefined;
+  if (courseMode !== undefined && courseMode !== "NON_INTEGRATED") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["courseMode"],
+      message: "Open Elective (OE) courses must use NON_INTEGRATED mode",
+    });
+  }
+
+  const numberOfBatches = value.numberOfBatches as number | undefined;
+  const studentsPerBatch = value.studentsPerBatch as number | undefined;
+
+  if (strict || numberOfBatches !== undefined) {
+    if (
+      numberOfBatches === undefined ||
+      !Number.isInteger(numberOfBatches) ||
+      numberOfBatches < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["numberOfBatches"],
+        message: "Number of batches is required for OE and must be at least 1",
+      });
+    }
+  }
+
+  if (strict || studentsPerBatch !== undefined) {
+    if (
+      studentsPerBatch === undefined ||
+      !Number.isInteger(studentsPerBatch) ||
+      studentsPerBatch < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["studentsPerBatch"],
+        message: "Students per batch is required for OE and must be at least 1",
+      });
+    }
+  }
+
+  const eligibility = value.openElectiveEligibility as string | undefined;
+  const eligibleDepartmentIds = value.eligibleDepartmentIds as
+    | string[]
+    | undefined;
+  if (eligibility === "CUSTOM") {
+    if (
+      !Array.isArray(eligibleDepartmentIds) ||
+      eligibleDepartmentIds.length === 0
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["eligibleDepartmentIds"],
+        message:
+          "At least one department is required when eligibility is CUSTOM",
+      });
+    }
+  }
+};
+
+const validatePwConfig = (
+  value: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+  strict = true
+) => {
+  const courseType = value.courseType as string | undefined;
+  if (courseType !== "PW") {
+    return;
+  }
+
+  const courseMode = value.courseMode as string | undefined;
+  if (courseMode !== undefined && courseMode !== "FINAL_SUMMARY") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["courseMode"],
+      message:
+        "Project / Mini-Project (PW) courses must use FINAL_SUMMARY mode",
+    });
+  }
+
+  const studentsPerBatch = value.studentsPerBatch as number | undefined;
+  if (strict || studentsPerBatch !== undefined) {
+    if (
+      studentsPerBatch === undefined ||
+      !Number.isInteger(studentsPerBatch) ||
+      studentsPerBatch < 1
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["studentsPerBatch"],
+        message: "Students per group is required for PW and must be at least 1",
+      });
+    }
+  }
+
+  const scope = value.projectGroupingScope as string | undefined;
+  if (scope !== undefined && scope !== "WITHIN_SECTION") {
+    const numberOfGroups = value.numberOfBatches as number | undefined;
+    if (strict || numberOfGroups !== undefined) {
+      if (
+        numberOfGroups === undefined ||
+        !Number.isInteger(numberOfGroups) ||
+        numberOfGroups < 1
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["numberOfBatches"],
+          message:
+            "Number of groups is required for DEPARTMENT_WIDE PW and must be at least 1",
+        });
+      }
+    }
+  }
+};
+
 export const CreateCourseSchema = BaseCourseSchema.superRefine((value, ctx) => {
   if (!value.departmentId && !value.departmentName) {
     ctx.addIssue({
@@ -194,6 +392,9 @@ export const CreateCourseSchema = BaseCourseSchema.superRefine((value, ctx) => {
     true
   );
   validateAssessmentBounds(value as unknown as Record<string, unknown>, ctx);
+  validatePeConfig(value as unknown as Record<string, unknown>, ctx, true);
+  validateOeConfig(value as unknown as Record<string, unknown>, ctx, true);
+  validatePwConfig(value as unknown as Record<string, unknown>, ctx, true);
 });
 
 export const UpdateCourseSchema = BaseCourseSchema.partial()
@@ -201,14 +402,24 @@ export const UpdateCourseSchema = BaseCourseSchema.partial()
     id: z.string().uuid("Course ID is required for updates"),
   })
   .superRefine((value, ctx) => {
-    if (!value.courseMode) return;
-    validateModeLockedValues(
-      value as unknown as Record<string, unknown>,
-      value.courseMode,
-      ctx,
-      false
-    );
+    if (value.courseMode) {
+      validateModeLockedValues(
+        value as unknown as Record<string, unknown>,
+        value.courseMode,
+        ctx,
+        false
+      );
+    }
     validateAssessmentBounds(value as unknown as Record<string, unknown>, ctx);
+    if (value.courseType === "PE" || value.numberOfBatches !== undefined) {
+      validatePeConfig(value as unknown as Record<string, unknown>, ctx, false);
+    }
+    if (value.courseType === "OE" || value.numberOfBatches !== undefined) {
+      validateOeConfig(value as unknown as Record<string, unknown>, ctx, false);
+    }
+    if (value.courseType === "PW") {
+      validatePwConfig(value as unknown as Record<string, unknown>, ctx, false);
+    }
   });
 
 export const DeleteCourseSchema = z.object({
@@ -259,6 +470,21 @@ export const CourseBranchQuerySchema = z.object({
     .transform((value) => (value === "" ? undefined : value))
     .optional(),
 });
+
+export const PeCapacitySummaryQuerySchema = z.object({
+  semesterId: z.string().uuid("Invalid semester ID"),
+  cycle: z
+    .enum(COURSE_CYCLES)
+    .or(z.literal(""))
+    .transform((value) => (value === "" ? undefined : value))
+    .optional(),
+});
+
+export const PeCapacitySummaryResponseSchema = z.object({
+  eligibleStudents: z.number().int(),
+  configuredCapacity: z.number().int(),
+  remainingSeats: z.number().int(),
+});
 /**
  * Response schema for a single course (includes backend-computed fields)
  */
@@ -297,10 +523,39 @@ export const CourseResponseSchema = BaseCourseSchema.extend({
   lastOverrideById: z.string().nullable().optional(),
   overrideCount: z.number().int().optional(),
   hasPostApprovalEdits: z.boolean().optional(),
+  numberOfBatches: z.number().int().nullable().optional(),
+  studentsPerBatch: z.number().int().nullable().optional(),
+  electiveMappingVersion: z.number().int().optional(),
+  projectGroupingScope: z.enum(PROJECT_GROUPING_SCOPES).optional(),
+  openElectiveEligibility: z.enum(OPEN_ELECTIVE_ELIGIBILITIES).optional(),
+  eligibleDepartmentIds: z.array(z.string().uuid()).optional(),
+  eligibleDepartments: z
+    .array(z.object({ id: z.string().uuid(), name: z.string() }))
+    .optional(),
+  facultyMappingComplete: z.boolean().optional(),
+  electiveMappingComplete: z.boolean().optional(),
+  electiveBatches: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string(),
+        sortOrder: z.number().int(),
+        facultyId: z.string().uuid().nullable().optional(),
+        facultyName: z.string().nullable().optional(),
+        studentCount: z.number().int().optional(),
+      })
+    )
+    .optional(),
 });
 
 export type CreateCourseDTO = z.infer<typeof CreateCourseSchema>;
 export type UpdateCourseDTO = z.infer<typeof UpdateCourseSchema>;
 export type DeleteCourseDTO = z.infer<typeof DeleteCourseSchema>;
 export type CourseBranchQueryType = z.infer<typeof CourseBranchQuerySchema>;
+export type PeCapacitySummaryQueryType = z.infer<
+  typeof PeCapacitySummaryQuerySchema
+>;
+export type PeCapacitySummaryResponseDTO = z.infer<
+  typeof PeCapacitySummaryResponseSchema
+>;
 export type CourseResponseDTO = z.infer<typeof CourseResponseSchema>;

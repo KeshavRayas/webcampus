@@ -59,9 +59,11 @@ export interface MarksReportFilterOption {
   id: string;
   code: string;
   name: string;
+  courseType: string;
   sectionId: string;
   sectionName: string;
   semesterId: string;
+  isElectiveBatch?: boolean;
 }
 
 export interface MarksReportFilterOptionsData {

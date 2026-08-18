@@ -53,6 +53,7 @@ type FilterState = {
   semesterId: string;
   departmentId: string;
   sectionId: string;
+  cycle: string;
   search: string;
 };
 
@@ -61,8 +62,12 @@ const EMPTY_FILTERS: FilterState = {
   semesterId: "",
   departmentId: "",
   sectionId: "",
+  cycle: "",
   search: "",
 };
+
+const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
+const CYCLE_OPTIONS = ["PHYSICS", "CHEMISTRY"] as const;
 
 export const AdminHallTicketView = () => {
   const [draftFilters, setDraftFilters] = useState<FilterState>(EMPTY_FILTERS);
@@ -119,6 +124,9 @@ export const AdminHallTicketView = () => {
         eligible: c.eligible,
         status: c.eligible ? ("ELIGIBLE" as const) : ("NOT_ELIGIBLE" as const),
       })),
+      qrPayload: previewData.verificationToken
+        ? `WCHT_VERIFY:${previewData.verificationToken}`
+        : undefined,
     };
   }, [previewData, previewTarget]);
 
@@ -131,14 +139,36 @@ export const AdminHallTicketView = () => {
     (term) => term.id === draftFilters.academicTermId
   );
   const semesterOptions = selectedDraftTerm?.Semester ?? [];
+  const selectedDraftSemester = semesterOptions.find(
+    (semester) => semester.id === draftFilters.semesterId
+  );
+  const isFirstYearUg =
+    selectedDraftSemester?.programType === "UG" &&
+    FIRST_YEAR_UG_SEMESTERS.has(selectedDraftSemester.semesterNumber);
+
+  const selectedAppliedTerm = terms.find(
+    (term) => term.id === appliedFilters.academicTermId
+  );
+  const selectedAppliedSemester = (selectedAppliedTerm?.Semester ?? []).find(
+    (semester) => semester.id === appliedFilters.semesterId
+  );
+  const isAppliedFirstYearUg =
+    selectedAppliedSemester?.programType === "UG" &&
+    FIRST_YEAR_UG_SEMESTERS.has(selectedAppliedSemester.semesterNumber);
 
   const {
     data: sections = [],
     isLoading: sectionsLoading,
     isError: sectionsError,
-  } = useSections(draftFilters.semesterId, draftFilters.departmentId);
+  } = useSections(
+    draftFilters.semesterId,
+    isFirstYearUg ? undefined : draftFilters.departmentId,
+    isFirstYearUg ? draftFilters.cycle || undefined : undefined
+  );
 
-  const queryEnabled = appliedFilters.academicTermId.length > 0;
+  const queryEnabled =
+    appliedFilters.academicTermId.length > 0 &&
+    appliedFilters.semesterId.length > 0;
 
   const {
     data: students,
@@ -152,7 +182,10 @@ export const AdminHallTicketView = () => {
     ...(appliedFilters.semesterId
       ? { semesterId: appliedFilters.semesterId }
       : {}),
-    ...(appliedFilters.departmentId
+    ...(isAppliedFirstYearUg && appliedFilters.cycle
+      ? { cycle: appliedFilters.cycle }
+      : {}),
+    ...(appliedFilters.departmentId && !isAppliedFirstYearUg
       ? { departmentId: appliedFilters.departmentId }
       : {}),
     ...(appliedFilters.sectionId
@@ -189,25 +222,53 @@ export const AdminHallTicketView = () => {
           value: semester.id,
         })),
       },
-      {
-        key: "departmentId",
-        label: "Department",
-        type: "select",
-        options: departments.map((d) => ({ label: d.name, value: d.id })),
-      },
-      {
-        key: "sectionId",
-        label: "Section",
-        type: "select",
-        placeholder: sectionsLoading
-          ? "Loading sections..."
-          : sectionsError
-            ? "Failed to load sections"
-            : draftFilters.semesterId && draftFilters.departmentId
-              ? "Select section"
-              : "Select semester and department first",
-        options: sections.map((s) => ({ label: s.name, value: s.id })),
-      },
+      ...(isFirstYearUg
+        ? [
+            {
+              key: "cycle",
+              label: "Cycle",
+              type: "select",
+              allOptionLabel: "All cycles",
+              options: CYCLE_OPTIONS.map((cycle) => ({
+                label: cycle,
+                value: cycle,
+              })),
+            } as FilterFieldConfig<FilterState>,
+            {
+              key: "sectionId",
+              label: "Section",
+              type: "select",
+              placeholder: sectionsLoading
+                ? "Loading sections..."
+                : sectionsError
+                  ? "Failed to load sections"
+                  : draftFilters.semesterId
+                    ? "Select section"
+                    : "Select semester first",
+              options: sections.map((s) => ({ label: s.name, value: s.id })),
+            } as FilterFieldConfig<FilterState>,
+          ]
+        : [
+            {
+              key: "departmentId",
+              label: "Department",
+              type: "select",
+              options: departments.map((d) => ({ label: d.name, value: d.id })),
+            } as FilterFieldConfig<FilterState>,
+            {
+              key: "sectionId",
+              label: "Section",
+              type: "select",
+              placeholder: sectionsLoading
+                ? "Loading sections..."
+                : sectionsError
+                  ? "Failed to load sections"
+                  : draftFilters.semesterId && draftFilters.departmentId
+                    ? "Select section"
+                    : "Select semester and department first",
+              options: sections.map((s) => ({ label: s.name, value: s.id })),
+            } as FilterFieldConfig<FilterState>,
+          ]),
       {
         key: "search",
         label: "Search",
@@ -223,11 +284,16 @@ export const AdminHallTicketView = () => {
       sections,
       sectionsLoading,
       sectionsError,
+      isFirstYearUg,
     ]
   );
 
   const handleApply = () => {
-    setAppliedFilters(draftFilters);
+    setAppliedFilters({
+      ...draftFilters,
+      departmentId: isFirstYearUg ? "" : draftFilters.departmentId,
+      cycle: isFirstYearUg ? draftFilters.cycle : "",
+    });
     setSelectedStudentIds(new Set());
   };
 
@@ -318,7 +384,24 @@ export const AdminHallTicketView = () => {
             fields={filterFields}
             draftFilters={draftFilters}
             onDraftChange={(key, value) => {
-              setDraftFilters((prev) => ({ ...prev, [key]: value }));
+              setDraftFilters((prev) => ({
+                ...prev,
+                [key]: value,
+                ...(key === "academicTermId"
+                  ? {
+                      semesterId: "",
+                      departmentId: "",
+                      sectionId: "",
+                      cycle: "",
+                    }
+                  : key === "semesterId"
+                    ? { departmentId: "", sectionId: "", cycle: "" }
+                    : key === "departmentId"
+                      ? { sectionId: "", cycle: "" }
+                      : key === "cycle"
+                        ? { sectionId: "" }
+                        : {}),
+              }));
 
               if (key === "search") {
                 setAppliedFilters((prev) => ({ ...prev, search: value }));
@@ -354,14 +437,34 @@ export const AdminHallTicketView = () => {
                   ...current,
                   academicTermId: value,
                   semesterId: "",
+                  departmentId: "",
                   sectionId: "",
+                  cycle: "",
                 };
               }
               if (key === "semesterId") {
-                return { ...current, semesterId: value, sectionId: "" };
+                return {
+                  ...current,
+                  semesterId: value,
+                  departmentId: "",
+                  sectionId: "",
+                  cycle: "",
+                };
               }
               if (key === "departmentId") {
-                return { ...current, departmentId: value, sectionId: "" };
+                return {
+                  ...current,
+                  departmentId: value,
+                  sectionId: "",
+                  cycle: "",
+                };
+              }
+              if (key === "cycle") {
+                return {
+                  ...current,
+                  cycle: value,
+                  sectionId: "",
+                };
               }
               return { ...current, [key]: value };
             });
@@ -376,7 +479,7 @@ export const AdminHallTicketView = () => {
       {!queryEnabled ? (
         <Card>
           <CardContent className="text-muted-foreground py-12 text-center text-sm">
-            Select an academic term to view eligible students.
+            Select an academic term and semester to view eligible students.
           </CardContent>
         </Card>
       ) : isError ? (

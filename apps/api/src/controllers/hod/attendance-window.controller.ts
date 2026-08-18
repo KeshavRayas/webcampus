@@ -21,6 +21,7 @@ const getStatusCode = (error: unknown): number => {
     error.message === "HOD profile not found or department not assigned"
   )
     return 404;
+  if (error.message.includes("Forbidden")) return 403;
   if (
     error.message.includes("Semester does not belong") ||
     error.message === "Academic Term is not current"
@@ -119,7 +120,10 @@ export class HODAttendanceWindowController {
       const params = req.params as HODFreezeParams;
       const response = await HODAttendanceWindowService.freezeAssignment(
         session.user.id,
-        params.courseAssignmentId,
+        {
+          courseAssignmentId: params.courseAssignmentId,
+          electiveBatchFacultyId: params.electiveBatchFacultyId,
+        },
         session?.user?.username,
         session?.user?.displayUsername
       );
@@ -154,7 +158,10 @@ export class HODAttendanceWindowController {
       const params = req.params as HODUnfreezeParams;
       const response = await HODAttendanceWindowService.unfreezeAssignment(
         session.user.id,
-        params.courseAssignmentId
+        {
+          courseAssignmentId: params.courseAssignmentId,
+          electiveBatchFacultyId: params.electiveBatchFacultyId,
+        }
       );
 
       if (response.status === "success") {

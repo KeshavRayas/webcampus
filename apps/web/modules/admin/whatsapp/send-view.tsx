@@ -38,6 +38,7 @@ import { MultiSelect } from "./multi-select";
 import { CATEGORY_LABELS, RECIPIENT_LABELS } from "./template-form";
 import type {
   MessageCategory,
+  MessageChannel,
   MessageScope,
   PreviewResult,
   SendConfig,
@@ -60,6 +61,7 @@ export const SendView = () => {
   const [scope, setScope] = useState<Scope>("STUDENT");
   const [studentTemplateId, setStudentTemplateId] = useState("");
   const [parentTemplateId, setParentTemplateId] = useState("");
+  const [channel, setChannel] = useState<MessageChannel>("WHATSAPP");
 
   const [cieNumber, setCieNumber] = useState<1 | 2 | 3>(1);
   const [subjectMode, setSubjectMode] = useState<"all" | "custom">("all");
@@ -139,6 +141,7 @@ export const SendView = () => {
             }
           : undefined;
     return {
+      channel,
       academicTermId: academicTermId || undefined,
       departmentId: departmentId || undefined,
       semesterId: semesterId || undefined,
@@ -513,7 +516,22 @@ export const SendView = () => {
             </Button>
             <Button
               size="sm"
-              onClick={() => setConfirmOpen(true)}
+              variant="outline"
+              onClick={() => {
+                setChannel("WHATSAPP");
+                setConfirmOpen(true);
+              }}
+              disabled={selectedCount === 0 || sendMutation.isPending}
+            >
+              <Send className="mr-2 size-4" />
+              Send WhatsApp ({selectedCount})
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setChannel("SMS");
+                setConfirmOpen(true);
+              }}
               disabled={selectedCount === 0 || sendMutation.isPending}
             >
               {sendMutation.isPending ? (
@@ -521,8 +539,7 @@ export const SendView = () => {
               ) : (
                 <Send className="mr-2 size-4" />
               )}
-              Send ({selectedCount} student
-              {selectedCount === 1 ? "" : "s"})
+              Send SMS ({selectedCount})
             </Button>
           </div>
 
@@ -642,7 +659,9 @@ export const SendView = () => {
                   selectedStudentIds.has(r.studentId)
                 ).length ?? 0}
               </span>{" "}
-              recipient(s) as real WhatsApp messages. This cannot be undone.
+              recipient(s) as real{" "}
+              <span className="text-foreground font-semibold">{channel}</span>{" "}
+              messages. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

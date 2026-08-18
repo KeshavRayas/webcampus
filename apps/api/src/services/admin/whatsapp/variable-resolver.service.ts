@@ -83,10 +83,16 @@ export function resolveFieldSource(
 
 export function renderMessageBody(
   messageBody: string,
-  values: Map<MessageFieldSource, string>
+  values: Map<MessageFieldSource, string>,
+  bodyvar: string[]
 ): string {
-  return messageBody.replace(/\{([a-z_]+)\}/g, (match, token: string) => {
-    const normalized = token.toUpperCase() as MessageFieldSource;
-    return values.get(normalized) ?? match;
-  });
+  return messageBody
+    .replace(/\{\{(\d+)\}\}/g, (match, index) => {
+      const value = bodyvar[Number(index) - 1];
+      return value ?? match;
+    })
+    .replace(/\{([a-z_]+)\}/g, (match, token: string) => {
+      const normalized = token.toUpperCase() as MessageFieldSource;
+      return values.get(normalized) ?? match;
+    });
 }

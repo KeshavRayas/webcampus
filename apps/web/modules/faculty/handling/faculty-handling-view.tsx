@@ -46,6 +46,8 @@ const EMPTY_FILTERS: FacultyHandlingFilters = {
   programType: "",
   semester: "",
   section: "",
+  courseId: "",
+  batchId: "",
   page: "",
 };
 
@@ -133,6 +135,8 @@ export const FacultyHandlingView = ({
     academicTerms: [],
     semesters: [],
     sections: [],
+    courses: [],
+    batches: [],
   };
 
   const selectedTerm = useMemo(
@@ -200,6 +204,35 @@ export const FacultyHandlingView = ({
       sectionsBySemester,
     ]
   );
+
+  const courseOptions = useMemo(() => {
+    if (!draftFilters.semester) {
+      return [];
+    }
+
+    return filterOptions.courses
+      .filter((course) => course.semesterId === draftFilters.semester)
+      .map((course) => ({
+        value: course.id,
+        label: `${course.code} - ${course.name}`,
+      }));
+  }, [filterOptions.courses, draftFilters.semester]);
+
+  const batchOptions = useMemo(() => {
+    if (!draftFilters.courseId) {
+      return [];
+    }
+
+    return filterOptions.batches
+      .filter((batch) => batch.courseId === draftFilters.courseId)
+      .filter((batch) =>
+        kind === "courses" ? batch.isElective : !batch.isElective
+      )
+      .map((batch) => ({
+        value: batch.id,
+        label: batch.name,
+      }));
+  }, [filterOptions.batches, draftFilters.courseId, kind]);
 
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: filterOptions.academicTerms,
@@ -351,13 +384,31 @@ export const FacultyHandlingView = ({
   const sectionOptions = useMemo(
     () =>
       filteredSections.map((section) => ({
-        label: section.name,
+        label: section.isElectiveBatch
+          ? `${section.name} (Elective)`
+          : section.name,
         value: section.id,
       })),
     [filteredSections]
   );
 
-  const handlingFilterFields: FilterFieldConfig<FacultyHandlingFilters>[] = [
+  const selectedCourse = useMemo(
+    () =>
+      filterOptions.courses.find(
+        (course) => course.id === draftFilters.courseId
+      ) ?? null,
+    [filterOptions.courses, draftFilters.courseId]
+  );
+
+  const filterMode: "section" | "batch" | "group" | "mixed" = selectedCourse
+    ? selectedCourse.courseType === "PC" || selectedCourse.courseType === "NCMC"
+      ? "section"
+      : selectedCourse.courseType === "PW"
+        ? "group"
+        : "batch"
+    : "mixed";
+
+  const baseFilterFields: FilterFieldConfig<FacultyHandlingFilters>[] = [
     {
       key: "search",
       label: "Search",
@@ -399,15 +450,85 @@ export const FacultyHandlingView = ({
       options: semesterOptions,
     },
     {
-      key: "section",
-      label: "Section",
+      key: "courseId",
+      label: "Course",
       type: "select",
-      allOptionLabel: "All sections",
-      placeholder: draftFilters.academicTerm
-        ? "All sections"
-        : "Select term first",
-      options: sectionOptions,
+      allOptionLabel: "All courses",
+      placeholder: draftFilters.semester
+        ? "All courses"
+        : "Select semester first",
+      options: courseOptions,
     },
+  ];
+
+  const handlingFilterFields: FilterFieldConfig<FacultyHandlingFilters>[] = [
+    ...baseFilterFields,
+    ...(filterMode === "section"
+      ? [
+          {
+            key: "section" as const,
+            label: "Section",
+            type: "select" as const,
+            allOptionLabel: "All sections",
+            placeholder: draftFilters.academicTerm
+              ? "All sections"
+              : "Select term first",
+            options: sectionOptions,
+          },
+        ]
+      : []),
+    ...(filterMode === "batch"
+      ? [
+          {
+            key: "batchId" as const,
+            label: "Batch",
+            type: "select" as const,
+            allOptionLabel: "All batches",
+            placeholder: draftFilters.courseId
+              ? "All batches"
+              : "Select course first",
+            options: batchOptions,
+          },
+        ]
+      : []),
+    ...(filterMode === "group"
+      ? [
+          {
+            key: "batchId" as const,
+            label: "Group",
+            type: "select" as const,
+            allOptionLabel: "All groups",
+            placeholder: draftFilters.courseId
+              ? "All groups"
+              : "Select course first",
+            options: batchOptions,
+          },
+        ]
+      : []),
+    ...(filterMode === "mixed"
+      ? [
+          {
+            key: "section" as const,
+            label: "Section",
+            type: "select" as const,
+            allOptionLabel: "All sections",
+            placeholder: draftFilters.academicTerm
+              ? "All sections"
+              : "Select term first",
+            options: sectionOptions,
+          },
+          {
+            key: "batchId" as const,
+            label: "Batch",
+            type: "select" as const,
+            allOptionLabel: "All batches",
+            placeholder: draftFilters.courseId
+              ? "All batches"
+              : "Select course first",
+            options: batchOptions,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -429,6 +550,8 @@ export const FacultyHandlingView = ({
                 programType: "",
                 semester: "",
                 section: "",
+                courseId: "",
+                batchId: "",
                 page: "1",
               }));
               return;
@@ -440,6 +563,8 @@ export const FacultyHandlingView = ({
                 programType: value,
                 semester: "",
                 section: "",
+                courseId: "",
+                batchId: "",
                 page: "1",
               }));
               return;
@@ -450,6 +575,29 @@ export const FacultyHandlingView = ({
                 ...current,
                 semester: value,
                 section: "",
+                courseId: "",
+                batchId: "",
+                page: "1",
+              }));
+              return;
+            }
+
+            if (key === "courseId") {
+              setDraftFilters((current) => ({
+                ...current,
+                courseId: value,
+                section: "",
+                batchId: "",
+                page: "1",
+              }));
+              return;
+            }
+
+            if (key === "section") {
+              setDraftFilters((current) => ({
+                ...current,
+                section: value,
+                batchId: "",
                 page: "1",
               }));
               return;

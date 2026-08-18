@@ -22,6 +22,14 @@ import { Download, Loader2, Upload } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import {
+  buildDomainOptions,
+  deriveCourseFilterDomain,
+  DOMAIN_ALL_LABELS,
+  DOMAIN_LABELS,
+  type DomainOption,
+  type FilterDomain,
+} from "../filter-domain";
 import { EnterMarksDialog } from "../marks-entry/enter-marks-dialog";
 import {
   downloadMarksTemplate,
@@ -35,6 +43,7 @@ interface MarksFilters extends Record<string, string> {
   semesterId: string;
   courseId: string;
   sectionId: string;
+  electiveBatchId: string;
 }
 
 const EMPTY_FILTERS: MarksFilters = {
@@ -42,6 +51,7 @@ const EMPTY_FILTERS: MarksFilters = {
   semesterId: "",
   courseId: "",
   sectionId: "",
+  electiveBatchId: "",
 };
 
 export const MarksView = () => {
@@ -112,47 +122,39 @@ export const MarksView = () => {
     return Array.from(options.values());
   }, [assignments, draftFilters.termId]);
 
-  const sectionOptions = useMemo(() => {
-    const options = new Map<string, { value: string; label: string }>();
-    (assignments ?? [])
-      .filter((assignment) =>
-        draftFilters.semesterId
-          ? assignment.course.semester.id === draftFilters.semesterId
-          : true
-      )
-      .forEach((assignment) => {
-        if (!assignment.section) {
-          return;
-        }
+  const domainScope = useMemo(
+    () => ({
+      termId: draftFilters.termId,
+      semesterId: draftFilters.semesterId,
+      courseId: draftFilters.courseId,
+    }),
+    [draftFilters.termId, draftFilters.semesterId, draftFilters.courseId]
+  );
 
-        if (!options.has(assignment.section.id)) {
-          options.set(assignment.section.id, {
-            value: assignment.section.id,
-            label: assignment.section.name,
-          });
-        }
-      });
+  const sectionOptions = useMemo<DomainOption[]>(() => {
+    if (!draftFilters.courseId) {
+      return [];
+    }
+    return buildDomainOptions(assignments ?? [], domainScope, "section");
+  }, [assignments, domainScope, draftFilters.courseId]);
 
-    return Array.from(options.values());
-  }, [assignments, draftFilters.semesterId]);
+  const batchGroupOptions = useMemo<DomainOption[]>(() => {
+    if (!draftFilters.courseId) {
+      return [];
+    }
+    return buildDomainOptions(assignments ?? [], domainScope, "batch");
+  }, [assignments, domainScope, draftFilters.courseId]);
 
   const courseOptions = useMemo(() => {
     const options = new Map<string, { value: string; label: string }>();
     (assignments ?? [])
-      .filter((assignment) =>
-        draftFilters.termId
-          ? assignment.course.semester.academicTerm.id === draftFilters.termId
-          : true
-      )
-      .filter((assignment) =>
-        draftFilters.semesterId
-          ? assignment.course.semester.id === draftFilters.semesterId
-          : true
-      )
-      .filter((assignment) =>
-        draftFilters.sectionId
-          ? assignment.section?.id === draftFilters.sectionId
-          : true
+      .filter(
+        (assignment) =>
+          (!draftFilters.termId ||
+            assignment.course.semester.academicTerm.id ===
+              draftFilters.termId) &&
+          (!draftFilters.semesterId ||
+            assignment.course.semester.id === draftFilters.semesterId)
       )
       .forEach((assignment) => {
         const course = assignment.course;
@@ -165,42 +167,41 @@ export const MarksView = () => {
       });
 
     return Array.from(options.values());
-  }, [
-    assignments,
-    draftFilters.termId,
-    draftFilters.semesterId,
-    draftFilters.sectionId,
-  ]);
-
-  const filteredAssignments = useMemo(() => {
-    return (assignments ?? [])
-      .filter((assignment) =>
-        appliedFilters.termId
-          ? assignment.course.semester.academicTerm.id === appliedFilters.termId
-          : true
-      )
-      .filter((assignment) =>
-        appliedFilters.semesterId
-          ? assignment.course.semester.id === appliedFilters.semesterId
-          : true
-      )
-      .filter((assignment) =>
-        appliedFilters.sectionId
-          ? assignment.section?.id === appliedFilters.sectionId
-          : true
-      );
-  }, [assignments, appliedFilters]);
+  }, [assignments, draftFilters.termId, draftFilters.semesterId]);
 
   const selectedCourse = useMemo<MarksCourseInfo | null>(() => {
     if (!appliedFilters.courseId) {
       return null;
     }
-
-    const match = filteredAssignments.find(
+    const match = (assignments ?? []).find(
       (assignment) => assignment.course.id === appliedFilters.courseId
     );
     return match?.course ?? null;
-  }, [filteredAssignments, appliedFilters.courseId]);
+  }, [assignments, appliedFilters.courseId]);
+
+  const appliedDomain = useMemo<FilterDomain>(() => {
+    if (!selectedCourse) {
+      return null;
+    }
+    return deriveCourseFilterDomain(selectedCourse.courseType);
+  }, [selectedCourse]);
+
+  const draftDomainCourse = useMemo<MarksCourseInfo | null>(() => {
+    if (!draftFilters.courseId) {
+      return null;
+    }
+    const match = (assignments ?? []).find(
+      (assignment) => assignment.course.id === draftFilters.courseId
+    );
+    return match?.course ?? null;
+  }, [assignments, draftFilters.courseId]);
+
+  const draftDomain = useMemo<FilterDomain>(() => {
+    if (!draftDomainCourse) {
+      return null;
+    }
+    return deriveCourseFilterDomain(draftDomainCourse.courseType);
+  }, [draftDomainCourse]);
 
   const filterFields: FilterFieldConfig<MarksFilters>[] = [
     {
@@ -216,17 +217,39 @@ export const MarksView = () => {
       options: semesterOptions,
     },
     {
-      key: "sectionId",
-      label: "Section",
-      type: "select",
-      options: sectionOptions,
-    },
-    {
       key: "courseId",
       label: "Course",
       type: "select",
       options: courseOptions,
     },
+    ...(draftDomain === "section"
+      ? [
+          {
+            key: "sectionId" as const,
+            label: DOMAIN_LABELS.section,
+            type: "select" as const,
+            allOptionLabel: DOMAIN_ALL_LABELS.section,
+            options: sectionOptions,
+          },
+        ]
+      : []),
+    ...(draftDomain === "batch" || draftDomain === "group"
+      ? [
+          {
+            key: "electiveBatchId" as const,
+            label:
+              draftDomain === "batch"
+                ? DOMAIN_LABELS.batch
+                : DOMAIN_LABELS.group,
+            type: "select" as const,
+            allOptionLabel:
+              draftDomain === "batch"
+                ? DOMAIN_ALL_LABELS.batch
+                : DOMAIN_ALL_LABELS.group,
+            options: batchGroupOptions,
+          },
+        ]
+      : []),
   ];
 
   const handleDraftChange = (key: keyof MarksFilters, value: string) => {
@@ -234,15 +257,18 @@ export const MarksView = () => {
       const updated: MarksFilters = { ...prev, [key]: value } as MarksFilters;
       if (key === "termId") {
         updated.semesterId = "";
-        updated.sectionId = "";
         updated.courseId = "";
+        updated.sectionId = "";
+        updated.electiveBatchId = "";
       }
       if (key === "semesterId") {
+        updated.courseId = "";
         updated.sectionId = "";
-        updated.courseId = "";
+        updated.electiveBatchId = "";
       }
-      if (key === "sectionId") {
-        updated.courseId = "";
+      if (key === "courseId") {
+        updated.sectionId = "";
+        updated.electiveBatchId = "";
       }
       return updated;
     });
@@ -265,7 +291,12 @@ export const MarksView = () => {
       setIsProcessingExcel(true);
       await downloadMarksTemplate(
         assessmentId,
-        appliedFilters.sectionId || undefined,
+        appliedDomain === "section"
+          ? appliedFilters.sectionId || undefined
+          : undefined,
+        appliedDomain === "batch" || appliedDomain === "group"
+          ? appliedFilters.electiveBatchId || undefined
+          : undefined,
         selectedCourse.code,
         assessmentTitle
       );
@@ -289,7 +320,12 @@ export const MarksView = () => {
       setIsProcessingExcel(true);
       await uploadMarksExcel(
         assessmentId,
-        appliedFilters.sectionId || undefined,
+        appliedDomain === "section"
+          ? appliedFilters.sectionId || undefined
+          : undefined,
+        appliedDomain === "batch" || appliedDomain === "group"
+          ? appliedFilters.electiveBatchId || undefined
+          : undefined,
         file
       );
       toast.success("Marks uploaded successfully");
@@ -446,7 +482,16 @@ export const MarksView = () => {
           assessmentId={selectedAssessment.assessmentId}
           courseId={selectedAssessment.courseId}
           assessmentTitle={selectedAssessment.assessmentTitle}
-          sectionId={appliedFilters.sectionId || undefined}
+          sectionId={
+            appliedDomain === "section"
+              ? appliedFilters.sectionId || undefined
+              : undefined
+          }
+          electiveBatchId={
+            appliedDomain === "batch" || appliedDomain === "group"
+              ? appliedFilters.electiveBatchId || undefined
+              : undefined
+          }
           onClose={() => setSelectedAssessment(null)}
           onSuccess={() => setSelectedAssessment(null)}
         />

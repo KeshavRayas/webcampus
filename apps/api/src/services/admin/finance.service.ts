@@ -24,12 +24,13 @@ export class AdminFinanceService {
 
   private static async uploadPhoto(
     photoFile: Express.Multer.File,
-    prefix: string
+    name: string
   ): Promise<string> {
-    const { generateFileName, uploadToS3 } = await import(
+    const { generateFileName, uploadToS3, sanitizeForS3 } = await import(
       "@webcampus/api/src/utils/s3"
     );
 
+    const prefix = `finance_${sanitizeForS3(name)}_`;
     const photoFileName = generateFileName(photoFile.originalname, prefix);
     const uploadResult = await uploadToS3(
       photoFile.buffer,
@@ -75,10 +76,7 @@ export class AdminFinanceService {
       createdUserId = user.data.id;
 
       if (photoFile) {
-        uploadedImageUrl = await this.uploadPhoto(
-          photoFile,
-          "finance_user_photo_"
-        );
+        uploadedImageUrl = await this.uploadPhoto(photoFile, data.name);
 
         await db.user.update({
           where: { id: createdUserId },
@@ -146,7 +144,7 @@ export class AdminFinanceService {
     try {
       const existingUser = await db.user.findUnique({
         where: { id },
-        select: { id: true, role: true, image: true },
+        select: { id: true, role: true, image: true, name: true },
       });
 
       if (!existingUser || existingUser.role !== "finance") {
@@ -156,7 +154,7 @@ export class AdminFinanceService {
       if (photoFile) {
         uploadedImageUrl = await this.uploadPhoto(
           photoFile,
-          "finance_user_photo_"
+          data.name ?? existingUser.name
         );
       }
 

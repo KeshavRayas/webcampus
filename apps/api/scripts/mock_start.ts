@@ -496,44 +496,50 @@ const ADMISSION_USERS = [
     email: "admission@webcampus.com",
     role: "admission" as const,
   },
+  {
+    name: "Admission Instructor",
+    username: "admission-instructor",
+    email: "admission-instructor@webcampus.com",
+    role: "admission-instructor" as const,
+  },
 ];
 
 const ODD_2026_SEMESTERS = [
   {
     programType: "UG" as const,
     semesterNumber: 1,
-    startDate: new Date("2026-03-29T18:30:00.000Z"),
-    endDate: new Date("2026-04-29T18:30:00.000Z"),
+    startDate: new Date("2026-08-01T18:30:00.000Z"),
+    endDate: new Date("2026-08-31T18:30:00.000Z"),
   },
   {
     programType: "UG" as const,
     semesterNumber: 3,
-    startDate: new Date("2026-04-30T18:30:00.000Z"),
-    endDate: new Date("2026-05-30T18:30:00.000Z"),
+    startDate: new Date("2026-09-01T18:30:00.000Z"),
+    endDate: new Date("2026-09-30T18:30:00.000Z"),
   },
   {
     programType: "UG" as const,
     semesterNumber: 5,
-    startDate: new Date("2026-05-31T18:30:00.000Z"),
-    endDate: new Date("2026-06-29T18:30:00.000Z"),
+    startDate: new Date("2026-10-01T18:30:00.000Z"),
+    endDate: new Date("2026-10-31T18:30:00.000Z"),
   },
   {
     programType: "UG" as const,
     semesterNumber: 7,
-    startDate: new Date("2026-06-30T18:30:00.000Z"),
-    endDate: new Date("2026-07-30T18:30:00.000Z"),
+    startDate: new Date("2026-11-01T18:30:00.000Z"),
+    endDate: new Date("2026-11-30T18:30:00.000Z"),
   },
   {
     programType: "PG" as const,
     semesterNumber: 1,
-    startDate: new Date("2026-03-29T18:30:00.000Z"),
-    endDate: new Date("2026-04-29T18:30:00.000Z"),
+    startDate: new Date("2026-08-01T18:30:00.000Z"),
+    endDate: new Date("2026-08-31T18:30:00.000Z"),
   },
   {
     programType: "PG" as const,
     semesterNumber: 3,
-    startDate: new Date("2026-04-30T18:30:00.000Z"),
-    endDate: new Date("2026-05-30T18:30:00.000Z"),
+    startDate: new Date("2026-09-01T18:30:00.000Z"),
+    endDate: new Date("2026-09-30T18:30:00.000Z"),
   },
 ];
 
@@ -736,16 +742,6 @@ class MockStarter {
       throw new Error("Admin user id missing. Call signIn first.");
     }
 
-    const latestOddTerm = await db.academicTerm.findFirst({
-      where: { type: "odd" },
-      orderBy: [{ year: "desc" }],
-      select: {
-        isCurrent: true,
-      },
-    });
-
-    const termIsCurrent = latestOddTerm?.isCurrent ?? true;
-
     let term = await db.academicTerm.findFirst({
       where: {
         type: "odd",
@@ -757,7 +753,7 @@ class MockStarter {
       term = await db.academicTerm.update({
         where: { id: term.id },
         data: {
-          isCurrent: termIsCurrent,
+          isCurrent: true,
         },
       });
       logger.info("Updated academic term ODD 2026");
@@ -766,7 +762,7 @@ class MockStarter {
         data: {
           type: "odd",
           year: "2026",
-          isCurrent: termIsCurrent,
+          isCurrent: true,
         },
       });
       logger.info("Created academic term ODD 2026");

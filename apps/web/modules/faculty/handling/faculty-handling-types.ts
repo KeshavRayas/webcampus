@@ -6,6 +6,8 @@ export type FacultyHandlingFilters = {
   programType: string;
   semester: string;
   section: string;
+  courseId: string;
+  batchId: string;
   page: string;
   limit?: string;
 };

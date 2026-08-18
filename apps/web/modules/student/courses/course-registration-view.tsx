@@ -7,6 +7,7 @@ import {
   useSubmitCourseRegistration,
 } from "@/modules/student/courses/use-course-registration";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { courseTypeLabel } from "@webcampus/schemas/constants";
 import { Alert, AlertDescription } from "@webcampus/ui/components/alert";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -28,6 +29,7 @@ import { z } from "zod";
 const registrationFormSchema = z.object({
   professionalElectiveId: z.string().uuid().optional(),
   openElectiveId: z.string().uuid().optional(),
+  openElectiveBatchId: z.string().uuid().optional(),
 });
 
 export const CourseRegistrationView = () => {
@@ -51,6 +53,7 @@ export const CourseRegistrationView = () => {
 
   const selectedProfessionalElective = form.watch("professionalElectiveId");
   const selectedOpenElective = form.watch("openElectiveId");
+  const selectedOpenElectiveBatch = form.watch("openElectiveBatchId");
 
   const coreCourseIds = useMemo(
     () => curriculum?.coreCourses.map((course) => course.id) ?? [],
@@ -70,7 +73,8 @@ export const CourseRegistrationView = () => {
       curriculum.professionalElectives.length === 0 ||
       Boolean(selectedProfessionalElective);
     const hasOeSelection =
-      curriculum.openElectives.length === 0 || Boolean(selectedOpenElective);
+      curriculum.openElectives.length === 0 ||
+      Boolean(selectedOpenElective && selectedOpenElectiveBatch);
 
     return hasPeSelection && hasOeSelection;
   }, [
@@ -78,6 +82,7 @@ export const CourseRegistrationView = () => {
     dashboard?.current.hasRegistered,
     dashboard?.current.isWindowOpen,
     selectedOpenElective,
+    selectedOpenElectiveBatch,
     selectedProfessionalElective,
   ]);
 
@@ -94,6 +99,11 @@ export const CourseRegistrationView = () => {
 
     submitRegistrationMutation.mutate({
       courseIds: selectedCourseIds,
+      ...(values.openElectiveId && values.openElectiveBatchId
+        ? {
+            oeBatchIds: { [values.openElectiveId]: values.openElectiveBatchId },
+          }
+        : {}),
     });
   };
 
@@ -184,7 +194,9 @@ export const CourseRegistrationView = () => {
                           <tr key={course.id} className="border-t">
                             <td className="px-3 py-2">{course.code}</td>
                             <td className="px-3 py-2">{course.name}</td>
-                            <td className="px-3 py-2">{course.courseType}</td>
+                            <td className="px-3 py-2">
+                              {courseTypeLabel(course.courseType)}
+                            </td>
                             <td className="px-3 py-2">{course.ltp}</td>
                             <td className="px-3 py-2">{course.totalCredits}</td>
                           </tr>
@@ -211,22 +223,39 @@ export const CourseRegistrationView = () => {
                             onValueChange={field.onChange}
                             className="space-y-2"
                           >
-                            {curriculum.professionalElectives.map((course) => (
-                              <label
-                                key={course.id}
-                                htmlFor={`pe-${course.id}`}
-                                className="flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2"
-                              >
-                                <RadioGroupItem
-                                  id={`pe-${course.id}`}
-                                  value={course.id}
-                                />
-                                <span className="text-sm">
-                                  {course.code} - {course.name} (
-                                  {course.totalCredits} credits)
-                                </span>
-                              </label>
-                            ))}
+                            {curriculum.professionalElectives.map((course) => {
+                              const isFull = Boolean(course.isFull);
+                              const seatsLabel =
+                                course.capacity != null
+                                  ? `${course.registeredCount ?? 0} / ${course.capacity} · ${course.seatsLeft ?? 0} seats left`
+                                  : null;
+                              return (
+                                <label
+                                  key={course.id}
+                                  htmlFor={`pe-${course.id}`}
+                                  className={`flex items-center gap-3 rounded-md border px-3 py-2 ${
+                                    isFull
+                                      ? "cursor-not-allowed opacity-60"
+                                      : "cursor-pointer"
+                                  }`}
+                                >
+                                  <RadioGroupItem
+                                    id={`pe-${course.id}`}
+                                    value={course.id}
+                                    disabled={isFull}
+                                  />
+                                  <span className="text-sm">
+                                    {course.code} - {course.name} (
+                                    {course.totalCredits} credits)
+                                    {seatsLabel ? (
+                                      <span className="text-muted-foreground ml-2">
+                                        {isFull ? "Full" : seatsLabel}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </label>
+                              );
+                            })}
                           </RadioGroup>
                         </FormControl>
                         <FormMessage />
@@ -240,39 +269,107 @@ export const CourseRegistrationView = () => {
                     control={form.control}
                     name="openElectiveId"
                     rules={{ required: "Select one Open Elective" }}
-                    render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormLabel className="text-base font-semibold">
-                          Open Elective (OE)
-                        </FormLabel>
-                        <FormControl>
-                          <RadioGroup
-                            name="open-elective"
-                            value={field.value}
-                            onValueChange={field.onChange}
-                            className="space-y-2"
-                          >
-                            {curriculum.openElectives.map((course) => (
-                              <label
-                                key={course.id}
-                                htmlFor={`oe-${course.id}`}
-                                className="flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2"
-                              >
-                                <RadioGroupItem
-                                  id={`oe-${course.id}`}
-                                  value={course.id}
-                                />
-                                <span className="text-sm">
-                                  {course.code} - {course.name} (
-                                  {course.totalCredits} credits)
-                                </span>
-                              </label>
-                            ))}
-                          </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const selectedCourse = curriculum.openElectives.find(
+                        (course) => course.id === field.value
+                      );
+                      const batches = selectedCourse?.batches ?? [];
+                      return (
+                        <FormItem className="space-y-3">
+                          <FormLabel className="text-base font-semibold">
+                            Open Elective (OE)
+                          </FormLabel>
+                          <FormControl>
+                            <RadioGroup
+                              name="open-elective"
+                              value={field.value}
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                form.setValue("openElectiveBatchId", undefined);
+                              }}
+                              className="space-y-2"
+                            >
+                              {curriculum.openElectives.map((course) => (
+                                <label
+                                  key={course.id}
+                                  htmlFor={`oe-${course.id}`}
+                                  className="flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2"
+                                >
+                                  <RadioGroupItem
+                                    id={`oe-${course.id}`}
+                                    value={course.id}
+                                  />
+                                  <span className="text-sm">
+                                    {course.code} - {course.name} (
+                                    {course.totalCredits} credits)
+                                  </span>
+                                </label>
+                              ))}
+                            </RadioGroup>
+                          </FormControl>
+
+                          {batches.length > 0 && (
+                            <FormField
+                              control={form.control}
+                              name="openElectiveBatchId"
+                              rules={{
+                                required:
+                                  "Select a batch for the Open Elective",
+                              }}
+                              render={({ field: batchField }) => (
+                                <FormItem className="space-y-2">
+                                  <FormLabel className="text-sm font-medium">
+                                    Select Batch
+                                  </FormLabel>
+                                  <FormControl>
+                                    <RadioGroup
+                                      name="open-elective-batch"
+                                      value={batchField.value}
+                                      onValueChange={batchField.onChange}
+                                      className="space-y-2"
+                                    >
+                                      {batches.map((batch) => (
+                                        <label
+                                          key={batch.batchId}
+                                          htmlFor={`oe-batch-${batch.batchId}`}
+                                          className={`flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 ${
+                                            batch.isFull
+                                              ? "cursor-not-allowed opacity-60"
+                                              : ""
+                                          }`}
+                                        >
+                                          <RadioGroupItem
+                                            id={`oe-batch-${batch.batchId}`}
+                                            value={batch.batchId}
+                                            disabled={batch.isFull}
+                                          />
+                                          <span className="text-sm">
+                                            Batch {batch.name}
+                                            {batch.facultyName ? (
+                                              <span className="text-muted-foreground ml-2">
+                                                · {batch.facultyName}
+                                              </span>
+                                            ) : null}
+                                            <span className="text-muted-foreground ml-2">
+                                              {batch.isFull
+                                                ? "Full"
+                                                : `${batch.registeredCount} / ${batch.capacity} · ${batch.seatsLeft} seats left`}
+                                            </span>
+                                          </span>
+                                        </label>
+                                      ))}
+                                    </RadioGroup>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
                 )}
 

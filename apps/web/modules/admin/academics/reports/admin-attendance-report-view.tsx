@@ -216,20 +216,19 @@ export const AdminAttendanceReportView = ({
         !draftFilters.courseId
       )
         return [];
-      const res = await axios.get<BaseResponse<{ id: string; name: string }[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/sections`,
-        {
-          params: {
-            departmentId: draftFilters.departmentId,
-            semesterId: draftFilters.semesterId,
-            courseId: draftFilters.courseId,
-            ...(isSemesterOneOrTwo && draftFilters.cycle
-              ? { cycle: draftFilters.cycle }
-              : {}),
-          },
-          withCredentials: true,
-        }
-      );
+      const res = await axios.get<
+        BaseResponse<{ id: string; name: string; isElectiveBatch?: boolean }[]>
+      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/sections`, {
+        params: {
+          departmentId: draftFilters.departmentId,
+          semesterId: draftFilters.semesterId,
+          courseId: draftFilters.courseId,
+          ...(isSemesterOneOrTwo && draftFilters.cycle
+            ? { cycle: draftFilters.cycle }
+            : {}),
+        },
+        withCredentials: true,
+      });
       if (res.data.status === "success") return res.data.data ?? [];
       return [];
     },
@@ -689,7 +688,7 @@ export const AdminAttendanceReportView = ({
       type: "select" as const,
       placeholder: loadingSections ? "Loading sections..." : "Select a section",
       options: sections.map((sec) => ({
-        label: sec.name,
+        label: sec.isElectiveBatch ? `${sec.name} (Elective)` : sec.name,
         value: sec.id,
       })),
       hideAllOption: true,

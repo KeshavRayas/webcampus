@@ -9,6 +9,7 @@ type AttendanceRecordRow = {
 };
 
 type AttendanceRow = {
+  id: string;
   studentId: string;
   courseId: string;
   total: number;
@@ -16,6 +17,8 @@ type AttendanceRow = {
   absent: number;
   percentage: number;
   condonationStatus: string;
+  batchId: string | null;
+  electiveBatchId: string | null;
 };
 
 let attendanceRecords: AttendanceRecordRow[] = [];
@@ -76,6 +79,54 @@ const dbMock = {
   },
   attendance: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    findMany: async ({ where, distinct }: any) => {
+      const rows = Array.from(attendanceStore.values()).filter((row) => {
+        if (where?.studentId && row.studentId !== where.studentId) {
+          return false;
+        }
+
+        if (where?.courseId && row.courseId !== where.courseId) {
+          return false;
+        }
+
+        return true;
+      });
+
+      if (distinct?.includes("studentId")) {
+        const seen = new Set<string>();
+        return rows
+          .filter((row) => {
+            if (seen.has(row.studentId)) {
+              return false;
+            }
+
+            seen.add(row.studentId);
+            return true;
+          })
+          .map((row) => ({ studentId: row.studentId }));
+      }
+
+      return rows;
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    findFirst: async ({ where }: any) => {
+      const row = Array.from(attendanceStore.values()).find(
+        (entry) =>
+          (!where?.studentId || entry.studentId === where.studentId) &&
+          (!where?.courseId || entry.courseId === where.courseId) &&
+          (!where?.batchId || entry.batchId === where.batchId) &&
+          (!where?.electiveBatchId ||
+            entry.electiveBatchId === where.electiveBatchId)
+      );
+
+      return row
+        ? {
+            id: row.id,
+            condonationStatus: row.condonationStatus,
+          }
+        : null;
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findUnique: async ({ where }: any) => {
       const key = keyOf(
         where.studentId_courseId.studentId,
@@ -99,6 +150,7 @@ const dbMock = {
 
       if (!existing) {
         attendanceStore.set(key, {
+          id: create.id ?? `${create.studentId}:${create.courseId}`,
           studentId: create.studentId,
           courseId: create.courseId,
           total: create.total,
@@ -106,6 +158,8 @@ const dbMock = {
           absent: create.absent,
           percentage: create.percentage,
           condonationStatus: create.condonationStatus,
+          batchId: create.batchId ?? null,
+          electiveBatchId: create.electiveBatchId ?? null,
         });
         return;
       }
@@ -116,6 +170,39 @@ const dbMock = {
         present: update.present,
         absent: update.absent,
         percentage: update.percentage,
+      });
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    update: async ({ where, data }: any) => {
+      const key = where.id;
+      const existing = attendanceStore.get(key);
+
+      if (!existing) {
+        return;
+      }
+
+      attendanceStore.set(key, {
+        ...existing,
+        total: data.total,
+        present: data.present,
+        absent: data.absent,
+        percentage: data.percentage,
+      });
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    create: async ({ data }: any) => {
+      const key = keyOf(data.studentId, data.courseId);
+      attendanceStore.set(key, {
+        id: data.id ?? key,
+        studentId: data.studentId,
+        courseId: data.courseId,
+        total: data.total,
+        present: data.present,
+        absent: data.absent,
+        percentage: data.percentage,
+        condonationStatus: data.condonationStatus,
+        batchId: data.batchId ?? null,
+        electiveBatchId: data.electiveBatchId ?? null,
       });
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -182,6 +269,7 @@ describe("AttendanceAggregationService", () => {
 
   it("preserves condonationStatus while updating aggregates", async () => {
     attendanceStore.set("student-1:course-1", {
+      id: "student-1:course-1",
       studentId: "student-1",
       courseId: "course-1",
       total: 1,
@@ -189,6 +277,8 @@ describe("AttendanceAggregationService", () => {
       absent: 0,
       percentage: 100,
       condonationStatus: "APPROVED",
+      batchId: null,
+      electiveBatchId: null,
     });
 
     attendanceRecords = [
@@ -248,6 +338,7 @@ describe("AttendanceAggregationService", () => {
 
   it("deletes attendance summary row when no attendance records remain", async () => {
     attendanceStore.set("student-1:course-1", {
+      id: "student-1:course-1",
       studentId: "student-1",
       courseId: "course-1",
       total: 1,
@@ -255,6 +346,8 @@ describe("AttendanceAggregationService", () => {
       absent: 0,
       percentage: 100,
       condonationStatus: "APPROVED",
+      batchId: null,
+      electiveBatchId: null,
     });
 
     attendanceRecords = [];

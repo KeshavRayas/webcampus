@@ -36,16 +36,26 @@ type SectionOption = {
   label?: string;
 };
 
+type ElectiveBatchOption = {
+  id: string;
+  name: string;
+  courseId: string;
+};
+
 type AttendanceFormProps = {
   form: FacultyAttendanceFormState;
   courses: CourseOption[];
   sections: SectionOption[];
+  electiveBatches?: ElectiveBatchOption[];
   selectedCourseValue?: string;
   selectedSectionValue?: string;
+  selectedElectiveBatchId?: string;
   isLabBatch?: boolean;
+  isElective?: boolean;
   onDateChange: (date: Date | undefined) => void;
   onCourseChange: (courseId: string) => void;
   onSectionChange: (sectionId: string) => void;
+  onElectiveBatchChange?: (id: string) => void;
   onTimingModeChange: (mode: "FIXED" | "CUSTOM") => void;
   onFixedSlotChange: (
     code: Exclude<FacultyAttendanceFormState["fixedTimingCode"], "">
@@ -136,12 +146,16 @@ export const AttendanceForm = ({
   form,
   courses,
   sections,
+  electiveBatches = [],
   selectedCourseValue,
   selectedSectionValue,
+  selectedElectiveBatchId,
   isLabBatch = false,
+  isElective = false,
   onDateChange,
   onCourseChange,
   onSectionChange,
+  onElectiveBatchChange,
   onTimingModeChange,
   onFixedSlotChange,
   onCustomStartTimeChange,
@@ -257,29 +271,50 @@ export const AttendanceForm = ({
               htmlFor="attendance-section"
               className="text-muted-foreground text-xs uppercase tracking-wide"
             >
-              Section
+              {isElective ? "Elective Batch" : "Section"}
             </Label>
-            <Select
-              value={selectedSectionValue || form.sectionId || undefined}
-              onValueChange={onSectionChange}
-            >
-              <SelectTrigger
-                id="attendance-section"
-                className="bg-background/60 h-11 rounded-xl border-white/10"
+            {isElective ? (
+              <Select
+                value={selectedElectiveBatchId || undefined}
+                onValueChange={(value) => onElectiveBatchChange?.(value)}
               >
-                <SelectValue placeholder="Select section" />
-              </SelectTrigger>
-              <SelectContent>
-                {sections.map((section) => (
-                  <SelectItem
-                    key={`${section.id}:${section.courseId}`}
-                    value={section.id}
-                  >
-                    {section.label ?? section.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectTrigger
+                  id="attendance-section"
+                  className="bg-background/60 h-11 rounded-xl border-white/10"
+                >
+                  <SelectValue placeholder="Select elective batch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {electiveBatches.map((batch) => (
+                    <SelectItem key={batch.id} value={batch.id}>
+                      {batch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Select
+                value={selectedSectionValue || form.sectionId || undefined}
+                onValueChange={onSectionChange}
+              >
+                <SelectTrigger
+                  id="attendance-section"
+                  className="bg-background/60 h-11 rounded-xl border-white/10"
+                >
+                  <SelectValue placeholder="Select section" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sections.map((section) => (
+                    <SelectItem
+                      key={`${section.id}:${section.courseId}`}
+                      value={section.id}
+                    >
+                      {section.label ?? section.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <fieldset className="space-y-3 md:col-span-3">

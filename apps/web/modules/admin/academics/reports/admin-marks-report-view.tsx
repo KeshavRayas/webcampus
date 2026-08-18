@@ -198,20 +198,19 @@ export const AdminMarksReportView = ({
         !draftFilters.courseId
       )
         return [];
-      const res = await axios.get<BaseResponse<{ id: string; name: string }[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/sections`,
-        {
-          params: {
-            departmentId: draftFilters.departmentId,
-            semesterId: draftFilters.semesterId,
-            courseId: draftFilters.courseId,
-            ...(isSemesterOneOrTwo && draftFilters.cycle
-              ? { cycle: draftFilters.cycle }
-              : {}),
-          },
-          withCredentials: true,
-        }
-      );
+      const res = await axios.get<
+        BaseResponse<{ id: string; name: string; isElectiveBatch?: boolean }[]>
+      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/sections`, {
+        params: {
+          departmentId: draftFilters.departmentId,
+          semesterId: draftFilters.semesterId,
+          courseId: draftFilters.courseId,
+          ...(isSemesterOneOrTwo && draftFilters.cycle
+            ? { cycle: draftFilters.cycle }
+            : {}),
+        },
+        withCredentials: true,
+      });
       return res.data.status === "success" ? (res.data.data ?? []) : [];
     },
     enabled:
@@ -473,7 +472,7 @@ export const AdminMarksReportView = ({
         ? "Loading sections..."
         : "Select a section (Optional)",
       options: sections.map((sec) => ({
-        label: sec.name,
+        label: sec.isElectiveBatch ? `${sec.name} (Elective)` : sec.name,
         value: sec.id,
       })),
       hideAllOption: false, // Optional for marks report

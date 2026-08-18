@@ -9,11 +9,24 @@ import {
 } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@webcampus/ui/components/select";
 import { Combobox } from "@webcampus/ui/molecules/combobox";
 import axios, { AxiosError } from "axios";
 import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import {
+  ALL_SECTIONS,
+  filterMappingsBySection,
+  getSectionOptions,
+  SectionFilterMapping,
+} from "../../department/course-mapping/section-filter";
 
 interface SectionData {
   id: string;
@@ -46,6 +59,8 @@ type SectionMappingState = {
   labFacultyByBatch: { batchName: string; facultyId: string | null }[];
 };
 
+type PeBatchMappingState = SectionFilterMapping;
+
 const DEFAULT_BATCHES = ["L1", "L2", "L3", "L4"];
 
 export const AdminCourseMappingGrid = ({
@@ -62,6 +77,14 @@ export const AdminCourseMappingGrid = ({
 }: AdminCourseMappingGridProps) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
+
+  const isBatchManaged =
+    course.courseType === "PE" ||
+    course.courseType === "OE" ||
+    course.courseType === "PW";
+  const isPw = course.courseType === "PW";
+  const isDepartmentWidePw =
+    isPw && course.projectGroupingScope === "DEPARTMENT_WIDE";
 
   const hasSectionFaculty =
     (course.lectureCredits ?? 0) > 0 || (course.tutorialCredits ?? 0) > 0;
@@ -82,10 +105,10 @@ export const AdminCourseMappingGrid = ({
         ? res.data.data
         : [];
     },
-    enabled: !!departmentId && !!semesterId,
+    enabled: !!departmentId && !!semesterId && !isBatchManaged,
   });
 
-  const sections = rawSections ?? [];
+  const sections = useMemo(() => rawSections ?? [], [rawSections]);
 
   const { data: rawFaculty, isLoading: loadingFaculty } = useQuery({
     queryKey: ["admin-mapping-faculty", departmentId],
@@ -105,7 +128,7 @@ export const AdminCourseMappingGrid = ({
     enabled: !!departmentId,
   });
 
-  const faculty = rawFaculty ?? [];
+  const faculty = useMemo(() => rawFaculty ?? [], [rawFaculty]);
 
   const { data: rawExistingMappings, isLoading: loadingExisting } = useQuery({
     queryKey: ["admin-course-mapping", course.id, semesterId, academicYear],
@@ -130,7 +153,10 @@ export const AdminCourseMappingGrid = ({
     enabled: !!course.id && !!semesterId && !!academicYear && !!departmentId,
   });
 
-  const existingMappings = rawExistingMappings ?? [];
+  const existingMappings = useMemo(
+    () => rawExistingMappings ?? [],
+    [rawExistingMappings]
+  );
 
   const facultyOptions = useMemo(
     () =>
@@ -143,9 +169,40 @@ export const AdminCourseMappingGrid = ({
   );
 
   const [mappings, setMappings] = useState<SectionMappingState[]>([]);
+  const [peMappings, setPeMappings] = useState<PeBatchMappingState[]>([]);
+  const [sectionFilter, setSectionFilter] = useState(ALL_SECTIONS);
   const [showReasonDialog, setShowReasonDialog] = useState(false);
 
+  const sectionOptions = useMemo(() => {
+    if (!isPw || course.projectGroupingScope !== "WITHIN_SECTION") return [];
+    return getSectionOptions(peMappings);
+  }, [isPw, course.projectGroupingScope, peMappings]);
+
+  const visiblePeMappings = useMemo(
+    () => filterMappingsBySection(peMappings, sectionFilter),
+    [peMappings, sectionFilter]
+  );
+
   useEffect(() => {
+    if (isBatchManaged) {
+      if (loadingExisting) {
+        return;
+      }
+
+      setPeMappings(
+        existingMappings
+          .filter((mapping) => mapping.electiveBatchId)
+          .map((mapping) => ({
+            electiveBatchId: mapping.electiveBatchId!,
+            electiveBatchName: mapping.electiveBatchName ?? "",
+            sectionName: mapping.sectionName ?? null,
+            facultyId: mapping.facultyId || mapping.proposedFacultyId || null,
+            proposedFacultyId: mapping.proposedFacultyId || null,
+          }))
+      );
+      return;
+    }
+
     if (loadingSections || loadingExisting) {
       return;
     }
@@ -179,7 +236,13 @@ export const AdminCourseMappingGrid = ({
     });
 
     setMappings(initialState);
-  }, [existingMappings, loadingExisting, loadingSections, sections]);
+  }, [
+    existingMappings,
+    loadingExisting,
+    loadingSections,
+    sections,
+    isBatchManaged,
+  ]);
 
   // Apply extracted Excel data to mappings when received
   useEffect(() => {
@@ -254,25 +317,49 @@ export const AdminCourseMappingGrid = ({
     );
   };
 
+  const updatePeFaculty = (
+    electiveBatchId: string,
+    facultyId: string | null
+  ) => {
+    setPeMappings((prev) =>
+      prev.map((m) =>
+        m.electiveBatchId === electiveBatchId ? { ...m, facultyId } : m
+      )
+    );
+  };
+
   const doSave = (reason?: string) => {
-    const payload: Record<string, unknown> = {
-      courseId: course.id,
-      departmentId,
-      departmentName,
-      semesterId,
-      academicYear,
-      studentsPerLabBatch: 15,
-      version: course.version,
-      sectionMappings: mappings.map((mapping) => ({
-        sectionId: mapping.sectionId,
-        theoryFacultyId: hasSectionFaculty ? mapping.theoryFacultyId : null,
-        labFacultyByBatch: hasLab
-          ? mapping.labFacultyByBatch.filter(
-              (batch) => batch.facultyId !== null
-            )
-          : [],
-      })),
-    };
+    const payload: Record<string, unknown> = isBatchManaged
+      ? {
+          courseId: course.id,
+          departmentId,
+          departmentName,
+          semesterId,
+          academicYear,
+          isSuperEdit: isLocked,
+          electiveBatchMappings: peMappings.map((mapping) => ({
+            electiveBatchId: mapping.electiveBatchId,
+            facultyId: mapping.facultyId,
+          })),
+        }
+      : {
+          courseId: course.id,
+          departmentId,
+          departmentName,
+          semesterId,
+          academicYear,
+          studentsPerLabBatch: 15,
+          version: course.version,
+          sectionMappings: mappings.map((mapping) => ({
+            sectionId: mapping.sectionId,
+            theoryFacultyId: hasSectionFaculty ? mapping.theoryFacultyId : null,
+            labFacultyByBatch: hasLab
+              ? mapping.labFacultyByBatch.filter(
+                  (batch) => batch.facultyId !== null
+                )
+              : [],
+          })),
+        };
 
     if (reason) {
       payload.reason = reason;
@@ -330,6 +417,119 @@ export const AdminCourseMappingGrid = ({
       <div className="text-muted-foreground flex items-center justify-center p-12">
         <Loader2 className="size-8 animate-spin" />
       </div>
+    );
+  }
+
+  if (isBatchManaged) {
+    return (
+      <>
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-lg font-semibold">
+              {isPw
+                ? "Project Group Faculty Assignments"
+                : "Elective Batch Faculty Assignments"}
+            </h3>
+            {sectionOptions.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs">Section</span>
+                <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                  <SelectTrigger size="sm" className="min-w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_SECTIONS}>All Sections</SelectItem>
+                    {sectionOptions.map((sectionName) => (
+                      <SelectItem key={sectionName} value={sectionName}>
+                        {sectionName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          {isDepartmentWidePw && (
+            <p className="text-muted-foreground text-xs">
+              Proposed balanced distribution shown below. Review or override any
+              assignment, then save Course Mapping to commit.
+            </p>
+          )}
+          {peMappings.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No elective batches configured for this batch-managed course.
+            </p>
+          ) : (
+            <>
+              {sectionOptions.length > 0 && sectionFilter !== ALL_SECTIONS && (
+                <p className="text-muted-foreground text-xs">
+                  Showing {visiblePeMappings.length} of {peMappings.length}{" "}
+                  groups for {sectionFilter}.
+                </p>
+              )}
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-muted border-b font-medium">
+                    <tr>
+                      <th className="border-border min-w-40 border-r px-4 py-3">
+                        {isPw ? "Group" : "Elective Batch"}
+                      </th>
+                      {isPw && (
+                        <th className="border-border border-r px-4 py-3">
+                          Section
+                        </th>
+                      )}
+                      <th className="px-4 py-3">Faculty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visiblePeMappings.map((row) => (
+                      <tr key={row.electiveBatchId} className="border-t">
+                        <td className="border-border border-r px-4 py-3 font-medium">
+                          {row.electiveBatchName}
+                        </td>
+                        {isPw && (
+                          <td className="border-border border-r px-4 py-3">
+                            {row.sectionName ?? "—"}
+                          </td>
+                        )}
+                        <td className="px-4 py-3">
+                          <Combobox
+                            options={facultyOptions}
+                            value={row.facultyId}
+                            onValueChange={(value) =>
+                              updatePeFaculty(row.electiveBatchId, value)
+                            }
+                            placeholder="Select faculty"
+                            className="min-w-50 w-full"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+          <div className="flex justify-end">
+            <Button onClick={handleSaveClick} disabled={saveMutation.isPending}>
+              {saveMutation.isPending && (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              )}
+              {isLocked
+                ? `Super Edit & Save ${isPw ? "Project Group Mapping" : "Batch Mapping"}`
+                : `Save ${isPw ? "Project Group Mapping" : "Batch Mapping"}`}
+            </Button>
+          </div>
+        </div>
+
+        <ReasonDialog
+          open={showReasonDialog}
+          onOpenChange={setShowReasonDialog}
+          onConfirm={handleReasonConfirm}
+          isRequired={true}
+        />
+      </>
     );
   }
 

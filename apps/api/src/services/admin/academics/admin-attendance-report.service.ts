@@ -1,6 +1,9 @@
 import { logger } from "@webcampus/common/logger";
 import { Cycle, db } from "@webcampus/db";
 import { BaseResponse } from "@webcampus/types/api";
+import { assertBatchBelongsToCourse } from "../../shared/batch-managed";
+import { FACULTY_COURSE_STATUS } from "../../shared/course-approval";
+import { isBatchManagedCourse } from "../../shared/course-kind";
 
 export class AdminAttendanceReportService {
   // 1. Get Courses (Filtered by Department & Cycle)
@@ -40,6 +43,42 @@ export class AdminAttendanceReportService {
     });
     if (!department) throw new Error("Department not found");
 
+    const course = await db.course.findUnique({
+      where: { id: courseId },
+      select: { courseType: true },
+    });
+    if (!course) throw new Error("Course not found");
+
+    if (isBatchManagedCourse(course.courseType)) {
+      const electiveAssignments = await db.electiveBatchFaculty.findMany({
+        where: {
+          course: {
+            approvalStatus: FACULTY_COURSE_STATUS,
+            departmentId,
+            semesterId,
+          },
+        },
+        select: {
+          electiveBatch: { select: { id: true, name: true } },
+        },
+      });
+      const seen = new Set<string>();
+      const sections = electiveAssignments
+        .filter((row) => {
+          if (seen.has(row.electiveBatch.id)) return false;
+          seen.add(row.electiveBatch.id);
+          return true;
+        })
+        .map((row) => ({
+          id: row.electiveBatch.id,
+          name: row.electiveBatch.name,
+          isElectiveBatch: true,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      return { status: "success", message: "Sections fetched", data: sections };
+    }
+
     const sections = await db.section.findMany({
       where: {
         departmentId,
@@ -62,8 +101,20 @@ export class AdminAttendanceReportService {
     batchId?: string
   ): Promise<BaseResponse<unknown>> {
     try {
+      const course = await db.course.findUnique({
+        where: { id: courseId },
+        select: { courseType: true },
+      });
+      if (!course) throw new Error("Course not found");
+      const isBatchManaged = isBatchManagedCourse(course.courseType);
+      if (isBatchManaged) {
+        await assertBatchBelongsToCourse(courseId, sectionId);
+      }
+
       const sessions = await db.classSession.findMany({
-        where: { courseId, sectionId, ...(batchId ? { batchId } : {}) },
+        where: isBatchManaged
+          ? { courseId, electiveBatchId: sectionId }
+          : { courseId, sectionId, ...(batchId ? { batchId } : {}) },
         orderBy: { sessionDate: "asc" },
       });
 
@@ -71,15 +122,23 @@ export class AdminAttendanceReportService {
         where: { sessionId: { in: sessions.map((s) => s.id) } },
       });
 
-      const studentSections = await db.studentSection.findMany({
-        where: {
-          sectionId,
-          ...(batchId
-            ? { student: { batches: { some: { id: batchId } } } }
-            : {}),
-        },
-        select: { studentId: true },
-      });
+      const batchStudents = isBatchManaged
+        ? await db.electiveStudentAssignment.findMany({
+            where: { courseId, electiveBatchId: sectionId },
+            select: { studentId: true },
+          })
+        : [];
+      const studentSections = isBatchManaged
+        ? batchStudents
+        : await db.studentSection.findMany({
+            where: {
+              sectionId,
+              ...(batchId
+                ? { student: { batches: { some: { id: batchId } } } }
+                : {}),
+            },
+            select: { studentId: true },
+          });
       const totalStudents = studentSections.length;
 
       const data = sessions.map((session) => {
@@ -121,22 +180,43 @@ export class AdminAttendanceReportService {
     batchId?: string
   ): Promise<BaseResponse<unknown>> {
     try {
-      const studentSections = await db.studentSection.findMany({
-        where: {
-          sectionId,
-          ...(batchId
-            ? { student: { batches: { some: { id: batchId } } } }
-            : {}),
-        },
-        include: {
-          student: {
-            include: { user: true, attendances: { where: { courseId } } },
-          },
-        },
+      const course = await db.course.findUnique({
+        where: { id: courseId },
+        select: { courseType: true },
       });
+      if (!course) throw new Error("Course not found");
+      const isBatchManaged = isBatchManagedCourse(course.courseType);
+      if (isBatchManaged) {
+        await assertBatchBelongsToCourse(courseId, sectionId);
+      }
+
+      const studentSections = isBatchManaged
+        ? await db.electiveStudentAssignment.findMany({
+            where: { courseId, electiveBatchId: sectionId },
+            include: {
+              student: {
+                include: { user: true, attendances: { where: { courseId } } },
+              },
+            },
+          })
+        : await db.studentSection.findMany({
+            where: {
+              sectionId,
+              ...(batchId
+                ? { student: { batches: { some: { id: batchId } } } }
+                : {}),
+            },
+            include: {
+              student: {
+                include: { user: true, attendances: { where: { courseId } } },
+              },
+            },
+          });
 
       const sessions = await db.classSession.findMany({
-        where: { courseId, sectionId, ...(batchId ? { batchId } : {}) },
+        where: isBatchManaged
+          ? { courseId, electiveBatchId: sectionId }
+          : { courseId, sectionId, ...(batchId ? { batchId } : {}) },
         orderBy: { sessionDate: "asc" },
       });
 
@@ -145,6 +225,7 @@ export class AdminAttendanceReportService {
       });
 
       const mappedStudents = studentSections.map((ss) => {
+        const student = isBatchManaged ? ss.student : ss.student;
         const studentRecords = attendanceRecords.filter(
           (r) => r.studentId === ss.studentId
         );
@@ -155,12 +236,12 @@ export class AdminAttendanceReportService {
           (r) => r.status !== null
         ).length;
 
-        const attendanceAgg = ss.student.attendances[0];
+        const attendanceAgg = student.attendances[0];
 
         return {
           studentId: ss.studentId,
-          usn: ss.student.usn,
-          name: ss.student.user.name,
+          usn: student.usn,
+          name: student.user.name,
           presentSessions: presentCount,
           absentSessions: totalCount - presentCount,
           totalSessions: totalCount,

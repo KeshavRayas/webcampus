@@ -46,9 +46,7 @@ type PortResponse = {
 
 export type CreateShellInput = {
   applicationId: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
+  nameAsPer10th: string;
   modeOfAdmission: string;
   semesterId: string;
   departmentId: string;
@@ -69,8 +67,7 @@ export function makeShellInput(
   const seq = String(_seq).padStart(4, "0");
   return {
     applicationId: `APP${ts}${seq}`,
-    firstName: `Test${seq}`,
-    lastName: `Applicant${seq}`,
+    nameAsPer10th: `Test${seq} Applicant${seq}`,
     modeOfAdmission: "CET",
     semesterId,
     departmentId,
@@ -149,7 +146,7 @@ export async function createAndPortStudent(
 
   await testDb.admission.update({
     where: { id: shell.id },
-    data: { status: "SUBMITTED" },
+    data: { status: "SUBMITTED", nameAsPer10th: shellInput.nameAsPer10th },
   });
 
   await approveAdmission(api, shell.id);

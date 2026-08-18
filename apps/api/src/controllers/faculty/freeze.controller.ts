@@ -98,7 +98,9 @@ export class FreezeController {
       });
 
       const freezeState = await FreezeService.freeze(
-        params.courseAssignmentId,
+        {
+          courseAssignmentId: params.courseAssignmentId,
+        },
         requestContext.role,
         session?.user?.username,
         session?.user?.displayUsername

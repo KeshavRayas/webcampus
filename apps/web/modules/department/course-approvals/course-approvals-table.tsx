@@ -350,12 +350,15 @@ export const CourseApprovalsTable = ({
 };
 
 interface MappingInfo {
-  sectionId: string;
-  sectionName: string;
+  id: string;
+  sectionId: string | null;
+  sectionName: string | null;
   assignmentType: string;
   facultyId: string;
-  facultyName: string;
-  batchName?: string;
+  facultyName: string | null;
+  batchName?: string | null;
+  electiveBatchId?: string | null;
+  electiveBatchName?: string | null;
 }
 
 interface CoordinatorInfo {
@@ -583,15 +586,18 @@ const CourseDetailContent = ({
                   <Table className="text-sm">
                     <TableBody>
                       {theoryMappings.map((m) => (
-                        <TableRow key={m.sectionId + "-theory"}>
+                        <TableRow key={m.id}>
                           <TableCell className="bg-muted/10 w-1/2 font-medium">
-                            Section {m.sectionName} (Theory)
+                            {m.sectionName
+                              ? `Section ${m.sectionName}`
+                              : `Batch ${m.electiveBatchName}`}{" "}
+                            (Theory)
                           </TableCell>
                           <TableCell>{m.facultyName}</TableCell>
                         </TableRow>
                       ))}
                       {labMappings.map((m) => (
-                        <TableRow key={m.sectionId + m.batchName + "-lab"}>
+                        <TableRow key={m.id}>
                           <TableCell className="bg-muted/10 w-1/2 font-medium">
                             Section {m.sectionName} Lab {m.batchName}
                           </TableCell>

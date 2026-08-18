@@ -5,9 +5,7 @@ import { db } from "@webcampus/db";
 type AdmissionForRewrite = {
   id: string;
   applicationId: string;
-  firstName: string | null;
-  middleName: string | null;
-  lastName: string | null;
+  nameAsPer10th: string | null;
   tempUsn: string | null;
   studentId: string | null;
   semester: {
@@ -42,11 +40,7 @@ const getYearSuffix = (year: string): string => {
 };
 
 const getSortableName = (admission: AdmissionForRewrite): string => {
-  return [admission.firstName, admission.middleName, admission.lastName]
-    .map((value) => value?.trim())
-    .filter((value): value is string => Boolean(value))
-    .join(" ")
-    .toLocaleLowerCase();
+  return admission.nameAsPer10th?.trim().toLocaleLowerCase() ?? "";
 };
 
 const buildTempUsn = (
@@ -65,9 +59,7 @@ async function rewriteAdmissionAndStudentUsn(): Promise<void> {
     select: {
       id: true,
       applicationId: true,
-      firstName: true,
-      middleName: true,
-      lastName: true,
+      nameAsPer10th: true,
       tempUsn: true,
       studentId: true,
       semester: {

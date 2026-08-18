@@ -327,11 +327,17 @@ export class AdminStudentService {
     try {
       const student = await db.student.findUnique({
         where: { id: studentId },
-        select: { id: true, userId: true },
+        select: { id: true, userId: true, user: { select: { image: true } } },
       });
 
       if (!student) {
         throw new Error("Student not found");
+      }
+
+      // --- CLEANUP S3 ON DELETE ---
+      if (student.user.image) {
+        const { deleteFromS3 } = await import("@webcampus/api/src/utils/s3");
+        await deleteFromS3(student.user.image);
       }
 
       await db.$transaction(async (tx) => {

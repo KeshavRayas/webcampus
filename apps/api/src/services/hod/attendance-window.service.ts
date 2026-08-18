@@ -1,4 +1,5 @@
 import { FreezeService } from "@webcampus/api/src/services/faculty/freeze.service";
+import { FACULTY_COURSE_STATUS } from "@webcampus/api/src/services/shared/course-approval";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import type {
@@ -60,6 +61,8 @@ export class HODAttendanceWindowService {
   ): HODAttendanceWindowRow {
     return {
       courseAssignmentId: row.courseAssignmentId,
+      electiveBatchFacultyId: row.electiveBatchFacultyId,
+      isElective: row.isElective,
       courseCode: row.courseCode,
       courseName: row.courseName,
       department: row.department,
@@ -114,13 +117,83 @@ export class HODAttendanceWindowService {
 
   static async freezeAssignment(
     userId: string,
-    courseAssignmentId: string,
+    input: {
+      courseAssignmentId?: string | null;
+      electiveBatchFacultyId?: string | null;
+    },
     username?: string | null,
     displayUsername?: string | null
   ): Promise<BaseResponse<HODAttendanceWindowRow>> {
     try {
+      const departmentId = await this.resolveHODDepartment(userId);
+
+      if (input.electiveBatchFacultyId) {
+        const electiveAssignment = await db.electiveBatchFaculty.findFirst({
+          where: {
+            id: input.electiveBatchFacultyId,
+            course: {
+              departmentId,
+              approvalStatus: FACULTY_COURSE_STATUS,
+            },
+          },
+          include: {
+            course: {
+              select: {
+                code: true,
+                name: true,
+                department: { select: { name: true } },
+              },
+            },
+            faculty: { select: { shortName: true } },
+            electiveBatch: { select: { id: true, name: true } },
+          },
+        });
+
+        if (!electiveAssignment) {
+          throw new Error(
+            "Forbidden: this elective batch does not belong to your department"
+          );
+        }
+
+        const freeze = await FreezeService.freeze(
+          { electiveBatchFacultyId: electiveAssignment.id },
+          "department",
+          username,
+          displayUsername
+        );
+
+        return {
+          status: "success",
+          message: "Attendance window closed",
+          data: {
+            courseAssignmentId: null,
+            electiveBatchFacultyId: electiveAssignment.id,
+            isElective: true,
+            courseCode: electiveAssignment.course.code,
+            courseName: electiveAssignment.course.name,
+            department: electiveAssignment.course.department?.name ?? "",
+            facultyName: electiveAssignment.faculty.shortName,
+            semester: electiveAssignment.semester,
+            sectionId: electiveAssignment.electiveBatch.id,
+            sectionName: electiveAssignment.electiveBatch.name,
+            batchName: null,
+            assignmentType: "THEORY",
+            freeze: {
+              displayState: freeze.displayState,
+              lockedBy: freeze.lockedBy,
+              frozenAt: freeze.frozenAt,
+              message: freeze.message,
+              frozenByRole: freeze.frozenBy.frozenByRole,
+              frozenByUsername: freeze.frozenBy.frozenByUsername,
+              frozenByDisplay: freeze.frozenBy.frozenByDisplay,
+            },
+          },
+        };
+      }
+
+      const courseAssignmentId = input.courseAssignmentId ?? "";
       const freeze = await FreezeService.freeze(
-        courseAssignmentId,
+        { courseAssignmentId },
         "department",
         username,
         displayUsername
@@ -144,6 +217,8 @@ export class HODAttendanceWindowService {
         message: "Attendance window closed",
         data: {
           courseAssignmentId: assignment.id,
+          electiveBatchFacultyId: null,
+          isElective: false,
           courseCode: assignment.course.code,
           courseName: assignment.course.name,
           department: assignment.department.name,
@@ -173,11 +248,79 @@ export class HODAttendanceWindowService {
 
   static async unfreezeAssignment(
     userId: string,
-    courseAssignmentId: string
+    input: {
+      courseAssignmentId?: string | null;
+      electiveBatchFacultyId?: string | null;
+    }
   ): Promise<BaseResponse<HODAttendanceWindowRow>> {
     try {
+      const departmentId = await this.resolveHODDepartment(userId);
+
+      if (input.electiveBatchFacultyId) {
+        const electiveAssignment = await db.electiveBatchFaculty.findFirst({
+          where: {
+            id: input.electiveBatchFacultyId,
+            course: {
+              departmentId,
+              approvalStatus: FACULTY_COURSE_STATUS,
+            },
+          },
+          include: {
+            course: {
+              select: {
+                code: true,
+                name: true,
+                department: { select: { name: true } },
+              },
+            },
+            faculty: { select: { shortName: true } },
+            electiveBatch: { select: { id: true, name: true } },
+          },
+        });
+
+        if (!electiveAssignment) {
+          throw new Error(
+            "Forbidden: this elective batch does not belong to your department"
+          );
+        }
+
+        const freeze = await FreezeService.unfreeze(
+          { electiveBatchFacultyId: electiveAssignment.id },
+          "department"
+        );
+
+        return {
+          status: "success",
+          message: "Attendance window reopened",
+          data: {
+            courseAssignmentId: null,
+            electiveBatchFacultyId: electiveAssignment.id,
+            isElective: true,
+            courseCode: electiveAssignment.course.code,
+            courseName: electiveAssignment.course.name,
+            department: electiveAssignment.course.department?.name ?? "",
+            facultyName: electiveAssignment.faculty.shortName,
+            semester: electiveAssignment.semester,
+            sectionId: electiveAssignment.electiveBatch.id,
+            sectionName: electiveAssignment.electiveBatch.name,
+            batchName: null,
+            assignmentType: "THEORY",
+            freeze: {
+              displayState: freeze.displayState,
+              lockedBy: freeze.lockedBy,
+              frozenAt: freeze.frozenAt,
+              message: freeze.message,
+              frozenByRole: freeze.frozenBy.frozenByRole,
+              frozenByUsername: freeze.frozenBy.frozenByUsername,
+              frozenByDisplay: freeze.frozenBy.frozenByDisplay,
+            },
+          },
+        };
+      }
+
+      const courseAssignmentId = input.courseAssignmentId ?? "";
       const freeze = await FreezeService.unfreeze(
-        courseAssignmentId,
+        { courseAssignmentId },
         "department"
       );
 
@@ -199,6 +342,8 @@ export class HODAttendanceWindowService {
         message: "Attendance window reopened",
         data: {
           courseAssignmentId: assignment.id,
+          electiveBatchFacultyId: null,
+          isElective: false,
           courseCode: assignment.course.code,
           courseName: assignment.course.name,
           department: assignment.department.name,
@@ -235,12 +380,39 @@ export class HODAttendanceWindowService {
       departmentId,
     };
     if (semesterId) where.semesterId = semesterId;
-    const sections = await db.section.findMany({
-      where,
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    });
-    return sections;
+
+    const [sections, electiveBatchFaculties] = await Promise.all([
+      db.section.findMany({
+        where,
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+      db.electiveBatchFaculty.findMany({
+        where: {
+          course: {
+            departmentId,
+            ...(semesterId ? { semesterId } : {}),
+            approvalStatus: FACULTY_COURSE_STATUS,
+          },
+        },
+        select: { electiveBatch: { select: { id: true, name: true } } },
+      }),
+    ]);
+
+    const seen = new Set<string>();
+    const merged: HODSection[] = [];
+    for (const section of sections) {
+      if (seen.has(section.id)) continue;
+      seen.add(section.id);
+      merged.push(section);
+    }
+    for (const eb of electiveBatchFaculties) {
+      if (seen.has(eb.electiveBatch.id)) continue;
+      seen.add(eb.electiveBatch.id);
+      merged.push({ id: eb.electiveBatch.id, name: eb.electiveBatch.name });
+    }
+    merged.sort((a, b) => a.name.localeCompare(b.name));
+    return merged;
   }
 
   static async bulkFreeze(
@@ -263,14 +435,13 @@ export class HODAttendanceWindowService {
         payload
       );
 
-      const assignments = await db.courseAssignment.findMany({
-        where: {
-          departmentId,
-          section: { semesterId },
-          ...(payload.sectionId ? { sectionId: payload.sectionId } : {}),
-        },
-        select: { id: true },
-      });
+      const rows = await FreezeService.getDepartmentWindows(
+        departmentId,
+        semesterId
+      );
+      const targetRows = payload.sectionId
+        ? rows.filter((r) => r.sectionId === payload.sectionId)
+        : rows;
 
       const result = {
         processed: 0,
@@ -280,18 +451,20 @@ export class HODAttendanceWindowService {
         failedAssignments: [] as string[],
       };
 
-      for (const assignment of assignments) {
+      for (const row of targetRows) {
+        const ownershipKey = row.isElective
+          ? (row.electiveBatchFacultyId ?? "")
+          : (row.courseAssignmentId ?? "");
         try {
-          const freeze = await db.freeze.findUnique({
-            where: { courseAssignmentId: assignment.id },
-          });
-          if (freeze?.adminFrozen) {
+          if (row.freeze.displayState === "LOCKED_BY_ADMIN") {
             result.skipped++;
-            result.skippedAssignments.push(assignment.id);
+            result.skippedAssignments.push(ownershipKey);
             continue;
           }
           await FreezeService.freeze(
-            assignment.id,
+            row.isElective
+              ? { electiveBatchFacultyId: row.electiveBatchFacultyId ?? "" }
+              : { courseAssignmentId: row.courseAssignmentId ?? "" },
             "department",
             username,
             displayUsername
@@ -299,11 +472,11 @@ export class HODAttendanceWindowService {
           result.processed++;
         } catch (error) {
           logger.error("Failed to freeze assignment", {
-            assignmentId: assignment.id,
+            assignmentId: ownershipKey,
             error,
           });
           result.failed++;
-          result.failedAssignments.push(assignment.id);
+          result.failedAssignments.push(ownershipKey);
         }
       }
 
@@ -337,14 +510,13 @@ export class HODAttendanceWindowService {
         payload
       );
 
-      const assignments = await db.courseAssignment.findMany({
-        where: {
-          departmentId,
-          section: { semesterId },
-          ...(payload.sectionId ? { sectionId: payload.sectionId } : {}),
-        },
-        select: { id: true },
-      });
+      const rows = await FreezeService.getDepartmentWindows(
+        departmentId,
+        semesterId
+      );
+      const targetRows = payload.sectionId
+        ? rows.filter((r) => r.sectionId === payload.sectionId)
+        : rows;
 
       const result = {
         processed: 0,
@@ -354,25 +526,25 @@ export class HODAttendanceWindowService {
         failedAssignments: [] as string[],
       };
 
-      for (const assignment of assignments) {
+      for (const row of targetRows) {
+        const ownershipKey = row.isElective
+          ? (row.electiveBatchFacultyId ?? "")
+          : (row.courseAssignmentId ?? "");
         try {
-          const freeze = await db.freeze.findUnique({
-            where: { courseAssignmentId: assignment.id },
-          });
-          if (freeze?.adminFrozen) {
-            result.skipped++;
-            result.skippedAssignments.push(assignment.id);
-            continue;
-          }
-          await FreezeService.unfreeze(assignment.id, "department");
+          await FreezeService.unfreeze(
+            row.isElective
+              ? { electiveBatchFacultyId: row.electiveBatchFacultyId ?? "" }
+              : { courseAssignmentId: row.courseAssignmentId ?? "" },
+            "department"
+          );
           result.processed++;
         } catch (error) {
           logger.error("Failed to unfreeze assignment", {
-            assignmentId: assignment.id,
+            assignmentId: ownershipKey,
             error,
           });
           result.failed++;
-          result.failedAssignments.push(assignment.id);
+          result.failedAssignments.push(ownershipKey);
         }
       }
 

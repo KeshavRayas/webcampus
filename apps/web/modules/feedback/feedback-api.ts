@@ -19,7 +19,7 @@ export async function getFeedbackReport(
 
 export async function getFeedbackFilterOptions(
   role: string,
-  scope?: { academicTermId?: string; semesterId?: string }
+  scope?: { academicTermId?: string; semesterId?: string; courseId?: string }
 ) {
   const response = await axios.get(
     `${baseUrl()}/${role}/feedback/filter-options`,
@@ -28,7 +28,11 @@ export async function getFeedbackFilterOptions(
   return response.data.data as {
     faculty: Array<{ id: string; shortName: string; user: { name: string } }>;
     courses: Array<{ id: string; code: string; name: string }>;
-    sections: Array<{ id: string; name: string }>;
+    sections: Array<{
+      id: string;
+      name: string;
+      isElectiveBatch?: boolean;
+    }>;
     batches: Array<{ id: string; name: string }>;
     departments: Array<{ id: string; name: string }>;
     rounds: Array<{ id: string; roundNumber: number; name: string }>;

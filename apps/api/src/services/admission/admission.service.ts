@@ -1,9 +1,12 @@
+import { randomUUID } from "crypto";
 import { IncomingHttpHeaders } from "http";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
+import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
   AdmissionActionParamType,
+  CancelAdmissionType,
   ChangeAdmissionModeType,
   CreateAdmissionShellType,
   GetAdmissionsQueryType,
@@ -14,30 +17,33 @@ import {
   buildStudentEmailAddress,
   getStudentEmailYearSuffix,
   normalizeStudentEmailToken,
+  splitStudentName,
 } from "./student-email";
+
+const parseOptionalNumber = (value: string | undefined): number | null => {
+  if (value === undefined || value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const calculatePercentage = (
+  marks: number | null,
+  maxMarks: number | null
+): number | null => {
+  if (marks === null || maxMarks === null || maxMarks <= 0) return null;
+  return Number(((marks / maxMarks) * 100).toFixed(2));
+};
 
 export class AdmissionService {
   private static getStudentFullName(admission: {
-    firstName?: string | null;
-    middleName?: string | null;
-    lastName?: string | null;
+    nameAsPer10th?: string | null;
   }): string | null {
-    const fullName = [
-      admission.firstName?.trim(),
-      admission.middleName?.trim(),
-      admission.lastName?.trim(),
-    ]
-      .filter((value): value is string => Boolean(value))
-      .join(" ")
-      .trim();
-
-    return fullName.length > 0 ? fullName : null;
+    const fullName = admission.nameAsPer10th?.trim();
+    return fullName && fullName.length > 0 ? fullName : null;
   }
 
   private static getSortableApplicantName(admission: {
-    firstName?: string | null;
-    middleName?: string | null;
-    lastName?: string | null;
+    nameAsPer10th?: string | null;
   }): string {
     return (
       AdmissionService.getStudentFullName(admission)?.toLocaleLowerCase() || ""
@@ -85,6 +91,12 @@ export class AdmissionService {
               mode: "insensitive" as const,
             },
           })),
+          ...normalizedApplicationIds.map((applicationId) => ({
+            email: {
+              equals: applicationId,
+              mode: "insensitive" as const,
+            },
+          })),
           {
             email: {
               in: normalizedApplicationIds.map((applicationId) =>
@@ -114,6 +126,11 @@ export class AdmissionService {
       }
 
       const normalizedEmail = user.email.trim().toLowerCase();
+      if (normalizedApplicationIds.includes(normalizedEmail)) {
+        userIdByApplicationId.set(normalizedEmail, user.id);
+        continue;
+      }
+
       if (!normalizedEmail.endsWith("@applicant.local")) {
         continue;
       }
@@ -224,7 +241,10 @@ export class AdmissionService {
 
     const updatedAdmission = await db.admission.update({
       where: { id },
-      data: { status },
+      data: {
+        status,
+        ...(status === "APPROVED" ? { feeStatus: true } : {}),
+      },
       include: { semester: true },
     });
 
@@ -240,6 +260,15 @@ export class AdmissionService {
     headers: IncomingHttpHeaders
   ): Promise<BaseResponse<unknown>> {
     try {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(headers),
+      });
+      const filledById = session?.user?.id;
+
+      if (!filledById) {
+        throw new Error("Unauthorized");
+      }
+
       const applicantEmail = data.primaryEmail.trim().toLowerCase();
 
       const existingApplicantUser = await db.user.findFirst({
@@ -255,11 +284,39 @@ export class AdmissionService {
         throw new Error("An account with this email already exists");
       }
 
+      const departmentCode = applicantEmail
+        .split("@")[0]
+        ?.match(/\.([a-z]+)\d{2,4}$/i)?.[1];
+
+      if (!departmentCode) {
+        throw new Error(
+          "Applicant email must follow the name.departmentCodeYear format"
+        );
+      }
+
+      const department = await db.department.findFirst({
+        where: {
+          code: {
+            equals: departmentCode,
+            mode: "insensitive",
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!department) {
+        throw new Error(`Department code ${departmentCode} was not found`);
+      }
+
+      if (department.id !== data.departmentId) {
+        throw new Error("The selected department does not match the email");
+      }
+
       const userService = new UserService({
         request: {
           email: applicantEmail,
           name: "Applicant",
-          username: applicantEmail,
+          username: (applicantEmail.split("@")[0] ?? "").trim().toLowerCase(),
           password: data.password,
           role: "applicant",
         },
@@ -274,21 +331,14 @@ export class AdmissionService {
         );
       }
 
-      const placeholderDepartment = await db.department.findFirst({
-        select: { id: true },
-      });
-
-      if (!placeholderDepartment) {
-        throw new Error("No departments found to use as placeholder");
-      }
-
       await db.admission.create({
         data: {
-          // applicationId: crypto.randomUUID(), // or primaryEmail for now
+          applicationId: randomUUID(),
           primaryEmail: data.primaryEmail,
 
           semesterId: data.semesterId,
-          departmentId: placeholderDepartment.id,
+          departmentId: department.id,
+          filledById,
 
           status: "PENDING",
         },
@@ -311,7 +361,8 @@ export class AdmissionService {
   }
 
   static async getAdmissions(
-    filters: GetAdmissionsQueryType
+    filters: GetAdmissionsQueryType,
+    filledById?: string
   ): Promise<BaseResponse<unknown>> {
     try {
       const createdTo = filters.createdTo
@@ -324,6 +375,7 @@ export class AdmissionService {
 
       const admissions = await db.admission.findMany({
         where: {
+          filledById,
           applicationId: filters.applicationId
             ? {
                 contains: filters.applicationId,
@@ -331,9 +383,21 @@ export class AdmissionService {
               }
             : undefined,
           status: filters.status,
+          feeStatus:
+            filters.feeStatus === "true"
+              ? true
+              : filters.feeStatus === "false"
+                ? false
+                : undefined,
           modeOfAdmission: filters.mode
             ? {
                 equals: filters.mode,
+                mode: "insensitive",
+              }
+            : undefined,
+          admissionType: filters.admissionType
+            ? {
+                equals: filters.admissionType,
                 mode: "insensitive",
               }
             : undefined,
@@ -362,6 +426,20 @@ export class AdmissionService {
               },
             },
           },
+          filledBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
+          cancellation: {
+            select: {
+              reason: true,
+              cancelledAt: true,
+            },
+          },
         },
       });
 
@@ -377,9 +455,10 @@ export class AdmissionService {
   }
 
   static async getAdmissionsBySemester(
-    semesterId: string
+    semesterId: string,
+    filledById?: string
   ): Promise<BaseResponse<unknown>> {
-    return this.getAdmissions({ semester: semesterId });
+    return this.getAdmissions({ semester: semesterId }, filledById);
   }
 
   static async getByApplicationId(
@@ -429,6 +508,7 @@ export class AdmissionService {
         admission.aadharCard,
         admission.transferCertificate,
         admission.studyCertificate,
+        admission.embassyPermissionLetter,
       ].filter(
         (url): url is string => typeof url === "string" && url.length > 0
       );
@@ -523,7 +603,8 @@ export class AdmissionService {
   static async submitApplication(
     primaryEmail: string,
     data: Record<string, string>,
-    fileUrls: { [key: string]: string }
+    fileUrls: { [key: string]: string },
+    filledById?: string
   ): Promise<BaseResponse<unknown>> {
     try {
       logger.info("submitApplication called", {
@@ -538,15 +619,106 @@ export class AdmissionService {
         where: {
           primaryEmail,
         },
+        include: {
+          semester: true,
+        },
       });
 
       if (!admission) {
         throw new Error("Admission application not found.");
       }
 
-      if (admission.status === "SUBMITTED") {
+      const actorId =
+        filledById ??
+        (
+          await db.user.findUnique({
+            where: { email: primaryEmail },
+            select: { id: true },
+          })
+        )?.id;
+
+      if (!actorId) {
+        throw new Error("Unable to identify the user who filled the form.");
+      }
+
+      if (admission.status === "SUBMITTED" && !filledById) {
         throw new Error("Application has already been submitted.");
       }
+
+      if (!data.admissionType) {
+        throw new Error("Admission type is required.");
+      }
+
+      if (!data.abcAparId?.trim()) {
+        throw new Error("ABC/APAAR ID is required.");
+      }
+
+      if (!data.nationality?.trim()) {
+        throw new Error("Nationality is required.");
+      }
+
+      const validAdmissionTypes =
+        admission.semester.semesterNumber === 1
+          ? ["REGULAR"]
+          : admission.semester.semesterNumber === 3
+            ? ["LATERAL_ENTRY", "COLLEGE_CHANGE"]
+            : [];
+
+      if (!validAdmissionTypes.includes(data.admissionType)) {
+        throw new Error(
+          `Admission type ${data.admissionType} is not valid for semester ${admission.semester.semesterNumber}.`
+        );
+      }
+
+      if (data.semesterId && data.semesterId !== admission.semesterId) {
+        throw new Error("The submitted semester does not match the admission.");
+      }
+
+      if (data.scholarship !== "true" && data.scholarship !== "false") {
+        throw new Error("Scholarship selection is required.");
+      }
+
+      if (data.scholarship === "true" && !data.sspId?.trim()) {
+        throw new Error("SSP ID is required when scholarship is enabled.");
+      }
+
+      const physicsMarks = parseOptionalNumber(data.physicsMarks);
+      const physicsMaxMarks = parseOptionalNumber(data.physicsMaxMarks);
+      const chemistryMarks = parseOptionalNumber(data.chemistryMarks);
+      const chemistryMaxMarks = parseOptionalNumber(data.chemistryMaxMarks);
+      const mathematicsMarks = parseOptionalNumber(data.mathematicsMarks);
+      const mathematicsMaxMarks = parseOptionalNumber(data.mathematicsMaxMarks);
+      const pcmMaxMarks = [
+        physicsMaxMarks,
+        chemistryMaxMarks,
+        mathematicsMaxMarks,
+      ];
+      const pcmMarks = [physicsMarks, chemistryMarks, mathematicsMarks];
+      if (
+        [...pcmMarks, ...pcmMaxMarks].some((value) => value !== null) &&
+        [...pcmMarks, ...pcmMaxMarks].some((value) => value === null)
+      ) {
+        throw new Error(
+          "Physics, Chemistry, and Mathematics marks and maximum marks are all required."
+        );
+      }
+      for (let index = 0; index < pcmMarks.length; index++) {
+        if (pcmMarks[index]! > pcmMaxMarks[index]!) {
+          throw new Error("Obtained marks cannot exceed maximum marks.");
+        }
+      }
+      const pcmPercentage =
+        pcmMarks.every((value) => value !== null) &&
+        pcmMaxMarks.every((value) => value !== null) &&
+        pcmMaxMarks.every((value) => value! > 0)
+          ? Number(
+              (
+                (pcmMarks.reduce((sum, value) => sum + value!, 0) /
+                  pcmMaxMarks.reduce((sum, value) => sum + value!, 0)) *
+                100
+              ).toFixed(2)
+            )
+          : null;
 
       if (data.aadharNumber && data.aadharNumber !== admission.aadharNumber) {
         const existingAadhar = await db.admission.findFirst({
@@ -573,12 +745,11 @@ export class AdmissionService {
           status: "SUBMITTED",
 
           // Admission Details
-          applicationId: data.applicationId,
-          firstName: data.firstName,
-          middleName: data.middleName,
-          lastName: data.lastName,
+          applicationId:
+            admission.applicationId || data.applicationId || randomUUID(),
+          admissionType: data.admissionType,
           modeOfAdmission: data.modeOfAdmission,
-          semesterId: data.semesterId,
+          semesterId: admission.semesterId,
           departmentId: data.departmentId,
           categoryClaimed: data.categoryClaimed,
           categoryAllotted: data.categoryAllotted,
@@ -590,8 +761,13 @@ export class AdmissionService {
             ? new Date(data.originalAdmissionOrderDate)
             : null,
           feePaid: data.feePaid ? parseFloat(data.feePaid) : null,
+          feeReceiptNumber: data.feeReceiptNumber ?? null,
+          scholarship: data.scholarship === "true",
+          sspId: data.scholarship === "true" ? data.sspId?.trim() : null,
+          abcAparId: data.abcAparId ?? null,
+          counsellingRound: data.counsellingRound ?? null,
+          dateOfAdmission: admission.dateOfAdmission ?? new Date(),
           hostel: data.hostel === "true",
-          hostelRoomNumber: data.hostelRoomNumber ?? null,
 
           // Personal Information
           nameAsPer10th: data.nameAsPer10th,
@@ -602,6 +778,7 @@ export class AdmissionService {
           secondaryPhoneNumber: data.secondaryPhoneNumber,
           emergencyContactNumber: data.emergencyContactNumber,
           primaryEmail,
+          filledById: actorId,
           secondaryEmail: data.secondaryEmail,
 
           currentAddress: data.currentAddress,
@@ -632,9 +809,26 @@ export class AdmissionService {
           disabilityType: data.disabilityType ?? null,
           economicallyBackward: data.economicallyBackward === "true",
           aadharNumber: data.aadharNumber,
+          studiedKannadaIn10th: data.studiedKannadaIn10th === "true",
+          passportNumber: data.passportNumber ?? null,
+          passportExpiryDate: data.passportExpiryDate
+            ? new Date(data.passportExpiryDate)
+            : null,
+          visaNumber: data.visaNumber ?? null,
+          visaExpiryDate: data.visaExpiryDate
+            ? new Date(data.visaExpiryDate)
+            : null,
+          parentPassportNumber: data.parentPassportNumber ?? null,
+          parentVisaNumber: data.parentVisaNumber ?? null,
+          parentVisaExpiryDate: data.parentVisaExpiryDate
+            ? new Date(data.parentVisaExpiryDate)
+            : null,
 
           class10thSchoolName: data.class10thSchoolName,
+          class10thRollRegNumber: data.class10thRollRegNumber ?? null,
+          admissionBasedOn: data.admissionBasedOn ?? null,
           class10thSchoolType: data.class10thSchoolType,
+          schoolCountry: data.schoolCountry ?? null,
           class10thSchoolCity: data.class10thSchoolCity,
           class10thSchoolState: data.class10thSchoolState,
           class10thYearOfPassing: data.class10thYearOfPassing,
@@ -649,7 +843,9 @@ export class AdmissionService {
           hasClass12: data.hasClass12 === "true",
           hasDiploma: data.hasDiploma === "true",
           class12thInstituteName: data.class12thInstituteName,
+          class12thRollRegNumber: data.class12thRollRegNumber ?? null,
           class12thInstituteType: data.class12thInstituteType,
+          instituteCountry: data.instituteCountry ?? null,
           class12thInstituteCity: data.class12thInstituteCity,
           class12thInstituteState: data.class12thInstituteState,
           class12thYearOfPassing: data.class12thYearOfPassing,
@@ -661,9 +857,26 @@ export class AdmissionService {
             ? parseFloat(data.class12thAggregateTotal)
             : null,
           class12thMediumOfTeaching: data.class12thMediumOfTeaching,
+          physicsMarks,
+          physicsMaxMarks,
+          physicsPercentage: calculatePercentage(physicsMarks, physicsMaxMarks),
+          chemistryMarks,
+          chemistryMaxMarks,
+          chemistryPercentage: calculatePercentage(
+            chemistryMarks,
+            chemistryMaxMarks
+          ),
+          mathematicsMarks,
+          mathematicsMaxMarks,
+          mathematicsPercentage: calculatePercentage(
+            mathematicsMarks,
+            mathematicsMaxMarks
+          ),
+          pcmPercentage,
 
           diplomaInstituteName: data.diplomaInstituteName ?? null,
           diplomaInstituteType: data.diplomaInstituteType ?? null,
+          diplomaCountry: data.diplomaCountry ?? null,
           diplomaInstituteCity: data.diplomaInstituteCity ?? null,
           diplomaInstituteState: data.diplomaInstituteState ?? null,
           diplomaYearOfPassing: data.diplomaYearOfPassing ?? null,
@@ -681,18 +894,21 @@ export class AdmissionService {
           fatherNumber: data.fatherNumber,
           fatherPermanentAddress: data.fatherPermanentAddress,
           fatherOccupation: data.fatherOccupation ?? null,
+          fatherAnnualIncome: data.fatherAnnualIncome ?? null,
 
           motherName: data.motherName,
           motherEmail: data.motherEmail,
           motherNumber: data.motherNumber,
           motherPermanentAddress: data.motherPermanentAddress,
           motherOccupation: data.motherOccupation ?? null,
+          motherAnnualIncome: data.motherAnnualIncome ?? null,
 
           guardianName: data.guardianName ?? null,
           guardianEmail: data.guardianEmail ?? null,
           guardianNumber: data.guardianNumber ?? null,
           guardianPermanentAddress: data.guardianPermanentAddress ?? null,
           guardianOccupation: data.guardianOccupation ?? null,
+          guardianAnnualIncome: data.guardianAnnualIncome ?? null,
 
           ...fileUrls,
         },
@@ -709,6 +925,62 @@ export class AdmissionService {
       throw new Error(
         error instanceof Error ? error.message : "Failed to submit application"
       );
+    }
+  }
+
+  static async createAndSubmitApplication(
+    primaryEmail: string,
+    data: Record<string, string>,
+    fileUrls: { [key: string]: string },
+    filledById: string
+  ): Promise<BaseResponse<unknown>> {
+    if (!data.semesterId || !data.departmentId) {
+      throw new Error("Semester and department are required");
+    }
+
+    const existingAdmission = await db.admission.findUnique({
+      where: { primaryEmail },
+      select: { id: true },
+    });
+
+    try {
+      if (existingAdmission) {
+        // Staff editing flow: update the existing admission record in place.
+        return await AdmissionService.submitApplication(
+          primaryEmail,
+          data,
+          fileUrls,
+          filledById
+        );
+      }
+
+      await db.admission.create({
+        data: {
+          applicationId: randomUUID(),
+          primaryEmail,
+          semesterId: data.semesterId,
+          departmentId: data.departmentId,
+          filledById,
+          status: "PENDING",
+        },
+      });
+
+      return await AdmissionService.submitApplication(
+        primaryEmail,
+        data,
+        fileUrls,
+        filledById
+      );
+    } catch (error) {
+      const createdAdmission = await db.admission.findUnique({
+        where: { primaryEmail },
+        select: { id: true, status: true },
+      });
+
+      if (createdAdmission && createdAdmission.status === "PENDING") {
+        await db.admission.delete({ where: { id: createdAdmission.id } });
+      }
+      throw error;
     }
   }
 
@@ -768,7 +1040,7 @@ export class AdmissionService {
           modeOfAdmission: data.modeOfAdmission,
           categoryClaimed: data.categoryClaimed,
           categoryAllotted: data.categoryAllotted,
-          quota: data.modeOfAdmission ? data.quota : undefined,
+          quota: data.modeOfAdmission === "KCET" ? (data.quota ?? null) : null,
           entranceExamRank:
             data.entranceExamRank != null
               ? String(data.entranceExamRank)
@@ -843,6 +1115,79 @@ export class AdmissionService {
       );
     }
   }
+
+  static async cancelAdmission(
+    id: string,
+    data: CancelAdmissionType,
+    headers: IncomingHttpHeaders
+  ): Promise<BaseResponse<unknown>> {
+    try {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(headers),
+      });
+      const cancelledById = session?.user?.id;
+
+      if (!cancelledById) {
+        throw new Error("Unauthorized");
+      }
+
+      const reason =
+        data.reason === "OTHER"
+          ? `OTHER: ${data.otherReason!.trim()}`
+          : data.reason;
+
+      const result = await db.$transaction(async (tx) => {
+        const admission = await tx.admission.findUnique({
+          where: { id },
+          select: { id: true, status: true },
+        });
+
+        if (!admission) {
+          throw new Error("Admission not found");
+        }
+
+        const existingCancellation = await tx.cancelledAdmissions.findUnique({
+          where: { admissionId: id },
+        });
+
+        if (existingCancellation) {
+          throw new Error("Admission has already been cancelled");
+        }
+
+        const cancellation = await tx.cancelledAdmissions.create({
+          data: {
+            admissionId: id,
+            reason,
+            cancelledById,
+          },
+          include: {
+            admission: true,
+            cancelledBy: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+        });
+
+        await tx.admission.update({
+          where: { id },
+          data: { status: "CANCELLED" },
+        });
+
+        return cancellation;
+      });
+
+      return {
+        status: "success",
+        message: "Admission cancelled successfully",
+        data: result,
+      };
+    } catch (error) {
+      logger.error("Failed to cancel admission", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to cancel admission"
+      );
+    }
+  }
   static async portStudents(
     payload: PortStudentsType,
     headers: IncomingHttpHeaders
@@ -879,9 +1224,7 @@ export class AdmissionService {
               departmentId: true,
               tempUsn: true,
               studentId: true,
-              firstName: true,
-              middleName: true,
-              lastName: true,
+              nameAsPer10th: true,
               primaryEmail: true,
               photo: true,
             },
@@ -927,16 +1270,16 @@ export class AdmissionService {
           continue;
         }
 
-        const firstNameKey = normalizeStudentEmailToken(
-          admission.firstName ?? ""
+        const { firstName, lastName } = splitStudentName(
+          admission.nameAsPer10th ?? ""
         );
+
+        const firstNameKey = normalizeStudentEmailToken(firstName);
         if (!firstNameKey) {
           continue;
         }
 
-        const lastInitial = normalizeStudentEmailToken(
-          admission.lastName ?? ""
-        ).slice(0, 1);
+        const lastInitial = normalizeStudentEmailToken(lastName).slice(0, 1);
 
         const counts = studentEmailCollisionCountsByDepartmentId.get(
           admission.departmentId
@@ -1033,8 +1376,7 @@ export class AdmissionService {
             }
 
             const fullName = AdmissionService.getStudentFullName(admission);
-            const firstName = admission.firstName?.trim();
-            const lastName = admission.lastName?.trim();
+            const { firstName, lastName } = splitStudentName(fullName ?? "");
 
             if (!fullName) {
               throw new Error(

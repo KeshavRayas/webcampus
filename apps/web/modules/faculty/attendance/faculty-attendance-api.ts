@@ -25,8 +25,9 @@ export type CreateOrOpenSessionPayload =
 
 export type SessionStudentsQuery = {
   courseId: string;
-  sectionId: string;
+  sectionId?: string;
   batchId?: string;
+  electiveBatchId?: string;
 };
 
 export type SessionDetailQuery = {
@@ -119,6 +120,10 @@ export const listFacultyAttendanceSessions = async (
       params.batchId = filters.batchId;
     }
 
+    if (filters.electiveBatchId) {
+      params.electiveBatchId = filters.electiveBatchId;
+    }
+
     if (filters.sessionDate) {
       params.sessionDate = dayjs(filters.sessionDate).format("YYYY-MM-DD");
     }
@@ -165,6 +170,7 @@ export const getFacultyAttendanceSessionStudents = async (
         courseId: query.courseId,
         sectionId: query.sectionId,
         batchId: query.batchId,
+        electiveBatchId: query.electiveBatchId,
       },
     });
 
@@ -232,8 +238,9 @@ export const deleteFacultyAttendanceSession = async (
 
 export type DetailedReportFilters = {
   courseId: string;
-  sectionId: string;
+  sectionId?: string;
   batchId?: string;
+  electiveBatchId?: string;
 };
 
 export const getFacultyAttendanceDetailedReport = async (
@@ -243,11 +250,16 @@ export const getFacultyAttendanceDetailedReport = async (
   try {
     const params: Record<string, string> = {
       courseId: filters.courseId,
-      sectionId: filters.sectionId,
     };
 
+    if (filters.sectionId) {
+      params.sectionId = filters.sectionId;
+    }
     if (filters.batchId) {
       params.batchId = filters.batchId;
+    }
+    if (filters.electiveBatchId) {
+      params.electiveBatchId = filters.electiveBatchId;
     }
 
     const response = await apiClient.get<

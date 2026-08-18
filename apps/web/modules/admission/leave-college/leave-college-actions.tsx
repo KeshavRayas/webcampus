@@ -42,8 +42,7 @@ export function LeaveCollegeActions({
           <DialogDescription>
             This will permanently mark{" "}
             <strong>
-              {admission.student?.user.name ??
-                `${admission.firstName} ${admission.lastName}`}
+              {admission.student?.user.name ?? admission.nameAsPer10th}
             </strong>{" "}
             as exited from the college.
           </DialogDescription>

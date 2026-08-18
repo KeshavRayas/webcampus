@@ -13,6 +13,7 @@ import {
 } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import type { DepartmentRequestContext } from "@webcampus/types/request-context";
+import { ProjectMappingService } from "./project-mapping.service";
 
 type SectionCycle = "PHYSICS" | "CHEMISTRY";
 
@@ -397,12 +398,20 @@ export class SectionService {
         requestContext,
       });
 
-      const section = await db.section.create({
-        data: {
-          ...data,
+      const section = await db.$transaction(async (tx) => {
+        const created = await tx.section.create({
+          data: {
+            ...data,
+            departmentId: resolvedDepartment.departmentId,
+            departmentName: resolvedDepartment.departmentName,
+          },
+        });
+        await ProjectMappingService.reconcileProjectGroupsForScope({
+          tx,
           departmentId: resolvedDepartment.departmentId,
-          departmentName: resolvedDepartment.departmentName,
-        },
+          semesterId: data.semesterId,
+        });
+        return created;
       });
 
       const response: BaseResponse<SectionResponseType> = {
@@ -589,10 +598,18 @@ export class SectionService {
       }
 
       // Unassign all students, remove any linked batches, then delete the section.
+      const reconcileScope = {
+        departmentId: resolvedDepartment.departmentId,
+        semesterId: existing.semesterId,
+      };
       await db.$transaction(async (tx) => {
         await tx.studentSection.deleteMany({ where: { sectionId: id } });
         await tx.batch.deleteMany({ where: { sectionId: id } });
         await tx.section.delete({ where: { id } });
+        await ProjectMappingService.reconcileProjectGroupsForScope({
+          tx,
+          ...reconcileScope,
+        });
       });
 
       return {
@@ -924,6 +941,12 @@ export class SectionService {
             sections.push(section);
           }
 
+          await ProjectMappingService.reconcileProjectGroupsForScope({
+            tx,
+            departmentId: resolvedDepartment.departmentId,
+            semesterId: data.semesterId,
+          });
+
           return sections;
         });
 
@@ -1044,6 +1067,12 @@ export class SectionService {
 
           sections.push(section);
         }
+
+        await ProjectMappingService.reconcileProjectGroupsForScope({
+          tx,
+          departmentId: resolvedDepartment.departmentId,
+          semesterId: data.semesterId,
+        });
 
         return sections;
       });
@@ -1302,6 +1331,12 @@ export class SectionService {
           skipDuplicates: true,
         });
 
+        await ProjectMappingService.reconcileProjectGroupsForScope({
+          tx,
+          departmentId: section.departmentId,
+          semesterId: section.semesterId,
+        });
+
         return created;
       });
 
@@ -1426,6 +1461,12 @@ export class SectionService {
           sections.push(section);
         }
 
+        await ProjectMappingService.reconcileProjectGroupsForScope({
+          tx,
+          departmentId: resolvedDepartment.departmentId,
+          semesterId: data.semesterId,
+        });
+
         return sections;
       });
 
@@ -1490,6 +1531,28 @@ export class SectionService {
         throw new Error("No sections found in the source semester");
       }
 
+      // Capture the affected OLD and NEW {departmentId, semesterId} scopes before
+      // the mutation so both are reconciled after the promotion (see §D.1).
+      const reconcileScopes = new Map<
+        string,
+        { departmentId: string; semesterId: string }
+      >();
+      for (const oldSection of sem1Sections) {
+        reconcileScopes.set(`${oldSection.departmentId}:${fromSemesterId}`, {
+          departmentId: oldSection.departmentId,
+          semesterId: fromSemesterId,
+        });
+        reconcileScopes.set(`${oldSection.departmentId}:${toSemesterId}`, {
+          departmentId: oldSection.departmentId,
+          semesterId: toSemesterId,
+        });
+      }
+      const orderedScopes = Array.from(reconcileScopes.values()).sort(
+        (a, b) =>
+          a.departmentId.localeCompare(b.departmentId) ||
+          a.semesterId.localeCompare(b.semesterId)
+      );
+
       const createdSections = await db.$transaction(async (tx) => {
         const newSections: Section[] = [];
 
@@ -1532,6 +1595,16 @@ export class SectionService {
           }
 
           newSections.push(newSection);
+        }
+
+        // Reconcile every affected OLD and NEW scope in deterministic order so PW
+        // groups are recalculated both where sections left and where they arrived.
+        for (const scope of orderedScopes) {
+          await ProjectMappingService.reconcileProjectGroupsForScope({
+            tx,
+            departmentId: scope.departmentId,
+            semesterId: scope.semesterId,
+          });
         }
 
         return newSections;
