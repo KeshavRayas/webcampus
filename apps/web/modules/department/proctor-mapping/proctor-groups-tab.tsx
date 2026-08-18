@@ -31,17 +31,20 @@ import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-toastify";
 
-export const ProctorGroupsTab = () => {
+export const ProctorGroupsTab = ({ semesterId }: { semesterId?: string }) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [newGroup, setNewGroup] = useState("");
 
   const { data: groups, isLoading } = useQuery({
-    queryKey: ["proctor-groups"],
+    queryKey: ["proctor-groups", semesterId],
     queryFn: async () => {
       const res = await axios.get<any>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/proctor`,
-        { withCredentials: true }
+        {
+          params: { semesterId },
+          withCredentials: true,
+        }
       );
       return res.data.data || [];
     },
