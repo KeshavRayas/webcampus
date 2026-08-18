@@ -49,6 +49,7 @@ type ApplicantAdmissionData = {
   categoryAllotted?: string;
   quota?: string;
   primaryEmail: string;
+  secondaryEmail?: string | null;
   filledBy?: { name: string; email: string; role?: string | null } | null;
   admissionType?: string | null;
   admissionBasedOn?: string | null;
@@ -1227,8 +1228,23 @@ export const ApplicantAdmissionView = ({
   };
 
   const warnAndNavigate = (step: StepKey) => {
-    toast.error(`Please fill ${STEP_LABELS[step]} before proceeding`);
+    const section = sectionRefs.current[step];
+    const invalidField = section
+      ? Array.from(
+          section.querySelectorAll<
+            HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+          >("input, select, textarea")
+        ).find((field) => !field.disabled && !field.checkValidity())
+      : null;
+
+    const fieldLabel = invalidField?.name || invalidField?.id;
+    toast.error(
+      fieldLabel
+        ? `Please complete ${fieldLabel} in ${STEP_LABELS[step]} before proceeding`
+        : `Please fill ${STEP_LABELS[step]} before proceeding`
+    );
     setActiveStep(step);
+    invalidField?.focus();
   };
 
   const saveAndNext = (step: StepKey) => {
@@ -1509,7 +1525,8 @@ export const ApplicantAdmissionView = ({
     setSelectedQuota(String(a.quota ?? ""));
     setSportName(String(a.sportName ?? ""));
     setSelectedBloodGroup(String(a.bloodGroup ?? ""));
-    setSelectedGender(String(a.gender ?? ""));
+    // Applicant shells do not have a stored gender yet; retain the form default.
+    setSelectedGender(String(a.gender ?? "Male"));
     setSelectedClass10SchoolType(String(a.class10thSchoolType ?? ""));
     setSelectedClass12InstituteType(String(a.class12thInstituteType ?? ""));
     setSelectedDiplomaInstituteType(String(a.diplomaInstituteType ?? ""));
@@ -2297,6 +2314,7 @@ export const ApplicantAdmissionView = ({
                   id="secondaryEmail"
                   name="secondaryEmail"
                   type="email"
+                  defaultValue={admission.secondaryEmail ?? ""}
                   required
                   placeholder="Personal Email"
                 />
