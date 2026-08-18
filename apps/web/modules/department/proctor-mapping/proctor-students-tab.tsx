@@ -30,29 +30,35 @@ import axios from "axios";
 import { useState } from "react";
 import { toast } from "react-toastify";
 
-export const ProctorStudentsTab = () => {
+export const ProctorStudentsTab = ({ semesterId }: { semesterId?: string }) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>("unassigned");
 
   const { data: students, isLoading: studentsLoading } = useQuery({
-    queryKey: ["proctor-students"],
+    queryKey: ["proctor-students", semesterId],
     queryFn: async () => {
       const res = await axios.get<any>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/students`,
-        { withCredentials: true }
+        {
+          params: { semesterId },
+          withCredentials: true,
+        }
       );
       return res.data.data || [];
     },
   });
 
   const { data: groups } = useQuery({
-    queryKey: ["proctor-groups"],
+    queryKey: ["proctor-groups", semesterId],
     queryFn: async () => {
       const res = await axios.get<any>(
         `${NEXT_PUBLIC_API_BASE_URL}/department/proctor`,
-        { withCredentials: true }
+        {
+          params: { semesterId },
+          withCredentials: true,
+        }
       );
       return res.data.data || [];
     },
@@ -158,6 +164,7 @@ export const ProctorStudentsTab = () => {
                 <TableHead>Name</TableHead>
                 <TableHead>Semester</TableHead>
                 <TableHead>Current Group</TableHead>
+                <TableHead>Move</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -199,6 +206,32 @@ export const ProctorStudentsTab = () => {
                             Unassigned
                           </span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={student.proctorGroupId || "unassigned"}
+                          onValueChange={(value) => {
+                            assignStudents.mutate({
+                              studentIds: [student.id],
+                              proctorGroupId:
+                                value === "unassigned" ? null : value,
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Move to group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unassigned">
+                              Unassigned
+                            </SelectItem>
+                            {groups?.map((g: any) => (
+                              <SelectItem key={g.id} value={g.id}>
+                                {g.groupNumber}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                     </TableRow>
                   );
