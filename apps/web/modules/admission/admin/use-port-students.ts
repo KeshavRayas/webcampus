@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 
 type PortStudentsPayload = {
   semesterId: string;
+  admissionIds?: string[];
 };
 
 type PortStudentsResult = {
@@ -18,6 +19,7 @@ type PortStudentsResult = {
   alreadyPorted: number;
   autoCreatedApplicants?: number;
   rejectedCount: number;
+  failedPorts?: { applicationId: string; reason: string }[];
 };
 
 export const usePortStudents = () => {
@@ -38,11 +40,23 @@ export const usePortStudents = () => {
       const result = response.data.data;
       if (result) {
         const autoCreated = result.autoCreatedApplicants ?? 0;
-        toast.success(
-          autoCreated > 0
-            ? `Port completed. New: ${result.newlyPorted}, already ported: ${result.alreadyPorted}, applicant users auto-created: ${autoCreated}.`
-            : `Port completed. New: ${result.newlyPorted}, already ported: ${result.alreadyPorted}.`
-        );
+        const failedPorts = result.failedPorts ?? [];
+        if (failedPorts.length > 0) {
+          const reasons = Array.from(
+            new Set(failedPorts.map((failure) => failure.reason))
+          )
+            .slice(0, 3)
+            .join("; ");
+          toast.error(
+            `Port completed with ${failedPorts.length} failure(s). ${reasons}`
+          );
+        } else {
+          toast.success(
+            autoCreated > 0
+              ? `Port completed. New: ${result.newlyPorted}, already ported: ${result.alreadyPorted}, applicant users auto-created: ${autoCreated}.`
+              : `Port completed. New: ${result.newlyPorted}, already ported: ${result.alreadyPorted}.`
+          );
+        }
       } else {
         toast.success(response.data.message || "Students ported successfully");
       }

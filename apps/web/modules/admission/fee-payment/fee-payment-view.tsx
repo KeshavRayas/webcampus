@@ -25,23 +25,22 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
 import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
+import { Input } from "@webcampus/ui/components/input";
+import { Label } from "@webcampus/ui/components/label";
 import { FileDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import { getAdmissionFullName } from "../admin/admin-admission-columns";
 import { renderNodeToPdf } from "../applicant/admission-pdf";
 import { ApplicantAdmissionView } from "../applicant/applicant-admission-view";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
-import {
-  FeeReceiptDocument,
-  FeeReportDocument,
-  type FeeReceiptData,
-  type FeeReportData,
-} from "./fee-document";
+import { FeeReceiptDocument, type FeeReceiptData } from "./fee-document";
 import { type FeePaymentResponse } from "./fee-payment-columns";
 import { useAdmissionPayment } from "./use-admission-payment";
 
@@ -50,17 +49,18 @@ const ADMISSION_STATUSES = [
   "SUBMITTED",
   "APPROVED",
   "REJECTED",
+  "PORTED",
 ] as const;
 
 type FeePaymentFilters = {
   academicTerm: string;
   semester: string;
-  applicationId: string;
+  search: string;
   status: string;
   feeStatus: string;
   mode: string;
   admissionType: string;
-  email: string;
+  filledBy: string;
   createdFrom: string;
   createdTo: string;
 };
@@ -68,30 +68,14 @@ type FeePaymentFilters = {
 const EMPTY_FILTERS: FeePaymentFilters = {
   academicTerm: "",
   semester: "",
-  applicationId: "",
+  search: "",
   status: "",
   feeStatus: "",
   mode: "",
   admissionType: "",
-  email: "",
+  filledBy: "",
   createdFrom: "",
   createdTo: "",
-};
-
-const buildFeePaymentSummary = (admissions: FeePaymentResponse[]) => {
-  const paid = admissions.filter(
-    (admission) => admission.feeStatus === true
-  ).length;
-  const unpaid = admissions.length - paid;
-  const approved = admissions.filter(
-    (admission) => admission.status === "APPROVED"
-  ).length;
-  const pending = admissions.filter(
-    (admission) =>
-      admission.status === "PENDING" || admission.status === "SUBMITTED"
-  ).length;
-
-  return { total: admissions.length, paid, unpaid, approved, pending };
 };
 
 const getFullName = (admission: FeePaymentResponse) => {
@@ -201,11 +185,15 @@ const FeePaymentStaffView = () => {
   const [selectedAdmission, setSelectedAdmission] =
     useState<FeePaymentResponse | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isPayOpen, setIsPayOpen] = useState(false);
+  const [paymentAdmission, setPaymentAdmission] =
+    useState<FeePaymentResponse | null>(null);
+  const [feeReceiptNumber, setFeeReceiptNumber] = useState("");
+  const [feeAmount, setFeeAmount] = useState(0);
+  const [isFetchingFee, setIsFetchingFee] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const { initiatePayment, isProcessing } = useAdmissionPayment();
-  const [reportData, setReportData] = useState<FeeReportData | null>(null);
   const [receiptData, setReceiptData] = useState<FeeReceiptData | null>(null);
-  const reportRef = useRef<HTMLDivElement | null>(null);
   const receiptRef = useRef<HTMLDivElement | null>(null);
 
   const { data: termsData } = useAcademicTerms();
@@ -217,9 +205,16 @@ const FeePaymentStaffView = () => {
   const selectedTerm = terms.find((t) => t.id === draftFilters.academicTerm);
   const nestedSemesters = selectedTerm?.Semester || [];
 
+  const semesterOptions = nestedSemesters.filter(
+    (semester) =>
+      (semester.programType === "UG" &&
+        (semester.semesterNumber === 1 || semester.semesterNumber === 3)) ||
+      (semester.programType === "PG" && semester.semesterNumber === 1)
+  );
+
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: nestedSemesters,
+    semesters: semesterOptions,
     departments,
   });
 
@@ -239,6 +234,62 @@ const FeePaymentStaffView = () => {
     }));
   };
 
+  const query = createFilterQueryString(
+    (() => {
+      const apiFilters: Omit<FeePaymentFilters, "search"> = {
+        ...appliedFilters,
+      };
+      return apiFilters;
+    })()
+  );
+  const { data, isFetching, isLoading } = useQuery({
+    queryKey: ["fee-payments", appliedFilters],
+    queryFn: async () => {
+      const response = await apiClient.get<BaseResponse<FeePaymentResponse[]>>(
+        `/admission${query ? `?${query}` : ""}`,
+        { withCredentials: true }
+      );
+      if (response.data.status === "error") {
+        throw new Error(response.data.message);
+      }
+      return response.data.data ?? [];
+    },
+  });
+
+  const admissions = useMemo(() => {
+    let rows = data ?? [];
+    const search = appliedFilters.search.trim().toLowerCase();
+    if (search) {
+      rows = rows.filter(
+        (admission) =>
+          getAdmissionFullName(admission).toLowerCase().includes(search) ||
+          admission.primaryEmail?.toLowerCase().includes(search)
+      );
+    }
+    if (appliedFilters.filledBy) {
+      rows = rows.filter(
+        (admission) => admission.filledBy?.id === appliedFilters.filledBy
+      );
+    }
+    return rows;
+  }, [data, appliedFilters.search, appliedFilters.filledBy]);
+
+  const filledByOptions = useMemo(() => {
+    const byId = new Map<string, { label: string; value: string }>();
+    (data ?? []).forEach((admission) => {
+      if (admission.filledBy?.id) {
+        byId.set(admission.filledBy.id, {
+          value: admission.filledBy.id,
+          label:
+            admission.filledBy.name || admission.filledBy.email || "Unknown",
+        });
+      }
+    });
+    return Array.from(byId.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+  }, [data]);
+
   const simpleFilterFields: FilterFieldConfig<FeePaymentFilters>[] = [
     {
       key: "academicTerm",
@@ -247,7 +298,7 @@ const FeePaymentStaffView = () => {
       placeholder: "All terms",
       allOptionLabel: "All terms",
       options: terms.map((term) => ({
-        label: `${term.type} ${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
     },
@@ -259,7 +310,7 @@ const FeePaymentStaffView = () => {
         ? "All semesters"
         : "Select term first",
       allOptionLabel: "All semesters",
-      options: nestedSemesters.map((semester) => ({
+      options: semesterOptions.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
@@ -268,18 +319,19 @@ const FeePaymentStaffView = () => {
 
   const advancedFilterFields: FilterFieldConfig<FeePaymentFilters>[] = [
     {
-      key: "email",
-      label: "Email",
+      key: "search",
+      label: "Search",
       type: "text",
-      placeholder: "Search by email",
-      inputId: "fee-payment-email",
+      placeholder: "Search by name or email",
+      inputId: "fee-payment-search",
     },
     {
-      key: "applicationId",
-      label: "Application ID",
-      type: "text",
-      placeholder: "Search application ID",
-      inputId: "fee-payment-application-id",
+      key: "filledBy",
+      label: "Filled By",
+      type: "select",
+      placeholder: "All",
+      allOptionLabel: "All",
+      options: filledByOptions,
     },
     {
       key: "createdFrom",
@@ -336,41 +388,6 @@ const FeePaymentStaffView = () => {
     },
   ];
 
-  const query = createFilterQueryString(
-    (() => {
-      const apiFilters: Omit<FeePaymentFilters, "email"> = {
-        ...appliedFilters,
-      };
-      return apiFilters;
-    })()
-  );
-  const { data, isFetching, isLoading } = useQuery({
-    queryKey: ["fee-payments", appliedFilters],
-    queryFn: async () => {
-      const response = await apiClient.get<BaseResponse<FeePaymentResponse[]>>(
-        `/admission${query ? `?${query}` : ""}`,
-        { withCredentials: true }
-      );
-      if (response.data.status === "error") {
-        throw new Error(response.data.message);
-      }
-      return response.data.data ?? [];
-    },
-  });
-
-  const admissions = useMemo(() => {
-    const email = appliedFilters.email.trim().toLowerCase();
-    if (!email) return data ?? [];
-    return (data ?? []).filter((admission) =>
-      admission.primaryEmail?.toLowerCase().includes(email)
-    );
-  }, [data, appliedFilters.email]);
-
-  const summary = useMemo(
-    () => buildFeePaymentSummary(admissions),
-    [admissions]
-  );
-
   const applyFilters = () => {
     if (
       draftFilters.createdFrom &&
@@ -393,45 +410,6 @@ const FeePaymentStaffView = () => {
     setAppliedFilters(EMPTY_FILTERS);
     router.replace(pathname, { scroll: false });
   };
-
-  const generateReportPdf = () => {
-    if (admissions.length === 0) {
-      toast.error("No admissions to include in the report.");
-      return;
-    }
-
-    setReportData({
-      generatedAt: new Date().toLocaleString(),
-      total: summary.total,
-      paid: summary.paid,
-      unpaid: summary.unpaid,
-      approved: summary.approved,
-      pending: summary.pending,
-      rows: admissions.map((admission) => ({
-        applicationId: admission.applicationId || "-",
-        name: getFullName(admission),
-        email: admission.primaryEmail,
-        feePaid:
-          admission.feePaid != null ? String(admission.feePaid) : "Not paid",
-        receiptNo: admission.feeReceiptNumber || "-",
-        status: admission.status,
-        mode: admission.modeOfAdmission || "-",
-      })),
-    });
-  };
-
-  useEffect(() => {
-    if (!reportData) return;
-    const node = reportRef.current;
-    if (!node) return;
-    void renderNodeToPdf(
-      node,
-      `fee-payment-report-${new Date().toISOString().slice(0, 10)}.pdf`
-    )
-      .then(() => toast.success("Fee report PDF downloaded."))
-      .catch(() => toast.error("Failed to generate the fee report PDF."))
-      .finally(() => setReportData(null));
-  }, [reportData]);
 
   const generateReceiptPdf = (admission: FeePaymentResponse) => {
     if (!admission) {
@@ -458,7 +436,6 @@ const FeePaymentStaffView = () => {
         year: "numeric",
       }),
       name: getFullName(admission),
-      applicationId: admission.applicationId || "-",
       usn: admission.student?.usn || "-",
       contact,
       branch,
@@ -477,17 +454,61 @@ const FeePaymentStaffView = () => {
     if (!node) return;
     void renderNodeToPdf(
       node,
-      `fee-receipt-${receiptData.applicationId || "application"}.pdf`
+      `fee-receipt-${new Date().toISOString().slice(0, 10)}.pdf`
     )
       .then(() => toast.success("Fee receipt PDF downloaded."))
       .catch(() => toast.error("Failed to generate the fee receipt PDF."))
       .finally(() => setReceiptData(null));
   }, [receiptData]);
 
-  const handlePay = async (id: string) => {
-    setPayingId(id);
+  const handlePay = (admission: FeePaymentResponse) => {
+    setPaymentAdmission(admission);
+    setFeeReceiptNumber("");
+    setFeeAmount(0);
+    setIsPayOpen(true);
+
+    const params = new URLSearchParams();
+    if (admission.departmentId) {
+      params.set("departmentId", admission.departmentId);
+    }
+    if (admission.modeOfAdmission) {
+      params.set("modeOfAdmission", admission.modeOfAdmission);
+    }
+    if (admission.categoryAllotted) {
+      params.set("categoryAllotted", admission.categoryAllotted);
+    }
+    if (admission.quota) {
+      params.set("quota", admission.quota);
+    }
+
+    if (params.size === 0) {
+      return;
+    }
+
+    setIsFetchingFee(true);
+    apiClient
+      .get<BaseResponse<{ feeAmount: number }>>(
+        `/admission/fee-structure?${params.toString()}`,
+        { withCredentials: true }
+      )
+      .then((response) => {
+        if (response.data.status === "success" && response.data.data != null) {
+          setFeeAmount(response.data.data.feeAmount);
+        }
+      })
+      .finally(() => setIsFetchingFee(false));
+  };
+
+  const handleConfirmPay = async () => {
+    if (!paymentAdmission) return;
+    setPayingId(paymentAdmission.id);
     try {
-      await initiatePayment(id);
+      await initiatePayment({
+        id: paymentAdmission.id,
+        feePaid: feeAmount,
+        feeReceiptNumber: feeReceiptNumber.trim() || undefined,
+      });
+      setIsPayOpen(false);
     } catch {
       // error handled by hook
     } finally {
@@ -503,27 +524,20 @@ const FeePaymentStaffView = () => {
   const columns = useMemo(() => {
     const baseColumns = [
       {
-        id: "studentName",
-        header: "Student",
-        cell: ({ row }: { row: { original: FeePaymentResponse } }) => {
-          const studentName = row.original.student?.user?.name?.trim();
-          const admissionName = row.original.nameAsPer10th?.trim();
-
-          return (
-            <div>
-              <div className="font-medium">
-                {studentName || admissionName || "-"}
-              </div>
-              <div className="text-muted-foreground text-xs">
-                {row.original.primaryEmail}
-              </div>
-            </div>
-          );
-        },
+        id: "name",
+        header: "Name",
+        cell: ({ row }: { row: { original: FeePaymentResponse } }) => (
+          <div className="font-medium">
+            {getAdmissionFullName(row.original)}
+          </div>
+        ),
       },
       {
-        accessorKey: "applicationId",
-        header: "Application ID",
+        id: "email",
+        header: "Email",
+        cell: ({ row }: { row: { original: FeePaymentResponse } }) => (
+          <div>{row.original.primaryEmail}</div>
+        ),
       },
       {
         accessorKey: "status",
@@ -567,27 +581,27 @@ const FeePaymentStaffView = () => {
 
           return (
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                onClick={() => handlePay(admission.id)}
-                disabled={!canPay || isPaying}
-                title={
-                  !canPay
-                    ? "Application must be submitted before payment"
-                    : undefined
-                }
-              >
-                {isPaying ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : isPaid ? (
-                  "Approved"
-                ) : (
-                  "Pay Now"
-                )}
-              </Button>
+              {!isPaid && (
+                <Button
+                  size="sm"
+                  onClick={() => handlePay(admission)}
+                  disabled={!canPay || isPaying}
+                  title={
+                    !canPay
+                      ? "Application must be submitted before payment"
+                      : undefined
+                  }
+                >
+                  {isPaying ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Pay Now"
+                  )}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -626,33 +640,8 @@ const FeePaymentStaffView = () => {
             onApply={applyFilters}
             onReset={resetFilters}
             dialogTitle="Advanced Filters"
-            dialogDescription="Filter fee payments by email, application ID, status, mode, and date range."
-            onGenerateReport={generateReportPdf}
-            reportButtonLabel="Generate Fee Report PDF"
+            dialogDescription="Filter fee payments by email, status, mode, and date range."
           />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <div className="bg-muted/30 rounded-md border p-3">
-            <p className="text-muted-foreground text-sm">Total</p>
-            <p className="text-xl font-semibold">{summary.total}</p>
-          </div>
-          <div className="bg-muted/30 rounded-md border p-3">
-            <p className="text-muted-foreground text-sm">Paid</p>
-            <p className="text-xl font-semibold">{summary.paid}</p>
-          </div>
-          <div className="bg-muted/30 rounded-md border p-3">
-            <p className="text-muted-foreground text-sm">Unpaid</p>
-            <p className="text-xl font-semibold">{summary.unpaid}</p>
-          </div>
-          <div className="bg-muted/30 rounded-md border p-3">
-            <p className="text-muted-foreground text-sm">Approved</p>
-            <p className="text-xl font-semibold">{summary.approved}</p>
-          </div>
-          <div className="bg-muted/30 rounded-md border p-3">
-            <p className="text-muted-foreground text-sm">Pending Review</p>
-            <p className="text-xl font-semibold">{summary.pending}</p>
-          </div>
         </div>
 
         <div className="flex items-center justify-between gap-3">
@@ -726,18 +715,58 @@ const FeePaymentStaffView = () => {
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="rounded-md border p-3">
                     <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                      Application ID
-                    </p>
-                    <p className="mt-1 font-medium">
-                      {selectedAdmission.applicationId || "-"}
-                    </p>
-                  </div>
-                  <div className="rounded-md border p-3">
-                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
                       Admission Mode
                     </p>
                     <p className="mt-1 font-medium">
                       {selectedAdmission.modeOfAdmission || "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                      Admission Type
+                    </p>
+                    <p className="mt-1 font-medium">
+                      {selectedAdmission.admissionType || "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                      Department
+                    </p>
+                    <p className="mt-1 font-medium">
+                      {selectedAdmission.department?.name || "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                      Quota
+                    </p>
+                    <p className="mt-1 font-medium">
+                      {selectedAdmission.quota || "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                      Category Allotted
+                    </p>
+                    <p className="mt-1 font-medium">
+                      {selectedAdmission.categoryAllotted || "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                      Category Claimed
+                    </p>
+                    <p className="mt-1 font-medium">
+                      {selectedAdmission.categoryClaimed || "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                      USN
+                    </p>
+                    <p className="mt-1 font-medium">
+                      {selectedAdmission.student?.usn || "-"}
                     </p>
                   </div>
                   <div className="rounded-md border p-3">
@@ -758,14 +787,6 @@ const FeePaymentStaffView = () => {
                       {selectedAdmission.feeReceiptNumber || "-"}
                     </p>
                   </div>
-                  <div className="rounded-md border p-3 md:col-span-2">
-                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                      Department
-                    </p>
-                    <p className="mt-1 font-medium">
-                      {selectedAdmission.department?.name || "-"}
-                    </p>
-                  </div>
                 </div>
 
                 <div className="flex justify-end">
@@ -782,16 +803,89 @@ const FeePaymentStaffView = () => {
             ) : null}
           </DialogContent>
         </Dialog>
+
+        <Dialog open={isPayOpen} onOpenChange={setIsPayOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Record Fee Payment</DialogTitle>
+              <DialogDescription>
+                Confirm the fee amount and receipt details to approve the
+                admission.
+              </DialogDescription>
+            </DialogHeader>
+
+            {paymentAdmission ? (
+              <div className="space-y-4">
+                <div className="bg-muted/20 rounded-lg border p-4">
+                  <p className="text-sm font-semibold">
+                    {getFullName(paymentAdmission)}
+                  </p>
+                  <p className="text-muted-foreground break-all text-sm">
+                    {paymentAdmission.primaryEmail}
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    {paymentAdmission.department?.name || "-"}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="feeAmount">Fee Amount (₹)</Label>
+                  {isFetchingFee ? (
+                    <div className="bg-muted/20 flex h-10 items-center gap-2 rounded-md border px-3 text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading fee structure...
+                    </div>
+                  ) : (
+                    <Input
+                      id="feeAmount"
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={feeAmount}
+                      onChange={(event) =>
+                        setFeeAmount(Number(event.target.value))
+                      }
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="feeReceiptNumber">Fee Receipt Number *</Label>
+                  <Input
+                    id="feeReceiptNumber"
+                    value={feeReceiptNumber}
+                    onChange={(event) =>
+                      setFeeReceiptNumber(event.target.value)
+                    }
+                    placeholder="Enter receipt number"
+                    maxLength={100}
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsPayOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => void handleConfirmPay()}
+                    disabled={isProcessing || !feeReceiptNumber.trim()}
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      "Confirm Payment"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <div
-        className="pointer-events-none absolute left-[-10000px] top-0"
-        aria-hidden="true"
-      >
-        <div ref={reportRef}>
-          {reportData ? <FeeReportDocument data={reportData} /> : null}
-        </div>
-      </div>
       <div
         className="pointer-events-none absolute left-[-10000px] top-0"
         aria-hidden="true"

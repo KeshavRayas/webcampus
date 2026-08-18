@@ -1,6 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import { Checkbox } from "@webcampus/ui/components/checkbox";
 import { AdminAdmissionActions } from "./admin-admission-actions";
 
 export type AdmissionResponse = {
@@ -8,13 +9,20 @@ export type AdmissionResponse = {
   applicationId: string;
   modeOfAdmission: string;
   semesterId?: string | null;
+  semester?: {
+    academicTerm?: {
+      type?: string | null;
+      year?: string | null;
+    } | null;
+  } | null;
   status:
     | "PENDING"
     | "SUBMITTED"
     | "APPROVED"
     | "REJECTED"
     | "EXITED"
-    | "CANCELLED";
+    | "CANCELLED"
+    | "PORTED";
   createdAt: string;
 
   departmentId?: string | null;
@@ -25,8 +33,10 @@ export type AdmissionResponse = {
       name: string;
     };
   } | null;
+  studentId?: string | null;
   cancellation?: {
     reason: string;
+    description?: string | null;
     cancelledAt: string;
   } | null;
   filledBy: {
@@ -55,6 +65,7 @@ export type AdmissionResponse = {
   sspId?: string | null;
   counsellingRound?: string | null;
   admissionType?: string | null;
+  dateOfAdmission?: Date | null;
 
   nameAsPer10th?: string | null;
   dob?: Date | null;
@@ -122,6 +133,7 @@ export type AdmissionResponse = {
   class10thAggregateTotal?: number | null;
   class10thMediumOfTeaching?: string | null;
   class10thMarksPdf?: string | null;
+  schoolCountry?: string | null;
 
   class12thInstituteName?: string | null;
   class12thRollRegNumber?: string | null;
@@ -134,6 +146,7 @@ export type AdmissionResponse = {
   class12thAggregateTotal?: number | null;
   class12thMediumOfTeaching: string | null;
   class12thMarksPdf?: string | null;
+  instituteCountry?: string | null;
   admissionBasedOn?: string | null;
   physicsMarks?: number | null;
   physicsMaxMarks?: number | null;
@@ -158,6 +171,9 @@ export type AdmissionResponse = {
   diplomaMediumOfTeaching?: string | null;
   diplomaAggregateScore?: number | null;
   diplomaAggregateTotal?: number | null;
+  diplomaMarksPdf?: string | null;
+  diplomaCountry?: string | null;
+  sportName?: string | null;
 
   studyCertificate?: string | null;
   transferCertificate?: string | null;
@@ -167,21 +183,78 @@ export type AdmissionResponse = {
   fatherNumber?: string | null;
   fatherPermanentAddress?: string | null;
   fatherOccupation?: string | null;
+  fatherAnnualIncome?: string | null;
 
   motherName?: string | null;
   motherEmail?: string | null;
   motherNumber?: string | null;
   motherPermanentAddress?: string | null;
   motherOccupation?: string | null;
+  motherAnnualIncome?: string | null;
 
   guardianName?: string | null;
   guardianEmail?: string | null;
   guardianNumber?: string | null;
   guardianPermanentAddress?: string | null;
   guardianOccupation?: string | null;
+  guardianAnnualIncome?: string | null;
 
   tempUsn?: string | null;
   uniqueId?: string | null;
+};
+
+export type AdmissionNameSource = {
+  student?: { user?: { name?: string | null } } | null;
+  firstName?: string | null;
+  middleName?: string | null;
+  lastName?: string | null;
+  nameAsPer10th?: string | null;
+};
+
+export const getAdmissionFullName = (admission: AdmissionNameSource) => {
+  const studentName = admission.student?.user?.name?.trim();
+  const admissionName = [
+    admission.firstName,
+    admission.middleName,
+    admission.lastName,
+    admission.nameAsPer10th,
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(" ")
+    .trim();
+
+  return studentName || admissionName || "-";
+};
+
+export const isAdmissionPorted = (admission: AdmissionResponse) =>
+  admission.status === "PORTED" || Boolean(admission.studentId);
+
+export const canPortAdmission = (admission: AdmissionResponse) =>
+  admission.status === "APPROVED" && !admission.studentId;
+
+export const selectionColumn: ColumnDef<AdmissionResponse> = {
+  id: "select",
+  header: ({ table }) => (
+    <Checkbox
+      checked={
+        table.getIsAllPageRowsSelected()
+          ? true
+          : table.getIsSomePageRowsSelected()
+            ? "indeterminate"
+            : false
+      }
+      onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+      aria-label="Select all admissions on this page"
+    />
+  ),
+  cell: ({ row }) => (
+    <Checkbox
+      checked={row.getIsSelected()}
+      disabled={!row.getCanSelect()}
+      onCheckedChange={(value) => row.toggleSelected(!!value)}
+      aria-label={`Select ${row.original.primaryEmail}`}
+    />
+  ),
 };
 
 const emailColumn: ColumnDef<AdmissionResponse> = {
@@ -226,32 +299,27 @@ const filledByColumn: ColumnDef<AdmissionResponse> = {
   ),
 };
 
+const nameColumn: ColumnDef<AdmissionResponse> = {
+  id: "name",
+  header: "Name",
+  cell: ({ row }) => (
+    <div className="font-medium">{getAdmissionFullName(row.original)}</div>
+  ),
+};
+
+const actionsColumn: ColumnDef<AdmissionResponse> = {
+  id: "actions",
+  header: "Actions",
+  cell: ({ row }) => <AdminAdmissionActions admission={row.original} />,
+};
+
 export const getAdminAdmissionColumns = (
   showViewDetails: boolean,
   showFilledBy = true
 ): ColumnDef<AdmissionResponse>[] => [
+  nameColumn,
   emailColumn,
   createdAtColumn,
   ...(showFilledBy ? [filledByColumn] : []),
-  ...(showViewDetails
-    ? [
-        {
-          id: "name",
-          header: "Name",
-          cell: ({ row }: { row: { original: AdmissionResponse } }) => {
-            const studentName = row.original.student?.user?.name?.trim();
-            const admissionName = row.original.nameAsPer10th?.trim();
-
-            return <div>{studentName || admissionName || "-"}</div>;
-          },
-        },
-        {
-          id: "actions",
-          header: "Actions",
-          cell: ({ row }: { row: { original: AdmissionResponse } }) => (
-            <AdminAdmissionActions admission={row.original} />
-          ),
-        } satisfies ColumnDef<AdmissionResponse>,
-      ]
-    : []),
+  ...(showViewDetails ? [actionsColumn] : []),
 ];

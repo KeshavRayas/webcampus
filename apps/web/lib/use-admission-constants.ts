@@ -34,7 +34,6 @@ export const useAdmissionConstants = () => {
       }
       return EMPTY_OPTIONS;
     },
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000,
   });
 };

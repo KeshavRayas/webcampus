@@ -16,10 +16,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@webcampus/ui/components/dialog";
-import { FileDown, Loader2, Pencil, RefreshCw } from "lucide-react";
+import { FileDown, Loader2, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useRef, useState } from "react";
 import { toast } from "react-toastify";
+import {
+  AdmissionAcknowledgement,
+  buildAckDocuments,
+} from "../applicant/admission-acknowledgement";
+import {
+  academicYearLabel,
+  admissionBasedOnLabel,
+  formatDate,
+  semesterLabelOf,
+  stateNameOf,
+  yesNo,
+} from "../applicant/admission-docdata";
 import {
   AdmissionDocument,
   type DocData,
@@ -37,6 +49,8 @@ const getStatusVariant = (status: AdmissionResponse["status"]) => {
       return "destructive";
     case "EXITED":
       return "outline";
+    case "PORTED":
+      return "default";
     default:
       return "outline";
   }
@@ -86,14 +100,6 @@ const DataField = ({
   );
 };
 
-const toDate = (value?: string | Date | null) => {
-  if (!value) return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
-};
-
-const yesNo = (value?: boolean | null) => (value ? "Yes" : "No");
-
 const buildDocData = (admission: AdmissionResponse): DocData => {
   const currentFullAddress = [
     admission.currentAddress,
@@ -126,16 +132,12 @@ const buildDocData = (admission: AdmissionResponse): DocData => {
       .join(" ") ||
     "";
 
-  const admissionBasedOn =
-    admission.admissionBasedOn === "CLASS_12_PUC"
-      ? "Class 12th / PUC"
-      : admission.admissionBasedOn === "DIPLOMA"
-        ? "Diploma"
-        : (admission.admissionBasedOn ?? "");
+  const semesterLabel = semesterLabelOf(admission.semester);
 
   return {
     student_name: fullName,
-    dob: toDate(admission.dob),
+    photo: admission.photo ?? "",
+    dob: formatDate(admission.dob),
     blood_group: admission.bloodGroup ?? "",
     gender: admission.gender ?? "",
     primary_phone: admission.primaryPhoneNumber ?? "",
@@ -170,22 +172,27 @@ const buildDocData = (admission: AdmissionResponse): DocData => {
     disability_type: admission.disabilityType ?? "",
     economically_backward: yesNo(admission.economicallyBackward),
     passport_number: admission.passportNumber ?? "",
-    passport_expiry: toDate(admission.passportExpiryDate),
+    passport_expiry: formatDate(admission.passportExpiryDate),
     visa_number: admission.visaNumber ?? "",
-    visa_expiry: toDate(admission.visaExpiryDate),
+    visa_expiry: formatDate(admission.visaExpiryDate),
     application_id: admission.applicationId ?? "",
     mode_of_admission: admission.modeOfAdmission ?? "",
     branch: admission.department?.name ?? "",
+    program: admission.department?.name
+      ? `B.E - ${admission.department?.name}`
+      : "",
+    admission_year: academicYearLabel(semesterLabel),
+    date_of_admission: formatDate(admission.dateOfAdmission),
     admission_type: admission.admissionType ?? "",
-    admission_based_on: admissionBasedOn,
-    semester: "",
+    admission_based_on: admissionBasedOnLabel(admission.admissionBasedOn),
+    semester: semesterLabel,
     category_claimed: admission.categoryClaimed ?? "",
     category_allotted: admission.categoryAllotted ?? "",
     quota: admission.quota ?? "",
     entrance_exam_rank: admission.entranceExamRank ?? "",
-    sport_name: "",
+    sport_name: admission.sportName ?? "",
     admission_order_number: admission.originalAdmissionOrderNumber ?? "",
-    admission_order_date: toDate(admission.originalAdmissionOrderDate),
+    admission_order_date: formatDate(admission.originalAdmissionOrderDate),
     counselling_round: admission.counsellingRound ?? "",
     abc_apar_id: admission.abcAparId ?? "",
     receiving_scholarship: yesNo(admission.scholarship),
@@ -194,8 +201,11 @@ const buildDocData = (admission: AdmissionResponse): DocData => {
     class10_school_name: admission.class10thSchoolName ?? "",
     class10_reg_number: admission.class10thRollRegNumber ?? "",
     class10_school_type: admission.class10thSchoolType ?? "",
-    class10_country: "",
-    class10_state: admission.class10thSchoolState ?? "",
+    class10_country: admission.schoolCountry ?? "",
+    class10_state: stateNameOf(
+      admission.schoolCountry,
+      admission.class10thSchoolState
+    ),
     class10_city: admission.class10thSchoolCity ?? "",
     class10_year: admission.class10thYearOfPassing ?? "",
     class10_marks:
@@ -210,8 +220,11 @@ const buildDocData = (admission: AdmissionResponse): DocData => {
     class10_kannada: yesNo(admission.studiedKannadaIn10th),
     class12_institute_name: admission.class12thInstituteName ?? "",
     class12_institute_type: admission.class12thInstituteType ?? "",
-    class12_country: "",
-    class12_state: admission.class12thInstituteState ?? "",
+    class12_country: admission.instituteCountry ?? "",
+    class12_state: stateNameOf(
+      admission.instituteCountry,
+      admission.class12thInstituteState
+    ),
     class12_city: admission.class12thInstituteCity ?? "",
     class12_branch: admission.class12thBranch ?? "",
     class12_reg_number: admission.class12thRollRegNumber ?? "",
@@ -249,8 +262,11 @@ const buildDocData = (admission: AdmissionResponse): DocData => {
       admission.pcmPercentage != null ? String(admission.pcmPercentage) : "",
     diploma_institute_name: admission.diplomaInstituteName ?? "",
     diploma_institute_type: admission.diplomaInstituteType ?? "",
-    diploma_country: "",
-    diploma_state: admission.diplomaInstituteState ?? "",
+    diploma_country: admission.diplomaCountry ?? "",
+    diploma_state: stateNameOf(
+      admission.diplomaCountry,
+      admission.diplomaInstituteState
+    ),
     diploma_city: admission.diplomaInstituteCity ?? "",
     diploma_branch: admission.diplomaBranch ?? "",
     diploma_year: admission.diplomaYearOfPassing ?? "",
@@ -265,22 +281,22 @@ const buildDocData = (admission: AdmissionResponse): DocData => {
         : "",
     father_name: admission.fatherName ?? "",
     father_occupation: admission.fatherOccupation ?? "",
-    father_income: "",
+    father_income: admission.fatherAnnualIncome ?? "",
     father_mobile: admission.fatherNumber ?? "",
     father_email: admission.fatherEmail ?? "",
     father_address: admission.fatherPermanentAddress ?? "",
     parent_passport: admission.parentPassportNumber ?? "",
     parent_visa: admission.parentVisaNumber ?? "",
-    parent_visa_expiry: toDate(admission.parentVisaExpiryDate),
+    parent_visa_expiry: formatDate(admission.parentVisaExpiryDate),
     mother_name: admission.motherName ?? "",
     mother_occupation: admission.motherOccupation ?? "",
-    mother_income: "",
+    mother_income: admission.motherAnnualIncome ?? "",
     mother_mobile: admission.motherNumber ?? "",
     mother_email: admission.motherEmail ?? "",
     mother_address: admission.motherPermanentAddress ?? "",
     guardian_name: admission.guardianName ?? "",
     guardian_occupation: admission.guardianOccupation ?? "",
-    guardian_income: "",
+    guardian_income: admission.guardianAnnualIncome ?? "",
     guardian_mobile: admission.guardianNumber ?? "",
     guardian_email: admission.guardianEmail ?? "",
     guardian_address: admission.guardianPermanentAddress ?? "",
@@ -305,10 +321,11 @@ export const AdminAdmissionActions = ({
     role === "admin" || role === "admission" || role === "admission-instructor";
 
   const isPending = admission.status === "PENDING";
+  const [open, setOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [docData, setDocData] = useState<DocData | null>(null);
-  const [isDocReady, setIsDocReady] = useState(false);
   const documentRef = useRef<HTMLDivElement | null>(null);
+  const acknowledgementRef = useRef<HTMLDivElement | null>(null);
 
   // Compute Full Name
   const fullName =
@@ -332,22 +349,16 @@ export const AdminAdmissionActions = ({
     router.push(`${path}?${params.toString()}`);
   };
 
-  const handleUpdateDocument = async () => {
-    try {
+  const handleOpenChange = (value: boolean) => {
+    setOpen(value);
+    if (value && !docData) {
       setDocData(buildDocData(admission));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      await new Promise((resolve) => setTimeout(resolve, 60));
-      const node = documentRef.current;
-      if (!node) return;
-      setIsDocReady(true);
-    } catch {
-      // Silent: never surface errors from Update.
     }
   };
 
   const handleDownloadPdf = async () => {
     const node = documentRef.current;
-    if (!node || !isDocReady) return;
+    if (!node) return;
     setIsGeneratingPdf(true);
     try {
       await renderNodeToPdf(
@@ -362,9 +373,26 @@ export const AdminAdmissionActions = ({
     }
   };
 
+  const handleDownloadAcknowledgement = async () => {
+    const node = acknowledgementRef.current;
+    if (!node) return;
+    setIsGeneratingPdf(true);
+    try {
+      await renderNodeToPdf(
+        node,
+        `admission-acknowledgement-${admission.applicationId ?? "application"}.pdf`
+      );
+      toast.success("Acknowledgement PDF downloaded.");
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-1">
-      <Dialog>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">
             <Pencil className="mr-2 h-3.5 w-3.5" />
@@ -372,16 +400,16 @@ export const AdminAdmissionActions = ({
           </Button>
         </DialogTrigger>
         <DialogContent className="max-h-[92vh] w-full overflow-hidden p-0 sm:max-w-6xl">
-          <DialogHeader className="px-8 pt-8">
+          <DialogHeader className="px-4 pt-4 sm:px-8 sm:pt-8">
             <DialogTitle className="text-left text-2xl">
               Admission Details
             </DialogTitle>
             <DialogDescription>
-              Application ID: {admission.applicationId}
+              Review the full admission record for the selected applicant.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="max-h-[calc(92vh-8rem)] overflow-y-auto px-8 pb-8">
+          <div className="max-h-[calc(92vh-8rem)] overflow-y-auto px-4 pb-4 sm:px-8 sm:pb-8">
             <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[18rem_1fr]">
               <div className="bg-card flex w-full flex-col items-center gap-4 rounded-xl border p-6 lg:w-72">
                 <Avatar className="h-28 w-28 border">
@@ -409,10 +437,6 @@ export const AdminAdmissionActions = ({
                     label="Mode of Admission"
                     value={admission.modeOfAdmission}
                   />
-                  <DataField
-                    label="Application ID"
-                    value={admission.applicationId}
-                  />
                   <div className="space-y-1">
                     <p className="text-muted-foreground text-sm">Status</p>
                     <Badge variant={getStatusVariant(admission.status)}>
@@ -421,35 +445,21 @@ export const AdminAdmissionActions = ({
                   </div>
                   <DataField label="Temporary USN" value={admission.tempUsn} />
                   <DataField label="USN" value={admission.student?.usn} />
-                  <DataField label="Unique ID" value={admission.uniqueId} />
                 </div>
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <div className="mb-6 flex flex-wrap items-center gap-3">
                   {canEdit && (
                     <Button size="sm" onClick={openFillForm}>
-                      Fill / Edit Application
+                      Edit Application
                     </Button>
                   )}
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => void handleUpdateDocument()}
-                    disabled={isPending}
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Update
-                  </Button>
-                  <Button
-                    size="sm"
                     onClick={() => void handleDownloadPdf()}
-                    disabled={isGeneratingPdf || isPending || !isDocReady}
-                    title={
-                      isDocReady
-                        ? "Download the verification PDF"
-                        : "Click Update first to prepare the document"
-                    }
+                    disabled={isGeneratingPdf || isPending}
                   >
                     {isGeneratingPdf ? (
                       <>
@@ -459,9 +469,18 @@ export const AdminAdmissionActions = ({
                     ) : (
                       <>
                         <FileDown className="mr-2 h-4 w-4" />
-                        Download
+                        Download Form PDF
                       </>
                     )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleDownloadAcknowledgement()}
+                    disabled={isGeneratingPdf || isPending}
+                  >
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Download Acknowledgement
                   </Button>
                 </div>
 
@@ -642,7 +661,7 @@ export const AdminAdmissionActions = ({
                         />
                         <DataField
                           label="Passport Expiry"
-                          value={toDate(admission.passportExpiryDate)}
+                          value={formatDate(admission.passportExpiryDate)}
                         />
                         <DataField
                           label="Student Visa No."
@@ -650,7 +669,7 @@ export const AdminAdmissionActions = ({
                         />
                         <DataField
                           label="Visa Expiry"
-                          value={toDate(admission.visaExpiryDate)}
+                          value={formatDate(admission.visaExpiryDate)}
                         />
                       </div>
                       <div className="grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-2">
@@ -954,11 +973,18 @@ export const AdminAdmissionActions = ({
 
       {docData && (
         <div
-          ref={documentRef}
           className="pointer-events-none absolute left-[-10000px] top-0"
           aria-hidden="true"
         >
-          <AdmissionDocument data={docData ?? {}} />
+          <div ref={documentRef}>
+            <AdmissionDocument data={docData ?? {}} />
+          </div>
+          <div ref={acknowledgementRef}>
+            <AdmissionAcknowledgement
+              data={docData ?? {}}
+              documents={buildAckDocuments(admission)}
+            />
+          </div>
         </div>
       )}
     </div>

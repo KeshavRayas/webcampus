@@ -7,13 +7,6 @@ import { LeaveCollegeActions } from "./leave-college-actions";
 
 const baseColumns: ColumnDef<AdmissionResponse>[] = [
   {
-    accessorKey: "applicationId",
-    header: "Application ID",
-    cell: ({ row }) => (
-      <div className="font-medium">{row.original.applicationId}</div>
-    ),
-  },
-  {
     id: "name",
     header: "Name",
     cell: ({ row }) => {
@@ -42,7 +35,9 @@ const baseColumns: ColumnDef<AdmissionResponse>[] = [
             ? "secondary"
             : status === "REJECTED"
               ? "destructive"
-              : "outline";
+              : status === "PORTED"
+                ? "default"
+                : "outline";
 
       return <Badge variant={variant}>{status}</Badge>;
     },

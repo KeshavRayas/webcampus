@@ -39,12 +39,6 @@ export function LeaveCollegeView() {
     );
   }
   const students = (admissions ?? []).filter((a) => a.primaryEmail);
-  console.log(
-    students.map((s) => ({
-      id: s.applicationId,
-      status: s.status,
-    }))
-  );
 
   const filteredStudents = students.filter((student) => {
     switch (filter) {

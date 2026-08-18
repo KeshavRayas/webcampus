@@ -5,6 +5,7 @@ import {
   Building,
   CalendarDays,
   ClipboardList,
+  FileBarChart,
   FileText,
   Fingerprint,
   GraduationCap,
@@ -61,9 +62,13 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/admin/admission-users",
           icon: Users,
           children: [
-            { name: "Admission Users", url: "/admin/admission-users" },
-            { name: "COE Users", url: "/admin/coe" },
-            { name: "Finance Users", url: "/admin/finance" },
+            { name: "Admission", url: "/admin/admission-users" },
+            {
+              name: "Admission Instructors",
+              url: "/admin/admission-instructors",
+            },
+            { name: "COE", url: "/admin/coe" },
+            { name: "Accounts", url: "/admin/accounts" },
           ],
         },
         {
@@ -519,13 +524,25 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     },
     navSecondary,
   },
-  finance: {
+  accounts: {
     navMain: {
       items: [
         {
-          name: "Finance",
-          url: "/finance",
+          name: "Accounts",
+          url: "/accounts",
           icon: IndianRupee,
+        },
+      ],
+    },
+    navSecondary,
+  },
+  trust: {
+    navMain: {
+      items: [
+        {
+          name: "Trust",
+          url: "/trust",
+          icon: Building,
         },
       ],
     },
@@ -535,19 +552,9 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     navMain: {
       items: [
         {
-          name: "Create Admission",
-          url: "/admission",
-          icon: LayoutDashboard,
-        },
-        {
-          name: "View Admissions",
-          url: "/admission/view-admissions",
-          icon: BookCopy,
-        },
-        {
-          name: "Fee Payment",
-          url: "/admission/fee-payment",
-          icon: IndianRupee,
+          name: "Admission Setup",
+          url: "/admission/setup",
+          icon: Settings2,
         },
         {
           name: "Cancel Admission",
@@ -555,14 +562,43 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: GraduationCap,
         },
         {
+          name: "Create Admission",
+          url: "/admission",
+          icon: LayoutDashboard,
+        },
+        {
+          name: "Fee Payment",
+          url: "/admission/fee-payment",
+          icon: IndianRupee,
+        },
+        {
+          name: "Reports",
+          url: "/admission/reports/admission",
+          icon: FileBarChart,
+          children: [
+            {
+              name: "Admission Report",
+              url: "/admission/reports/admission",
+            },
+            {
+              name: "Cancellation Report",
+              url: "/admission/reports/cancellation",
+            },
+            {
+              name: "Fee Report",
+              url: "/admission/reports/fee",
+            },
+          ],
+        },
+        {
           name: "Upload Documents",
           url: "/admission/upload-documents",
           icon: Upload,
         },
         {
-          name: "Admission Setup",
-          url: "/admission/setup",
-          icon: Settings2,
+          name: "View Admissions",
+          url: "/admission/view-admissions",
+          icon: BookCopy,
         },
       ],
     },

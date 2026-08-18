@@ -46,6 +46,7 @@ export const AdmissionActionParamSchema = z.object({
 
 export const PortStudentsSchema = z.object({
   semesterId: z.string().uuid("Invalid semester ID"),
+  admissionIds: z.array(z.string().uuid("Invalid admission ID")).optional(),
 });
 
 export const ChangeAdmissionModeSchema = z
@@ -114,35 +115,60 @@ const optionalQueryString = <T extends z.ZodTypeAny>(schema: T) =>
     return trimmed.length > 0 ? trimmed : undefined;
   }, schema.optional());
 
+const admissionQueryFields = {
+  applicationId: optionalQueryString(z.string()),
+  status: optionalQueryString(z.string()),
+  feeStatus: optionalQueryString(z.string()),
+  mode: optionalQueryString(z.string()),
+  admissionType: optionalQueryString(z.string()),
+  admissionBasedOn: optionalQueryString(z.string()),
+  department: optionalQueryString(z.string()),
+  categoryClaimed: optionalQueryString(z.string()),
+  categoryAllotted: optionalQueryString(z.string()),
+  quota: optionalQueryString(z.string()),
+  hostel: optionalQueryString(z.string()),
+  round: optionalQueryString(z.string()),
+  cancellationStatus: optionalQueryString(z.string()),
+  cancellationReason: optionalQueryString(z.string()),
+  semester: optionalQueryString(z.string().uuid("Invalid semester")),
+  createdFrom: optionalQueryString(
+    z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+      message: "Invalid created from date",
+    })
+  ),
+  createdTo: optionalQueryString(
+    z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+      message: "Invalid created to date",
+    })
+  ),
+};
+
+const validateAdmissionDateRange = (data: {
+  createdFrom?: string;
+  createdTo?: string;
+}) => {
+  if (!data.createdFrom || !data.createdTo) return true;
+  return new Date(data.createdFrom) <= new Date(data.createdTo);
+};
+
 export const GetAdmissionsQuerySchema = z
+  .object(admissionQueryFields)
+  .refine(validateAdmissionDateRange, {
+    message: "Created from date must be before created to date",
+    path: ["createdFrom"],
+  });
+
+export const GetAdmissionReportsQuerySchema = z
   .object({
-    applicationId: optionalQueryString(z.string()),
-    status: optionalQueryString(AdmissionStatusSchema),
-    feeStatus: optionalQueryString(z.enum(["true", "false"])),
-    mode: optionalQueryString(z.string()),
-    admissionType: optionalQueryString(AdmissionTypeSchema),
-    semester: optionalQueryString(z.string().uuid("Invalid semester")),
-    createdFrom: optionalQueryString(
-      z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
-        message: "Invalid created from date",
-      })
-    ),
-    createdTo: optionalQueryString(
-      z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
-        message: "Invalid created to date",
-      })
-    ),
+    ...admissionQueryFields,
+    search: optionalQueryString(z.string()),
+    page: optionalQueryString(z.string()),
+    pageSize: optionalQueryString(z.string()),
   })
-  .refine(
-    (data) => {
-      if (!data.createdFrom || !data.createdTo) return true;
-      return new Date(data.createdFrom) <= new Date(data.createdTo);
-    },
-    {
-      message: "Created from date must be before created to date",
-      path: ["createdFrom"],
-    }
-  );
+  .refine(validateAdmissionDateRange, {
+    message: "Created from date must be before created to date",
+    path: ["createdFrom"],
+  });
 
 export const ExitAdmissionSchema = z.object({});
 
@@ -181,6 +207,7 @@ export const CancelAdmissionSchema = z
   .object({
     reason: AdmissionCancellationReasonSchema,
     otherReason: z.string().trim().max(500).optional(),
+    description: z.string().trim().max(2000).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.reason === "OTHER" && !data.otherReason?.trim()) {
@@ -296,10 +323,18 @@ export type CreateAdmissionShellType = z.infer<
 >;
 
 export type GetAdmissionsQueryType = z.infer<typeof GetAdmissionsQuerySchema>;
+export type GetAdmissionReportsQueryType = z.infer<
+  typeof GetAdmissionReportsQuerySchema
+>;
 
 export type AdmissionActionParamType = z.infer<
   typeof AdmissionActionParamSchema
 >;
+
+export const ApproveAdmissionSchema = z.object({
+  feePaid: z.coerce.number().nonnegative().optional(),
+  feeReceiptNumber: z.string().trim().max(100).optional(),
+});
 
 export type SubmitApplicationType = z.infer<typeof SubmitApplicationSchema>;
 

@@ -226,8 +226,6 @@ export function AdmissionDocument({ data }: { data: DocData }) {
             data={data}
             keyName="receiving_scholarship"
           />
-          <Row label="Fee Paid" data={data} keyName="fee_paid" />
-          <Row label="Fee Receipt No." data={data} keyName="fee_receipt" />
         </Panel>
       </section>
 
