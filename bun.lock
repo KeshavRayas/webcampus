@@ -181,6 +181,7 @@
       "name": "@webcampus/common",
       "dependencies": {
         "dayjs": "^1.11.13",
+        "ioredis": "^6.0.0",
         "winston": "^3.17.0",
         "zod": "^4.0.5",
       },

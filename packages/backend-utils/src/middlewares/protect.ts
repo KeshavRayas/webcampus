@@ -42,25 +42,13 @@ interface ProtectParams {
 export const protect =
   ({ role, permissions }: ProtectParams) =>
   async (req: Request, res: Response, next: NextFunction) => {
-    console.log(">>> protect middleware entered", {
-      path: req.path,
-      method: req.method,
-    });
     try {
       const cookieHeader = req.headers.cookie;
       const authHeader = req.headers.authorization;
       const hasCookie = !!cookieHeader;
       const hasAuth = !!authHeader;
-      console.log("protect: checking credentials", {
-        hasCookie,
-        hasAuth,
-        path: req.path,
-        cookieValue: cookieHeader?.substring(0, 50),
-        authValue: authHeader?.substring(0, 30),
-      });
 
       if (!hasCookie && !hasAuth) {
-        console.log("protect: NO credentials - short-circuiting to 401");
         return sendResponse({
           status: "error",
           res,
@@ -72,11 +60,6 @@ export const protect =
 
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
-      });
-      console.log("Session: ", session);
-      console.log("protect: after getSession", {
-        hasSession: !!session?.user,
-        userId: session?.user?.id,
       });
       if (!session?.user) {
         logger.error(ERRORS.UNAUTHENTICATED);

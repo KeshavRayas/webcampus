@@ -2,6 +2,7 @@ import "dotenv/config";
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
+import { redis } from "@webcampus/common/redis";
 import { db } from "@webcampus/db";
 import { APIError } from "better-auth/api";
 
@@ -124,5 +125,10 @@ export class AdminBootstrap {
     await new AdminBootstrap().run();
   } catch (error) {
     logger.error("Error during AdminBootstrap:", { error });
+    process.exitCode = 1;
+  } finally {
+    // tsx runs on Node: the ioredis socket and Prisma pool keep the event
+    // loop alive, so close them explicitly to let the process exit.
+    await Promise.allSettled([redis.quit(), db.$disconnect()]);
   }
 })();

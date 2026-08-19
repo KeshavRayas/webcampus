@@ -4,6 +4,8 @@ import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
+import { redis } from "@webcampus/common/redis";
+import { db } from "@webcampus/db";
 import { CreateUserType } from "@webcampus/schemas/admin";
 
 class Seeder {
@@ -121,8 +123,10 @@ async function main() {
     await seeder.ensureAdmissionInstructorUser();
   } catch (error) {
     logger.error(`Fatal error in seed script: ${(error as Error).message}`);
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    await Promise.allSettled([redis.quit(), db.$disconnect()]);
   }
 }
 
-main();
+void main();

@@ -5,7 +5,9 @@
   "exports": {
     "./env": "./src/env.ts",
     "./logger": "./src/logger.ts",
-    "./dayjs": "./src/dayjs.ts"
+    "./dayjs": "./src/dayjs.ts",
+    "./redis": "./src/redis.ts",
+    "./cache": "./src/cache.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit --pretty"
@@ -19,6 +21,7 @@
   },
   "dependencies": {
     "dayjs": "^1.11.13",
+    "ioredis": "^6.0.0",
     "winston": "^3.17.0",
     "zod": "^4.0.5"
   }

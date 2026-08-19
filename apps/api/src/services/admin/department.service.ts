@@ -1,6 +1,7 @@
 import { IncomingHttpHeaders } from "http";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { auth, fromNodeHeaders } from "@webcampus/auth";
+import { getOrSet, invalidatePrefix } from "@webcampus/common/cache";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import { CreateUserType } from "@webcampus/schemas/admin";
@@ -109,6 +110,7 @@ export class DepartmentService {
           },
         },
       });
+      await invalidatePrefix("cache:department:");
       const response: BaseResponse<DepartmentResponseDTO> = {
         status: "success",
         message: "Department created successfully",
@@ -189,38 +191,38 @@ export class DepartmentService {
     try {
       await UserService.backfillMissingProfileFields();
 
-      const departments = await db.department.findMany({
-        include: {
-          user: {
-            select: {
-              email: true,
-              emailVerified: true,
-              // username: true,
-              // displayUsername: true,
-              image: true,
+      const formattedDepartments = await getOrSet(
+        "cache:department:list",
+        3600,
+        async () => {
+          const departments = await db.department.findMany({
+            include: {
+              user: {
+                select: {
+                  email: true,
+                  emailVerified: true,
+                  // username: true,
+                  // displayUsername: true,
+                  image: true,
+                },
+              },
             },
-          },
-        },
-        // FIX: Subarno - Added ordering by department name in ascending order
-        orderBy: { name: "asc" },
-      });
-      const formattedDepartments: (DepartmentResponseDTO & {
-        email?: string;
-        emailVerified?: boolean;
-        // username?: string | null;
-        // displayUsername?: string | null;
-        image?: string | null;
-      })[] = departments.map((dept) => {
-        const { user, ...departmentData } = dept;
-        return {
-          ...departmentData,
-          email: user?.email,
-          emailVerified: user?.emailVerified,
-          // username: user?.username,
-          // displayUsername: user?.displayUsername,
-          image: user?.image,
-        };
-      });
+            // FIX: Subarno - Added ordering by department name in ascending order
+            orderBy: { name: "asc" },
+          });
+          return departments.map((dept) => {
+            const { user, ...departmentData } = dept;
+            return {
+              ...departmentData,
+              email: user?.email,
+              emailVerified: user?.emailVerified,
+              // username: user?.username,
+              // displayUsername: user?.displayUsername,
+              image: user?.image,
+            };
+          });
+        }
+      );
 
       const response = {
         status: "success" as const,
@@ -242,20 +244,22 @@ export class DepartmentService {
     >
   > {
     try {
-      const departments = await db.department.findMany({
-        where: {
-          type: {
-            not: "BASIC_SCIENCES",
+      const departments = await getOrSet("cache:department:public", 3600, () =>
+        db.department.findMany({
+          where: {
+            type: {
+              not: "BASIC_SCIENCES",
+            },
           },
-        },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          abbreviation: true,
-        },
-        orderBy: { name: "asc" },
-      });
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            abbreviation: true,
+          },
+          orderBy: { name: "asc" },
+        })
+      );
       return {
         status: "success",
         message: "Departments fetched successfully",
@@ -299,6 +303,8 @@ export class DepartmentService {
       await db.user.deleteMany({
         where: { id: department.userId },
       });
+
+      await invalidatePrefix("cache:department:");
 
       const response: BaseResponse<null> = {
         status: "success",
@@ -386,6 +392,8 @@ export class DepartmentService {
       ]);
 
       // FIX: Subarno - Removed username and displayUsername updates from the transaction and handled them separately to avoid issues with partial updates
+
+      await invalidatePrefix("cache:department:");
 
       // const nextUserData: { username?: string; displayUsername?: string } = {};
       // if (data.username !== undefined) {

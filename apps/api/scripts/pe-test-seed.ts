@@ -5,6 +5,7 @@ import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
+import { redis } from "@webcampus/common/redis";
 import { db } from "@webcampus/db";
 
 const DEFAULT_PASSWORD = "password";
@@ -340,8 +341,10 @@ async function main() {
     await seed.run();
   } catch (error) {
     logger.error("pe-test-seed failed", { error });
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    await Promise.allSettled([redis.quit(), db.$disconnect()]);
   }
 }
 
-main();
+void main();

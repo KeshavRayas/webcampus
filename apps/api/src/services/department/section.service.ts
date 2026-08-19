@@ -1,4 +1,5 @@
 import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
+import { getOrSet, invalidatePrefix } from "@webcampus/common/cache";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma, Section } from "@webcampus/db";
 import {
@@ -414,6 +415,8 @@ export class SectionService {
         return created;
       });
 
+      await invalidatePrefix("cache:section:");
+
       const response: BaseResponse<SectionResponseType> = {
         status: "success",
         message: "Section created successfully",
@@ -482,9 +485,11 @@ export class SectionService {
         ];
       }
 
-      const sections = await db.section.findMany({
-        where: whereClause,
-      });
+      const sections = await getOrSet(
+        `cache:section:list:${JSON.stringify({ query, requestingUserId })}`,
+        1800,
+        () => db.section.findMany({ where: whereClause })
+      );
       const response: BaseResponse<SectionResponseType[]> = {
         status: "success",
         message: "Sections retrieved successfully",
@@ -611,6 +616,8 @@ export class SectionService {
           ...reconcileScope,
         });
       });
+
+      await invalidatePrefix("cache:section:");
 
       return {
         status: "success",
@@ -1077,6 +1084,8 @@ export class SectionService {
         return sections;
       });
 
+      await invalidatePrefix("cache:section:");
+
       return {
         status: "success",
         message: `Generated ${createdSections.length} sections with ${unassignedStudents.length} students assigned`,
@@ -1132,36 +1141,41 @@ export class SectionService {
         }
       }
 
-      const sections = await db.section.findMany({
-        where: {
-          semesterId,
-          department: {
-            is: {
-              id: resolvedDepartment.departmentId,
+      const sections = await getOrSet(
+        `cache:section:with-students:${semesterId}:${resolvedDepartment.departmentId}`,
+        1800,
+        () =>
+          db.section.findMany({
+            where: {
+              semesterId,
+              department: {
+                is: {
+                  id: resolvedDepartment.departmentId,
+                },
+              },
             },
-          },
-        },
-        include: {
-          studentSections: {
             include: {
-              student: {
+              studentSections: {
                 include: {
-                  user: {
-                    select: {
-                      name: true,
-                      email: true,
+                  student: {
+                    include: {
+                      user: {
+                        select: {
+                          name: true,
+                          email: true,
+                        },
+                      },
                     },
                   },
                 },
               },
+              _count: {
+                select: { studentSections: true },
+              },
             },
-          },
-          _count: {
-            select: { studentSections: true },
-          },
-        },
-        orderBy: { name: "asc" },
-      });
+            orderBy: { name: "asc" },
+          })
+      );
 
       return {
         status: "success",
@@ -1340,6 +1354,9 @@ export class SectionService {
         return created;
       });
 
+      await invalidatePrefix("cache:section:");
+      await invalidatePrefix("cache:handling-filters:");
+
       return {
         status: "success",
         message: `Successfully assigned ${result.count} students`,
@@ -1469,6 +1486,8 @@ export class SectionService {
 
         return sections;
       });
+
+      await invalidatePrefix("cache:section:");
 
       return {
         status: "success",
@@ -1609,6 +1628,8 @@ export class SectionService {
 
         return newSections;
       });
+
+      await invalidatePrefix("cache:section:");
 
       return {
         status: "success",

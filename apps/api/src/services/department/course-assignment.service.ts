@@ -10,6 +10,7 @@ import {
   assertFacultyReassignmentAllowed,
   computeBalancedFacultyProposal,
 } from "@webcampus/api/src/services/shared/faculty-distribution";
+import { invalidatePrefix } from "@webcampus/common/cache";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import type {
@@ -980,6 +981,8 @@ export class CourseAssignmentService {
         }
       }
 
+      await invalidatePrefix("cache:handling-filters:");
+
       return {
         status: "success",
         message: `Course mapping saved successfully (${result} assignments)`,
@@ -1212,6 +1215,8 @@ export class CourseAssignmentService {
           );
         }
       }
+
+      await invalidatePrefix("cache:handling-filters:");
 
       return {
         status: "success",

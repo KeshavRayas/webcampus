@@ -1,4 +1,5 @@
 import { IncomingHttpHeaders } from "http";
+import { invalidateUserSessions } from "@webcampus/auth/redis";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
@@ -413,6 +414,7 @@ export class AdmissionViewService {
       let newlyPorted = 0;
       let alreadyPorted = 0;
       const failedPorts: { applicationId: string; reason: string }[] = [];
+      const portedUserIds: string[] = [];
 
       for (const admission of approvedUnportedAdmissions) {
         try {
@@ -559,6 +561,8 @@ export class AdmissionViewService {
 
             newlyPorted += 1;
           });
+
+          portedUserIds.push(userId);
         } catch (studentError) {
           const reason =
             studentError instanceof Error
@@ -569,6 +573,10 @@ export class AdmissionViewService {
             reason,
           });
         }
+      }
+
+      if (portedUserIds.length > 0) {
+        await Promise.all(portedUserIds.map(invalidateUserSessions));
       }
 
       return {
@@ -772,6 +780,8 @@ export class AdmissionViewService {
 
         return { studentId: createdStudent.id, usn: finalUsn };
       });
+
+      await invalidateUserSessions(userId);
 
       return {
         status: "success",

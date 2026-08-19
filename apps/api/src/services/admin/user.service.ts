@@ -1,5 +1,6 @@
 import { IncomingHttpHeaders } from "http";
 import { auth, fromNodeHeaders } from "@webcampus/auth";
+import { invalidateUserSessions } from "@webcampus/auth/redis";
 import { logger } from "@webcampus/common/logger";
 import { db, User } from "@webcampus/db";
 import {
@@ -282,6 +283,8 @@ export class UserService {
         where: { id: this.userId },
         data: { role: targetRole },
       });
+
+      await invalidateUserSessions(this.userId);
 
       logger.info("User role updated via DB fallback", {
         userId: this.userId,

@@ -1,3 +1,4 @@
+import { getOrSet, invalidatePrefix } from "@webcampus/common/cache";
 import { db } from "@webcampus/db";
 import { AdmissionReferenceListsSchema } from "@webcampus/schemas/admission";
 import {
@@ -36,75 +37,79 @@ function orderByReference<T extends string>(
 
 export class AdmissionConstantsService {
   static async getOptions(): Promise<AdmissionConstantsOptionsDTO> {
-    const rows = await db.admissionConstants.findMany({
-      orderBy: [{ modeOfAdmission: "asc" }],
+    return getOrSet("cache:admission-constants:options", 3600, async () => {
+      const rows = await db.admissionConstants.findMany({
+        orderBy: [{ modeOfAdmission: "asc" }],
+      });
+
+      const distinctModes = Array.from(
+        new Set(rows.map((row) => row.modeOfAdmission))
+      );
+      const categoriesClaimedMap: Record<string, string[]> = {};
+      const categoriesAllottedMap: Record<string, string[]> = {};
+      const quotasMap: Record<string, string[]> = {};
+
+      for (const row of rows) {
+        const mode = row.modeOfAdmission;
+        const claimedOptions =
+          categoriesClaimedMap[mode] ?? (categoriesClaimedMap[mode] = []);
+        const allottedOptions =
+          categoriesAllottedMap[mode] ?? (categoriesAllottedMap[mode] = []);
+        const modeQuotas = quotasMap[mode] ?? (quotasMap[mode] = []);
+
+        if (!claimedOptions.includes(row.categoryClaimed)) {
+          claimedOptions.push(row.categoryClaimed);
+        }
+        if (!allottedOptions.includes(row.categoryAllotted)) {
+          allottedOptions.push(row.categoryAllotted);
+        }
+        if (row.quota && !modeQuotas.includes(row.quota)) {
+          modeQuotas.push(row.quota);
+        }
+      }
+
+      for (const mode of distinctModes) {
+        categoriesClaimedMap[mode] = orderByReference(
+          categoriesClaimedMap[mode] ?? [],
+          categoriesClaimed[mode as (typeof admissionModes)[number]]
+        );
+        categoriesAllottedMap[mode] = orderByReference(
+          categoriesAllottedMap[mode] ?? [],
+          categoriesAllotted[mode as (typeof admissionModes)[number]]
+        );
+        quotasMap[mode] = orderByReference(
+          quotasMap[mode] ?? [],
+          quotas[mode as (typeof admissionModes)[number]]
+        );
+      }
+
+      return {
+        modes: orderByReference(distinctModes, admissionModes),
+        categoriesClaimed: categoriesClaimedMap,
+        categoriesAllotted: categoriesAllottedMap,
+        quotas: quotasMap,
+      };
     });
-
-    const distinctModes = Array.from(
-      new Set(rows.map((row) => row.modeOfAdmission))
-    );
-    const categoriesClaimedMap: Record<string, string[]> = {};
-    const categoriesAllottedMap: Record<string, string[]> = {};
-    const quotasMap: Record<string, string[]> = {};
-
-    for (const row of rows) {
-      const mode = row.modeOfAdmission;
-      const claimedOptions =
-        categoriesClaimedMap[mode] ?? (categoriesClaimedMap[mode] = []);
-      const allottedOptions =
-        categoriesAllottedMap[mode] ?? (categoriesAllottedMap[mode] = []);
-      const modeQuotas = quotasMap[mode] ?? (quotasMap[mode] = []);
-
-      if (!claimedOptions.includes(row.categoryClaimed)) {
-        claimedOptions.push(row.categoryClaimed);
-      }
-      if (!allottedOptions.includes(row.categoryAllotted)) {
-        allottedOptions.push(row.categoryAllotted);
-      }
-      if (row.quota && !modeQuotas.includes(row.quota)) {
-        modeQuotas.push(row.quota);
-      }
-    }
-
-    for (const mode of distinctModes) {
-      categoriesClaimedMap[mode] = orderByReference(
-        categoriesClaimedMap[mode] ?? [],
-        categoriesClaimed[mode as (typeof admissionModes)[number]]
-      );
-      categoriesAllottedMap[mode] = orderByReference(
-        categoriesAllottedMap[mode] ?? [],
-        categoriesAllotted[mode as (typeof admissionModes)[number]]
-      );
-      quotasMap[mode] = orderByReference(
-        quotasMap[mode] ?? [],
-        quotas[mode as (typeof admissionModes)[number]]
-      );
-    }
-
-    return {
-      modes: orderByReference(distinctModes, admissionModes),
-      categoriesClaimed: categoriesClaimedMap,
-      categoriesAllotted: categoriesAllottedMap,
-      quotas: quotasMap,
-    };
   }
 
   static async getAll(): Promise<AdmissionConstantRecordDTO[]> {
-    const rows = await db.admissionConstants.findMany({
-      orderBy: [
-        { modeOfAdmission: "asc" },
-        { quota: "asc" },
-        { categoryClaimed: "asc" },
-      ],
-    });
+    return getOrSet("cache:admission-constants:all", 3600, async () => {
+      const rows = await db.admissionConstants.findMany({
+        orderBy: [
+          { modeOfAdmission: "asc" },
+          { quota: "asc" },
+          { categoryClaimed: "asc" },
+        ],
+      });
 
-    return rows.map((row) => ({
-      id: row.id,
-      modeOfAdmission: row.modeOfAdmission,
-      quota: row.quota,
-      categoryClaimed: row.categoryClaimed,
-      categoryAllotted: row.categoryAllotted,
-    }));
+      return rows.map((row) => ({
+        id: row.id,
+        modeOfAdmission: row.modeOfAdmission,
+        quota: row.quota,
+        categoryClaimed: row.categoryClaimed,
+        categoryAllotted: row.categoryAllotted,
+      }));
+    });
   }
 
   private static buildRowsForMode(
@@ -166,6 +171,8 @@ export class AdmissionConstantsService {
       db.admissionConstants.deleteMany({ where: { modeOfAdmission } }),
       db.admissionConstants.createMany({ data: rows }),
     ]);
+
+    await invalidatePrefix("cache:admission-constants:");
   }
 
   static async updateMode(
@@ -188,11 +195,15 @@ export class AdmissionConstantsService {
       db.admissionConstants.deleteMany({ where: { modeOfAdmission: mode } }),
       db.admissionConstants.createMany({ data: rows }),
     ]);
+
+    await invalidatePrefix("cache:admission-constants:");
   }
 
   static async deleteMode(mode: string): Promise<void> {
     await db.admissionConstants.deleteMany({
       where: { modeOfAdmission: mode },
     });
+
+    await invalidatePrefix("cache:admission-constants:");
   }
 }

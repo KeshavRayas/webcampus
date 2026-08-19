@@ -1,4 +1,5 @@
 import { isBatchManagedCourse } from "@webcampus/api/src/services/shared/course-kind";
+import { getOrSet } from "@webcampus/common/cache";
 import { logger } from "@webcampus/common/logger";
 import { db, type AssignmentType, type Prisma } from "@webcampus/db";
 import type { BaseResponse } from "@webcampus/types/api";
@@ -858,77 +859,46 @@ export class FacultyHandlingService {
     assignmentType: AssignmentType
   ): Promise<BaseResponse<FacultyHandlingFilterOptionsDTO>> {
     try {
-      const facultyId =
-        await FacultyHandlingService.getFacultyIdByUserId(userId);
+      return await getOrSet(
+        `cache:handling-filters:${userId}:${assignmentType}`,
+        900,
+        async () => {
+          const facultyId =
+            await FacultyHandlingService.getFacultyIdByUserId(userId);
 
-      const dbTerms = await db.academicTerm.findMany();
+          const dbTerms = await db.academicTerm.findMany();
 
-      const dbSemesters = await db.semester.findMany({
-        select: {
-          id: true,
-          academicTermId: true,
-          programType: true,
-          semesterNumber: true,
-        },
-      });
-
-      const assignments = await db.courseAssignment.findMany({
-        where: {
-          facultyId,
-          assignmentType,
-          course: {
-            approvalStatus: "APPROVED",
-          },
-        },
-        select: {
-          section: {
+          const dbSemesters = await db.semester.findMany({
             select: {
               id: true,
-              name: true,
-              semesterId: true,
+              academicTermId: true,
+              programType: true,
+              semesterNumber: true,
             },
-          },
-          batch: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          course: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              courseType: true,
-              semesterId: true,
-              semester: {
-                select: {
-                  id: true,
-                  semesterNumber: true,
-                  programType: true,
-                  academicTerm: {
-                    select: {
-                      id: true,
-                      year: true,
-                      type: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
+          });
 
-      const electiveBatchFacultyRows = await (assignmentType === "THEORY"
-        ? db.electiveBatchFaculty.findMany({
+          const assignments = await db.courseAssignment.findMany({
             where: {
               facultyId,
+              assignmentType,
               course: {
                 approvalStatus: "APPROVED",
               },
             },
             select: {
+              section: {
+                select: {
+                  id: true,
+                  name: true,
+                  semesterId: true,
+                },
+              },
+              batch: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
               course: {
                 select: {
                   id: true,
@@ -952,199 +922,236 @@ export class FacultyHandlingService {
                   },
                 },
               },
-              electiveBatch: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
             },
-          })
-        : Promise.resolve([]));
-
-      const batchManagedRows = electiveBatchFacultyRows.filter((row) =>
-        isBatchManagedCourse(row.course.courseType)
-      );
-
-      const semesterMap = new Map<
-        string,
-        {
-          id: string;
-          academicTermId: string;
-          programType: "UG" | "PG";
-          semesterNumber: number;
-        }
-      >();
-      const sectionMap = new Map<
-        string,
-        {
-          id: string;
-          name: string;
-          semesterId: string;
-          isElectiveBatch: boolean;
-        }
-      >();
-      const courseMap = new Map<
-        string,
-        {
-          id: string;
-          code: string;
-          name: string;
-          courseType: string;
-          semesterId: string;
-        }
-      >();
-      const batchMap = new Map<
-        string,
-        { id: string; name: string; courseId: string; isElective: boolean }
-      >();
-
-      for (const semester of dbSemesters) {
-        semesterMap.set(semester.id, {
-          id: semester.id,
-          academicTermId: semester.academicTermId,
-          programType: semester.programType,
-          semesterNumber: semester.semesterNumber,
-        });
-      }
-
-      for (const assignment of assignments) {
-        sectionMap.set(assignment.section.id, {
-          id: assignment.section.id,
-          name: assignment.section.name,
-          semesterId: assignment.section.semesterId,
-          isElectiveBatch: false,
-        });
-
-        courseMap.set(assignment.course.id, {
-          id: assignment.course.id,
-          code: assignment.course.code,
-          name: assignment.course.name,
-          courseType: assignment.course.courseType,
-          semesterId: assignment.course.semesterId,
-        });
-
-        if (assignment.batch) {
-          batchMap.set(assignment.batch.id, {
-            id: assignment.batch.id,
-            name: assignment.batch.name,
-            courseId: assignment.course.id,
-            isElective: false,
-          });
-        }
-      }
-
-      for (const row of batchManagedRows) {
-        const semester = row.course.semester;
-
-        sectionMap.set(row.electiveBatch.id, {
-          id: row.electiveBatch.id,
-          name: row.electiveBatch.name,
-          semesterId: semester.id,
-          isElectiveBatch: true,
-        });
-
-        courseMap.set(row.course.id, {
-          id: row.course.id,
-          code: row.course.code,
-          name: row.course.name,
-          courseType: row.course.courseType,
-          semesterId: row.course.semesterId,
-        });
-
-        batchMap.set(row.electiveBatch.id, {
-          id: row.electiveBatch.id,
-          name: row.electiveBatch.name,
-          courseId: row.course.id,
-          isElective: true,
-        });
-      }
-
-      const academicTerms = dbTerms
-        .map((term) => ({
-          id: term.id,
-          year: term.year,
-          type: term.type,
-        }))
-        .sort((a, b) => {
-          const yearComparison = b.year.localeCompare(a.year, undefined, {
-            numeric: true,
-            sensitivity: "base",
           });
 
-          if (yearComparison !== 0) {
-            return yearComparison;
+          const electiveBatchFacultyRows = await (assignmentType === "THEORY"
+            ? db.electiveBatchFaculty.findMany({
+                where: {
+                  facultyId,
+                  course: {
+                    approvalStatus: "APPROVED",
+                  },
+                },
+                select: {
+                  course: {
+                    select: {
+                      id: true,
+                      code: true,
+                      name: true,
+                      courseType: true,
+                      semesterId: true,
+                      semester: {
+                        select: {
+                          id: true,
+                          semesterNumber: true,
+                          programType: true,
+                          academicTerm: {
+                            select: {
+                              id: true,
+                              year: true,
+                              type: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  electiveBatch: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              })
+            : Promise.resolve([]));
+
+          const batchManagedRows = electiveBatchFacultyRows.filter((row) =>
+            isBatchManagedCourse(row.course.courseType)
+          );
+
+          const semesterMap = new Map<
+            string,
+            {
+              id: string;
+              academicTermId: string;
+              programType: "UG" | "PG";
+              semesterNumber: number;
+            }
+          >();
+          const sectionMap = new Map<
+            string,
+            {
+              id: string;
+              name: string;
+              semesterId: string;
+              isElectiveBatch: boolean;
+            }
+          >();
+          const courseMap = new Map<
+            string,
+            {
+              id: string;
+              code: string;
+              name: string;
+              courseType: string;
+              semesterId: string;
+            }
+          >();
+          const batchMap = new Map<
+            string,
+            { id: string; name: string; courseId: string; isElective: boolean }
+          >();
+
+          for (const semester of dbSemesters) {
+            semesterMap.set(semester.id, {
+              id: semester.id,
+              academicTermId: semester.academicTermId,
+              programType: semester.programType,
+              semesterNumber: semester.semesterNumber,
+            });
           }
 
-          const termPriority: Record<"odd" | "even", number> = {
-            odd: 0,
-            even: 1,
-          };
+          for (const assignment of assignments) {
+            sectionMap.set(assignment.section.id, {
+              id: assignment.section.id,
+              name: assignment.section.name,
+              semesterId: assignment.section.semesterId,
+              isElectiveBatch: false,
+            });
 
-          return termPriority[a.type] - termPriority[b.type];
-        });
+            courseMap.set(assignment.course.id, {
+              id: assignment.course.id,
+              code: assignment.course.code,
+              name: assignment.course.name,
+              courseType: assignment.course.courseType,
+              semesterId: assignment.course.semesterId,
+            });
 
-      const termOrder = new Map(
-        academicTerms.map((term, index) => [term.id, index])
-      );
+            if (assignment.batch) {
+              batchMap.set(assignment.batch.id, {
+                id: assignment.batch.id,
+                name: assignment.batch.name,
+                courseId: assignment.course.id,
+                isElective: false,
+              });
+            }
+          }
 
-      const semesters = Array.from(semesterMap.values()).sort((a, b) => {
-        const aTermOrder =
-          termOrder.get(a.academicTermId) ?? Number.MAX_SAFE_INTEGER;
-        const bTermOrder =
-          termOrder.get(b.academicTermId) ?? Number.MAX_SAFE_INTEGER;
+          for (const row of batchManagedRows) {
+            const semester = row.course.semester;
 
-        if (aTermOrder !== bTermOrder) {
-          return aTermOrder - bTermOrder;
-        }
+            sectionMap.set(row.electiveBatch.id, {
+              id: row.electiveBatch.id,
+              name: row.electiveBatch.name,
+              semesterId: semester.id,
+              isElectiveBatch: true,
+            });
 
-        const programTypePriority: Record<"UG" | "PG", number> = {
-          UG: 0,
-          PG: 1,
-        };
+            courseMap.set(row.course.id, {
+              id: row.course.id,
+              code: row.course.code,
+              name: row.course.name,
+              courseType: row.course.courseType,
+              semesterId: row.course.semesterId,
+            });
 
-        if (a.programType !== b.programType) {
-          return (
-            programTypePriority[a.programType] -
-            programTypePriority[b.programType]
+            batchMap.set(row.electiveBatch.id, {
+              id: row.electiveBatch.id,
+              name: row.electiveBatch.name,
+              courseId: row.course.id,
+              isElective: true,
+            });
+          }
+
+          const academicTerms = dbTerms
+            .map((term) => ({
+              id: term.id,
+              year: term.year,
+              type: term.type,
+            }))
+            .sort((a, b) => {
+              const yearComparison = b.year.localeCompare(a.year, undefined, {
+                numeric: true,
+                sensitivity: "base",
+              });
+
+              if (yearComparison !== 0) {
+                return yearComparison;
+              }
+
+              const termPriority: Record<"odd" | "even", number> = {
+                odd: 0,
+                even: 1,
+              };
+
+              return termPriority[a.type] - termPriority[b.type];
+            });
+
+          const termOrder = new Map(
+            academicTerms.map((term, index) => [term.id, index])
           );
+
+          const semesters = Array.from(semesterMap.values()).sort((a, b) => {
+            const aTermOrder =
+              termOrder.get(a.academicTermId) ?? Number.MAX_SAFE_INTEGER;
+            const bTermOrder =
+              termOrder.get(b.academicTermId) ?? Number.MAX_SAFE_INTEGER;
+
+            if (aTermOrder !== bTermOrder) {
+              return aTermOrder - bTermOrder;
+            }
+
+            const programTypePriority: Record<"UG" | "PG", number> = {
+              UG: 0,
+              PG: 1,
+            };
+
+            if (a.programType !== b.programType) {
+              return (
+                programTypePriority[a.programType] -
+                programTypePriority[b.programType]
+              );
+            }
+
+            return a.semesterNumber - b.semesterNumber;
+          });
+
+          const sections = Array.from(sectionMap.values()).sort((a, b) => {
+            return a.name.localeCompare(b.name, undefined, {
+              numeric: true,
+              sensitivity: "base",
+            });
+          });
+
+          const courses = Array.from(courseMap.values()).sort((a, b) => {
+            return a.code.localeCompare(b.code, undefined, {
+              numeric: true,
+              sensitivity: "base",
+            });
+          });
+
+          const batches = Array.from(batchMap.values()).sort((a, b) => {
+            return a.name.localeCompare(b.name, undefined, {
+              numeric: true,
+              sensitivity: "base",
+            });
+          });
+
+          return {
+            status: "success",
+            message: "Faculty handling filter options fetched successfully",
+            data: {
+              academicTerms,
+              semesters,
+              sections,
+              courses,
+              batches,
+            },
+          };
         }
-
-        return a.semesterNumber - b.semesterNumber;
-      });
-
-      const sections = Array.from(sectionMap.values()).sort((a, b) => {
-        return a.name.localeCompare(b.name, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-      });
-
-      const courses = Array.from(courseMap.values()).sort((a, b) => {
-        return a.code.localeCompare(b.code, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-      });
-
-      const batches = Array.from(batchMap.values()).sort((a, b) => {
-        return a.name.localeCompare(b.name, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        });
-      });
-
-      return {
-        status: "success",
-        message: "Faculty handling filter options fetched successfully",
-        data: {
-          academicTerms,
-          semesters,
-          sections,
-          courses,
-          batches,
-        },
-      };
+      );
     } catch (error) {
       logger.error("Error fetching faculty handling filter options", { error });
       throw error;

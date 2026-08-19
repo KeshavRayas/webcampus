@@ -1,6 +1,7 @@
 import { IncomingHttpHeaders } from "http";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { auth, fromNodeHeaders } from "@webcampus/auth";
+import { invalidateUserSessions } from "@webcampus/auth/redis";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
 import {
@@ -81,6 +82,8 @@ export class AdminAdmissionUserService {
           role,
         },
       });
+
+      await invalidateUserSessions(userId);
     }
   }
 

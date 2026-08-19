@@ -8,6 +8,7 @@ import {
   peCourseCapacity,
   seatsLeft,
 } from "@webcampus/api/src/services/shared/pe-capacity.service";
+import { invalidatePrefix } from "@webcampus/common/cache";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import type {
@@ -386,6 +387,8 @@ export class ElectiveMappingService {
         userAgent: context?.userAgent,
       });
 
+      await invalidatePrefix("cache:handling-filters:");
+
       return {
         status: "success",
         message: "Elective mapping saved",
@@ -601,6 +604,8 @@ export class ElectiveMappingService {
         userAgent: context?.userAgent,
       });
 
+      await invalidatePrefix("cache:handling-filters:");
+
       return {
         status: "success",
         message:
@@ -630,6 +635,8 @@ export class ElectiveMappingService {
       data: { name },
       select: { id: true, name: true },
     });
+
+    await invalidatePrefix("cache:handling-filters:");
 
     return {
       status: "success",
@@ -716,6 +723,8 @@ export class ElectiveMappingService {
       });
       return count;
     });
+
+    await invalidatePrefix("cache:handling-filters:");
 
     return {
       status: "success",

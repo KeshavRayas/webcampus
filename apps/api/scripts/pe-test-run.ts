@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { auth } from "@webcampus/auth";
+import { redis } from "@webcampus/common/redis";
 import { db } from "@webcampus/db";
 
 const API_BASE = "http://localhost:8080";
@@ -777,7 +778,8 @@ async function main() {
     process.exitCode = 1;
   } finally {
     await runner.cleanup();
+    await Promise.allSettled([redis.quit(), db.$disconnect()]);
   }
 }
 
-main();
+void main();

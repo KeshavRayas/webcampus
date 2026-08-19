@@ -71,3 +71,6 @@ packages/db/data/minio/*
 
 AGENTS.md
 .cursor
+
+# Local deployment plan
+plan.md

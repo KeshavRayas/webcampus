@@ -6,6 +6,7 @@ import { AdmissionViewService } from "@webcampus/api/src/services/admission/admi
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
+import { redis } from "@webcampus/common/redis";
 import { db } from "@webcampus/db";
 
 let IMAGE_URL = "";
@@ -559,5 +560,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await db.$disconnect();
+    await Promise.allSettled([redis.quit(), db.$disconnect()]);
   });

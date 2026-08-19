@@ -7,6 +7,7 @@ import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
+import { redis } from "@webcampus/common/redis";
 import { db } from "@webcampus/db";
 
 type MockUserInput = {
@@ -995,8 +996,10 @@ async function main() {
     logger.error(
       `Fatal error in mock_start script: ${(error as Error).message}`
     );
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    await Promise.allSettled([redis.quit(), db.$disconnect()]);
   }
 }
 
-main();
+void main();

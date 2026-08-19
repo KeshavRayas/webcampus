@@ -6,6 +6,7 @@ import { admin, bearer, username } from "better-auth/plugins";
 import { getFileContent } from "./mail/get-file-content";
 import { sendEmail } from "./mail/send-mail";
 import { ac, roles } from "./rbac/permissions";
+import { secondaryStorage } from "./redis/secondary-storage";
 
 /**
  * To fix the typescript error here,
@@ -41,6 +42,21 @@ export const auth = betterAuth({
           },
         }),
       });
+    },
+  },
+  secondaryStorage,
+  session: {
+    storeSessionInDatabase: true,
+  },
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 50,
+    customRules: {
+      "/sign-in/email": { window: 60, max: 10 },
+      "/sign-up/email": { window: 60, max: 10 },
+      "/request-password-reset": { window: 60, max: 10 },
+      "/reset-password": { window: 60, max: 10 },
     },
   },
   plugins: [
