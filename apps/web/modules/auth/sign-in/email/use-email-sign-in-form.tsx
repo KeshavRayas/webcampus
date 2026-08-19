@@ -28,10 +28,10 @@ export const useEmailSignInForm = ({ role }: { role: Role }) => {
       onError: (error) => {
         toast.error(error.error.message);
       },
-      onSuccess: () => {
+      onSuccess: (ctx: { data: { user: { role: Role } } }) => {
         toast.success("Signed in successfully!");
-        const redirectTo = role === "admission" ? "admission" : role;
-        router.push(`/${redirectTo}`);
+        const destinationRole = ctx?.data?.user?.role || role;
+        router.push(`/${destinationRole}`);
       },
       onRetry: () => {
         toast.info("Retrying sign in...");
