@@ -28,31 +28,24 @@ import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { useAdmissionUsers } from "../admission-users/use-admission-users";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
 import {
-  AdminAdmissionUserColumns,
-  AdminAdmissionUserResponse,
-} from "./admin-admission-users-columns";
-import { useAdmissionUsers } from "./use-admission-users";
+  AdminAdmissionInstructorColumns,
+  AdminAdmissionInstructorResponse,
+} from "./admin-admission-instructors-columns";
 
-type CreateAdmissionUserFormValues = z.infer<typeof CreateAdmissionUserSchema>;
+type CreateAdmissionInstructorFormValues = z.infer<
+  typeof CreateAdmissionUserSchema
+>;
 
-const CreateAdmissionUserDialog = ({
-  role,
-}: {
-  role: "admission" | "admission-instructor";
-}) => {
+const CreateAdmissionInstructorDialog = () => {
   const { form, onSubmit, isCreating, setPhotoFile, photoFile } =
-    useAdmissionUsers(role);
+    useAdmissionUsers("admission-instructor");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const previewUrlRef = useRef<string | null>(null);
-
-  const title =
-    role === "admission"
-      ? "Create Admission User"
-      : "Create Admission Instructor";
 
   const replacePhotoPreview = (file: File | null) => {
     if (previewUrlRef.current) {
@@ -90,7 +83,9 @@ const CreateAdmissionUserDialog = ({
     }
   };
 
-  const handleCreateSubmit = async (values: CreateAdmissionUserFormValues) => {
+  const handleCreateSubmit = async (
+    values: CreateAdmissionInstructorFormValues
+  ) => {
     try {
       await onSubmit(values);
       setIsCreateOpen(false);
@@ -109,11 +104,11 @@ const CreateAdmissionUserDialog = ({
   return (
     <Dialog open={isCreateOpen} onOpenChange={handleDialogChange}>
       <DialogTrigger asChild>
-        <Button>{title}</Button>
+        <Button>Create Admission Instructor</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>Create Admission Instructor</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -204,7 +199,7 @@ const CreateAdmissionUserDialog = ({
 
             <UserPhotoUpload
               label="Profile Photo *"
-              personName={form.watch("name") || "Admission User"}
+              personName={form.watch("name") || "Admission Instructor"}
               previewUrl={photoPreview}
               selectedFileName={photoFile?.name || null}
               onChange={handlePhotoChange}
@@ -227,20 +222,22 @@ const CreateAdmissionUserDialog = ({
   );
 };
 
-export const AdminAdmissionUsersView = () => {
+export const AdminAdmissionInstructorsView = () => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
   const { data: users = [], isLoading } = useQuery({
-    queryKey: ["admin-admission-users", "admission"],
+    queryKey: ["admin-admission-users", "admission-instructor"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<AdminAdmissionUserResponse[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users?role=admission`,
+      const res = await axios.get<
+        BaseResponse<AdminAdmissionInstructorResponse[]>
+      >(
+        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users?role=admission-instructor`,
         { withCredentials: true }
       );
       if (res.data.status === "success" && Array.isArray(res.data.data)) {
         return res.data.data;
       }
-      return [] as AdminAdmissionUserResponse[];
+      return [] as AdminAdmissionInstructorResponse[];
     },
   });
 
@@ -249,18 +246,21 @@ export const AdminAdmissionUsersView = () => {
       <div className="bg-card text-card-foreground space-y-4 rounded-lg border p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-semibold tracking-tight">
-            Admission Users
+            Admission Instructors
           </h3>
 
           <div className="flex items-center gap-2">
-            <CreateAdmissionUserDialog role="admission" />
+            <CreateAdmissionInstructorDialog />
           </div>
         </div>
 
         {isLoading ? (
           <div className="text-muted-foreground text-sm">Loading users...</div>
         ) : (
-          <DataTable columns={AdminAdmissionUserColumns} data={users || []} />
+          <DataTable
+            columns={AdminAdmissionInstructorColumns}
+            data={users || []}
+          />
         )}
       </div>
     </div>

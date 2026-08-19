@@ -36,28 +36,18 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import {
   AdmissionResponse,
   getAdminAdmissionColumns,
   getAdmissionFullName,
-} from "./admin-admission-columns";
-import { useCreateAdmissionShellForm } from "./use-create-admission-shell-form";
-
-// const ADMISSION_MODES = [
-//   "KCET",
-//   "COMEDK",
-//   "Management",
-//   "SNQ Quota",
-//   "Other",
-// ] as const;
-// const ADMISSION_CATEGORIES = ["GENERAL", "OBC", "SC", "ST"] as const;
+} from "../admin/admin-admission-columns";
+import { useCreateAdmissionShellForm } from "../admin/use-create-admission-shell-form";
+import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 
 type AdmissionFilters = {
   academicTerm: string;
   semester: string;
   search: string;
-  filledBy: string;
   createdFrom: string;
   createdTo: string;
 };
@@ -66,12 +56,11 @@ const EMPTY_FILTERS: AdmissionFilters = {
   academicTerm: "",
   semester: "",
   search: "",
-  filledBy: "",
   createdFrom: "",
   createdTo: "",
 };
 
-export const AdminAdmissionView = ({
+export const AdmissionInstructorView = ({
   hideAddForm = false,
   showFilters = false,
 }: {
@@ -83,11 +72,7 @@ export const AdminAdmissionView = ({
 
   const { data: session } = authClient.useSession();
   const role = session?.user?.role;
-  const canCreate =
-    isMounted &&
-    (role === "admin" ||
-      role === "admission" ||
-      role === "admission-instructor");
+  const canCreate = isMounted && role === "admission-instructor";
 
   const router = useRouter();
   const pathname = usePathname();
@@ -165,28 +150,8 @@ export const AdminAdmissionView = ({
           admission.primaryEmail.toLowerCase().includes(search)
       );
     }
-    if (appliedFilters.filledBy) {
-      rows = rows.filter(
-        (admission) => admission.filledBy?.id === appliedFilters.filledBy
-      );
-    }
     return rows;
-  }, [admissions, appliedFilters.search, appliedFilters.filledBy]);
-  const filledByOptions = useMemo(() => {
-    const byId = new Map<string, { label: string; value: string }>();
-    (admissions ?? []).forEach((admission) => {
-      if (admission.filledBy?.id) {
-        byId.set(admission.filledBy.id, {
-          value: admission.filledBy.id,
-          label:
-            admission.filledBy.name || admission.filledBy.email || "Unknown",
-        });
-      }
-    });
-    return Array.from(byId.values()).sort((a, b) =>
-      a.label.localeCompare(b.label)
-    );
-  }, [admissions]);
+  }, [admissions, appliedFilters.search]);
   const selectedSemesterId = draftFilters.semester;
   const { form, onSubmit } = useCreateAdmissionShellForm(
     selectedSemesterId,
@@ -245,14 +210,6 @@ export const AdminAdmissionView = ({
       inputId: "admission-search",
     },
     {
-      key: "filledBy",
-      label: "Filled By",
-      type: "select",
-      placeholder: "All",
-      allOptionLabel: "All",
-      options: filledByOptions,
-    },
-    {
       key: "createdFrom",
       label: "Created From",
       type: "date",
@@ -295,10 +252,7 @@ export const AdminAdmissionView = ({
     }
   };
 
-  const fillApplicantPath =
-    role === "admission-instructor"
-      ? "/admission-instructor/fill-applicant"
-      : "/admission/fill-applicant";
+  const fillApplicantPath = "/admission-instructor/fill-applicant";
 
   const handleCreateDialogOpenChange = (open: boolean) => {
     setIsCreateDialogOpen(open);
@@ -306,6 +260,11 @@ export const AdminAdmissionView = ({
       setCreateChoice(null);
     }
   };
+
+  const columns = useMemo(
+    () => getAdminAdmissionColumns(showFilters, false),
+    [showFilters]
+  );
 
   return (
     <div className="space-y-8">
@@ -499,13 +458,7 @@ export const AdminAdmissionView = ({
                 Applying filters...
               </div>
             )}
-            <DataTable
-              columns={getAdminAdmissionColumns(
-                showFilters,
-                role !== "admission-instructor"
-              )}
-              data={relevantAdmissions}
-            />
+            <DataTable columns={columns} data={relevantAdmissions} />
           </div>
         )}
       </div>

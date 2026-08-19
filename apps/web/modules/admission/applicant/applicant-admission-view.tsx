@@ -31,6 +31,16 @@ import { CheckCircle2, FileDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import {
+  AdmissionAcknowledgement,
+  buildAckDocuments,
+} from "./admission-acknowledgement";
+import {
+  academicYearLabel,
+  admissionBasedOnLabel,
+  formatDate,
+  semesterLabelOf,
+} from "./admission-docdata";
 import { AdmissionDocument, COLLEGE, type DocData } from "./admission-document";
 
 type ApplicantAdmissionData = {
@@ -75,6 +85,16 @@ type ApplicantAdmissionData = {
   fatherAnnualIncome?: string | null;
   motherAnnualIncome?: string | null;
   guardianAnnualIncome?: string | null;
+  aadharCard?: string | null;
+  class10thMarksPdf?: string | null;
+  class12thMarksPdf?: string | null;
+  diplomaMarksPdf?: string | null;
+  casteCertificate?: string | null;
+  disabilityCertificate?: string | null;
+  economicallyBackwardCertificate?: string | null;
+  studyCertificate?: string | null;
+  transferCertificate?: string | null;
+  embassyPermissionLetter?: string | null;
   semester?: {
     id: string;
     semesterNumber: number;
@@ -591,9 +611,12 @@ export const ApplicantAdmissionView = ({
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const photoPreviewRef = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
+  const acknowledgementRef = useRef<HTMLDivElement | null>(null);
   const [docData, setDocData] = useState<DocData | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isGeneratingAckPdf, setIsGeneratingAckPdf] = useState(false);
   const [showAcknowledgement, setShowAcknowledgement] = useState(true);
   const sectionRefs = useRef<Record<StepKey, HTMLDivElement | null>>({
     personal: null,
@@ -773,6 +796,8 @@ export const ApplicantAdmissionView = ({
   ]
     .filter(Boolean)
     .join(" ");
+
+  const admissionDocuments = buildAckDocuments(admission);
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -921,6 +946,16 @@ export const ApplicantAdmissionView = ({
 
     const isYes = (flag: boolean) => (flag ? "Yes" : "No");
 
+    const semesterLabel = staffMode
+      ? (selectedStaffSemester?.termLabel ?? "")
+      : semesterLabelOf(admission.semester);
+
+    const semesterYear = academicYearLabel(semesterLabel);
+
+    const dateOfAdmission = admission.dateOfAdmission
+      ? formatDate(admission.dateOfAdmission)
+      : "";
+
     return {
       college_name: COLLEGE.name,
       college_address: COLLEGE.address,
@@ -929,7 +964,7 @@ export const ApplicantAdmissionView = ({
       college_pincode: COLLEGE.pincode,
       photo: photoPreviewUrl ?? admission.photo ?? "",
       student_name: g("nameAsPer10th") || fullName,
-      dob: g("dob"),
+      dob: formatDate(g("dob")),
       blood_group: selectedBloodGroup,
       gender: selectedGender,
       primary_phone: primaryPhone,
@@ -954,7 +989,7 @@ export const ApplicantAdmissionView = ({
       permanent_country: countryName(permanentCountry),
       permanent_pincode: permanentPincode,
       place_of_birth: g("placeOfBirth"),
-      domicile_state: domicileState,
+      domicile_state: g("stateOfBirth"),
       religion: g("religion"),
       caste: g("caste"),
       sub_caste: g("subCaste"),
@@ -966,26 +1001,25 @@ export const ApplicantAdmissionView = ({
       disability_type: disabilityEnabled ? g("disabilityType") : "",
       economically_backward: isYes(economicallyBackwardEnabled),
       passport_number: g("passportNumber"),
-      passport_expiry: g("passportExpiryDate"),
+      passport_expiry: formatDate(g("passportExpiryDate")),
       visa_number: g("visaNumber"),
-      visa_expiry: g("visaExpiryDate"),
+      visa_expiry: formatDate(g("visaExpiryDate")),
       application_id: g("applicationId") || (admission.applicationId ?? ""),
       mode_of_admission: selectedMode,
       branch: departmentName,
+      program: departmentName ? `B.E - ${departmentName}` : "",
+      admission_year: semesterYear,
+      date_of_admission: dateOfAdmission,
       admission_type: selectedAdmissionType || admission.admissionType || "",
-      admission_based_on: admissionBasedOn,
-      semester: staffMode
-        ? (selectedStaffSemester?.termLabel ?? "")
-        : admission.semester?.academicTerm
-          ? `${admission.semester.academicTerm.type} ${admission.semester.academicTerm.year}`.toUpperCase()
-          : "",
+      admission_based_on: admissionBasedOnLabel(admissionBasedOn),
+      semester: semesterLabel,
       category_claimed: selectedCategoryClaimed,
       category_allotted: selectedCategoryAllotted,
       quota: selectedQuota,
       entrance_exam_rank: g("entranceExamRank"),
       sport_name: sportName,
       admission_order_number: g("originalAdmissionOrderNumber"),
-      admission_order_date: g("originalAdmissionOrderDate"),
+      admission_order_date: formatDate(g("originalAdmissionOrderDate")),
       counselling_round: g("counsellingRound"),
       abc_apar_id: g("abcAparId"),
       class10_school_name: g("class10thSchoolName"),
@@ -1035,7 +1069,7 @@ export const ApplicantAdmissionView = ({
       father_address: g("fatherPermanentAddress"),
       parent_passport: g("parentPassportNumber"),
       parent_visa: g("parentVisaNumber"),
-      parent_visa_expiry: g("parentVisaExpiryDate"),
+      parent_visa_expiry: formatDate(g("parentVisaExpiryDate")),
       mother_name: g("motherName"),
       mother_occupation: g("motherOccupation"),
       mother_income: g("motherAnnualIncome"),
@@ -1056,6 +1090,93 @@ export const ApplicantAdmissionView = ({
         year: "numeric",
       }),
     };
+  };
+
+  const captureNodeToPdf = async (node: HTMLElement): Promise<Blob> => {
+    const previousStyle = node.style.cssText;
+    node.style.position = "fixed";
+    node.style.top = "0";
+    node.style.left = "0";
+    node.style.zIndex = "-9999";
+    node.style.width = "794px";
+    node.style.maxHeight = "none";
+    node.style.margin = "0";
+    node.style.boxShadow = "none";
+
+    let canvas: HTMLCanvasElement;
+    try {
+      canvas = await html2canvas(node, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        width: node.scrollWidth,
+        height: node.scrollHeight,
+        windowWidth: node.scrollWidth,
+        windowHeight: node.scrollHeight,
+      });
+    } finally {
+      node.style.cssText = previousStyle;
+    }
+
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const border = 4;
+    const contentWidth = pageWidth - border * 2;
+    const pxPerMm = canvas.width / contentWidth;
+    const contentHeightPx = Math.floor((pageHeight - border * 2) * pxPerMm);
+    let remaining = canvas.height;
+    let offset = 0;
+    let pageIndex = 0;
+    while (remaining > 0) {
+      const sliceH = Math.min(contentHeightPx, remaining);
+      if (pageIndex > 0) pdf.addPage();
+      const pageCanvas = document.createElement("canvas");
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = sliceH;
+      const ctx = pageCanvas.getContext("2d");
+      ctx?.drawImage(
+        canvas,
+        0,
+        offset,
+        canvas.width,
+        sliceH,
+        0,
+        0,
+        canvas.width,
+        sliceH
+      );
+      const pageData = pageCanvas.toDataURL("image/jpeg", 0.95);
+      pdf.addImage(
+        pageData,
+        "JPEG",
+        border,
+        border,
+        contentWidth,
+        (sliceH / canvas.width) * contentWidth,
+        undefined,
+        "FAST"
+      );
+      remaining -= sliceH;
+      offset += sliceH;
+      pageIndex++;
+    }
+
+    return pdf.output("blob");
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = url;
+    downloadLink.download = filename;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
   };
 
   const generatePdf = async (opts?: { auto?: boolean }) => {
@@ -1082,89 +1203,10 @@ export const ApplicantAdmissionView = ({
         return;
       }
 
-      const previousStyle = node.style.cssText;
-      node.style.position = "fixed";
-      node.style.top = "0";
-      node.style.left = "0";
-      node.style.zIndex = "-9999";
-      node.style.width = "794px";
-      node.style.maxHeight = "none";
-      node.style.margin = "0";
-      node.style.boxShadow = "none";
-
-      let canvas: HTMLCanvasElement;
-      try {
-        canvas = await html2canvas(node, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: "#ffffff",
-          width: node.scrollWidth,
-          height: node.scrollHeight,
-          windowWidth: node.scrollWidth,
-          windowHeight: node.scrollHeight,
-        });
-      } finally {
-        node.style.cssText = previousStyle;
-      }
-
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const border = 4;
-      const contentWidth = pageWidth - border * 2;
-      const pxPerMm = canvas.width / contentWidth;
-      const contentHeightPx = Math.floor((pageHeight - border * 2) * pxPerMm);
-      let remaining = canvas.height;
-      let offset = 0;
-      let pageIndex = 0;
-      while (remaining > 0) {
-        const sliceH = Math.min(contentHeightPx, remaining);
-        if (pageIndex > 0) pdf.addPage();
-        const pageCanvas = document.createElement("canvas");
-        pageCanvas.width = canvas.width;
-        pageCanvas.height = sliceH;
-        const ctx = pageCanvas.getContext("2d");
-        ctx?.drawImage(
-          canvas,
-          0,
-          offset,
-          canvas.width,
-          sliceH,
-          0,
-          0,
-          canvas.width,
-          sliceH
-        );
-        const pageData = pageCanvas.toDataURL("image/jpeg", 0.95);
-        pdf.addImage(
-          pageData,
-          "JPEG",
-          border,
-          border,
-          contentWidth,
-          (sliceH / canvas.width) * contentWidth,
-          undefined,
-          "FAST"
-        );
-        remaining -= sliceH;
-        offset += sliceH;
-        pageIndex++;
-      }
-
-      const blob = pdf.output("blob");
-      const url = URL.createObjectURL(blob);
+      const blob = await captureNodeToPdf(node);
 
       if (!opts?.auto) {
-        const downloadLink = document.createElement("a");
-        downloadLink.href = url;
-        downloadLink.download = "admission-form.pdf";
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        downloadLink.remove();
+        downloadBlob(blob, "admission-form.pdf");
       }
 
       toast.success(
@@ -1177,6 +1219,38 @@ export const ApplicantAdmissionView = ({
       toast.error("Failed to generate PDF. Please try again.");
     } finally {
       setIsGeneratingPdf(false);
+    }
+  };
+
+  const generateAcknowledgementPdf = async () => {
+    if (isGeneratingAckPdf) return;
+
+    const data = buildDocumentData();
+    setDocData(data);
+
+    setIsGeneratingAckPdf(true);
+    try {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const node = acknowledgementRef.current;
+      if (!node) {
+        toast.error("Could not render the acknowledgement.");
+        return;
+      }
+
+      const blob = await captureNodeToPdf(node);
+      downloadBlob(
+        blob,
+        `admission-acknowledgement-${data.application_id || "application"}.pdf`
+      );
+      toast.success("Acknowledgement PDF downloaded.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to generate PDF. Please try again.");
+    } finally {
+      setIsGeneratingAckPdf(false);
     }
   };
 
@@ -1290,6 +1364,12 @@ export const ApplicantAdmissionView = ({
     return (Number(score.value) / totalValue) * 100 > 40;
   };
 
+  const scrollToFormTop = () => {
+    requestAnimationFrame(() => {
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
   const saveAndNext = (step: StepKey) => {
     const currentIndex = STEP_ORDER.indexOf(step);
 
@@ -1343,17 +1423,20 @@ export const ApplicantAdmissionView = ({
     ] as StepKey;
     setActiveStep(nextStep);
     setDocData(buildDocumentData());
+    scrollToFormTop();
   };
 
   const goBack = (step: StepKey) => {
     const nextIndex = STEP_ORDER.indexOf(step) - 1;
     const previousStep = STEP_ORDER[Math.max(nextIndex, 0)] as StepKey;
     setActiveStep(previousStep);
+    scrollToFormTop();
   };
 
   const handleTabChange = (nextStep: string) => {
     setActiveStep(nextStep as StepKey);
     setDocData(buildDocumentData());
+    scrollToFormTop();
   };
 
   useEffect(() => {
@@ -2002,7 +2085,7 @@ export const ApplicantAdmissionView = ({
   }
 
   return (
-    <div className="bg-card rounded-lg border p-6 shadow-sm">
+    <div ref={cardRef} className="bg-card rounded-lg border p-6 shadow-sm">
       <div className="mb-6 space-y-4">
         <div>
           <h3 className="text-lg font-medium">Complete Your Application</h3>
@@ -2164,7 +2247,12 @@ export const ApplicantAdmissionView = ({
                 <Select
                   name="modeOfAdmission"
                   value={selectedMode}
-                  onValueChange={setSelectedMode}
+                  onValueChange={(value) => {
+                    setSelectedMode(value);
+                    if (value !== "KCET") {
+                      setSelectedQuota("");
+                    }
+                  }}
                   required
                 >
                   <SelectTrigger className="w-full">
@@ -4208,7 +4296,8 @@ export const ApplicantAdmissionView = ({
                     Admission Acknowledgement
                   </h4>
                   <p className="text-muted-foreground text-sm">
-                    Sample acknowledgement for your reference.
+                    Acknowledgement with the list of documents for your
+                    reference.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -4221,25 +4310,39 @@ export const ApplicantAdmissionView = ({
                   >
                     {showAcknowledgement ? "Hide" : "View"}
                   </Button>
-                  <Button type="button" variant="outline" asChild>
-                    <a
-                      href="/sample-acknowledgement.pdf"
-                      download="Sample Acknowledgement.pdf"
-                    >
-                      <FileDown className="mr-2 h-4 w-4" />
-                      Download
-                    </a>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isGeneratingAckPdf}
+                    onClick={() => void generateAcknowledgementPdf()}
+                  >
+                    {isGeneratingAckPdf ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Download
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
 
               {showAcknowledgement ? (
-                <div className="bg-background h-[70vh] overflow-hidden rounded-lg border">
-                  <iframe
-                    title="Sample Acknowledgement PDF"
-                    src="/sample-acknowledgement.pdf"
-                    className="h-full w-full"
-                  />
+                <div className="bg-background h-[70vh] overflow-auto rounded-lg border">
+                  <div
+                    ref={acknowledgementRef}
+                    className="mx-auto w-max"
+                    aria-hidden="true"
+                  >
+                    <AdmissionAcknowledgement
+                      data={docData ?? {}}
+                      documents={admissionDocuments}
+                    />
+                  </div>
                 </div>
               ) : null}
             </div>

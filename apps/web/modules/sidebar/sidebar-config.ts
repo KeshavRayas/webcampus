@@ -62,7 +62,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           url: "/admin/admission-users",
           icon: Users,
           children: [
-            { name: "Admission Users", url: "/admin/admission-users" },
+            { name: "Admission", url: "/admin/admission-users" },
+            {
+              name: "Admission Instructors",
+              url: "/admin/admission-instructors",
+            },
             { name: "COE", url: "/admin/coe" },
             { name: "Accounts", url: "/admin/accounts" },
             { name: "Trust", url: "/admin/trust" },

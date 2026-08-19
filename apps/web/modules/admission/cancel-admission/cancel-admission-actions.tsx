@@ -20,7 +20,10 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { useState } from "react";
-import { AdmissionResponse } from "../admin/admin-admission-columns";
+import {
+  AdmissionResponse,
+  isAdmissionPorted,
+} from "../admin/admin-admission-columns";
 import { CancellationReason, useCancelAdmission } from "./use-cancel-admission";
 
 export function CancelAdmissionActions({
@@ -34,7 +37,7 @@ export function CancelAdmissionActions({
   const [description, setDescription] = useState("");
   const { cancelAdmission, isPending } = useCancelAdmission();
 
-  const isPorted = Boolean(admission.posted || admission.studentId);
+  const isPorted = isAdmissionPorted(admission);
 
   const submit = () => {
     if (!reason || (reason === "OTHER" && !otherReason.trim())) return;
@@ -72,7 +75,9 @@ export function CancelAdmissionActions({
           className={
             admission.status === "CANCELLED"
               ? "bg-red-200! text-red-400! hover:bg-red-200! disabled:opacity-100"
-              : "bg-red-600! text-white! hover:bg-red-700! disabled:opacity-100"
+              : isPorted
+                ? "bg-red-600/30! text-red-300! hover:bg-red-600/30! disabled:opacity-100"
+                : "bg-red-600! text-white! hover:bg-red-700! disabled:opacity-100"
           }
         >
           Cancel Admission

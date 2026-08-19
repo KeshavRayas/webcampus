@@ -290,14 +290,18 @@ export class AdminAdmissionUserService {
     }
   }
 
-  static async getAll(): Promise<BaseResponse<unknown>> {
+  static async getAll(role?: string): Promise<BaseResponse<unknown>> {
     try {
       await UserService.backfillMissingProfileFields();
+
+      const roles = [...ADMISSION_ROLES].filter(
+        (admissionRole) => !role || admissionRole === role
+      );
 
       const users = await db.user.findMany({
         where: {
           role: {
-            in: [...ADMISSION_ROLES],
+            in: roles,
           },
         },
         select: {

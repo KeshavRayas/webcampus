@@ -8,7 +8,13 @@ import { UploadDocsActions } from "./upload-docs-actions";
 export type UploadDocsResponse = {
   id: string;
   applicationId: string;
-  status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | "EXITED";
+  status:
+    | "PENDING"
+    | "SUBMITTED"
+    | "APPROVED"
+    | "REJECTED"
+    | "EXITED"
+    | "PORTED";
 
   primaryEmail: string;
 
@@ -92,7 +98,9 @@ export const uploadDocsColumns: ColumnDef<UploadDocsResponse>[] = [
             ? "secondary"
             : status === "REJECTED"
               ? "destructive"
-              : "outline";
+              : status === "PORTED"
+                ? "default"
+                : "outline";
 
       return <Badge variant={variant}>{status}</Badge>;
     },

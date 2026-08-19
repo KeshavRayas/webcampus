@@ -53,7 +53,8 @@ export class AdminAdmissionUserController {
 
   static async getAll(req: Request, res: Response) {
     try {
-      const response = await AdminAdmissionUserService.getAll();
+      const role = req.query.role as string | undefined;
+      const response = await AdminAdmissionUserService.getAll(role);
       return res.status(200).json(response);
     } catch (error) {
       const response: ErrorResponseBody = {

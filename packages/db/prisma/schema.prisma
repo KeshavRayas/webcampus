@@ -917,7 +917,6 @@ model Admission {
   guardianAnnualIncome            String?
   hostel                          Boolean?
   guardianRelation                String?
-  posted                          Boolean              @default(false)
   motherQualification             String?
   motherOccupation                String?
   motherPermanentAddress          String?
@@ -1408,6 +1407,7 @@ enum AdmissionStatus {
   REJECTED
   EXITED
   CANCELLED
+  PORTED
 }
 
 model CancelledAdmissions {

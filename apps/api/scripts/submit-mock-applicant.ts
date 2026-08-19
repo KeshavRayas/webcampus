@@ -1,7 +1,8 @@
 import "dotenv/config";
 import { faker } from "@faker-js/faker";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
-import { AdmissionService } from "@webcampus/api/src/services/admission/admission.service";
+import { AdmissionCreateService } from "@webcampus/api/src/services/admission/admission-create.service";
+import { AdmissionViewService } from "@webcampus/api/src/services/admission/admission-view.service";
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
@@ -328,7 +329,7 @@ const submitAndApprove = async (
       marks12Upload.success && marks12Upload.url ? marks12Upload.url : PDF_URL,
   };
 
-  const submitResponse = await AdmissionService.submitApplication(
+  const submitResponse = await AdmissionCreateService.submitApplication(
     email,
     data,
     fileUrls,
@@ -342,7 +343,7 @@ const submitAndApprove = async (
     );
   }
 
-  const approveResponse = await AdmissionService.approveAdmission({
+  const approveResponse = await AdmissionViewService.approveAdmission({
     id: admissionId,
   });
 
@@ -430,7 +431,7 @@ async function main() {
       const firstName = faker.person.firstName();
       const lastName = faker.person.lastName();
 
-      const shellResponse = await AdmissionService.createShell(
+      const shellResponse = await AdmissionCreateService.createShell(
         {
           primaryEmail: email,
           password,
@@ -524,7 +525,7 @@ async function main() {
     }
 
     try {
-      const portResponse = await AdmissionService.portStudents(
+      const portResponse = await AdmissionViewService.portStudents(
         { semesterId: context.semesterId },
         context.headers
       );

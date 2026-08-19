@@ -32,6 +32,7 @@ const ADMISSION_STATUSES = [
   "REJECTED",
   "EXITED",
   "CANCELLED",
+  "PORTED",
 ] as const;
 
 const CANCELLATION_STATUS_VALUES = ["ALL", "ACTIVE", "CANCELLED"] as const;

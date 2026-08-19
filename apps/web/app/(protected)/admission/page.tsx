@@ -2,7 +2,7 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
-import { AdminAdmissionView } from "@/modules/admission/admin/admin-admission-view";
+import { AdmissionView } from "@/modules/admission/admin/admission-view";
 import { ApplicantAdmissionView } from "@/modules/admission/applicant/applicant-admission-view";
 import React, { Suspense } from "react";
 
@@ -30,7 +30,7 @@ export default function AdmissionPage() {
         <p className="text-muted-foreground text-sm">{description}</p>
       </div>
       <Suspense>
-        {isApplicant ? <ApplicantAdmissionView /> : <AdminAdmissionView />}
+        {isApplicant ? <ApplicantAdmissionView /> : <AdmissionView />}
       </Suspense>
     </div>
   );

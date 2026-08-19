@@ -53,6 +53,7 @@ const ADMISSION_STATUSES = [
   "REJECTED",
   "EXITED",
   "CANCELLED",
+  "PORTED",
 ] as const;
 
 const REPORT_TITLES: Record<ReportType, string> = {
