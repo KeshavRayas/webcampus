@@ -1,0 +1,163 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Shared env for install/build (bun/postinstall/prisma generate + next build)
+  DATABASE_URL: "postgresql://postgres:example@localhost:6432/webcampus?connection_limit=20&pgbouncer=true"
+  DATABASE_UNPOOLED_URL: "postgresql://postgres:example@localhost:5432/webcampus"
+  BETTER_AUTH_SECRET: "ci-dummy-secret-for-checks"
+  NEXT_PUBLIC_API_BASE_URL: "http://localhost:8080"
+  NEXT_PUBLIC_FRONTEND_URL: "http://localhost:3000"
+
+jobs:
+  # ============================================
+  # JOB 1: Checks — gate for every PR + push
+  # ============================================
+  checks:
+    name: lint, types, build, docker, e2e
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.5
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Boot docker stack (db, minio, pgbouncer, redis)
+        run: |
+          cp .env.example .env
+          cd packages/db && docker compose --env-file=../../.env up -d --wait
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Check types
+        run: bun run check-types
+
+      - name: Build (turbo)
+        run: bun run build
+
+      - name: Docker build API image
+        run: docker build -f apps/api/Dockerfile -t webcampus/api:ci .
+
+      - name: Docker build Web image
+        run: docker build -f apps/web/Dockerfile -t webcampus/web:ci \
+            --build-arg NEXT_PUBLIC_API_BASE_URL=${{ env.NEXT_PUBLIC_API_BASE_URL }} \
+            --build-arg NEXT_PUBLIC_FRONTEND_URL=${{ env.NEXT_PUBLIC_FRONTEND_URL }} .
+
+      - name: E2E tests
+        env:
+          BETTER_AUTH_URL: http://localhost:8080
+          PORT: "8080"
+          FRONTEND_URL: http://localhost:3000
+          GMAIL_APP_PASSWORD: ci-dummy-app-password
+          SENDER_EMAIL: ci@webcampus.com
+          MINIO_ACCESS_KEY_ID: webcampus
+          MINIO_SECRET_ACCESS_KEY: example1
+          MINIO_BUCKET_NAME: webcampus-uploads
+          ADMIN_USER_NAME: developer
+          ADMIN_USER_EMAIL: dev@webcampus.com
+          ADMIN_USER_PASSWORD: password
+          ADMIN_USER_USERNAME: developer
+          ADMISSION_USER_NAME: admission
+          ADMISSION_USER_EMAIL: admission@webcampus.com
+          ADMISSION_USER_PASSWORD: password
+          ADMISSION_USER_USERNAME: admission
+        run: |
+          # Schema + accounts for the ephemeral CI stack only (never on the
+          # deployed server — the deploy job runs migrations only).
+          cd packages/db && bun run db:push
+          bun run bootstrap
+          cd apps/api && bun run seed:ci
+          cd packages/playwright-web && bun run e2e:test
+
+  # ============================================
+  # JOB 2: Deploy — merge to main only
+  # ============================================
+  deploy:
+    name: build+push GHCR and deploy to server
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: checks
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/api:latest
+            ghcr.io/${{ github.repository }}/api:sha-${{ github.sha }}
+
+      - name: Build & push Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/web:latest
+            ghcr.io/${{ github.repository }}/web:sha-${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+            NEXT_PUBLIC_FRONTEND_URL=${{ secrets.NEXT_PUBLIC_FRONTEND_URL }}
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            cd ~/webcampus
+            git fetch origin
+            git checkout main
+            git pull origin main
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose -f compose.prod.yaml pull
+            docker compose -f compose.prod.yaml up -d
+            docker compose -f compose.prod.yaml ps

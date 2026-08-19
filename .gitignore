@@ -52,7 +52,6 @@ playwright/.auth
 
 .agents/
 .opencode/
-.github/
 
 scripts/dev.sh
 .husky/pre-commit
