@@ -472,7 +472,7 @@ type FinanceSummary = {
 async function loadFinanceData(
   studentIds: string[]
 ): Promise<FinanceSummary[]> {
-  const records = await db.finance.findMany({
+  const records = await db.accounts.findMany({
     where: { studentId: { in: studentIds } },
     include: { payments: true },
     orderBy: { updatedAt: "desc" },

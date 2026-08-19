@@ -1,4 +1,5 @@
 import AcademicsReportRouter from "@webcampus/api/src/routers/admin/academics-report.router";
+import AccountsRouter from "@webcampus/api/src/routers/admin/accounts.router";
 import AdmissionUserRouter from "@webcampus/api/src/routers/admin/admission-user.router";
 import ArchiveRouter from "@webcampus/api/src/routers/admin/archive.router";
 import AttendanceWindowRouter from "@webcampus/api/src/routers/admin/attendance-window.router";
@@ -9,7 +10,6 @@ import AdminCourseAssignmentRouter from "@webcampus/api/src/routers/admin/course
 import AdminCourseRouter from "@webcampus/api/src/routers/admin/course.router";
 import DepartmentRouter from "@webcampus/api/src/routers/admin/department.router";
 import ElectiveMappingRouter from "@webcampus/api/src/routers/admin/elective-mapping.router";
-import FinanceRouter from "@webcampus/api/src/routers/admin/finance.router";
 import RegistrationTrackingRouter from "@webcampus/api/src/routers/admin/registration-tracking.router";
 import RegistrationWindowRouter from "@webcampus/api/src/routers/admin/registration-window.router";
 import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
@@ -27,7 +27,7 @@ const router: Router = Router();
 
 router.use("/user", UserRouter);
 router.use("/coe", CoeRouter);
-router.use("/finance", FinanceRouter);
+router.use("/accounts", AccountsRouter);
 router.use("/admission-users", AdmissionUserRouter);
 
 router.use("/department", DepartmentRouter);

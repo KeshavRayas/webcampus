@@ -10,9 +10,13 @@ export const CreateAdmissionUserSchema = z.object({
 });
 
 export const UpdateAdmissionUserSchema = CreateAdmissionUserSchema.omit({
-  password: true,
   photo: true,
   role: true,
+}).extend({
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .optional(),
 });
 
 export type CreateAdmissionUserType = z.infer<typeof CreateAdmissionUserSchema>;

@@ -31,8 +31,7 @@ export const useDepartments = () => {
       }
       return [];
     },
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -55,7 +54,6 @@ export const useAdmissionDepartments = () => {
       }
       return [];
     },
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000,
   });
 };

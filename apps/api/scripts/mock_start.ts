@@ -40,16 +40,15 @@ type FacultySeed = {
 
 const DEFAULT_PASSWORD = "password";
 
-const MOCK_FINANCE_USER: MockUserInput = {
-  email: "finance@webcampus.com",
-  username: "finance",
+const MOCK_ACCOUNTS_USER: MockUserInput = {
+  email: "accounts@webcampus.com",
+  username: "accounts",
   password: DEFAULT_PASSWORD,
-  name: "Finance",
-  role: "finance" as const,
+  name: "Accounts",
+  role: "accounts" as const,
 };
 
-const IMAGE_URL =
-  "https://adminportal-fileupload.s3.ap-southeast-2.amazonaws.com/department_logo_39bc77d3-dc17-4679-952e-2bab6d716229.jpg";
+let IMAGE_URL = "";
 
 const DEPARTMENTS: DepartmentSeed[] = [
   {
@@ -894,13 +893,13 @@ class MockStarter {
     }
   }
 
-  public async seedFinanceUser(): Promise<void> {
-    const financeUser = await this.ensureUser(MOCK_FINANCE_USER);
+  public async seedAccountsUser(): Promise<void> {
+    const accountsUser = await this.ensureUser(MOCK_ACCOUNTS_USER);
 
     logger.info(
-      financeUser.created
-        ? `Created finance user ${MOCK_FINANCE_USER.email}`
-        : `Updated finance user ${MOCK_FINANCE_USER.email}`
+      accountsUser.created
+        ? `Created accounts user ${MOCK_ACCOUNTS_USER.email}`
+        : `Updated accounts user ${MOCK_ACCOUNTS_USER.email}`
     );
   }
 
@@ -961,13 +960,33 @@ class MockStarter {
     await this.seedAcademicTermAndSemesters();
     await this.seedFaculty(departmentIdByCode);
     await this.seedAdmissionUsers();
-    await this.seedFinanceUser();
+    await this.seedAccountsUser();
     await this.seedCoeUser();
     logger.info("mock_start script completed successfully.");
   }
 }
 
 async function main() {
+  const { uploadToS3, generateFileName } = await import(
+    "@webcampus/api/src/utils/s3"
+  );
+
+  // Create a tiny 1x1 transparent PNG buffer
+  const dummyBuffer = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+    "base64"
+  );
+  const fileName = generateFileName("mock.png", "users/mock/");
+  const uploadResult = await uploadToS3(dummyBuffer, fileName, "image/png");
+
+  if (uploadResult.success && uploadResult.url) {
+    IMAGE_URL = uploadResult.url;
+    logger.info(`Uploaded dummy image to MinIO: ${IMAGE_URL}`);
+  } else {
+    IMAGE_URL = "https://placehold.co/400"; // Fallback
+    logger.warn("Failed to upload dummy image to MinIO, using fallback URL.");
+  }
+
   const starter = new MockStarter();
 
   try {

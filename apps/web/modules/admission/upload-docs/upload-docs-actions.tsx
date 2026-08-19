@@ -231,11 +231,13 @@ export function UploadDocsActions({ admission }: Props) {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
         <DialogHeader>
           <DialogTitle>Admission Documents</DialogTitle>
 
-          <DialogDescription>{admission.applicationId}</DialogDescription>
+          <DialogDescription>
+            Manage the uploaded documents for this applicant.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_1fr]">
@@ -259,14 +261,6 @@ export function UploadDocsActions({ admission }: Props) {
                 </Badge>
               </div>
             </div>
-
-            <div className="space-y-3 rounded-lg border p-4">
-              <div>
-                <p className="text-muted-foreground text-sm">Application ID</p>
-
-                <p className="font-medium">{admission.applicationId}</p>
-              </div>
-            </div>
           </div>
 
           <div className="space-y-5">
@@ -274,14 +268,6 @@ export function UploadDocsActions({ admission }: Props) {
               <h3 className="mb-4 text-lg font-semibold">Documents</h3>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <DocumentCard
-                  title="Passport Photo"
-                  field="photo"
-                  currentFile={admission.photo}
-                  selectedFile={files.photo}
-                  onFileChange={setFile}
-                />
-
                 <DocumentCard
                   title="Aadhaar Card"
                   field="aadharCard"

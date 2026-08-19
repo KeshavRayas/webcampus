@@ -16,14 +16,12 @@ import { DataTable } from "@webcampus/ui/components/data-table";
 import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { AdmissionResponse } from "../admin/admin-admission-columns";
 import {
-  AdmissionsReportDocument,
-  type AdmissionsReportData,
-} from "../admin/admissions-report-document";
-import { renderNodeToPdf } from "../applicant/admission-pdf";
+  AdmissionResponse,
+  getAdmissionFullName,
+} from "../admin/admin-admission-columns";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import { cancelAdmissionColumns } from "./cancel-admission-columns";
 
@@ -34,6 +32,7 @@ const ADMISSION_STATUSES = [
   "REJECTED",
   "EXITED",
   "CANCELLED",
+  "PORTED",
 ] as const;
 
 const CANCELLATION_STATUS_VALUES = ["ALL", "ACTIVE", "CANCELLED"] as const;
@@ -49,11 +48,11 @@ type CancellationReason = (typeof CANCELLATION_REASON_VALUES)[number];
 type CancelAdmissionFilters = {
   academicTerm: string;
   semester: string;
-  applicationId: string;
+  search: string;
   status: string;
   mode: string;
   admissionType: string;
-  email: string;
+  filledBy: string;
   createdFrom: string;
   createdTo: string;
   cancellationStatus: CancellationStatus | "";
@@ -63,11 +62,11 @@ type CancelAdmissionFilters = {
 const EMPTY_FILTERS: CancelAdmissionFilters = {
   academicTerm: "",
   semester: "",
-  applicationId: "",
+  search: "",
   status: "",
   mode: "",
   admissionType: "",
-  email: "",
+  filledBy: "",
   createdFrom: "",
   createdTo: "",
   cancellationStatus: "",
@@ -87,11 +86,6 @@ export function CancelAdmissionView() {
   const [appliedFilters, setAppliedFilters] =
     useState<CancelAdmissionFilters>(initialFilters);
 
-  const [reportData, setReportData] = useState<AdmissionsReportData | null>(
-    null
-  );
-  const reportRef = useRef<HTMLDivElement | null>(null);
-
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
   const { data: departments } = useAdmissionDepartments();
@@ -103,9 +97,16 @@ export function CancelAdmissionView() {
   );
   const nestedSemesters = selectedTerm?.Semester || [];
 
+  const semesterOptions = nestedSemesters.filter(
+    (semester) =>
+      (semester.programType === "UG" &&
+        (semester.semesterNumber === 1 || semester.semesterNumber === 3)) ||
+      (semester.programType === "PG" && semester.semesterNumber === 1)
+  );
+
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: nestedSemesters,
+    semesters: semesterOptions,
     departments,
   });
 
@@ -116,6 +117,40 @@ export function CancelAdmissionView() {
     setDraftFilters((current) => ({ ...current, [key]: value }));
   };
 
+  const queryFilters = {
+    academicTerm: appliedFilters.academicTerm,
+    semester: appliedFilters.semester,
+    status: appliedFilters.status,
+    mode: appliedFilters.mode,
+    admissionType: appliedFilters.admissionType,
+    createdFrom: appliedFilters.createdFrom,
+    createdTo: appliedFilters.createdTo,
+  };
+  const query = createFilterQueryString(queryFilters);
+  const { data, isFetching, isLoading } = useQuery({
+    queryKey: ["cancel-admissions", appliedFilters],
+    queryFn: async () => {
+      const response = await fetchAdmissions(query);
+      return response;
+    },
+  });
+
+  const filledByOptions = useMemo(() => {
+    const byId = new Map<string, { label: string; value: string }>();
+    (data ?? []).forEach((admission) => {
+      if (admission.filledBy?.id) {
+        byId.set(admission.filledBy.id, {
+          value: admission.filledBy.id,
+          label:
+            admission.filledBy.name || admission.filledBy.email || "Unknown",
+        });
+      }
+    });
+    return Array.from(byId.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+  }, [data]);
+
   const simpleFilterFields: FilterFieldConfig<CancelAdmissionFilters>[] = [
     {
       key: "academicTerm",
@@ -124,7 +159,7 @@ export function CancelAdmissionView() {
       placeholder: "All terms",
       allOptionLabel: "All terms",
       options: terms.map((term) => ({
-        label: `${term.type} ${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
     },
@@ -136,7 +171,7 @@ export function CancelAdmissionView() {
         ? "All semesters"
         : "Select term first",
       allOptionLabel: "All semesters",
-      options: nestedSemesters.map((semester) => ({
+      options: semesterOptions.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
@@ -145,18 +180,19 @@ export function CancelAdmissionView() {
 
   const advancedFilterFields: FilterFieldConfig<CancelAdmissionFilters>[] = [
     {
-      key: "email",
-      label: "Email",
+      key: "search",
+      label: "Search",
       type: "text",
-      placeholder: "Search by email",
-      inputId: "cancel-email",
+      placeholder: "Search by name or email",
+      inputId: "cancel-search",
     },
     {
-      key: "applicationId",
-      label: "Application ID",
-      type: "text",
-      placeholder: "Search application ID",
-      inputId: "cancel-application-id",
+      key: "filledBy",
+      label: "Filled By",
+      type: "select",
+      placeholder: "All",
+      allOptionLabel: "All",
+      options: filledByOptions,
     },
     {
       key: "createdFrom",
@@ -232,32 +268,21 @@ export function CancelAdmissionView() {
     },
   ];
 
-  const queryFilters = {
-    academicTerm: appliedFilters.academicTerm,
-    semester: appliedFilters.semester,
-    applicationId: appliedFilters.applicationId,
-    status: appliedFilters.status,
-    mode: appliedFilters.mode,
-    admissionType: appliedFilters.admissionType,
-    createdFrom: appliedFilters.createdFrom,
-    createdTo: appliedFilters.createdTo,
-  };
-  const query = createFilterQueryString(queryFilters);
-  const { data, isFetching, isLoading } = useQuery({
-    queryKey: ["cancel-admissions", appliedFilters],
-    queryFn: async () => {
-      const response = await fetchAdmissions(query);
-      return response;
-    },
-  });
-
   const filteredAdmissions = useMemo(() => {
     let admissions = data ?? [];
 
-    const email = appliedFilters.email.trim().toLowerCase();
-    if (email) {
-      admissions = admissions.filter((admission) =>
-        admission.primaryEmail.toLowerCase().includes(email)
+    const search = appliedFilters.search.trim().toLowerCase();
+    if (search) {
+      admissions = admissions.filter(
+        (admission) =>
+          getAdmissionFullName(admission).toLowerCase().includes(search) ||
+          admission.primaryEmail.toLowerCase().includes(search)
+      );
+    }
+
+    if (appliedFilters.filledBy) {
+      admissions = admissions.filter(
+        (admission) => admission.filledBy?.id === appliedFilters.filledBy
       );
     }
 
@@ -289,7 +314,8 @@ export function CancelAdmissionView() {
   }, [
     appliedFilters.cancellationReason,
     appliedFilters.cancellationStatus,
-    appliedFilters.email,
+    appliedFilters.search,
+    appliedFilters.filledBy,
     data,
   ]);
 
@@ -316,64 +342,6 @@ export function CancelAdmissionView() {
     router.replace(pathname, { scroll: false });
   };
 
-  const getFullName = (admission: AdmissionResponse) => {
-    const studentName = admission.student?.user?.name?.trim();
-    const admissionName = [
-      admission.firstName,
-      admission.middleName,
-      admission.lastName,
-      admission.nameAsPer10th,
-    ]
-      .filter((value): value is string => Boolean(value?.trim()))
-      .join(" ");
-
-    return studentName || admissionName || "-";
-  };
-
-  const generateReportPdf = () => {
-    const rows = filteredAdmissions;
-    if (rows.length === 0) {
-      toast.error("No admissions to include in the report.");
-      return;
-    }
-
-    const statusCount = (status: AdmissionResponse["status"]) =>
-      rows.filter((admission) => admission.status === status).length;
-
-    setReportData({
-      generatedAt: new Date().toLocaleString(),
-      total: rows.length,
-      approved: statusCount("APPROVED"),
-      submitted: statusCount("SUBMITTED"),
-      pending: statusCount("PENDING") + statusCount("SUBMITTED"),
-      rejected: statusCount("REJECTED"),
-      rows: rows.map((admission) => ({
-        applicationId: admission.applicationId || "-",
-        name: getFullName(admission),
-        email: admission.primaryEmail || "-",
-        status: admission.status || "-",
-        branch: admission.department?.name || "-",
-        mode: admission.modeOfAdmission || "-",
-        quota: admission.quota || "-",
-        feePaid: admission.feePaid != null ? String(admission.feePaid) : "-",
-        receiptNo: admission.feeReceiptNumber || "-",
-      })),
-    });
-  };
-
-  useEffect(() => {
-    if (!reportData) return;
-    const node = reportRef.current;
-    if (!node) return;
-    void renderNodeToPdf(
-      node,
-      `admissions-report-${new Date().toISOString().slice(0, 10)}.pdf`
-    )
-      .then(() => toast.success("Admissions report PDF downloaded."))
-      .catch(() => toast.error("Failed to generate the admissions report PDF."))
-      .finally(() => setReportData(null));
-  }, [reportData]);
-
   if (isLoading) {
     return (
       <div className="flex items-center gap-2">
@@ -396,8 +364,6 @@ export function CancelAdmissionView() {
             onReset={resetFilters}
             dialogTitle="Advanced Filters"
             dialogDescription="Filter admissions by email, dates, cancellation status, and reason."
-            onGenerateReport={generateReportPdf}
-            reportButtonLabel="Generate Admissions Report PDF"
           />
         </div>
 
@@ -414,15 +380,6 @@ export function CancelAdmissionView() {
         </div>
 
         <DataTable columns={cancelAdmissionColumns} data={filteredAdmissions} />
-      </div>
-
-      <div
-        className="pointer-events-none absolute left-[-10000px] top-0"
-        aria-hidden="true"
-      >
-        <div ref={reportRef}>
-          {reportData ? <AdmissionsReportDocument data={reportData} /> : null}
-        </div>
       </div>
     </div>
   );

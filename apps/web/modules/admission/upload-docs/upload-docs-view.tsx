@@ -16,31 +16,28 @@ import { DataTable } from "@webcampus/ui/components/data-table";
 import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { renderNodeToPdf } from "../applicant/admission-pdf";
+import { getAdmissionFullName } from "../admin/admin-admission-columns";
 import { AdmissionFilterBar } from "../shared/admission-filter-bar";
 import { uploadDocsColumns, UploadDocsResponse } from "./upload-docs-columns";
-import {
-  UploadDocsReportDocument,
-  type UploadDocsReportData,
-} from "./upload-docs-report-document";
 
 const ADMISSION_STATUSES = [
   "PENDING",
   "SUBMITTED",
   "APPROVED",
   "REJECTED",
+  "PORTED",
 ] as const;
 
 type UploadDocumentFilters = {
   academicTerm: string;
   semester: string;
-  applicationId: string;
+  search: string;
   status: string;
   mode: string;
   admissionType: string;
-  email: string;
+  filledBy: string;
   createdFrom: string;
   createdTo: string;
 };
@@ -48,11 +45,11 @@ type UploadDocumentFilters = {
 const EMPTY_FILTERS: UploadDocumentFilters = {
   academicTerm: "",
   semester: "",
-  applicationId: "",
+  search: "",
   status: "",
   mode: "",
   admissionType: "",
-  email: "",
+  filledBy: "",
   createdFrom: "",
   createdTo: "",
 };
@@ -72,11 +69,6 @@ export function UploadDocsView() {
 
   const [appliedFilters, setAppliedFilters] =
     useState<UploadDocumentFilters>(initialFilters);
-
-  const [reportData, setReportData] = useState<UploadDocsReportData | null>(
-    null
-  );
-  const reportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const nextFilters = getFiltersFromSearchParams(searchParams, EMPTY_FILTERS);
@@ -99,16 +91,23 @@ export function UploadDocsView() {
 
   const nestedSemesters = selectedTerm?.Semester ?? [];
 
+  const semesterOptions = nestedSemesters.filter(
+    (semester) =>
+      (semester.programType === "UG" &&
+        (semester.semesterNumber === 1 || semester.semesterNumber === 3)) ||
+      (semester.programType === "PG" && semester.semesterNumber === 1)
+  );
+
   useCascadingFilterSync(draftFilters, setDraftFilters, {
     academicTerms: terms,
-    semesters: nestedSemesters,
+    semesters: semesterOptions,
     departments,
   });
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["upload-documents", appliedFilters],
     queryFn: async () => {
-      const apiFilters: Omit<UploadDocumentFilters, "email"> = {
+      const apiFilters: Omit<UploadDocumentFilters, "search"> = {
         ...appliedFilters,
       };
       const query = createFilterQueryString(apiFilters);
@@ -129,12 +128,38 @@ export function UploadDocsView() {
   });
 
   const filteredDocuments = useMemo(() => {
-    const email = appliedFilters.email.trim().toLowerCase();
-    if (!email) return data ?? [];
-    return (data ?? []).filter((admission) =>
-      admission.primaryEmail?.toLowerCase().includes(email)
+    let rows = data ?? [];
+    const search = appliedFilters.search.trim().toLowerCase();
+    if (search) {
+      rows = rows.filter(
+        (admission) =>
+          getAdmissionFullName(admission).toLowerCase().includes(search) ||
+          admission.primaryEmail?.toLowerCase().includes(search)
+      );
+    }
+    if (appliedFilters.filledBy) {
+      rows = rows.filter(
+        (admission) => admission.filledBy?.id === appliedFilters.filledBy
+      );
+    }
+    return rows;
+  }, [data, appliedFilters.search, appliedFilters.filledBy]);
+
+  const filledByOptions = useMemo(() => {
+    const byId = new Map<string, { label: string; value: string }>();
+    (data ?? []).forEach((admission) => {
+      if (admission.filledBy?.id) {
+        byId.set(admission.filledBy.id, {
+          value: admission.filledBy.id,
+          label:
+            admission.filledBy.name || admission.filledBy.email || "Unknown",
+        });
+      }
+    });
+    return Array.from(byId.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
     );
-  }, [data, appliedFilters.email]);
+  }, [data]);
 
   const updateDraftFilter = (
     key: keyof UploadDocumentFilters,
@@ -164,7 +189,7 @@ export function UploadDocsView() {
       placeholder: "All terms",
       allOptionLabel: "All terms",
       options: terms.map((term) => ({
-        label: `${term.type} ${term.year}`,
+        label: `${term.type.toUpperCase()} ${term.year}`,
         value: term.id,
       })),
     },
@@ -176,7 +201,7 @@ export function UploadDocsView() {
         ? "All semesters"
         : "Select term first",
       allOptionLabel: "All semesters",
-      options: nestedSemesters.map((semester) => ({
+      options: semesterOptions.map((semester) => ({
         label: `${semester.programType} - Semester ${semester.semesterNumber}`,
         value: semester.id,
       })),
@@ -185,18 +210,19 @@ export function UploadDocsView() {
 
   const advancedFilterFields: FilterFieldConfig<UploadDocumentFilters>[] = [
     {
-      key: "email",
-      label: "Email",
+      key: "search",
+      label: "Search",
       type: "text",
-      inputId: "email",
-      placeholder: "Search by email",
+      inputId: "search",
+      placeholder: "Search by name or email",
     },
     {
-      key: "applicationId",
-      label: "Application ID",
-      type: "text",
-      inputId: "applicationId",
-      placeholder: "Search application ID",
+      key: "filledBy",
+      label: "Filled By",
+      type: "select",
+      placeholder: "All",
+      allOptionLabel: "All",
+      options: filledByOptions,
     },
     {
       key: "createdFrom",
@@ -274,66 +300,6 @@ export function UploadDocsView() {
     });
   };
 
-  const countUploadedDocuments = (row: UploadDocsResponse) =>
-    [
-      row.photo,
-      row.aadharCard,
-      row.class10thMarksPdf,
-      row.class12thMarksPdf,
-      row.diplomaMarksPdf,
-      row.casteCertificate,
-      row.studyCertificate,
-      row.transferCertificate,
-      ...(row.disability ? [row.disabilityCertificate] : []),
-    ].filter((doc): doc is string => !!doc).length;
-
-  const totalDocuments = (row: UploadDocsResponse) => (row.disability ? 9 : 8);
-
-  const getFullName = (row: UploadDocsResponse) =>
-    row.student?.user?.name?.trim() || row.nameAsPer10th?.trim() || "-";
-
-  const generateReportPdf = () => {
-    const rows = filteredDocuments;
-    if (rows.length === 0) {
-      toast.error("No applications to include in the report.");
-      return;
-    }
-
-    const uploaded = rows.map(countUploadedDocuments);
-    const totals = rows.map(totalDocuments);
-
-    setReportData({
-      generatedAt: new Date().toLocaleString(),
-      total: rows.length,
-      complete: rows.filter((_, i) => uploaded[i] === totals[i]).length,
-      incomplete: rows.filter((_, i) => (uploaded[i] ?? 0) < (totals[i] ?? 0))
-        .length,
-      rows: rows.map((row, i) => ({
-        applicationId: row.applicationId || "-",
-        name: getFullName(row),
-        email: row.primaryEmail || "-",
-        status: row.status || "-",
-        uploaded: uploaded[i] ?? 0,
-        total: totals[i] ?? 0,
-      })),
-    });
-  };
-
-  useEffect(() => {
-    if (!reportData) return;
-    const node = reportRef.current;
-    if (!node) return;
-    void renderNodeToPdf(
-      node,
-      `upload-documents-report-${new Date().toISOString().slice(0, 10)}.pdf`
-    )
-      .then(() => toast.success("Upload documents report PDF downloaded."))
-      .catch(() =>
-        toast.error("Failed to generate the upload documents report PDF.")
-      )
-      .finally(() => setReportData(null));
-  }, [reportData]);
-
   return (
     <div className="space-y-8">
       <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
@@ -346,9 +312,7 @@ export function UploadDocsView() {
             onApply={applyFilters}
             onReset={resetFilters}
             dialogTitle="Advanced Filters"
-            dialogDescription="Filter admission documents by email, application ID, status, mode, and date range."
-            onGenerateReport={generateReportPdf}
-            reportButtonLabel="Generate Upload Documents Report PDF"
+            dialogDescription="Filter admission documents by email, status, mode, and date range."
           />
         </div>
 
@@ -379,15 +343,6 @@ export function UploadDocsView() {
             <DataTable columns={uploadDocsColumns} data={filteredDocuments} />
           </div>
         )}
-      </div>
-
-      <div
-        className="pointer-events-none absolute left-[-10000px] top-0"
-        aria-hidden="true"
-      >
-        <div ref={reportRef}>
-          {reportData ? <UploadDocsReportDocument data={reportData} /> : null}
-        </div>
       </div>
     </div>
   );

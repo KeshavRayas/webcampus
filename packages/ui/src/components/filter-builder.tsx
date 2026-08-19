@@ -3,8 +3,10 @@
 import { cn } from "@webcampus/ui/lib/utils";
 import * as React from "react";
 import { Button } from "./button";
+import { Checkbox } from "./checkbox";
 import { Input } from "./input";
 import { Label } from "./label";
+import { MultiSelectFilter } from "./multi-select-filter";
 import {
   Select,
   SelectContent,
@@ -15,7 +17,7 @@ import {
 
 export const DEFAULT_FILTER_ALL_VALUE = "__all__";
 
-export type FilterFieldType = "text" | "select" | "date";
+export type FilterFieldType = "text" | "select" | "date" | "multiselect";
 
 export type FilterOption = {
   label: React.ReactNode;
@@ -38,6 +40,7 @@ export type FilterFieldConfig<TFilters extends Record<string, string>> = {
   allOptionLabel?: string;
   hideAllOption?: boolean;
   formatOptionLabel?: (option: FilterOption) => React.ReactNode;
+  columnKey?: string;
 };
 
 export function FilterPanel({
@@ -110,13 +113,39 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
   onDraftChange,
   allValue = DEFAULT_FILTER_ALL_VALUE,
   className,
+  toggles,
+  onToggle,
 }: {
   fields: FilterFieldConfig<TFilters>[];
   draftFilters: TFilters;
   onDraftChange: (key: FilterKey<TFilters>, value: string) => void;
   allValue?: string;
   className?: string;
+  toggles?: Record<string, boolean>;
+  onToggle?: (columnKey: string) => void;
 }) {
+  const renderFieldLabel = (
+    field: FilterFieldConfig<TFilters>,
+    inputId: string
+  ) => {
+    const columnKey = field.columnKey;
+    if (columnKey) {
+      return (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            checked={!!toggles?.[columnKey]}
+            onCheckedChange={() => onToggle?.(columnKey)}
+          />
+          <Label>{field.label}</Label>
+        </div>
+      );
+    }
+    if (field.type === "text" || field.type === "date") {
+      return <Label htmlFor={inputId}>{field.label}</Label>;
+    }
+    return <Label>{field.label}</Label>;
+  };
+
   return (
     <FilterGrid className={className}>
       {fields.map((field) => {
@@ -124,6 +153,26 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
         const rawValue = draftFilters[filterKey];
         const value = rawValue ?? "";
         const inputId = field.inputId ?? `filter-${String(filterKey)}`;
+
+        if (field.type === "multiselect") {
+          const options = field.options ?? [];
+          return (
+            <div
+              className={cn("space-y-2", field.className)}
+              key={String(filterKey)}
+            >
+              {renderFieldLabel(field, inputId)}
+              <MultiSelectFilter
+                options={options}
+                value={value}
+                onChange={(nextValue) => onDraftChange(filterKey, nextValue)}
+                placeholder={
+                  field.placeholder ?? `All ${field.label.toLowerCase()}`
+                }
+              />
+            </div>
+          );
+        }
 
         if (field.type === "select") {
           const options = field.options ?? [];
@@ -136,7 +185,7 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
               className={cn("space-y-2", field.className)}
               key={String(filterKey)}
             >
-              <Label>{field.label}</Label>
+              {renderFieldLabel(field, inputId)}
               <Select
                 value={shouldHideAll ? value : value || allValue}
                 onValueChange={(nextValue) =>
@@ -173,7 +222,7 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
             className={cn("space-y-2", field.className)}
             key={String(filterKey)}
           >
-            <Label htmlFor={inputId}>{field.label}</Label>
+            {renderFieldLabel(field, inputId)}
             <Input
               id={inputId}
               type={field.type === "date" ? "date" : "text"}
