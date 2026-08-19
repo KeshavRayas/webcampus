@@ -36,7 +36,6 @@ export async function middleware(request: NextRequest) {
   const isSignInPage = isSignInRoute(pathname);
   const isHomePage = pathname === "/" || pathname === "";
   const isTrustArea = roleFromPath === "trust";
-  const trustToken = request.cookies.get(TRUST_TOKEN_COOKIE)?.value;
 
   let session: Session | null = null;
 
@@ -57,6 +56,13 @@ export async function middleware(request: NextRequest) {
     console.error("Session fetch failed in middleware:", error);
   }
 
+  // Only verify the trust token when the request is actually for the trust
+  // area (dashboard or login). Otherwise we'd hit /trust/auth/me on every
+  // request across the whole app while a trust cookie exists, which shows up
+  // as constant polling traffic.
+  const trustToken = isTrustArea
+    ? request.cookies.get(TRUST_TOKEN_COOKIE)?.value
+    : undefined;
   const trustVerified = trustToken ? await verifyTrustToken(trustToken) : false;
   const canAccessTrustArea = trustVerified || session?.user?.role === "trust";
 

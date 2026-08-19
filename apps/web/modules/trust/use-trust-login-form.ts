@@ -52,7 +52,6 @@ export const useTrustLoginForm = () => {
       setTrustTokenCookie(response.data.data.token);
       toast.success("Signed in successfully!");
       router.push("/trust");
-      router.refresh();
     } catch (error) {
       const err = error as AxiosError<{ message?: string }>;
       toast.error(

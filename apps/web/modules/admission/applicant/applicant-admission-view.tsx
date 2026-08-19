@@ -29,7 +29,7 @@ import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
 import { CheckCircle2, FileDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { AdmissionDocument, COLLEGE, type DocData } from "./admission-document";
 
@@ -756,7 +756,15 @@ export const ApplicantAdmissionView = ({
   const admission = staffMode
     ? (fetchedStaffAdmission ?? EMPTY_ADMISSION)
     : (fetchedAdmission ?? EMPTY_ADMISSION);
-  const countries = Country.getAllCountries();
+  const countries = useMemo(() => Country.getAllCountries(), []);
+  const countryOptions = useMemo(
+    () =>
+      countries.map((country) => ({
+        value: country.isoCode,
+        label: country.name,
+      })),
+    [countries]
+  );
 
   const fullName = [
     admission?.firstName,
@@ -1699,6 +1707,17 @@ export const ApplicantAdmissionView = ({
     }
   }, [selectedMode]);
 
+  // Prefill Karnataka + India for current & permanent addresses when the
+  // student selects a Karnataka-based entrance exam mode. Only fills when the
+  // fields are still empty, so the student can change them freely.
+  useEffect(() => {
+    if (selectedMode !== "KCET" && selectedMode !== "COMED-K") return;
+    setCurrentCountry((prev) => (prev ? prev : "IN"));
+    setPermanentCountry((prev) => (prev ? prev : "IN"));
+    setCurrentState((prev) => (prev ? prev : "KA"));
+    setPermanentState((prev) => (prev ? prev : "KA"));
+  }, [selectedMode]);
+
   useEffect(() => {
     if (!isSameAddress) return;
 
@@ -1719,16 +1738,25 @@ export const ApplicantAdmissionView = ({
     currentPincode,
   ]);
 
-  const currentStates = State.getStatesOfCountry(currentCountry);
-
-  const currentDistricts = City.getCitiesOfState(currentCountry, currentState);
-  const permanentStates = State.getStatesOfCountry(permanentCountry);
-
-  const permanentDistricts = City.getCitiesOfState(
-    permanentCountry,
-    permanentState
+  const currentStates = useMemo(
+    () => State.getStatesOfCountry(currentCountry),
+    [currentCountry]
   );
-  const birthStates = State.getStatesOfCountry("IN");
+
+  const currentDistricts = useMemo(
+    () => City.getCitiesOfState(currentCountry, currentState),
+    [currentCountry, currentState]
+  );
+  const permanentStates = useMemo(
+    () => State.getStatesOfCountry(permanentCountry),
+    [permanentCountry]
+  );
+
+  const permanentDistricts = useMemo(
+    () => City.getCitiesOfState(permanentCountry, permanentState),
+    [permanentCountry, permanentState]
+  );
+  const birthStates = useMemo(() => State.getStatesOfCountry("IN"), []);
 
   useEffect(() => {
     const placeOfBirthState = birthStates.find(
@@ -1758,12 +1786,30 @@ export const ApplicantAdmissionView = ({
     }
   }, [semesterNumber, selectedAdmissionType]);
 
-  const class10States = State.getStatesOfCountry(class10Country);
-  const class12States = State.getStatesOfCountry(class12Country);
-  const diplomaStates = State.getStatesOfCountry(diplomaCountry);
-  const class10Cities = City.getCitiesOfState(class10Country, class10State);
-  const class12Cities = City.getCitiesOfState(class12Country, class12State);
-  const diplomaCities = City.getCitiesOfState(diplomaCountry, diplomaState);
+  const class10States = useMemo(
+    () => State.getStatesOfCountry(class10Country),
+    [class10Country]
+  );
+  const class12States = useMemo(
+    () => State.getStatesOfCountry(class12Country),
+    [class12Country]
+  );
+  const diplomaStates = useMemo(
+    () => State.getStatesOfCountry(diplomaCountry),
+    [diplomaCountry]
+  );
+  const class10Cities = useMemo(
+    () => City.getCitiesOfState(class10Country, class10State),
+    [class10Country, class10State]
+  );
+  const class12Cities = useMemo(
+    () => City.getCitiesOfState(class12Country, class12State),
+    [class12Country, class12State]
+  );
+  const diplomaCities = useMemo(
+    () => City.getCitiesOfState(diplomaCountry, diplomaState),
+    [diplomaCountry, diplomaState]
+  );
 
   const countryNameOf = (code: string) =>
     countries.find((c) => c.isoCode === code)?.name ?? code;
@@ -1785,43 +1831,61 @@ export const ApplicantAdmissionView = ({
       ? (diplomaStates.find((s) => s.isoCode === diplomaState)?.name ?? "")
       : diplomaState || diplomaCountryName;
 
-  const class10StateOptions =
-    class10States.length > 0
-      ? class10States.map((s) => ({ value: s.isoCode, label: s.name }))
-      : class10CountryName
-        ? [{ value: class10CountryName, label: class10CountryName }]
-        : [];
-  const class12StateOptions =
-    class12States.length > 0
-      ? class12States.map((s) => ({ value: s.isoCode, label: s.name }))
-      : class12CountryName
-        ? [{ value: class12CountryName, label: class12CountryName }]
-        : [];
-  const diplomaStateOptions =
-    diplomaStates.length > 0
-      ? diplomaStates.map((s) => ({ value: s.isoCode, label: s.name }))
-      : diplomaCountryName
-        ? [{ value: diplomaCountryName, label: diplomaCountryName }]
-        : [];
+  const class10StateOptions = useMemo(
+    () =>
+      class10States.length > 0
+        ? class10States.map((s) => ({ value: s.isoCode, label: s.name }))
+        : class10CountryName
+          ? [{ value: class10CountryName, label: class10CountryName }]
+          : [],
+    [class10States, class10CountryName]
+  );
+  const class12StateOptions = useMemo(
+    () =>
+      class12States.length > 0
+        ? class12States.map((s) => ({ value: s.isoCode, label: s.name }))
+        : class12CountryName
+          ? [{ value: class12CountryName, label: class12CountryName }]
+          : [],
+    [class12States, class12CountryName]
+  );
+  const diplomaStateOptions = useMemo(
+    () =>
+      diplomaStates.length > 0
+        ? diplomaStates.map((s) => ({ value: s.isoCode, label: s.name }))
+        : diplomaCountryName
+          ? [{ value: diplomaCountryName, label: diplomaCountryName }]
+          : [],
+    [diplomaStates, diplomaCountryName]
+  );
 
-  const class10CityOptions =
-    class10Cities.length > 0
-      ? class10Cities.map((c) => ({ value: c.name, label: c.name }))
-      : class10StateName
-        ? [{ value: class10StateName, label: class10StateName }]
-        : [];
-  const class12CityOptions =
-    class12Cities.length > 0
-      ? class12Cities.map((c) => ({ value: c.name, label: c.name }))
-      : class12StateName
-        ? [{ value: class12StateName, label: class12StateName }]
-        : [];
-  const diplomaCityOptions =
-    diplomaCities.length > 0
-      ? diplomaCities.map((c) => ({ value: c.name, label: c.name }))
-      : diplomaStateName
-        ? [{ value: diplomaStateName, label: diplomaStateName }]
-        : [];
+  const class10CityOptions = useMemo(
+    () =>
+      class10Cities.length > 0
+        ? class10Cities.map((c) => ({ value: c.name, label: c.name }))
+        : class10StateName
+          ? [{ value: class10StateName, label: class10StateName }]
+          : [],
+    [class10Cities, class10StateName]
+  );
+  const class12CityOptions = useMemo(
+    () =>
+      class12Cities.length > 0
+        ? class12Cities.map((c) => ({ value: c.name, label: c.name }))
+        : class12StateName
+          ? [{ value: class12StateName, label: class12StateName }]
+          : [],
+    [class12Cities, class12StateName]
+  );
+  const diplomaCityOptions = useMemo(
+    () =>
+      diplomaCities.length > 0
+        ? diplomaCities.map((c) => ({ value: c.name, label: c.name }))
+        : diplomaStateName
+          ? [{ value: diplomaStateName, label: diplomaStateName }]
+          : [],
+    [diplomaCities, diplomaStateName]
+  );
 
   useEffect(() => {
     if (class10Country && class10States.length === 0) {
@@ -2521,10 +2585,7 @@ export const ApplicantAdmissionView = ({
                       <SelectContent>
                         <SelectItems
                           value={currentCountry}
-                          items={countries.map((country) => ({
-                            value: country.isoCode,
-                            label: country.name,
-                          }))}
+                          items={countryOptions}
                         />
                       </SelectContent>
                     </Select>
@@ -2700,10 +2761,7 @@ export const ApplicantAdmissionView = ({
                       <SelectContent>
                         <SelectItems
                           value={permanentCountry}
-                          items={countries.map((country) => ({
-                            value: country.isoCode,
-                            label: country.name,
-                          }))}
+                          items={countryOptions}
                         />
                       </SelectContent>
                     </Select>
@@ -3215,10 +3273,7 @@ export const ApplicantAdmissionView = ({
                   <SelectContent>
                     <SelectItems
                       value={class10Country}
-                      items={countries.map((country) => ({
-                        value: country.isoCode,
-                        label: country.name,
-                      }))}
+                      items={countryOptions}
                     />
                   </SelectContent>
                 </Select>
@@ -3429,10 +3484,7 @@ export const ApplicantAdmissionView = ({
                       <SelectContent>
                         <SelectItems
                           value={class12Country}
-                          items={countries.map((country) => ({
-                            value: country.isoCode,
-                            label: country.name,
-                          }))}
+                          items={countryOptions}
                         />
                       </SelectContent>
                     </Select>
@@ -3735,10 +3787,7 @@ export const ApplicantAdmissionView = ({
                       <SelectContent>
                         <SelectItems
                           value={diplomaCountry}
-                          items={countries.map((country) => ({
-                            value: country.isoCode,
-                            label: country.name,
-                          }))}
+                          items={countryOptions}
                         />
                       </SelectContent>
                     </Select>
