@@ -68,3 +68,6 @@ packages/db/data/*
 !packages/db/data/minio/
 packages/db/data/minio/*
 !packages/db/data/minio/.gitkeep
+
+AGENTS.md
+.cursor
