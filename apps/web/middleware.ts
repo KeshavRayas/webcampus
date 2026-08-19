@@ -33,7 +33,7 @@ export async function middleware(request: NextRequest) {
   } catch (error) {
     // If the API is temporarily unavailable, continue as unauthenticated
     // instead of crashing middleware with a runtime error.
-    console.error("Session fetch failed in middleware:", error);
+    console.error("[MIDDLEWARE] Session fetch failed:", error);
   }
 
   if (session && isSignInPage) {

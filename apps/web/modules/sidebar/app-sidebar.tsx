@@ -16,25 +16,30 @@ import { capitalize } from "@webcampus/ui/lib/utils";
 import axios from "axios";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import * as React from "react";
 import { NavMain } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
 import { sidebarConfig } from "./sidebar-config";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
   const [isMounted, setIsMounted] = React.useState(false);
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  React.useEffect(() => {
+    authClient.getSession();
+  }, [pathname]);
+
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
       const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
+        `${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
         { withCredentials: true }
       );
       if (res.data.status === "success") return res.data.data;
@@ -110,7 +115,7 @@ const SidebarSkeleton = () => {
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <div className="bg-sidebar-foreground/20 mb-1 h-4 w-16 rounded" />
-                <div className="bg-sidebar-foreground/10 h-3 w-12 rounded" />
+                <div className="bg-sidebar-foreground/10 h-3 w-16 rounded" />
               </div>
             </div>
           </SidebarMenuItem>
