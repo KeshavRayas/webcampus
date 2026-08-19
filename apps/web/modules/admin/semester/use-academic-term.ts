@@ -51,8 +51,7 @@ export const useAcademicTerms = (
       return [];
     },
     enabled: options?.enabled ?? true,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000,
   });
 };
 

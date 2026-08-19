@@ -23,7 +23,12 @@ import { sidebarConfig } from "./sidebar-config";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session, isPending } = authClient.useSession();
+  const [isMounted, setIsMounted] = React.useState(false);
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
@@ -38,11 +43,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     enabled: session?.user.role === "department",
   });
 
-  if (isPending || !session) {
+  if (!isMounted || isPending || !session) {
     return <SidebarSkeleton />;
   }
-  console.log("Role:", session?.user.role);
-  console.log("Sidebar config:", sidebarConfig);
   const { navMain, navSecondary } = sidebarConfig[session?.user.role as Role];
 
   const filteredNavMainItems = navMain.items.map((item) => {

@@ -164,7 +164,7 @@ export class AdminAdmissionUserService {
   static async update(
     id: string,
     data: UpdateAdmissionUserType,
-    // headers: IncomingHttpHeaders
+    headers: IncomingHttpHeaders,
     photoFile?: Express.Multer.File
   ): Promise<BaseResponse<AdmissionUserRecord>> {
     let uploadedImageUrl: string | null = null;
@@ -194,6 +194,13 @@ export class AdminAdmissionUserService {
           photoFile,
           data.name ?? existingUser.name
         );
+      }
+
+      if (data.password) {
+        await auth.api.setUserPassword({
+          headers: fromNodeHeaders(headers),
+          body: { userId: id, newPassword: data.password },
+        });
       }
 
       // Safely Sync Roles with external Auth provider
@@ -283,14 +290,18 @@ export class AdminAdmissionUserService {
     }
   }
 
-  static async getAll(): Promise<BaseResponse<unknown>> {
+  static async getAll(role?: string): Promise<BaseResponse<unknown>> {
     try {
       await UserService.backfillMissingProfileFields();
+
+      const roles = [...ADMISSION_ROLES].filter(
+        (admissionRole) => !role || admissionRole === role
+      );
 
       const users = await db.user.findMany({
         where: {
           role: {
-            in: [...ADMISSION_ROLES],
+            in: roles,
           },
         },
         select: {

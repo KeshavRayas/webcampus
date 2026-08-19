@@ -78,7 +78,7 @@ export const generateFileName = (originalName: string, prefix: string) => {
     const deptName = parts[1] || "unknown";
     const facultyName = parts[2] || "unknown";
     return `faculty/${deptName}/${facultyName}_${uuid}${extension}`;
-  } else if (category && ["admission", "finance", "coe"].includes(category)) {
+  } else if (category && ["admission", "accounts", "coe"].includes(category)) {
     const name = parts[1] || "unknown";
     // Group user types into a parent "users" directory
     return `users/${category}/${name}_${uuid}${extension}`;

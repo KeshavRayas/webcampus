@@ -320,15 +320,26 @@ export class ProctorController {
   static async generateGroups(req: Request, res: Response): Promise<void> {
     try {
       const requestContext = await getDepartmentRequestContext(req);
-      const { semesterId, studentsPerGroup, action } = req.body;
+      const { semesterId, studentsPerGroup, action } = req.body as {
+        semesterId?: string;
+        studentsPerGroup?: unknown;
+        action?: unknown;
+      };
 
-      if (!semesterId || !studentsPerGroup || !action) {
+      const spg = Number(studentsPerGroup);
+      if (
+        !semesterId ||
+        !Number.isInteger(spg) ||
+        spg < 1 ||
+        (action !== "generate" && action !== "regenerate")
+      ) {
         sendResponse({
           res,
           status: "error",
           statusCode: 400,
-          message: "semesterId, studentsPerGroup, and action are required.",
-          error: new Error("Missing parameters"),
+          message:
+            "semesterId, studentsPerGroup (integer >= 1), and action (generate|regenerate) are required.",
+          error: new Error("Missing/invalid parameters"),
         });
         return;
       }
@@ -337,8 +348,8 @@ export class ProctorController {
         departmentId: requestContext.departmentId,
         departmentName: requestContext.departmentName || "",
         semesterId,
-        studentsPerGroup,
-        action,
+        studentsPerGroup: spg,
+        action: action as "generate" | "regenerate",
       });
 
       sendResponse({

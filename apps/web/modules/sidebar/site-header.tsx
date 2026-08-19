@@ -41,7 +41,7 @@ export const SiteHeader = () => {
           <Breadcrumb className="hidden sm:block">
             <BreadcrumbList>
               {pathNames.map((path, index, array) => (
-                <React.Fragment key={path}>
+                <React.Fragment key={`${index}-${path}`}>
                   <BreadcrumbItem>
                     {array.length - 1 === index ? (
                       <BreadcrumbPage>{capitalize(path)}</BreadcrumbPage>

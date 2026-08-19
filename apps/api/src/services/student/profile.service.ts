@@ -138,6 +138,7 @@ export class StudentProfileService {
                 select: {
                   id: true,
                   name: true,
+                  semesterId: true,
                 },
               },
             },
@@ -159,6 +160,10 @@ export class StudentProfileService {
           id: student.id,
           usn: student.usn,
           currentSemester: student.currentSemester,
+          semesterId:
+            student.semesterId ?? latestSection?.section?.semesterId ?? null,
+          sectionId: latestSection?.section?.id ?? null,
+          sectionName: latestSection?.section?.name ?? null,
           academicYear: student.academicYear,
           departmentName: student.departmentName,
           programType: student.programType,

@@ -7,6 +7,7 @@ import type {
   SendConfigType,
 } from "@webcampus/schemas/admin";
 import {
+  formatNumber,
   renderMessageBody,
   resolveFieldSource,
   type ResolutionContext,
@@ -291,10 +292,37 @@ export async function resolveTargets(
     for (const a of assessments) {
       cieMaxMap.set(a.courseId, a.totalMarks);
     }
-    const courseMaxFallback = new Map<string, number>();
-    for (const r of registrations) {
-      courseMaxFallback.set(r.courseId, r.course.cieMaxMarks);
-    }
+
+    const maxMarksSource = config.maxMarksSource ?? "ASSESSMENT";
+
+    const resolveMax = (
+      course: {
+        cieMaxMarks: number;
+        theoryExamMaxMarks: number;
+        labMaxMarks: number;
+        aatMaxMarks: number;
+      },
+      assessmentMax: number | null
+    ): number | null => {
+      switch (maxMarksSource) {
+        case "THEORY":
+          return course.theoryExamMaxMarks > 0
+            ? course.theoryExamMaxMarks
+            : assessmentMax;
+        case "LAB":
+          return course.labMaxMarks > 0 ? course.labMaxMarks : assessmentMax;
+        case "AAT":
+          return course.aatMaxMarks > 0 ? course.aatMaxMarks : assessmentMax;
+        case "CIE":
+          return course.cieMaxMarks > 0 ? course.cieMaxMarks : assessmentMax;
+        case "ASSESSMENT":
+        default:
+          return (
+            assessmentMax ??
+            (course.cieMaxMarks > 0 ? course.cieMaxMarks : null)
+          );
+      }
+    };
 
     for (const student of activeStudents) {
       const studentRegs = registrations.filter(
@@ -317,34 +345,38 @@ export async function resolveTargets(
         );
         continue;
       }
+
+      const detailsParts: string[] = [];
       for (const reg of studentRegs) {
         const course = reg.course;
-        const ctx: ResolutionContext = {
-          ...baseCtx(student),
-          course: { code: course.code, name: course.name },
-          cieNumber,
-          cieMarks: marksMap.get(`${student.studentId}:${course.id}`) ?? null,
-          cieMax:
-            cieMaxMap.get(course.id) ??
-            courseMaxFallback.get(course.id) ??
-            null,
-        };
-        addScopeTargets(
-          targets,
-          student,
-          studentTemplate,
-          parentTemplate,
-          scope,
-          (template, recipientType) =>
-            buildTarget(template, ctx, student, {
-              recipientType,
-              to: null,
-              skipReason: "No phone number",
-              course: { id: course.id, code: course.code, name: course.name },
-            }),
-          ctx
+        const obtained =
+          marksMap.get(`${student.studentId}:${course.id}`) ?? null;
+        const max = resolveMax(course, cieMaxMap.get(course.id) ?? null);
+        const last3 = course.code.slice(-3);
+        detailsParts.push(
+          `${last3}:(${formatNumber(obtained)}/${formatNumber(max)})`
         );
       }
+
+      const ctx: ResolutionContext = {
+        ...baseCtx(student),
+        cieNumber,
+        cieMarksDetails: detailsParts.join(", "),
+      };
+      addScopeTargets(
+        targets,
+        student,
+        studentTemplate,
+        parentTemplate,
+        scope,
+        (template, recipientType) =>
+          buildTarget(template, ctx, student, {
+            recipientType,
+            to: null,
+            skipReason: "No phone number",
+          }),
+        ctx
+      );
     }
   } else {
     const finance = await loadFinanceData(activeStudentIds);
@@ -440,7 +472,7 @@ type FinanceSummary = {
 async function loadFinanceData(
   studentIds: string[]
 ): Promise<FinanceSummary[]> {
-  const records = await db.finance.findMany({
+  const records = await db.accounts.findMany({
     where: { studentId: { in: studentIds } },
     include: { payments: true },
     orderBy: { updatedAt: "desc" },

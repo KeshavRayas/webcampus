@@ -49,6 +49,7 @@ export async function persistCampaign(input: {
         semesterId: input.config.semesterId ?? null,
         sectionIds: input.config.sectionIds ?? [],
         cieNumber: input.config.cieNumber ?? null,
+        maxMarksSource: input.config.maxMarksSource ?? null,
         subjectIds: input.config.subjectIds ?? [],
       },
       adHocData: input.config.adHocData ?? undefined,

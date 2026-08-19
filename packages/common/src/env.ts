@@ -25,6 +25,7 @@ const backendEnvSchema = commonEnvSchema.extend({
   SMS_API_KEY: z.string().optional(),
   SMS_SENDER_ID: z.string().optional(),
   SMS_API_URL: z.url().optional(),
+  REDIS_URL: z.string().url().default("redis://localhost:6379"),
   // Old AWS S3 vars (commented out — replaced by MinIO)
   // AWS_ACCESS_KEY_ID: z.string(),
   // AWS_SECRET_ACCESS_KEY: z.string(),

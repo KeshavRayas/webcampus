@@ -2,12 +2,19 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@webcampus/ui/components/badge";
+import { getAdmissionFullName } from "../admin/admin-admission-columns";
 import { UploadDocsActions } from "./upload-docs-actions";
 
 export type UploadDocsResponse = {
   id: string;
   applicationId: string;
-  status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" | "EXITED";
+  status:
+    | "PENDING"
+    | "SUBMITTED"
+    | "APPROVED"
+    | "REJECTED"
+    | "EXITED"
+    | "PORTED";
 
   primaryEmail: string;
 
@@ -19,6 +26,13 @@ export type UploadDocsResponse = {
       name: string;
     };
   } | null;
+
+  filledBy: {
+    id: string;
+    name: string;
+    email: string;
+    role?: string | null;
+  };
 
   photo?: string | null;
   aadharCard?: string | null;
@@ -56,23 +70,19 @@ const totalDocuments = (row: UploadDocsResponse) => (row.disability ? 9 : 8);
 
 export const uploadDocsColumns: ColumnDef<UploadDocsResponse>[] = [
   {
+    id: "name",
+    header: "Name",
+    cell: ({ row }) => (
+      <div className="font-medium">{getAdmissionFullName(row.original)}</div>
+    ),
+  },
+
+  {
     accessorKey: "primaryEmail",
     header: "College Email",
     cell: ({ row }) => (
       <div className="font-medium">{row.original.primaryEmail}</div>
     ),
-  },
-
-  {
-    id: "name",
-    header: "Name",
-    cell: ({ row }) => {
-      const studentName = row.original.student?.user?.name?.trim();
-
-      const admissionName = row.original.nameAsPer10th?.trim();
-
-      return <div>{studentName || admissionName || "-"}</div>;
-    },
   },
 
   {
@@ -88,7 +98,9 @@ export const uploadDocsColumns: ColumnDef<UploadDocsResponse>[] = [
             ? "secondary"
             : status === "REJECTED"
               ? "destructive"
-              : "outline";
+              : status === "PORTED"
+                ? "default"
+                : "outline";
 
       return <Badge variant={variant}>{status}</Badge>;
     },

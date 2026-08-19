@@ -4,6 +4,7 @@ import { auth, toNodeHandler } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import cors from "cors";
 import express, { type Express } from "express";
+import accountsRouter from "./routers/accounts/accounts.router";
 import adminRouter from "./routers/admin/admin.router";
 import admissionRouter from "./routers/admission/admission.router";
 import coeRouter from "./routers/coe/coe.router";
@@ -12,11 +13,13 @@ import {
   adminFeedbackRouter,
   feedbackReportRouter,
 } from "./routers/feedback.router";
-import financeRouter from "./routers/finance/finance.router";
+import fileRouter from "./routers/file-management/file.router";
 import hodRouter from "./routers/hod/hod.router";
-import fileRouter from "./routers/shared/file.router";
+import noticeRouter from "./routers/notice/notice.router";
+
 import studentRouter from "./routers/student/student-domain.router";
 import supportRouter from "./routers/support/support.router";
+import timetableRouter from "./routers/timetable/timetable.router";
 import verificationRouter from "./routers/verification/verification.router";
 
 const app: Express = express();
@@ -41,11 +44,14 @@ app.use("/hod", hodRouter);
 
 app.use("/department", DepartmentRouter);
 
+app.use("/timetable", timetableRouter);
+app.use("/notices", noticeRouter);
+
 app.use("/coe", coeRouter);
 
 app.use("/faculty", facultyRouter);
 
-app.use("/finance", financeRouter);
+app.use("/accounts", accountsRouter);
 
 app.use("/support", supportRouter);
 

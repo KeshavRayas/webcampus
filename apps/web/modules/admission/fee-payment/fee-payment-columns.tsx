@@ -15,6 +15,8 @@ const getStatusVariant = (status: AdmissionResponse["status"]) => {
       return "secondary";
     case "REJECTED":
       return "destructive";
+    case "PORTED":
+      return "default";
     default:
       return "outline";
   }
@@ -45,10 +47,6 @@ export const createFeePaymentColumns = ({
         </div>
       );
     },
-  },
-  {
-    accessorKey: "applicationId",
-    header: "Application ID",
   },
   {
     accessorKey: "status",

@@ -5,6 +5,9 @@ import {
   flexRender,
   getCoreRowModel,
   getPaginationRowModel,
+  PaginationState,
+  Row,
+  Updater,
   useReactTable,
 } from "@tanstack/react-table";
 import {
@@ -21,22 +24,69 @@ import { DataTablePagination } from "./data-table-pagination";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  manualPagination?: boolean;
+  page?: number;
+  pageSize?: number;
+  totalRows?: number;
+  onPaginationChange?: (page: number, pageSize: number) => void;
+  enableRowSelection?: boolean | ((row: Row<TData>) => boolean);
+  rowSelection?: Record<string, boolean>;
+  onRowSelectionChange?: (selection: Record<string, boolean>) => void;
+  getRowId?: (row: TData) => string;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  manualPagination = false,
+  page = 0,
+  pageSize = 10,
+  totalRows = 0,
+  onPaginationChange,
+  enableRowSelection,
+  rowSelection,
+  onRowSelectionChange,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: {
-      pagination: {
-        pageSize: 10,
-      },
+    getRowId,
+    enableRowSelection,
+    state: {
+      ...(rowSelection ? { rowSelection } : {}),
+      ...(manualPagination
+        ? { pagination: { pageIndex: page, pageSize } }
+        : {}),
     },
+    onRowSelectionChange: (updater: Updater<Record<string, boolean>>) => {
+      if (!onRowSelectionChange) return;
+      const next =
+        typeof updater === "function" ? updater(rowSelection ?? {}) : updater;
+      onRowSelectionChange(next);
+    },
+    ...(manualPagination
+      ? {
+          manualPagination: true,
+          rowCount: totalRows,
+          pageCount: Math.max(Math.ceil(totalRows / pageSize), 1),
+          onPaginationChange: (updater: Updater<PaginationState>) => {
+            const next =
+              typeof updater === "function"
+                ? updater({ pageIndex: page, pageSize })
+                : updater;
+            onPaginationChange?.(next.pageIndex, next.pageSize);
+          },
+        }
+      : {
+          getPaginationRowModel: getPaginationRowModel(),
+          initialState: {
+            pagination: {
+              pageSize: 10,
+            },
+          },
+        }),
   });
 
   return (
