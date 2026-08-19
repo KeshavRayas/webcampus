@@ -51,9 +51,10 @@ export const auth = betterAuth({
   rateLimit: {
     enabled: true,
     window: 60,
-    max: 50,
+    max: 60,
     customRules: {
-      "/sign-in/email": { window: 60, max: 10 },
+      "/get-session": { window: 60, max: 100000 },
+      "/sign-in/email": { window: 60, max: 40 },
       "/sign-up/email": { window: 60, max: 10 },
       "/request-password-reset": { window: 60, max: 10 },
       "/reset-password": { window: 60, max: 10 },
