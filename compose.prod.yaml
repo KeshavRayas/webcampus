@@ -1,0 +1,163 @@
+name: webcampus-prod
+
+# Production stack for the college server. Reads secrets from the repo-root
+# .env (compose auto-loads it). api/web images come from GHCR (built by CI);
+# override the tag to roll back: IMAGE_TAG=sha-<commit>.
+#
+#   docker compose -f compose.prod.yaml up -d
+#
+# The one-shot `migrate` service runs `prisma migrate deploy` (unpooled URL via
+# the schema's directUrl) and api/web only start after it succeeds.
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: webcampus-prod-db
+    restart: unless-stopped
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-webcampus}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: webcampus-prod-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # object API (browser-reachable for presigned URLs)
+      - "9001:9001" # MinIO console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:9000/minio/health/ready || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.2-p0
+    container_name: webcampus-prod-pgbouncer
+    restart: unless-stopped
+    environment:
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      AUTH_TYPE: scram-sha-256
+      ADMIN_USERS: pgbouncer_admin
+    volumes:
+      - ./packages/db/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: webcampus-prod-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 1gb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # One-shot migration runner: `prisma migrate deploy` (uses the unpooled URL).
+  migrate:
+    image: ghcr.io/keshavrayas/webcampus/api:${IMAGE_TAG:-latest}
+    restart: "no"
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    working_dir: /app
+    command:
+      - bun
+      - x
+      - prisma
+      - migrate
+      - deploy
+      - --schema
+      - packages/db/prisma/schema.prisma
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: ghcr.io/keshavrayas/webcampus/api:${IMAGE_TAG:-latest}
+    container_name: webcampus-prod-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/api/auth/get-session || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    image: ghcr.io/keshavrayas/webcampus/web:${IMAGE_TAG:-latest}
+    container_name: webcampus-prod-web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  minio_data:
+  redis_data:

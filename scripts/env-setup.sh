@@ -2,8 +2,11 @@
 
 set -e
 
-cp packages/db/.env.example packages/db/.env
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env
+if [ -f .env ]; then
+  echo ".env already exists — skipping copy (single source of truth at repo root)."
+  exit 0
+fi
 
-echo ".env files copied!"
+cp .env.example .env
+
+echo ".env copied from .env.example!"

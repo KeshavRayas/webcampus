@@ -15,10 +15,9 @@ import {
 const logoDataUri: string = (() => {
   try {
     const __filename = fileURLToPath(import.meta.url);
-    const svgPath = path.resolve(
-      __filename,
-      "../../../../../../apps/web/public/bmsce.svg"
-    );
+    const svgPath =
+      process.env.BMSCE_LOGO_PATH ??
+      path.resolve(__filename, "../../../../../../apps/web/public/bmsce.svg");
     const svg = readFileSync(svgPath, "utf-8");
     const base64 = Buffer.from(svg, "utf-8").toString("base64");
     return `data:image/svg+xml;base64,${base64}`;

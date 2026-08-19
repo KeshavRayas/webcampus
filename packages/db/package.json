@@ -8,18 +8,19 @@
   "scripts": {
     "check-types": "tsc --noEmit --pretty",
     "lint": "eslint .",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev --skip-generate",
-    "db:deploy": "prisma migrate deploy",
-    "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset -f",
-    "db:nuke": "docker compose down --volumes || docker-compose down --volumes",
-    "db:up": "docker compose up -d || docker-compose up -d",
+    "db:generate": "bun --env-file=../../.env run prisma generate",
+    "db:push": "bun --env-file=../../.env run prisma db push",
+    "db:migrate": "bun --env-file=../../.env run prisma migrate dev --skip-generate",
+    "db:deploy": "bun --env-file=../../.env run prisma migrate deploy",
+    "db:studio": "bun --env-file=../../.env run prisma studio",
+    "db:reset": "bun --env-file=../../.env run prisma migrate reset -f",
+    "db:nuke": "docker compose --env-file=../../.env down --volumes || docker-compose --env-file=../../.env down --volumes",
+    "db:up": "docker compose --env-file=../../.env up -d || docker-compose --env-file=../../.env up -d",
     "db:setup": "run-s db:up db:generate",
     "dx": "run-s db:setup",
     "format:write": "prettier --write \"**/*.{ts,tsx,mdx}\" --cache",
     "format:check": "prettier --check \"**/*.{ts,tsx,mdx}\" --cache",
-    "postinstall": "prisma generate"
+    "postinstall": "bun --env-file=../../.env run prisma generate"
   },
   "devDependencies": {
     "@eslint/css": "^0.9.0",

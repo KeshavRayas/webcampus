@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+**/node_modules
+apps/*/node_modules
+packages/*/node_modules
+**/.bun
+
+# Build output
+apps/web/.next
+**/.next
+**/dist
+**/build
+**/.turbo
+*.tsbuildinfo
+
+# Local data (Docker volumes / live DBs — never ship)
+packages/db/data
+**/data/postgres
+**/data/minio
+**/data/redis
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Git / CI
+.git
+.github
+.vscode
+.idea
+
+# Logs & misc
+*.log
+npm-debug.log*
+yarn-debug.log*
+bun-debug.log*
+plan.md
+deploy.md
+coverage
+playwright-report
+test-results
+.auth

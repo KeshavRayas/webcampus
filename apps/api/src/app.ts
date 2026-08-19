@@ -1,4 +1,3 @@
-import "dotenv/config";
 import DepartmentRouter from "@webcampus/api/src/routers/department/department.router";
 import { auth, toNodeHandler } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
@@ -16,7 +15,6 @@ import {
 import fileRouter from "./routers/file-management/file.router";
 import hodRouter from "./routers/hod/hod.router";
 import noticeRouter from "./routers/notice/notice.router";
-
 import studentRouter from "./routers/student/student-domain.router";
 import supportRouter from "./routers/support/support.router";
 import timetableRouter from "./routers/timetable/timetable.router";
