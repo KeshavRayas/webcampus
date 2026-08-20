@@ -15,7 +15,7 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import { FileDown, FileSpreadsheet, FilterIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 export const ADMISSION_FILTER_ALL_VALUE = "__all__";
 
@@ -35,6 +35,8 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   reportExcelButtonLabel = "Generate Report Excel",
   fieldToggles,
   onToggleField,
+  actionSlot,
+  showFieldToggles = true,
 }: {
   simpleFields: FilterFieldConfig<TFilters>[];
   advancedFields: FilterFieldConfig<TFilters>[];
@@ -51,6 +53,8 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   reportExcelButtonLabel?: string;
   fieldToggles?: Record<string, boolean>;
   onToggleField?: (columnKey: string) => void;
+  actionSlot?: ReactNode;
+  showFieldToggles?: boolean;
 }) {
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
 
@@ -65,20 +69,22 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="admission-filter-panel space-y-4">
       <FilterBuilder
         fields={simpleFields}
         draftFilters={draftFilters}
         onDraftChange={onDraftChange}
         allValue={allValue}
-        className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+        className="filter-builder-simple grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2"
       />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div
+        className={`admission-filter-actions ${actionSlot ? "has-create-action" : "three-actions"} flex flex-wrap items-center gap-2`}
+      >
         <Button type="button" onClick={onApply}>
           Apply Filters
         </Button>
-        <Button type="button" variant="outline" onClick={onReset}>
+        <Button type="button" onClick={onReset}>
           Reset Filters
         </Button>
 
@@ -88,7 +94,7 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
               <FilterIcon className="h-4 w-4" />
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-xl md:max-w-2xl">
+          <DialogContent className="admission-filter-dialog sm:max-w-xl md:max-w-2xl">
             <DialogHeader>
               <DialogTitle>{dialogTitle}</DialogTitle>
               <DialogDescription>{dialogDescription}</DialogDescription>
@@ -101,6 +107,7 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
                 allValue={allValue}
                 toggles={fieldToggles}
                 onToggle={onToggleField}
+                showToggles={showFieldToggles}
                 className="grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2"
               />
             </div>
@@ -114,6 +121,8 @@ export function AdmissionFilterBar<TFilters extends Record<string, string>>({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {actionSlot}
 
         {onGenerateReport && (
           <Button type="button" variant="outline" onClick={onGenerateReport}>

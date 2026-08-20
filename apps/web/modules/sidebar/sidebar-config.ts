@@ -552,26 +552,31 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Admission Setup",
           url: "/admission/setup",
           icon: Settings2,
+          section: "Admissions",
         },
         {
           name: "Cancel Admission",
           url: "/admission/cancel-admission",
           icon: GraduationCap,
+          section: "Admissions",
         },
         {
           name: "Create Admission",
           url: "/admission",
           icon: LayoutDashboard,
+          section: "Admissions",
         },
         {
           name: "Fee Payment",
           url: "/admission/fee-payment",
           icon: IndianRupee,
+          section: "Admissions",
         },
         {
           name: "Reports",
           url: "/admission/reports/admission",
           icon: FileBarChart,
+          section: "Reports",
           children: [
             {
               name: "Admission Report",
@@ -591,11 +596,13 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Upload Documents",
           url: "/admission/upload-documents",
           icon: Upload,
+          section: "Records",
         },
         {
           name: "View Admissions",
           url: "/admission/view-admissions",
           icon: BookCopy,
+          section: "Records",
         },
       ],
     },

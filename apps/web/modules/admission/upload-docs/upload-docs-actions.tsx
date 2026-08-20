@@ -132,7 +132,7 @@ function DocumentCard({
   const displayedFile = selectedFile || currentFile;
 
   return (
-    <div className="space-y-3 rounded-lg border p-4">
+    <div className="admission-document-card space-y-3 rounded-lg border p-4">
       <div className="flex items-center justify-between">
         <p className="font-medium">{title}</p>
 
@@ -156,7 +156,7 @@ function DocumentCard({
         </a>
       )}
 
-      <div className="bg-muted/20 flex items-center gap-3 rounded-lg border border-dashed p-3">
+      <div className="admission-upload-control bg-muted/20 flex items-center gap-3 rounded-lg border border-dashed p-3">
         <input
           id={inputId}
           ref={inputRef}
@@ -231,7 +231,7 @@ export function UploadDocsActions({ admission }: Props) {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
+      <DialogContent className="admission-theme-dialog max-h-[90vh] overflow-y-auto sm:max-w-6xl">
         <DialogHeader>
           <DialogTitle>Admission Documents</DialogTitle>
 
@@ -242,7 +242,7 @@ export function UploadDocsActions({ admission }: Props) {
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_1fr]">
           <div className="space-y-6">
-            <div className="flex flex-col items-center gap-4 rounded-lg border p-6">
+            <div className="admission-document-profile flex flex-col items-center gap-4 rounded-lg border p-6">
               <Avatar className="h-28 w-28">
                 <AvatarImage src={admission.photo ?? undefined} />
 
@@ -343,7 +343,7 @@ export function UploadDocsActions({ admission }: Props) {
                 )}
               </div>
 
-              <DialogFooter className="mt-8 border-t pt-6">
+              <DialogFooter className="admission-theme-footer mt-8 border-t pt-6">
                 <Button variant="outline" onClick={() => setFiles({})}>
                   Cancel
                 </Button>

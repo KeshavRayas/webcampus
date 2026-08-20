@@ -69,16 +69,12 @@ export function CancelAdmissionActions({
               ? "This admission has been ported to students and cannot be cancelled."
               : undefined
           }
-          className={
-            admission.status === "CANCELLED"
-              ? "bg-red-200! text-red-400! hover:bg-red-200! disabled:opacity-100"
-              : "bg-red-600! text-white! hover:bg-red-700! disabled:opacity-100"
-          }
+          className="admission-cancel-trigger"
         >
           Cancel Admission
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="admission-theme-dialog">
         <DialogHeader>
           <DialogTitle>Cancel Admission</DialogTitle>
           <DialogDescription>
@@ -93,7 +89,7 @@ export function CancelAdmissionActions({
               value={reason}
               onValueChange={(value) => setReason(value as CancellationReason)}
             >
-              <SelectTrigger>
+              <SelectTrigger className="admission-theme-control">
                 <SelectValue placeholder="Select a reason" />
               </SelectTrigger>
               <SelectContent>
@@ -127,7 +123,7 @@ export function CancelAdmissionActions({
               placeholder="Add additional context for this cancellation"
               maxLength={2000}
               rows={3}
-              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[60px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="admission-theme-control border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[60px] w-full border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
         </div>
@@ -136,7 +132,7 @@ export function CancelAdmissionActions({
             Cancel
           </Button>
           <Button
-            className="bg-red-600! text-white! hover:bg-red-700!"
+            className="admission-theme-primary"
             disabled={
               isPending ||
               !reason ||

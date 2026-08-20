@@ -1,21 +1,16 @@
 import { AdminAdmissionView } from "@/modules/admission/admin/admin-admission-view";
+import { AdmissionConsoleShell } from "@/modules/admission/shared/admission-console-shell";
 import React, { Suspense } from "react";
 
 export default function ViewAdmissionsPage() {
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Admissions Management
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Filter admissions by application ID, status, admission type, mode,
-          date range, and semester.
-        </p>
-      </div>
+    <AdmissionConsoleShell
+      title="Admissions management."
+      description="Filter admissions by application, status, type, mode, date range, and semester."
+    >
       <Suspense>
         <AdminAdmissionView hideAddForm showFilters />
       </Suspense>
-    </div>
+    </AdmissionConsoleShell>
   );
 }

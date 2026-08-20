@@ -339,6 +339,12 @@ export const AdminAdmissionActions = ({
     if (value && !docData) {
       setDocData(buildDocData(admission));
     }
+    if (!value) {
+      requestAnimationFrame(() => {
+        document.body.style.removeProperty("overflow");
+        document.documentElement.style.removeProperty("overflow");
+      });
+    }
   };
 
   const handleDownloadPdf = async () => {
@@ -384,7 +390,7 @@ export const AdminAdmissionActions = ({
             View Details
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-h-[92vh] w-full overflow-hidden p-0 sm:max-w-6xl">
+        <DialogContent className="admission-theme-dialog max-h-[92vh] w-full overflow-hidden p-0 sm:max-w-6xl">
           <DialogHeader className="px-4 pt-4 sm:px-8 sm:pt-8">
             <DialogTitle className="text-left text-2xl">
               Admission Details

@@ -115,6 +115,7 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
   className,
   toggles,
   onToggle,
+  showToggles = true,
 }: {
   fields: FilterFieldConfig<TFilters>[];
   draftFilters: TFilters;
@@ -123,13 +124,14 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
   className?: string;
   toggles?: Record<string, boolean>;
   onToggle?: (columnKey: string) => void;
+  showToggles?: boolean;
 }) {
   const renderFieldLabel = (
     field: FilterFieldConfig<TFilters>,
     inputId: string
   ) => {
     const columnKey = field.columnKey;
-    if (columnKey) {
+    if (columnKey && showToggles) {
       return (
         <div className="flex items-center gap-2">
           <Checkbox

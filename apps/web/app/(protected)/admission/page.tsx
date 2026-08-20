@@ -4,6 +4,7 @@
 import { authClient } from "@/lib/auth-client";
 import { AdminAdmissionView } from "@/modules/admission/admin/admin-admission-view";
 import { ApplicantAdmissionView } from "@/modules/admission/applicant/applicant-admission-view";
+import { AdmissionConsoleShell } from "@/modules/admission/shared/admission-console-shell";
 import React, { Suspense } from "react";
 
 export default function AdmissionPage() {
@@ -18,20 +19,14 @@ export default function AdmissionPage() {
   }
 
   const isApplicant = session.user.role === "applicant";
-  const heading = isApplicant ? "Applicant Portal" : "Admissions Portal";
-  const description = isApplicant
-    ? "Fill out your application and complete the admission payment details."
-    : "Create student admission shells and track application status.";
-
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{heading}</h1>
-        <p className="text-muted-foreground text-sm">{description}</p>
-      </div>
+    <AdmissionConsoleShell
+      title="Admissions, moving in real time."
+      description="Apply once, track every step, and stay updated from start to finish."
+    >
       <Suspense>
         {isApplicant ? <ApplicantAdmissionView /> : <AdminAdmissionView />}
       </Suspense>
-    </div>
+    </AdmissionConsoleShell>
   );
 }

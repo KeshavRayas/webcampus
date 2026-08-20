@@ -1,32 +1,8 @@
-import { roles } from "@webcampus/types/rbac";
-import { Button } from "@webcampus/ui/components/button";
-import { capitalize } from "@webcampus/ui/lib/utils";
-import Link from "next/link";
+import { AuthSignInView } from "@/modules/auth/sign-in/auth-sign-in-view";
 import React from "react";
 
 const HomePage = () => {
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold">BMSCE CAMPUS</h1>
-        <p className="text-muted-foreground text-balance text-sm">
-          Sign in with your personal credentials
-        </p>
-      </div>
-      <div className="flex flex-col gap-2.5">
-        {roles
-          .filter((r) => r !== "admission")
-          .map((role) => (
-            <Button key={role} size={"lg"} variant={"outline"} asChild>
-              <Link href={`/${role}/sign-in`}>{capitalize(role)} Sign In</Link>
-            </Button>
-          ))}
-        <Button size={"lg"} variant={"outline"} asChild>
-          <Link href="/admission/sign-in">Admission Sign In</Link>
-        </Button>
-      </div>
-    </div>
-  );
+  return <AuthSignInView initialRole="student" />;
 };
 
 export default HomePage;

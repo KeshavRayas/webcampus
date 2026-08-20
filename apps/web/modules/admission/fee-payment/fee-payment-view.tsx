@@ -575,7 +575,7 @@ const FeePaymentStaffView = () => {
         cell: ({ row }: { row: { original: FeePaymentResponse } }) => {
           const admission = row.original;
           const isPaid = admission.feeStatus === true;
-          const canPay = admission.status === "SUBMITTED";
+          const canPay = true;
           const isPaying = isProcessing && payingId === admission.id;
 
           return (
@@ -661,7 +661,7 @@ const FeePaymentStaffView = () => {
         <DataTable columns={columns} data={admissions} />
 
         <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="admission-theme-dialog max-w-2xl">
             <DialogHeader>
               <DialogTitle>Student Fee Details</DialogTitle>
               <DialogDescription>
@@ -728,14 +728,7 @@ const FeePaymentStaffView = () => {
                       {selectedAdmission.admissionType || "-"}
                     </p>
                   </div>
-                  <div className="rounded-md border p-3">
-                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                      Department
-                    </p>
-                    <p className="mt-1 font-medium">
-                      {selectedAdmission.department?.name || "-"}
-                    </p>
-                  </div>
+
                   <div className="rounded-md border p-3">
                     <p className="text-muted-foreground text-xs uppercase tracking-wide">
                       Quota
@@ -786,6 +779,14 @@ const FeePaymentStaffView = () => {
                       {selectedAdmission.feeReceiptNumber || "-"}
                     </p>
                   </div>
+                  <div className="rounded-md border p-3 md:col-span-2">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                      Department
+                    </p>
+                    <p className="mt-1 font-medium">
+                      {selectedAdmission.department?.name || "-"}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex justify-end">
@@ -804,7 +805,7 @@ const FeePaymentStaffView = () => {
         </Dialog>
 
         <Dialog open={isPayOpen} onOpenChange={setIsPayOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="admission-theme-dialog sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Record Fee Payment</DialogTitle>
               <DialogDescription>

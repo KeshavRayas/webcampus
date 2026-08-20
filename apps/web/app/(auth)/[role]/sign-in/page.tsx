@@ -1,5 +1,4 @@
-import { EmailSignIn } from "@/modules/auth/sign-in/email/email-sign-in-view";
-import { UsernameSignIn } from "@/modules/auth/sign-in/username/username-sign-in-view";
+import { AuthSignInView } from "@/modules/auth/sign-in/auth-sign-in-view";
 import { roles } from "@webcampus/types/rbac";
 import { notFound } from "next/navigation";
 import React from "react";
@@ -19,11 +18,7 @@ const SignInPage = async ({
     notFound();
   }
 
-  if (data.role === "applicant") {
-    return <UsernameSignIn role={data.role} />;
-  } else {
-    return <EmailSignIn />;
-  }
+  return <AuthSignInView initialRole={data.role} />;
 };
 
 export default SignInPage;

@@ -20,7 +20,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@webcampus/ui/components/dialog";
 import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import {
@@ -318,20 +317,26 @@ export const AdminAdmissionView = ({
             onDraftChange={updateDraftFilter}
             onApply={applyFilters}
             onReset={resetFilters}
+            actionSlot={
+              !hideAddForm && canCreate ? (
+                <Button
+                  type="button"
+                  disabled={!draftFilters.semester}
+                  onClick={() => setIsCreateDialogOpen(true)}
+                >
+                  Create Admission
+                </Button>
+              ) : null
+            }
           />
 
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="hidden">
             {!hideAddForm && canCreate && (
               <Dialog
                 open={isCreateDialogOpen}
                 onOpenChange={handleCreateDialogOpenChange}
               >
-                <DialogTrigger asChild>
-                  <Button disabled={!draftFilters.semester}>
-                    Create Admission
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent className="admission-theme-dialog sm:max-w-lg">
                   {createChoice === null ? (
                     <>
                       <DialogHeader>
@@ -344,7 +349,7 @@ export const AdminAdmissionView = ({
                       <div className="grid gap-3">
                         <button
                           type="button"
-                          className="bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
+                          className="admission-create-choice bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
                           onClick={() => setCreateChoice("profile")}
                         >
                           <p className="font-medium">
@@ -357,7 +362,7 @@ export const AdminAdmissionView = ({
                         </button>
                         <button
                           type="button"
-                          className="bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
+                          className="admission-create-choice bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
                           onClick={() => {
                             setCreateChoice(null);
                             setIsCreateDialogOpen(false);

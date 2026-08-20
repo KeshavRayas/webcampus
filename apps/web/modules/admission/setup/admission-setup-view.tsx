@@ -315,7 +315,7 @@ export function AdmissionSetupView() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="admission-setup flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">Admission Setup</h1>
         <p className="text-muted-foreground text-sm">
@@ -359,15 +359,7 @@ export function AdmissionSetupView() {
               onSaved={refresh}
               onDeleted={() => handleDeleted(activeMode)}
             />
-          ) : (
-            <Card>
-              <CardContent className="flex items-center justify-center p-8">
-                <p className="text-muted-foreground text-sm">
-                  Select a mode from the list, or create a new one below.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          ) : null}
 
           <Card>
             <CardHeader>

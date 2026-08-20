@@ -5,220 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admission Form</title>
 <style>
-  :root {
-    --brand: #6aa2e0;
-    --brand-dark: #4f86c8;
-    --brand-deep: #35608f;
-    --text: #1f2937;
-    --muted: #5b6b7c;
-    --line: #b9c8d8;
-    --soft: #eef5fd;
-  }
-
-  * { box-sizing: border-box; }
-
-  @page {
-    size: A4 portrait;
-    margin: 20mm;
-  }
-
-  html, body {
-    margin: 0;
-    padding: 0;
-  }
-
-  body {
-    background: #ffffff;
-    color: var(--text);
-    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-    font-size: 12px;
-    line-height: 1.5;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .page {
-    max-width: 210mm;
-    margin: 0 auto;
-  }
-
-  /* ---------- Header ---------- */
-  .letterhead {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding-bottom: 16px;
-    border-bottom: 3px solid var(--brand);
-    margin-bottom: 20px;
-  }
-
-  .letterhead .logo {
-    width: 92px;
-    height: 92px;
-    flex-shrink: 0;
-  }
-  .letterhead .logo img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-
-  .letterhead .institute {
-    flex: 1;
-    text-align: left;
-  }
-  .institute .name {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: 0.4px;
-    color: var(--brand-deep);
-    margin: 0;
-    text-transform: uppercase;
-  }
-  .institute .tagline {
-    font-size: 11px;
-    color: var(--muted);
-    margin: 2px 0 0;
-    letter-spacing: 0.3px;
-  }
-  .institute .address {
-    font-size: 11px;
-    color: var(--muted);
-    margin: 2px 0 0;
-  }
-
-  /* ---------- Document title ---------- */
-  .doc-title {
-    background: var(--brand);
-    color: #ffffff;
-    text-align: center;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    padding: 10px 12px;
-    border-radius: 6px;
-    margin-bottom: 20px;
-  }
-
-  /* ---------- Sections ---------- */
-  section {
-    margin-bottom: 22px;
-    page-break-inside: avoid;
-  }
-
-  section h2 {
-    background: var(--brand);
-    color: #ffffff;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    margin: 0 0 12px;
-    padding: 8px 12px;
-    border-radius: 4px;
-  }
-
-  .panel {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 14px 16px;
-  }
-
-  /* ---------- Field rows ---------- */
-  .row {
-    display: flex;
-    align-items: flex-start;
-    padding: 5px 0;
-    border-bottom: 1px dotted var(--line);
-  }
-  .row:last-child { border-bottom: 0; }
-
-  .row label {
-    width: 200px;
-    flex-shrink: 0;
-    font-weight: 600;
-    color: var(--brand-deep);
-    padding-top: 1px;
-  }
-  .row .value {
-    flex: 1;
-    color: var(--text);
-    min-height: 16px;
-  }
-  .row .placeholder {
-    color: #8a97a5;
-    font-style: italic;
-  }
-  .row .placeholder::after {
-    content: "";
-  }
-
-  /* ---------- Tables ---------- */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 8px;
-  }
-  table caption {
-    text-align: left;
-    font-weight: 600;
-    color: var(--brand-deep);
-    margin-bottom: 6px;
-  }
-  th {
-    background: var(--brand);
-    color: #ffffff;
-    font-weight: 600;
-    text-align: left;
-    padding: 7px 10px;
-    border: 1px solid var(--brand-deep);
-  }
-  td {
-    padding: 7px 10px;
-    border: 1px solid var(--line);
-    vertical-align: top;
-  }
-  tr:nth-child(even) td { background: var(--soft); }
-  td .value { width: 100%; }
-
-  /* ---------- Highlight box ---------- */
-  .highlight {
-    background: var(--soft);
-    border: 1px solid var(--brand);
-    border-left: 5px solid var(--brand);
-    border-radius: 4px;
-    padding: 10px 12px;
-    margin-top: 12px;
-  }
-  .highlight .hl-title {
-    font-weight: 700;
-    color: var(--brand-deep);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-size: 11px;
-    margin-bottom: 6px;
-  }
-
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
-
-  /* ---------- Footer ---------- */
-  .footer-notes {
-    display: flex;
-    justify-content: space-between;
-    gap: 24px;
-    margin-top: 26px;
-    padding-top: 12px;
-    border-top: 1px solid var(--line);
-    font-size: 11px;
-    color: var(--muted);
-  }
-
-  @media print {
-    .page { max-width: none; }
-    section { page-break-inside: avoid; }
-    thead { display: table-header-group; }
-  }
+:root{--ink:#111;--mid:#555;--muted:#777;--line:#d8d8d8;--line-dark:#b8b8b8;--wash:#f5f5f5;--wash2:#fafafa}
+*{box-sizing:border-box}
+@page{size:A4 portrait;margin:13mm 14mm 15mm}
+html,body{margin:0;padding:0;background:#fff}
+body{color:var(--ink);font-family:"Inter","Helvetica Neue",Helvetica,Arial,sans-serif;font-size:10.5px;line-height:1.45;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{max-width:182mm;margin:0 auto}
+.letterhead{display:flex;align-items:center;gap:17px;padding:0 0 13px;margin-bottom:16px;border-bottom:2px solid var(--ink)}
+.letterhead .logo{width:68px;height:68px;flex:0 0 68px}
+.letterhead .logo img{width:100%;height:100%;object-fit:contain;filter:grayscale(1) contrast(1.15)}
+.letterhead .institute{flex:1;min-width:0}
+.institute .name{margin:0;color:var(--ink);font-size:18px;font-weight:800;line-height:1.15;letter-spacing:.55px;text-transform:uppercase}
+.institute .tagline{margin:5px 0 0;color:var(--mid);font-size:9px;font-weight:600;letter-spacing:.35px}
+.institute .address{margin:3px 0 0;color:var(--muted);font-size:9px}
+.doc-title{margin:0 0 18px;padding:9px 14px 8px;border:1px solid var(--ink);background:var(--ink);color:#fff;text-align:center;font-size:13px;font-weight:800;line-height:1.2;letter-spacing:1.8px;text-transform:uppercase}
+section{margin-bottom:18px;page-break-inside:avoid}
+section h2{display:flex;align-items:center;gap:10px;margin:0 0 8px;padding:0 0 6px;border-bottom:1px solid var(--ink);color:var(--ink);font-size:10.5px;font-weight:800;letter-spacing:1.15px;line-height:1.2;text-transform:uppercase}
+section h2:before{content:"";width:4px;height:14px;flex:0 0 4px;background:var(--ink)}
+.panel{margin-bottom:10px;padding:9px 12px 8px;border:1px solid var(--line-dark);background:#fff;border-radius:2px;page-break-inside:avoid}
+.panel:last-child{margin-bottom:0}
+.group-heading,.mb-heading{margin:-1px 0 6px;padding:0 0 5px;border-bottom:1px solid var(--line);color:var(--ink);font-size:9.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}
+.row{display:flex;align-items:flex-start;min-height:23px;padding:4px 0;border-bottom:1px solid #e9e9e9}
+.row:last-child{border-bottom:0}
+.row label{width:178px;flex:0 0 178px;padding:1px 12px 0 0;color:var(--mid);font-size:9.5px;font-weight:650}
+.row .value{flex:1;min-width:0;min-height:15px;color:var(--ink);font-size:10px;font-weight:500;overflow-wrap:anywhere}
+.row .placeholder{color:#999;font-style:italic}
+.highlight{margin:7px 0;padding:7px 9px;border:1px solid var(--line);border-left:3px solid var(--ink);background:var(--wash2);border-radius:1px}
+.highlight .label{margin-bottom:2px;color:var(--ink);font-size:8.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase}
+.highlight .value{color:var(--mid);font-size:9.5px}
+table{width:100%;margin-top:8px;border-collapse:collapse;font-size:9px}
+table caption{margin-bottom:5px;color:var(--ink);font-size:9.5px;font-weight:700;text-align:left}
+th{padding:6px 8px;border:1px solid var(--ink);background:var(--ink);color:#fff;font-weight:700;text-align:left;letter-spacing:.2px}
+td{padding:5px 8px;border:1px solid var(--line-dark);color:var(--ink);vertical-align:top}
+tr:nth-child(even) td{background:var(--wash)}
+td .value{width:100%}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+.two-col .panel{margin-bottom:0}
+.two-col .row label{width:92px;flex-basis:92px;font-size:8.7px}
+.two-col .row .value{font-size:9px}
+.footer-notes{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:end;gap:20px;margin-top:22px;padding-top:9px;border-top:1px solid var(--ink);color:var(--mid);font-size:8.5px;font-weight:600}
+.footer-notes span:nth-child(2){text-align:center}.footer-notes span:last-child{text-align:right}
+@media print{html,body{background:#fff}.page{max-width:none}section,.panel,.highlight,table{page-break-inside:avoid}thead{display:table-header-group}tr{page-break-inside:avoid}}
+@media screen and (max-width:760px){body{padding:20px}.page{max-width:100%}.two-col{grid-template-columns:1fr}.two-col .panel{margin-bottom:10px}.row label{width:145px;flex-basis:145px}}
 </style>
 </head>
 <body>

@@ -238,7 +238,7 @@ function MemberAddressBlock({
       <div className="bg-background/40 space-y-2 rounded-lg border p-3">
         <Label className="text-sm font-medium">Address</Label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+          <div className="admission-address-choice flex items-center gap-2 rounded-[1.15rem] border px-3 py-2">
             <Checkbox
               id={`${memberKey}-current`}
               checked={source === "current"}
@@ -253,7 +253,7 @@ function MemberAddressBlock({
               Same as Current Address
             </Label>
           </div>
-          <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+          <div className="admission-address-choice flex items-center gap-2 rounded-[1.15rem] border px-3 py-2">
             <Checkbox
               id={`${memberKey}-permanent`}
               checked={source === "permanent"}
@@ -594,7 +594,6 @@ export const ApplicantAdmissionView = ({
   const documentRef = useRef<HTMLDivElement | null>(null);
   const [docData, setDocData] = useState<DocData | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [showAcknowledgement, setShowAcknowledgement] = useState(true);
   const sectionRefs = useRef<Record<StepKey, HTMLDivElement | null>>({
     personal: null,
     admission: null,
@@ -2002,7 +2001,7 @@ export const ApplicantAdmissionView = ({
   }
 
   return (
-    <div className="bg-card rounded-lg border p-6 shadow-sm">
+    <div className="admission-fill-form bg-card rounded-lg border p-6 shadow-sm">
       <div className="mb-6 space-y-4">
         <div>
           <h3 className="text-lg font-medium">Complete Your Application</h3>
@@ -2014,15 +2013,15 @@ export const ApplicantAdmissionView = ({
 
         <div className="border-border border-b">
           <Tabs value={activeStep} onValueChange={handleTabChange}>
-            <TabsList className="flex w-full flex-wrap gap-1 md:gap-2">
+            <TabsList className="admission-fill-tabs flex w-full flex-wrap gap-1 md:gap-2">
               {VISIBLE_STEPS.map((step, index) => (
                 <TabsTrigger
                   key={step}
                   value={step}
-                  className="hover:text-foreground data-[state=active]:text-foreground text-muted-foreground hover:border-border data-[state=active]:border-primary group flex min-h-0 flex-col items-center justify-center gap-1.5 border-b-2 border-transparent px-3 pb-2.5 pt-1.5 text-left transition data-[state=active]:bg-transparent"
+                  className="admission-fill-tab hover:text-foreground data-[state=active]:text-foreground text-muted-foreground hover:border-border data-[state=active]:border-foreground data-[state=active]:bg-foreground data-[state=active]:text-background group flex min-h-0 flex-col items-center justify-center gap-1.5 rounded-[1.15rem] border border-transparent px-3 py-2.5 text-left transition"
                 >
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="bg-muted-foreground/15 text-muted-foreground group-data-[state=active]:bg-primary inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-semibold group-data-[state=active]:text-white">
+                    <span className="bg-muted-foreground/15 text-muted-foreground group-data-[state=active]:bg-background/15 group-data-[state=active]:text-background inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md px-1 text-[0.7rem] font-semibold">
                       {index + 1}
                     </span>
                     <span className="text-xs font-medium md:text-sm">
@@ -3149,7 +3148,7 @@ export const ApplicantAdmissionView = ({
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-between gap-3">
+          <div className="admission-fill-actions flex flex-wrap justify-between gap-3">
             <Button
               type="button"
               variant="outline"
@@ -3916,7 +3915,7 @@ export const ApplicantAdmissionView = ({
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-between gap-3">
+          <div className="admission-fill-actions flex flex-wrap justify-between gap-3">
             <Button
               type="button"
               variant="outline"
@@ -4032,7 +4031,7 @@ export const ApplicantAdmissionView = ({
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-between gap-3">
+          <div className="admission-fill-actions flex flex-wrap justify-between gap-3">
             <Button
               type="button"
               variant="outline"
@@ -4096,7 +4095,10 @@ export const ApplicantAdmissionView = ({
                   className="sr-only"
                 />
                 <Button asChild variant="outline">
-                  <label htmlFor="photo" className="cursor-pointer">
+                  <label
+                    htmlFor="photo"
+                    className="admission-photo-action cursor-pointer"
+                  >
                     Change Photo
                   </label>
                 </Button>
@@ -4126,7 +4128,7 @@ export const ApplicantAdmissionView = ({
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-between gap-3">
+          <div className="admission-fill-actions flex flex-wrap justify-between gap-3">
             <Button
               type="button"
               variant="outline"
@@ -4160,7 +4162,7 @@ export const ApplicantAdmissionView = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="admission-verification-stack grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="bg-background/60 flex flex-col space-y-4 rounded-lg border p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -4212,15 +4214,6 @@ export const ApplicantAdmissionView = ({
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      setShowAcknowledgement((current) => !current)
-                    }
-                  >
-                    {showAcknowledgement ? "Hide" : "View"}
-                  </Button>
                   <Button type="button" variant="outline" asChild>
                     <a
                       href="/sample-acknowledgement.pdf"
@@ -4233,15 +4226,13 @@ export const ApplicantAdmissionView = ({
                 </div>
               </div>
 
-              {showAcknowledgement ? (
-                <div className="bg-background h-[70vh] overflow-hidden rounded-lg border">
-                  <iframe
-                    title="Sample Acknowledgement PDF"
-                    src="/sample-acknowledgement.pdf"
-                    className="h-full w-full"
-                  />
-                </div>
-              ) : null}
+              <div className="admission-pdf-viewer bg-background h-[70vh] overflow-hidden rounded-lg border">
+                <iframe
+                  title="Sample Acknowledgement PDF"
+                  src="/sample-acknowledgement.pdf"
+                  className="h-full w-full"
+                />
+              </div>
             </div>
           </div>
 
@@ -4267,3 +4258,5 @@ export const ApplicantAdmissionView = ({
     </div>
   );
 };
+
+// Named export consumed by the protected admissions routes.
