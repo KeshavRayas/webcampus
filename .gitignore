@@ -74,3 +74,9 @@ AGENTS.md
 # Local deployment plan
 plan.md
 deploy.md
+
+/scripts/bottleneck-test.ts
+/scripts/verify-rendering.py
+/scripts/load-test.ts
+
+/stress-tests/*

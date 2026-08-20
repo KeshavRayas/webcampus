@@ -41,3 +41,10 @@ coverage
 playwright-report
 test-results
 .auth
+
+# Load/stress testing (kept out of git; never ship)
+stress-tests
+
+/scripts/bottleneck-test.ts
+/scripts/verify-rendering.py
+/scripts/load-test.ts
