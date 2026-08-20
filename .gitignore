@@ -80,3 +80,5 @@ deploy.md
 /scripts/load-test.ts
 
 /stress-tests/*
+
+security-assessment.md
