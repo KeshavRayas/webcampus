@@ -1,0 +1,12 @@
+# Tells Grafana to look here for dashboard JSON files and load them automatically.
+apiVersion: 1
+
+providers:
+  - name: webcampus
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards

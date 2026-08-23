@@ -48,7 +48,9 @@
     "check-types": "turbo run check-types",
     "bootstrap": "turbo run bootstrap",
     "prepare": "husky",
-    "dx": "turbo run dx"
+    "dx": "turbo run dx",
+    "monitoring": "sh scripts/monitoring.sh",
+    "monitoring:prod": "sh scripts/monitoring.sh full"
   },
   "workspaces": [
     "apps/*",
