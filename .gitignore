@@ -74,3 +74,8 @@ AGENTS.md
 # Local deployment plan
 plan.md
 deploy.md
+
+# Prometheus file-SD targets are machine-specific:
+# `bun monitoring` generates api-dev.json locally; servers keep this dir empty.
+monitoring/prometheus/targets/*.json
+!monitoring/prometheus/targets/.gitkeep

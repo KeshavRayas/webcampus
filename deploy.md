@@ -256,6 +256,72 @@ docker compose -f compose.prod.yaml logs -f web  # web logs
 docker compose -f compose.prod.yaml up -d --no-deps migrate  # re-run migrations
 ```
 
+## Monitoring (Prometheus + Grafana)
+
+The API exposes `GET /metrics` (prom-client format). It is **not published to the
+host** — only Prometheus can reach it over the Docker network. Prometheus scrapes
+it every 15s; Grafana visualizes the stored time series.
+
+Stack (`compose.monitoring.yaml`, merged with prod so all containers share one network):
+
+| service | what it does | host port |
+| --- | --- | --- |
+| prometheus | scrapes + stores metrics (15d retention) | 127.0.0.1:9090 |
+| grafana | dashboards (datasource + dashboard auto-provisioned) | 127.0.0.1:3001 |
+| postgres-exporter | bridges Postgres stats to `/metrics` | internal only |
+| redis-exporter | bridges Redis stats to `/metrics` | internal only |
+
+Two commands, one per environment:
+
+```bash
+bun monitoring        # LOCAL DEV: monitoring + db/redis deps. Also writes
+                      # monitoring/prometheus/targets/api-dev.json (gitignored)
+                      # so Prometheus scrapes your host-run API (`bun run dev`).
+                      # The `api` container target stays red locally — expected.
+
+bun monitoring:prod   # DEPLOYED SERVER: entire prod stack + monitoring in one
+                      # network. Removes any local api-dev.json first, so the
+                      # API is scraped exactly once (no doubled graphs).
+
+bun monitoring status # either env: containers + Prometheus scrape health
+bun monitoring down   # stop just the monitoring services
+```
+
+How the dev/prod split works: the `api-dev` Prometheus job reads its targets from
+`monitoring/prometheus/targets/*.json` (file-SD). That directory ships empty —
+`bun monitoring` generates the file on dev machines only, and servers never have
+one, so prod never double-scrapes the API through its published host port.
+
+Equivalent raw compose command (what both modes run under the hood):
+
+```bash
+cd ~/webcampus
+docker compose -f compose.prod.yaml -f compose.monitoring.yaml up -d
+```
+
+First-time server setup: `docker login ghcr.io` with a PAT that has
+`read:packages` (api/web images are private), plus `GRAFANA_ADMIN_USER` /
+`GRAFANA_ADMIN_PASSWORD` in `.env` (`bun monitoring` auto-generates a password
+if missing).
+
+View dashboards — everything binds to localhost on the server, so tunnel in:
+
+```bash
+ssh -L 3001:localhost:3001 -L 9090:localhost:9090 <user>@<server>
+# then open http://localhost:3001 (Grafana, login = GRAFANA_ADMIN_*)
+#      and http://localhost:9090/targets (scrape health)
+```
+
+- Grafana login: `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` from `.env`.
+- Dashboard "Webcampus Overview" loads automatically from
+  `monitoring/grafana/provisioning/dashboards/webcampus-api.json`: request rate by
+  route, latency p50/p95/p99, status-class breakdown, event-loop lag, process CPU/RSS,
+  Postgres connections + cache hit ratio, Redis clients/memory/hit ratio.
+  The "API up" panel is green when *any* API target (container or host dev) is alive.
+- Check scrape health at http://localhost:9090/targets — locally expect
+  `api-dev`/postgres/redis/prometheus UP; on a deployed server expect all five.
+- To add panels: edit the dashboard JSON; Grafana reloads provisioned files every 30s.
+
 ## Backups (step 7 placeholder)
 
 Named volumes live under `/var/lib/docker/volumes/`. Backup recipes (pg_dump + MinIO/Redis snapshots) will be added in step 7.

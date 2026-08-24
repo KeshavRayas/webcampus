@@ -19,8 +19,15 @@ import studentRouter from "./routers/student/student-domain.router";
 import supportRouter from "./routers/support/support.router";
 import timetableRouter from "./routers/timetable/timetable.router";
 import verificationRouter from "./routers/verification/verification.router";
+import {
+  metricsContentType,
+  metricsMiddleware,
+  renderMetrics,
+} from "./utils/metrics";
 
 const app: Express = express();
+
+app.use(metricsMiddleware);
 
 app.use(
   cors({
@@ -69,6 +76,12 @@ app.get("/", (req, res) => {
   res.send({
     message: "Server is Up and Running",
   });
+});
+
+// Scraped by Prometheus over the Docker network only (never published to the host)
+app.get("/metrics", async (req, res) => {
+  res.set("Content-Type", metricsContentType);
+  res.send(await renderMetrics());
 });
 
 export default app;
