@@ -1,6 +1,4 @@
-import { PrismaClient } from "@webcampus/db";
-
-const prisma = new PrismaClient();
+import { db } from "@webcampus/db";
 
 export type NoticeInput = {
   title: string;
@@ -19,13 +17,13 @@ const activeWhere = (audience: "STUDENTS" | "FACULTY") => ({
 
 export class NoticeService {
   static async listForStudent(userId: string) {
-    const student = await prisma.student.findUnique({
+    const student = await db.student.findUnique({
       where: { userId },
       select: { id: true, departmentName: true },
     });
     if (!student) return [];
 
-    const latestSection = await prisma.studentSection.findFirst({
+    const latestSection = await db.studentSection.findFirst({
       where: { studentId: student.id },
       orderBy: { semester: "desc" },
       select: { section: { select: { departmentId: true } } },
@@ -41,7 +39,7 @@ export class NoticeService {
   }
 
   static async listForFaculty(userId: string) {
-    const faculty = await prisma.faculty.findUnique({
+    const faculty = await db.faculty.findUnique({
       where: { userId },
       select: { departmentId: true },
     });
@@ -53,7 +51,7 @@ export class NoticeService {
     departmentName: string,
     audience: "STUDENTS" | "FACULTY"
   ) {
-    const department = await prisma.department.findUnique({
+    const department = await db.department.findUnique({
       where: { name: departmentName },
       select: { id: true },
     });
@@ -64,7 +62,7 @@ export class NoticeService {
     departmentId: string,
     filters: { status?: string; audience?: string }
   ) {
-    return prisma.notice.findMany({
+    return db.notice.findMany({
       where: {
         departmentId,
         ...(filters.status ? { status: filters.status as never } : {}),
@@ -75,7 +73,7 @@ export class NoticeService {
   }
 
   static listAudience(departmentId: string, audience: "STUDENTS" | "FACULTY") {
-    return prisma.notice.findMany({
+    return db.notice.findMany({
       where: { departmentId, ...activeWhere(audience) },
       orderBy: [{ priority: "desc" }, { publishedAt: "desc" }],
     });
@@ -86,7 +84,7 @@ export class NoticeService {
     createdById: string,
     input: NoticeInput
   ): Promise<unknown> {
-    return prisma.notice.create({
+    return db.notice.create({
       data: {
         ...input,
         departmentId,
@@ -104,11 +102,11 @@ export class NoticeService {
     id: string,
     input: Partial<NoticeInput>
   ) {
-    const existing = await prisma.notice.findFirst({
+    const existing = await db.notice.findFirst({
       where: { id, departmentId },
     });
     if (!existing) throw new Error("Notice not found");
-    return prisma.notice.update({
+    return db.notice.update({
       where: { id },
       data: {
         ...input,
@@ -128,11 +126,11 @@ export class NoticeService {
   }
 
   static async remove(departmentId: string, id: string) {
-    const existing = await prisma.notice.findFirst({
+    const existing = await db.notice.findFirst({
       where: { id, departmentId },
     });
     if (!existing) throw new Error("Notice not found");
-    await prisma.notice.delete({ where: { id } });
+    await db.notice.delete({ where: { id } });
   }
 
   static async setStatus(
@@ -140,11 +138,11 @@ export class NoticeService {
     id: string,
     status: "DRAFT" | "PUBLISHED" | "ARCHIVED"
   ) {
-    const existing = await prisma.notice.findFirst({
+    const existing = await db.notice.findFirst({
       where: { id, departmentId },
     });
     if (!existing) throw new Error("Notice not found");
-    return prisma.notice.update({
+    return db.notice.update({
       where: { id },
       data: {
         status,

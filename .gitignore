@@ -79,3 +79,7 @@ deploy.md
 # `bun monitoring` generates api-dev.json locally; servers keep this dir empty.
 monitoring/prometheus/targets/*.json
 !monitoring/prometheus/targets/.gitkeep
+
+stress-tests/*
+security-assessment.md
+stress-tests.zip

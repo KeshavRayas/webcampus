@@ -6,7 +6,6 @@ import express, { type Express } from "express";
 import accountsRouter from "./routers/accounts/accounts.router";
 import adminRouter from "./routers/admin/admin.router";
 import admissionRouter from "./routers/admission/admission.router";
-import coeRouter from "./routers/coe/coe.router";
 import facultyRouter from "./routers/faculty/faculty-domain.router";
 import {
   adminFeedbackRouter,
@@ -52,8 +51,6 @@ app.use("/department", DepartmentRouter);
 app.use("/timetable", timetableRouter);
 app.use("/notices", noticeRouter);
 
-app.use("/coe", coeRouter);
-
 app.use("/faculty", facultyRouter);
 
 app.use("/accounts", accountsRouter);
@@ -68,7 +65,6 @@ app.use("/admin/feedback", adminFeedbackRouter);
 app.use("/faculty/feedback", feedbackReportRouter);
 app.use("/hod/feedback", feedbackReportRouter);
 app.use("/department/feedback", feedbackReportRouter);
-app.use("/coe/feedback", feedbackReportRouter);
 
 app.use("/files", fileRouter);
 

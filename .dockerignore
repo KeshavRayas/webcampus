@@ -41,3 +41,7 @@ coverage
 playwright-report
 test-results
 .auth
+
+stress-tests/*
+security-assessment.md
+stress-tests.zip

@@ -1,4 +1,4 @@
-import { PrismaClient } from "@webcampus/db";
+import { db } from "@webcampus/db";
 
 type TimetableWhere = Record<string, unknown>;
 type Slot = { label: string; startTime: string; endTime: string };
@@ -78,7 +78,7 @@ export class TimetableService {
   ): Promise<TimetableEntry> {
     void requestingUserId;
     // Validate course exists
-    const course = await prisma.course.findUnique({
+    const course = await db.course.findUnique({
       where: { id: data.courseId },
     });
     if (!course) {
@@ -86,7 +86,7 @@ export class TimetableService {
     }
 
     // Validate faculty exists
-    const faculty = await prisma.faculty.findUnique({
+    const faculty = await db.faculty.findUnique({
       where: { id: data.facultyId },
     });
     if (!faculty) {
@@ -94,7 +94,7 @@ export class TimetableService {
     }
 
     // Validate semester exists
-    const semester = await prisma.semester.findUnique({
+    const semester = await db.semester.findUnique({
       where: { id: data.semesterId },
     });
     if (!semester) {
@@ -103,7 +103,7 @@ export class TimetableService {
 
     // Validate section exists if provided
     if (data.sectionId) {
-      const section = await prisma.section.findUnique({
+      const section = await db.section.findUnique({
         where: { id: data.sectionId },
       });
       if (!section) {
@@ -113,7 +113,7 @@ export class TimetableService {
 
     // Validate batch exists if provided
     if (data.batchId) {
-      const batch = await prisma.batch.findUnique({
+      const batch = await db.batch.findUnique({
         where: { id: data.batchId },
       });
       if (!batch) {
@@ -122,7 +122,7 @@ export class TimetableService {
     }
 
     // Check for time conflicts
-    const conflictingEntry = await prisma.timetableEntry.findFirst({
+    const conflictingEntry = await db.timetableEntry.findFirst({
       where: {
         departmentId: data.departmentId,
         courseId: data.courseId,
@@ -141,7 +141,7 @@ export class TimetableService {
       );
     }
 
-    const entry = await prisma.timetableEntry.create({
+    const entry = await db.timetableEntry.create({
       data: {
         academicYear: data.academicYear,
         semesterId: data.semesterId,
@@ -194,7 +194,7 @@ export class TimetableService {
       where.status = status;
     }
 
-    return prisma.timetableEntry.findMany({
+    return db.timetableEntry.findMany({
       where,
       include: {
         semester: {
@@ -232,7 +232,7 @@ export class TimetableService {
       where.dayOfWeek = dayOfWeek;
     }
 
-    return prisma.timetableEntry.findMany({
+    return db.timetableEntry.findMany({
       where,
       include: {
         semester: {
@@ -260,7 +260,7 @@ export class TimetableService {
       where.sectionId = sectionId;
     }
 
-    return prisma.timetableEntry.findMany({
+    return db.timetableEntry.findMany({
       where,
       include: {
         semester: {
@@ -281,7 +281,7 @@ export class TimetableService {
     semesterId?: string,
     dayOfWeek?: string
   ) {
-    const labAssignments = await prisma.courseAssignment.findMany({
+    const labAssignments = await db.courseAssignment.findMany({
       where: {
         facultyId,
         assignmentType: "LAB",
@@ -308,7 +308,7 @@ export class TimetableService {
       where.dayOfWeek = dayOfWeek;
     }
 
-    return prisma.timetableEntry.findMany({
+    return db.timetableEntry.findMany({
       where,
       include: {
         semester: {
@@ -350,7 +350,7 @@ export class TimetableService {
       where.sectionId = sectionId;
     }
     if (facultyId) {
-      const labAssignments = await prisma.courseAssignment.findMany({
+      const labAssignments = await db.courseAssignment.findMany({
         where: {
           facultyId,
           assignmentType: "LAB",
@@ -368,7 +368,7 @@ export class TimetableService {
       ];
     }
 
-    return prisma.timetableEntry.findMany({
+    return db.timetableEntry.findMany({
       where,
       include: {
         course: true,
@@ -397,7 +397,7 @@ export class TimetableService {
 
     // If updating time/day, check for conflicts (excluding current entry)
     if (Object.keys(conflictWhere).length > 0) {
-      const conflicting = await prisma.timetableEntry.findFirst({
+      const conflicting = await db.timetableEntry.findFirst({
         where: {
           ...conflictWhere,
           NOT: { id: entryId },
@@ -411,7 +411,7 @@ export class TimetableService {
       }
     }
 
-    const entry = await prisma.timetableEntry.update({
+    const entry = await db.timetableEntry.update({
       where: { id: entryId },
       data: {
         academicYear: data.academicYear,
@@ -445,7 +445,7 @@ export class TimetableService {
   }
 
   static async deleteEntry(entryId: string): Promise<void> {
-    await prisma.timetableEntry.delete({
+    await db.timetableEntry.delete({
       where: { id: entryId },
     });
   }
@@ -465,7 +465,7 @@ export class TimetableService {
       where.sectionId = sectionId;
     }
 
-    const courses = await prisma.course.findMany({
+    const courses = await db.course.findMany({
       where: {
         semesterId,
       },
@@ -489,21 +489,21 @@ export class TimetableService {
 
     const sections = sectionId
       ? []
-      : await prisma.section.findMany({
+      : await db.section.findMany({
           where: { semesterId },
           include: { _count: { select: { courses: true } } },
         });
 
-    const faculty = await prisma.faculty.findMany({
+    const faculty = await db.faculty.findMany({
       include: { user: { select: { name: true, email: true } } },
     });
 
-    const rooms = await prisma.timetableEntry.findMany({
+    const rooms = await db.timetableEntry.findMany({
       where: { semesterId },
       select: { roomNumber: true },
     });
 
-    const timetableTemplate = await prisma.timetableTemplate.findFirst({
+    const timetableTemplate = await db.timetableTemplate.findFirst({
       where: { semesterId },
     });
     return {
@@ -544,7 +544,7 @@ export class TimetableService {
     semesterId: string,
     slots: Slot[]
   ): Promise<unknown> {
-    return prisma.timetableTemplate.upsert({
+    return db.timetableTemplate.upsert({
       where: { departmentId_semesterId: { departmentId, semesterId } },
       create: { departmentId, semesterId, slots },
       update: { slots },
@@ -557,13 +557,13 @@ export class TimetableService {
   ): Promise<Slot[]> {
     let departmentId: string | undefined;
     if (sectionId) {
-      const section = await prisma.section.findUnique({
+      const section = await db.section.findUnique({
         where: { id: sectionId },
         select: { departmentId: true },
       });
       departmentId = section?.departmentId;
     }
-    const template = await prisma.timetableTemplate.findFirst({
+    const template = await db.timetableTemplate.findFirst({
       where: { semesterId, ...(departmentId ? { departmentId } : {}) },
       select: { slots: true },
     });
@@ -596,7 +596,7 @@ export class TimetableService {
 
     for (const entry of entries) {
       const assignmentType = entry.classType === "LAB" ? "LAB" : "THEORY";
-      const assignments = await prisma.courseAssignment.findMany({
+      const assignments = await db.courseAssignment.findMany({
         where: {
           departmentId,
           courseId: entry.courseId,
@@ -624,7 +624,7 @@ export class TimetableService {
       throw new Error(`Timetable import aborted:\n- ${errors.join("\n- ")}`);
     }
 
-    return prisma.$transaction(async (tx) => {
+    return db.$transaction(async (tx) => {
       await tx.timetableEntry.deleteMany({
         where: { departmentId, semesterId },
       });
@@ -654,4 +654,3 @@ export class TimetableService {
     });
   }
 }
-const prisma = new PrismaClient();
