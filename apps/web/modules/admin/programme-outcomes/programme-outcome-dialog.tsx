@@ -44,12 +44,18 @@ interface ProgrammeOutcomeDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   outcome?: ProgrammeOutcomeTableItem;
+  defaultProgramType?: "UG" | "PG";
+  defaultDepartmentId?: string;
+  defaultType?: "PO" | "PEO" | "PSO";
 }
 
 export const ProgrammeOutcomeDialog = ({
   isOpen,
   onOpenChange,
   outcome,
+  defaultProgramType = "UG",
+  defaultDepartmentId = "",
+  defaultType = "PO",
 }: ProgrammeOutcomeDialogProps) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
@@ -78,19 +84,37 @@ export const ProgrammeOutcomeDialog = ({
   });
 
   useEffect(() => {
-    if (outcome && isOpen) {
-      form.reset({
-        programType: outcome.programType as "UG" | "PG",
-        departmentId: outcome.departmentId || "",
-        type: outcome.type as "PEO" | "PSO" | "PO",
-        code: outcome.code,
-        description: outcome.description,
-        isActive: outcome.isActive,
-      });
-    } else if (!isOpen) {
+    if (isOpen) {
+      if (outcome) {
+        form.reset({
+          programType: outcome.programType as "UG" | "PG",
+          departmentId: outcome.departmentId || "",
+          type: outcome.type as "PEO" | "PSO" | "PO",
+          code: outcome.code,
+          description: outcome.description,
+          isActive: outcome.isActive,
+        });
+      } else {
+        form.reset({
+          programType: defaultProgramType,
+          departmentId: defaultDepartmentId,
+          type: defaultType,
+          code: "",
+          description: "",
+          isActive: true,
+        });
+      }
+    } else {
       form.reset();
     }
-  }, [outcome, isOpen, form]);
+  }, [
+    outcome,
+    isOpen,
+    form,
+    defaultProgramType,
+    defaultDepartmentId,
+    defaultType,
+  ]);
 
   const mutation = useMutation({
     mutationFn: async (values: CreateProgrammeOutcomeType) => {

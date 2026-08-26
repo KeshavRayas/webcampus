@@ -53,11 +53,6 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: CalendarDays,
         },
         {
-          name: "Programme Outcomes",
-          url: "/admin/programme-outcomes",
-          icon: BookOpenText,
-        },
-        {
           name: "Faculty",
           url: "/admin/faculty",
           icon: Users,
@@ -175,6 +170,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
                   url: "/admin/academics/feedback",
                 },
               ],
+            },
+            {
+              name: "PO/PEO/PSO Configuration",
+              url: "/admin/academics/po-peo-pso",
             },
           ],
         },
