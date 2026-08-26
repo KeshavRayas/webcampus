@@ -53,6 +53,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           icon: CalendarDays,
         },
         {
+          name: "Programme Outcomes",
+          url: "/admin/programme-outcomes",
+          icon: BookOpenText,
+        },
+        {
           name: "Faculty",
           url: "/admin/faculty",
           icon: Users,

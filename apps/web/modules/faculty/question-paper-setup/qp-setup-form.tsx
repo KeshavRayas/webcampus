@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import {
   CreateAssessmentSchema,
@@ -20,7 +20,9 @@ import { Input } from "@webcampus/ui/components/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
@@ -57,6 +59,31 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
 
   const { course, assessmentTitle, maxMarks, componentType, sequence } =
     setupContext;
+
+  const outcomesQuery = useQuery({
+    queryKey: ["programme-outcomes", course.id],
+    queryFn: async () => {
+      return await axios.get(
+        `${NEXT_PUBLIC_API_BASE_URL}/faculty/programme-outcomes?courseId=${course.id}`,
+        { withCredentials: true }
+      );
+    },
+  });
+
+  const groupedOutcomes = useMemo(() => {
+    const data = outcomesQuery.data?.data?.data || [];
+    const groups: Record<string, typeof data> = {
+      PEO: [],
+      PSO: [],
+      PO: [],
+    };
+    data.forEach((outcome: { id: string; type: string; code: string }) => {
+      if (groups[outcome.type]) {
+        groups[outcome.type].push(outcome);
+      }
+    });
+    return groups;
+  }, [outcomesQuery.data]);
 
   const baseType = assessmentTitle.split(" ")[0] || "";
 
@@ -575,7 +602,7 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
                           <th className="w-20 px-4 py-3">Q#</th>
                           <th className="w-32 px-4 py-3">Marks</th>
                           <th className="w-32 px-4 py-3">CO</th>
-                          <th className="w-32 px-4 py-3">PO</th>
+                          <th className="w-32 px-4 py-3">Outcome</th>
                           <th className="w-32 px-4 py-3">BL</th>
                           <th className="w-40 px-4 py-3">OR</th>
                           <th className="w-16 px-4 py-3 text-right"></th>
@@ -659,11 +686,51 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormControl>
-                                        <Input
-                                          className="h-8 uppercase placeholder:normal-case"
-                                          placeholder="PO1"
-                                          {...field}
-                                        />
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          value={field.value || undefined}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="Outcome" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {Object.entries(
+                                              groupedOutcomes
+                                            ).map(([type, outcomes]) => {
+                                              if (
+                                                (
+                                                  outcomes as {
+                                                    id: string;
+                                                    type: string;
+                                                    code: string;
+                                                  }[]
+                                                ).length === 0
+                                              )
+                                                return null;
+                                              return (
+                                                <SelectGroup key={type}>
+                                                  <SelectLabel>
+                                                    {type}
+                                                  </SelectLabel>
+                                                  {(
+                                                    outcomes as {
+                                                      id: string;
+                                                      type: string;
+                                                      code: string;
+                                                    }[]
+                                                  ).map((outcome) => (
+                                                    <SelectItem
+                                                      key={outcome.id}
+                                                      value={outcome.code}
+                                                    >
+                                                      {outcome.code}
+                                                    </SelectItem>
+                                                  ))}
+                                                </SelectGroup>
+                                              );
+                                            })}
+                                          </SelectContent>
+                                        </Select>
                                       </FormControl>
                                     </FormItem>
                                   )}
