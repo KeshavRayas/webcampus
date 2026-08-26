@@ -522,6 +522,7 @@ model Course {
   electiveStudentAssignments ElectiveStudentAssignment[]
   openElectiveDepartments    OpenElectiveDepartment[]
   feedbackResponses          FeedbackResponse[]
+  courseOutcomes             CourseOutcome[]
   timetableEntries           TimetableEntry[]
 
   // ─── INDEXES ───
@@ -1296,6 +1297,8 @@ model AssessmentQuestion {
   marks        Int
   co           String?
   po           String?
+  peo          String?
+  pso          String?
   bl           String?
   orGroupId    String?
   assessment   AssessmentTemplate    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
@@ -1992,4 +1995,18 @@ model ProgrammeOutcome {
   department Department? @relation(fields: [departmentId], references: [id])
 
   @@unique([programType, departmentId, type, code])
+}
+
+model CourseOutcome {
+  id          String   @id @default(uuid())
+  courseId    String
+  code        String
+  description String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, code])
 }

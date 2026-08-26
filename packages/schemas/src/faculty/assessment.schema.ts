@@ -8,6 +8,8 @@ export const CreateAssessmentQuestionSchema = z.object({
   marks: z.number().min(1, "Marks must be at least 1"),
   co: z.string().optional(),
   po: z.string().optional(),
+  peo: z.string().optional(),
+  pso: z.string().optional(),
   bl: z.string().optional(),
   orGroupId: z.string().optional(),
 });

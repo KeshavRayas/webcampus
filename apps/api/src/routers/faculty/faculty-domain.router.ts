@@ -1,5 +1,6 @@
 import assessmentRouter from "@webcampus/api/src/routers/faculty/assessment.router";
 import attendanceRouter from "@webcampus/api/src/routers/faculty/attendance.router";
+import courseOutcomeRouter from "@webcampus/api/src/routers/faculty/course-outcome.router";
 import attendanceWindowRouter from "@webcampus/api/src/routers/faculty/faculty-attendance-window.router";
 import profileRouter from "@webcampus/api/src/routers/faculty/faculty.router";
 import handlingRouter from "@webcampus/api/src/routers/faculty/handling.router";
@@ -19,5 +20,6 @@ router.use("/marks", markRouter);
 router.use("/proctor", proctorRouter);
 
 router.use("/programme-outcomes", programmeOutcomeRouter);
+router.use("/course-outcomes", courseOutcomeRouter);
 
 export default router;

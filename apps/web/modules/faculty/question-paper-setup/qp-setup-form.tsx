@@ -20,9 +20,7 @@ import { Input } from "@webcampus/ui/components/input";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
@@ -65,6 +63,16 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
     queryFn: async () => {
       return await axios.get(
         `${NEXT_PUBLIC_API_BASE_URL}/faculty/programme-outcomes?courseId=${course.id}`,
+        { withCredentials: true }
+      );
+    },
+  });
+
+  const coQuery = useQuery({
+    queryKey: ["course-outcomes", course.id],
+    queryFn: async () => {
+      return await axios.get(
+        `${NEXT_PUBLIC_API_BASE_URL}/faculty/course-outcomes?courseId=${course.id}`,
         { withCredentials: true }
       );
     },
@@ -149,6 +157,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
             marks: 1,
             co: "",
             po: "",
+            peo: "",
+            pso: "",
             bl: "",
             orGroupId: undefined,
           });
@@ -160,6 +170,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
           marks: 1,
           co: "",
           po: "",
+          peo: "",
+          pso: "",
           bl: "",
           orGroupId: undefined,
         });
@@ -423,6 +435,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
             marks: q.marks,
             co: q.co || undefined,
             po: q.po || undefined,
+            peo: q.peo || undefined,
+            pso: q.pso || undefined,
             bl: q.bl || undefined,
             orGroupId: q.orGroupId || undefined,
           })
@@ -600,11 +614,13 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
                       <thead className="bg-muted text-muted-foreground text-xs uppercase">
                         <tr>
                           <th className="w-20 px-4 py-3">Q#</th>
-                          <th className="w-32 px-4 py-3">Marks</th>
-                          <th className="w-32 px-4 py-3">CO</th>
-                          <th className="w-32 px-4 py-3">Outcome</th>
-                          <th className="w-32 px-4 py-3">BL</th>
-                          <th className="w-40 px-4 py-3">OR</th>
+                          <th className="w-24 px-4 py-3">Marks</th>
+                          <th className="w-28 px-4 py-3">CO</th>
+                          <th className="w-28 px-4 py-3">PO</th>
+                          <th className="w-28 px-4 py-3">PEO</th>
+                          <th className="w-28 px-4 py-3">PSO</th>
+                          <th className="w-28 px-4 py-3">BL</th>
+                          <th className="w-32 px-4 py-3">OR</th>
                           <th className="w-16 px-4 py-3 text-right"></th>
                         </tr>
                       </thead>
@@ -669,11 +685,29 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormControl>
-                                        <Input
-                                          className="h-8 uppercase placeholder:normal-case"
-                                          placeholder="CO1"
-                                          {...field}
-                                        />
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          value={field.value || undefined}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="CO" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {coQuery.data?.data?.data?.map(
+                                              (co: {
+                                                id: string;
+                                                code: string;
+                                              }) => (
+                                                <SelectItem
+                                                  key={co.id}
+                                                  value={co.code}
+                                                >
+                                                  {co.code}
+                                                </SelectItem>
+                                              )
+                                            )}
+                                          </SelectContent>
+                                        </Select>
                                       </FormControl>
                                     </FormItem>
                                   )}
@@ -691,44 +725,92 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
                                           value={field.value || undefined}
                                         >
                                           <SelectTrigger className="h-8">
-                                            <SelectValue placeholder="Outcome" />
+                                            <SelectValue placeholder="PO" />
                                           </SelectTrigger>
                                           <SelectContent>
-                                            {Object.entries(
-                                              groupedOutcomes
-                                            ).map(([type, outcomes]) => {
-                                              if (
-                                                (
-                                                  outcomes as {
-                                                    id: string;
-                                                    type: string;
-                                                    code: string;
-                                                  }[]
-                                                ).length === 0
+                                            {groupedOutcomes["PO"]?.map(
+                                              (po: {
+                                                id: string;
+                                                code: string;
+                                              }) => (
+                                                <SelectItem
+                                                  key={po.id}
+                                                  value={po.code}
+                                                >
+                                                  {po.code}
+                                                </SelectItem>
                                               )
-                                                return null;
-                                              return (
-                                                <SelectGroup key={type}>
-                                                  <SelectLabel>
-                                                    {type}
-                                                  </SelectLabel>
-                                                  {(
-                                                    outcomes as {
-                                                      id: string;
-                                                      type: string;
-                                                      code: string;
-                                                    }[]
-                                                  ).map((outcome) => (
-                                                    <SelectItem
-                                                      key={outcome.id}
-                                                      value={outcome.code}
-                                                    >
-                                                      {outcome.code}
-                                                    </SelectItem>
-                                                  ))}
-                                                </SelectGroup>
-                                              );
-                                            })}
+                                            )}
+                                          </SelectContent>
+                                        </Select>
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`questions.${index}.peo`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          value={field.value || undefined}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="PEO" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {groupedOutcomes["PEO"]?.map(
+                                              (peo: {
+                                                id: string;
+                                                code: string;
+                                              }) => (
+                                                <SelectItem
+                                                  key={peo.id}
+                                                  value={peo.code}
+                                                >
+                                                  {peo.code}
+                                                </SelectItem>
+                                              )
+                                            )}
+                                          </SelectContent>
+                                        </Select>
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`questions.${index}.pso`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          value={field.value || undefined}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="PSO" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {groupedOutcomes["PSO"]?.map(
+                                              (pso: {
+                                                id: string;
+                                                code: string;
+                                              }) => (
+                                                <SelectItem
+                                                  key={pso.id}
+                                                  value={pso.code}
+                                                >
+                                                  {pso.code}
+                                                </SelectItem>
+                                              )
+                                            )}
                                           </SelectContent>
                                         </Select>
                                       </FormControl>
