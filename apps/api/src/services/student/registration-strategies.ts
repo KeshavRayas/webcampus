@@ -20,6 +20,7 @@ const isCoreCourseType = (courseType: string | undefined | null): boolean =>
 
 export type StudentRegistrationContext = {
   studentId: string;
+  departmentId: string;
   departmentName: string;
   semesterId: string;
   academicTermId: string;
@@ -39,6 +40,7 @@ export interface RegistrationStrategy {
   /** Which of the given courses may this student see? (OE visibility only; others pass-through.) */
   visibleCourses<T extends VisibleCourse>(
     courses: T[],
+    departmentId: string,
     departmentName: string
   ): T[];
   /** Validate the submitted selection for this bucket; throws a friendly Error. */
