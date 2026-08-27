@@ -11,25 +11,25 @@ const router: Router = Router();
 
 router.post(
   "/",
-  validateRequest(CreateAcademicTermSchema),
   protect({
     role: "admin",
     permissions: {
       semester: ["create"],
     },
   }),
+  validateRequest(CreateAcademicTermSchema),
   SemesterController.createAcademicTerm
 );
 
 router.put(
   "/:id",
-  validateRequest(CreateAcademicTermSchema),
   protect({
     role: "admin",
     permissions: {
       semester: ["update"],
     },
   }),
+  validateRequest(CreateAcademicTermSchema),
   SemesterController.updateAcademicTerm
 );
 
@@ -44,20 +44,20 @@ router.delete(
 
 router.get(
   "/",
-  validateRequest(AcademicTermQuerySchema, "query"),
   protect({
     permissions: { semester: ["read"] },
   }),
+  validateRequest(AcademicTermQuerySchema, "query"),
   SemesterController.getAllAcademicTerms
 );
 
 router.put(
   "/:id/semesters",
-  validateRequest(CreateSemesterConfigSchema.array()),
   protect({
     role: "admin",
     permissions: { semester: ["update"] },
   }),
+  validateRequest(CreateSemesterConfigSchema.array()),
   SemesterController.bulkUpsertSemesters
 );
 

@@ -39,7 +39,6 @@ services:
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000" # object API (browser-reachable for presigned URLs)
-      - "9001:9001" # MinIO console
     volumes:
       - minio_data:/data
     healthcheck:

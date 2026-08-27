@@ -67,7 +67,17 @@ export class MarkController {
 
   static async getAll(req: Request, res: Response): Promise<void> {
     try {
-      const response = await Mark.getAll();
+      const ctx = (
+        req as unknown as { requestContext?: { userId: string; role: string } }
+      ).requestContext;
+      const page = Number(req.query.page ?? 1);
+      const limit = Number(req.query.limit ?? 20);
+      const response = await Mark.getAll({
+        page,
+        limit,
+        userId: ctx?.userId,
+        role: ctx?.role,
+      });
       if (response.status === "success") {
         sendResponse({
           res,
@@ -121,9 +131,12 @@ export class MarkController {
     res: Response
   ): Promise<void> {
     try {
+      const ctx = (req as unknown as { requestContext?: { userId: string } })
+        .requestContext;
       const response = await Mark.getByStudentAndCourse(
         req.params.studentId,
-        req.params.courseId
+        req.params.courseId,
+        ctx?.userId
       );
       if (response.status === "success") {
         sendResponse({
