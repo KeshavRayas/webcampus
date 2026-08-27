@@ -14,81 +14,81 @@ const router: Router = Router();
 
 router.get(
   "/",
-  validateRequest(HODAttendanceWindowFiltersSchema, "query"),
   protect({
     role: "hod",
     permissions: { freeze: ["read"] },
   }),
+  validateRequest(HODAttendanceWindowFiltersSchema, "query"),
   HODAttendanceWindowController.getWindows
 );
 
 router.get(
   "/sections",
-  validateRequest(HODSectionQuerySchema, "query"),
   protect({
     role: "hod",
     permissions: { freeze: ["read"] },
   }),
+  validateRequest(HODSectionQuerySchema, "query"),
   HODAttendanceWindowController.getSections
 );
 
 router.post(
   "/freeze",
-  validateRequest(HODBulkFreezeSchema),
   protect({
     role: "hod",
     permissions: { freeze: ["lock"] },
   }),
+  validateRequest(HODBulkFreezeSchema),
   HODAttendanceWindowController.bulkFreeze
 );
 
 router.post(
   "/unfreeze",
-  validateRequest(HODBulkUnfreezeSchema),
   protect({
     role: "hod",
     permissions: { freeze: ["lock"] },
   }),
+  validateRequest(HODBulkUnfreezeSchema),
   HODAttendanceWindowController.bulkUnfreeze
 );
 
 router.post(
   "/course-assignment/:courseAssignmentId/freeze",
-  validateRequest(HODFreezeParamsSchema, "params"),
   protect({
     role: "hod",
     permissions: { freeze: ["lock"] },
   }),
+  validateRequest(HODFreezeParamsSchema, "params"),
   HODAttendanceWindowController.freezeAssignment
 );
 
 router.post(
   "/course-assignment/:courseAssignmentId/unfreeze",
-  validateRequest(HODUnfreezeParamsSchema, "params"),
   protect({
     role: "hod",
     permissions: { freeze: ["lock"] },
   }),
+  validateRequest(HODUnfreezeParamsSchema, "params"),
   HODAttendanceWindowController.unfreezeAssignment
 );
 
 router.post(
   "/elective-batch/:electiveBatchFacultyId/freeze",
-  validateRequest(HODFreezeParamsSchema, "params"),
   protect({
     role: "hod",
     permissions: { freeze: ["lock"] },
   }),
+  validateRequest(HODFreezeParamsSchema, "params"),
   HODAttendanceWindowController.freezeAssignment
 );
 
 router.post(
   "/elective-batch/:electiveBatchFacultyId/unfreeze",
-  validateRequest(HODUnfreezeParamsSchema, "params"),
   protect({
     role: "hod",
     permissions: { freeze: ["lock"] },
   }),
+  validateRequest(HODUnfreezeParamsSchema, "params"),
   HODAttendanceWindowController.unfreezeAssignment
 );
 

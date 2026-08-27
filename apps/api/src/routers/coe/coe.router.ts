@@ -1,3 +1,4 @@
+import { protect } from "@webcampus/backend-utils/middlewares";
 import { Router } from "express";
 import {
   getFinalLockedData,
@@ -6,7 +7,15 @@ import {
 
 const router: Router = Router();
 
-router.get("/frozen-data", getFrozenData);
-router.get("/final-locked", getFinalLockedData);
+router.get(
+  "/frozen-data",
+  protect({ role: "coe", permissions: {} }),
+  getFrozenData
+);
+router.get(
+  "/final-locked",
+  protect({ role: "coe", permissions: {} }),
+  getFinalLockedData
+);
 
 export default router;

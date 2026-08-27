@@ -47,6 +47,8 @@ playwright-report copy/
 playwright/.cache/
 playwright/.auth
 **/tests/.auth/
+packages/playwright-web/.auth/
+**/.auth/*.json
 
 .tsup
 
@@ -83,3 +85,4 @@ monitoring/prometheus/targets/*.json
 stress-tests/*
 security-assessment.md
 stress-tests.zip
+ISSUES.md

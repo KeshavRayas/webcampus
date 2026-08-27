@@ -10,7 +10,12 @@ const frontendEnvSchema = commonEnvSchema.extend({
 });
 
 const backendEnvSchema = commonEnvSchema.extend({
-  BETTER_AUTH_SECRET: z.string(),
+  BETTER_AUTH_SECRET: z
+    .string()
+    .min(
+      32,
+      "BETTER_AUTH_SECRET must be >=32 chars — generate with openssl rand -base64 32"
+    ),
   BETTER_AUTH_URL: z.url(),
   PORT: z.coerce.number(),
   FRONTEND_URL: z.url(),
@@ -35,7 +40,7 @@ const backendEnvSchema = commonEnvSchema.extend({
   MINIO_SECRET_ACCESS_KEY: z.string(),
   MINIO_REGION: z.string().default("us-east-1"),
   MINIO_BUCKET_NAME: z.string(),
-  MINIO_ENDPOINT: z.string().default("http://localhost:9000"),
+  MINIO_ENDPOINT: z.url().default("http://localhost:9000"),
   ADMIN_USER_NAME: z.string(),
   ADMIN_USER_EMAIL: z.string(),
   ADMIN_USER_PASSWORD: z.string(),

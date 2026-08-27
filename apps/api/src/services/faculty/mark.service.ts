@@ -242,10 +242,72 @@ export class Mark {
     }
   }
 
-  static async getAll(): Promise<BaseResponse<MarkResponseType[]>> {
+  static async getAll(params?: {
+    page?: number;
+    limit?: number;
+    userId?: string;
+    role?: string;
+  }): Promise<BaseResponse<MarkResponseType[]>> {
     try {
-      const marks = await db.mark.findMany();
-
+      const page = Math.max(1, params?.page ?? 1);
+      const limit = Math.min(100, Math.max(1, params?.limit ?? 20));
+      const skip = (page - 1) * limit;
+      if (params?.role === "admin") {
+        const marks = await db.mark.findMany({
+          skip,
+          take: limit,
+          orderBy: { id: "asc" },
+        });
+        return {
+          status: "success",
+          message: "Marks retrieved successfully",
+          data: marks,
+        };
+      }
+      if (params?.userId) {
+        const faculty = await db.faculty.findUnique({
+          where: { userId: params.userId },
+          select: { id: true },
+        });
+        if (faculty) {
+          const assignments = await db.courseAssignment.findMany({
+            where: { facultyId: faculty.id },
+            select: { courseId: true },
+          });
+          const elective = await db.electiveBatchFaculty.findMany({
+            where: { facultyId: faculty.id },
+            select: { courseId: true },
+          });
+          const courseIds = [
+            ...new Set([
+              ...assignments.map((a) => a.courseId),
+              ...elective.map((e) => e.courseId),
+            ]),
+          ];
+          if (courseIds.length === 0)
+            return {
+              status: "success",
+              message: "Marks retrieved successfully",
+              data: [],
+            };
+          const marks = await db.mark.findMany({
+            where: { courseId: { in: courseIds } },
+            skip,
+            take: limit,
+            orderBy: { id: "asc" },
+          });
+          return {
+            status: "success",
+            message: "Marks retrieved successfully",
+            data: marks,
+          };
+        }
+      }
+      const marks = await db.mark.findMany({
+        skip,
+        take: limit,
+        orderBy: { id: "asc" },
+      });
       return {
         status: "success",
         message: "Marks retrieved successfully",
@@ -284,9 +346,19 @@ export class Mark {
 
   static async getByStudentAndCourse(
     studentId: string,
-    courseId: string
+    courseId: string,
+    userId?: string
   ): Promise<BaseResponse<MarkResponseType>> {
     try {
+      if (userId) {
+        const faculty = await db.faculty.findUnique({
+          where: { userId },
+          select: { id: true },
+        });
+        if (faculty) {
+          await this.assertFacultyCanManageMark(faculty.id, courseId);
+        }
+      }
       const mark = await db.mark.findUnique({
         where: {
           studentId_courseId: {

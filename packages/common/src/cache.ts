@@ -1,3 +1,4 @@
+import { logger } from "./logger";
 import { redis } from "./redis";
 
 const DEFAULT_JITTER = 0.2;
@@ -37,7 +38,9 @@ export async function getOrSet<T>(
   if (value == null) return value;
 
   const ttl = withJitter(ttlSeconds, jitter);
-  await redis.set(key, JSON.stringify(value), "EX", ttl).catch(() => {});
+  await redis
+    .set(key, JSON.stringify(value), "EX", ttl)
+    .catch((err) => logger.warn("cache set failed", { key, err: String(err) }));
   return value;
 }
 

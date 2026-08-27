@@ -33,8 +33,12 @@ export class WhatsAppChannel implements MessageChannel {
   readonly name = "WHATSAPP";
 
   async send(payload: ChannelSendPayload): Promise<ChannelSendResult> {
-    const apiKey = process.env.TRUSTSIGNAL_API_KEY;
-    const sender = process.env.WHATSAPP_SENDER_NUMBER;
+    const apiKey =
+      (await import("@webcampus/common/env")).backendEnv()
+        .TRUSTSIGNAL_API_KEY ?? process.env.TRUSTSIGNAL_API_KEY;
+    const sender =
+      (await import("@webcampus/common/env")).backendEnv()
+        .WHATSAPP_SENDER_NUMBER ?? process.env.WHATSAPP_SENDER_NUMBER;
 
     if (!apiKey) {
       throw new Error("TRUSTSIGNAL_API_KEY is not configured in .env");
@@ -57,19 +61,24 @@ export class WhatsAppChannel implements MessageChannel {
 
     let response: globalThis.Response;
     try {
-      response = await fetch(
-        `${TRUSTSIGNAL_BULK_URL}?api_key=${encodeURIComponent(apiKey)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }
-      );
+      // Vendor requires ?api_key= in query — risk accepted, mitigated via redaction
+      const url = `${TRUSTSIGNAL_BULK_URL}?api_key=${encodeURIComponent(apiKey)}`;
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
     } catch (err) {
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      // Redact api_key if it leaks into error messages/URLs
+      const redacted = rawMsg.replace(
+        /api_key=[^&\s"]+/gi,
+        "api_key=***REDACTED***"
+      );
       return {
         ok: false,
         raw: {
-          networkError: err instanceof Error ? err.message : String(err),
+          networkError: redacted,
         },
       };
     }

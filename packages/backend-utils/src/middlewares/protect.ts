@@ -72,10 +72,10 @@ export const protect =
         });
       }
 
-      const sessionRole = session.user.role as Role | undefined;
-
-      if (!sessionRole) {
-        logger.error(ERRORS.UNAUTHENTICATED);
+      const rawRole = session.user.role as string | undefined;
+      const { roles } = await import("@webcampus/types/rbac");
+      if (!rawRole || !(roles as readonly string[]).includes(rawRole)) {
+        logger.error(ERRORS.UNAUTHENTICATED, { rawRole });
         return sendResponse({
           status: "error",
           res,
@@ -84,6 +84,7 @@ export const protect =
           error: ERRORS.UNAUTHORIZED,
         });
       }
+      const sessionRole = rawRole as Role;
 
       const requestContext: RequestContext = {
         userId: session.user.id,

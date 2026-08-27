@@ -1,13 +1,6 @@
 #!/bin/bash
 
-# 1. Clean the Next.js cache directly (no pushd/popd needed!)
-rm -rf apps/web/.next
-
-# 2. Run TypeScript checks across the monorepo
+# Fast pre-commit: type-check + lint staged files only
+# Full `bun run build` is CI-only (requires network for next/font) — see M33
 bunx turbo check-types
-
-# 3. Run ESLint and Prettier on staged files
 bunx lint-staged
-
-# 4. Ensure the project builds successfully before allowing the commit
-bun run build

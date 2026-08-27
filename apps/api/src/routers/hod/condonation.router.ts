@@ -12,48 +12,48 @@ const router: Router = Router();
 
 router.get(
   "/students",
-  validateRequest(HODCondonationFiltersSchema, "query"),
   protect({
     role: "hod",
     permissions: { freeze: ["read"] },
   }),
+  validateRequest(HODCondonationFiltersSchema, "query"),
   HODCondonationController.getStudents
 );
 
 router.get(
   "/courses",
-  validateRequest(HODCondonationSemesterQuerySchema, "query"),
   protect({
     role: "hod",
     permissions: { freeze: ["read"] },
   }),
+  validateRequest(HODCondonationSemesterQuerySchema, "query"),
   HODCondonationController.getCourses
 );
 
 router.patch(
   "/:attendanceId/revoke",
-  validateRequest(HODCondonationAttendanceIdSchema, "params"),
   protect({
     role: "hod",
     permissions: { freeze: ["lock"] },
   }),
+  validateRequest(HODCondonationAttendanceIdSchema, "params"),
   HODCondonationController.revokeCondonation
 );
 
 router.patch(
   "/:attendanceId",
-  validateRequest(HODCondonationAttendanceIdSchema, "params"),
   protect({
     role: "hod",
     permissions: { freeze: ["lock"] },
   }),
+  validateRequest(HODCondonationAttendanceIdSchema, "params"),
   HODCondonationController.approveCondonation
 );
 
 router.get(
   "/report",
-  validateRequest(HODCondonationFiltersSchema, "query"), // Or appropriate schema
   protect({ role: "hod", permissions: { freeze: ["read"] } }),
+  validateRequest(HODCondonationFiltersSchema, "query"), // Or appropriate schema
   HODCondonationReportController.getCondonedReport
 );
 

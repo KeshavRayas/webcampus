@@ -45,4 +45,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
     CMD curl -fsS http://localhost:3000/ || exit 1
 
+RUN addgroup --system app && adduser --system --ingroup app app && chown -R app:app /app
+USER app
+
 CMD ["bun", "x", "next", "start", "-p", "3000"]

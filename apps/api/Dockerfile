@@ -43,4 +43,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
     CMD curl -fsS http://localhost:8080/api/auth/get-session || exit 1
 
+RUN addgroup --system app && adduser --system --ingroup app app && chown -R app:app /app
+USER app
+
 CMD ["bun", "run", "dist/index.js"]
