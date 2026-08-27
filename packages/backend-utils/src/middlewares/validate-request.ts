@@ -40,10 +40,8 @@ export const validateRequest =
         status: "error",
         res,
         statusCode: 400,
-        //         message: z.prettifyError(result.error),
-        //         error: z.prettifyError(result.error),
         message: "Validation Error",
-        error: result.error.flatten().fieldErrors,
+        error: new Error(JSON.stringify(result.error.flatten())),
       });
     }
 

@@ -246,7 +246,7 @@ export class SectionService {
           },
         },
       },
-      orderBy: [{ departmentName: "asc" }, { usn: "asc" }],
+      orderBy: [{ departmentId: "asc" }, { usn: "asc" }],
       select: {
         id: true,
         usn: true,
@@ -758,14 +758,14 @@ export class SectionService {
         orderBy: { abbreviation: "asc" },
       });
 
-      const departmentNames = departments.map((department) => department.name);
+      const departmentIds = departments.map((department) => department.id);
 
       const unassignedCounts =
-        departmentNames.length > 0
+        departmentIds.length > 0
           ? await db.student.groupBy({
-              by: ["departmentName"],
+              by: ["departmentId"],
               where: {
-                departmentName: { in: departmentNames },
+                departmentId: { in: departmentIds },
                 currentSemester: semesterNumber,
                 studentSections: {
                   none: {
@@ -783,16 +783,15 @@ export class SectionService {
             })
           : [];
 
-      const unassignedCountByDepartmentName = new Map(
-        unassignedCounts.map((item) => [item.departmentName, item._count._all])
+      const unassignedCountByDepartmentId = new Map(
+        unassignedCounts.map((item) => [item.departmentId, item._count._all])
       );
 
       const counts = departments.map((department) => ({
         departmentId: department.id,
         departmentName: department.name,
         abbreviation: department.abbreviation,
-        unassignedCount:
-          unassignedCountByDepartmentName.get(department.name) ?? 0,
+        unassignedCount: unassignedCountByDepartmentId.get(department.id) ?? 0,
       }));
 
       return {

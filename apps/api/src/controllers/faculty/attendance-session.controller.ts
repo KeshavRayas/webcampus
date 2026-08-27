@@ -14,12 +14,8 @@ import type { Request, Response } from "express";
 import { FacultyAttendanceSessionService } from "../../services/faculty/attendance-session.service";
 
 const resolveSessionUser = async (req: Request) => {
-  console.log("resolveSessionUser: before getSession");
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(req.headers),
-  });
-  console.log("resolveSessionUser: after getSession", {
-    hasSession: !!session?.user,
   });
 
   if (!session?.user?.id) {

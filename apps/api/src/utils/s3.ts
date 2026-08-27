@@ -27,28 +27,45 @@ const s3Client = new S3Client({
 
 // Bucket auto-creation
 let bucketReady = false;
+let bucketReadyPromise: Promise<void> | null = null;
 
 async function ensureBucket(): Promise<void> {
   if (bucketReady) return;
+  if (bucketReadyPromise) return bucketReadyPromise;
 
-  try {
-    await s3Client.send(new HeadBucketCommand({ Bucket: BUCKET }));
-    bucketReady = true;
-  } catch (error: unknown) {
-    const code =
-      error && typeof error === "object" && "$metadata" in error
-        ? (error as { $metadata: { httpStatusCode?: number } }).$metadata
-            .httpStatusCode
-        : undefined;
-
-    if (code === 404 || code === 403) {
-      await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET }));
-      console.log(`[MinIO] Created bucket "${BUCKET}"`);
+  bucketReadyPromise = (async () => {
+    try {
+      await s3Client.send(new HeadBucketCommand({ Bucket: BUCKET }));
       bucketReady = true;
-    } else {
-      throw error;
+    } catch (error: unknown) {
+      const code =
+        error && typeof error === "object" && "$metadata" in error
+          ? (error as { $metadata: { httpStatusCode?: number } }).$metadata
+              .httpStatusCode
+          : undefined;
+
+      if (code === 404 || code === 403) {
+        try {
+          await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET }));
+        } catch (createErr: unknown) {
+          const createCode =
+            createErr &&
+            typeof createErr === "object" &&
+            "$metadata" in createErr
+              ? (createErr as { $metadata: { httpStatusCode?: number } })
+                  .$metadata.httpStatusCode
+              : undefined;
+          // 409 = BucketAlreadyOwnedByYou / BucketAlreadyExists — safe to ignore
+          if (createCode !== 409) throw createErr;
+        }
+        bucketReady = true;
+      } else {
+        throw error;
+      }
     }
-  }
+  })();
+
+  await bucketReadyPromise;
 }
 
 // Helpers
@@ -139,7 +156,8 @@ export const uploadToS3 = async (
     await s3Client.send(command);
 
     // Return the proxy route URL instead of the direct MinIO URL
-    const backendUrl = process.env.BETTER_AUTH_URL || "http://localhost:8080";
+    const backendUrl = process.env.BETTER_AUTH_URL;
+    if (!backendUrl) throw new Error("BETTER_AUTH_URL is not set");
     const url = `${backendUrl}/files/${fileName}`;
 
     // Old MinIO path-style URL (commented out for reference):

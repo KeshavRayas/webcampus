@@ -13,6 +13,22 @@ interface QueryParams {
   batchId?: string;
 }
 
+const getStatusCode = (error: unknown): number => {
+  if (!(error instanceof Error)) return 500;
+  if (error.message === "Unauthorized") return 401;
+  if (
+    error.message.startsWith("Missing ") ||
+    error.message.includes("required")
+  )
+    return 400;
+  if (
+    error.message.includes("not found") ||
+    error.message === "HOD profile not found or department not assigned"
+  )
+    return 404;
+  return 500;
+};
+
 export class HODAttendanceReportController {
   private static async getUserId(req: Request): Promise<string> {
     const session = await auth.api.getSession({
@@ -33,8 +49,11 @@ export class HODAttendanceReportController {
       sendResponse({
         res,
         status: "error",
-        statusCode: 500,
-        message: "Failed",
+        statusCode: getStatusCode(error),
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch filter options",
         error: error instanceof Error ? error : new Error(String(error)),
       });
     }
@@ -56,8 +75,9 @@ export class HODAttendanceReportController {
       sendResponse({
         res,
         status: "error",
-        statusCode: 500,
-        message: "Failed",
+        statusCode: getStatusCode(error),
+        message:
+          error instanceof Error ? error.message : "Failed to fetch courses",
         error: error instanceof Error ? error : new Error(String(error)),
       });
     }
@@ -81,8 +101,9 @@ export class HODAttendanceReportController {
       sendResponse({
         res,
         status: "error",
-        statusCode: 500,
-        message: "Failed",
+        statusCode: getStatusCode(error),
+        message:
+          error instanceof Error ? error.message : "Failed to fetch sections",
         error: error instanceof Error ? error : new Error(String(error)),
       });
     }
@@ -106,8 +127,11 @@ export class HODAttendanceReportController {
       sendResponse({
         res,
         status: "error",
-        statusCode: 500,
-        message: "Failed",
+        statusCode: getStatusCode(error),
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch detailed report",
         error: error instanceof Error ? error : new Error(String(error)),
       });
     }

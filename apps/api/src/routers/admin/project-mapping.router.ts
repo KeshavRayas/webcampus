@@ -1,4 +1,5 @@
 import { ProjectMappingController } from "@webcampus/api/src/controllers/department/project-mapping.controller";
+import { upload } from "@webcampus/api/src/utils/upload";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   ProjectMappingBulkAssignSchema,
@@ -10,9 +11,6 @@ import {
   ProjectMappingSaveSchema,
 } from "@webcampus/schemas/department";
 import { Router } from "express";
-import multer from "multer";
-
-const upload = multer({ storage: multer.memoryStorage() });
 
 const router: Router = Router();
 

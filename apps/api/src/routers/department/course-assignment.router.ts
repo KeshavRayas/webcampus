@@ -1,4 +1,5 @@
 import { CourseAssignmentController } from "@webcampus/api/src/controllers/department/course-assignment.controller";
+import { upload } from "@webcampus/api/src/utils/upload";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   CourseMappingByCourseQuerySchema,
@@ -9,9 +10,7 @@ import {
   UpsertCourseMappingSchema,
 } from "@webcampus/schemas/department";
 import { Router } from "express";
-import multer from "multer";
 
-const upload = multer({ storage: multer.memoryStorage() });
 const router: Router = Router();
 
 // GET /status — mapping status for all courses in a semester

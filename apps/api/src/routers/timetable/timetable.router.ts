@@ -2,12 +2,11 @@ import { resolveFacultyIdForUser } from "@webcampus/api/src/services/faculty/res
 import { TimetableExcelService } from "@webcampus/api/src/services/timetable/timetable-excel.service";
 import { TimetableService } from "@webcampus/api/src/services/timetable/timetable.service";
 import { getDepartmentRequestContext } from "@webcampus/api/src/utils/request-context";
+import { upload } from "@webcampus/api/src/utils/upload";
 import { protect } from "@webcampus/backend-utils/middlewares";
 import { Router as ExpressRouter, Router } from "express";
-import multer from "multer";
 
 const router: ExpressRouter = Router();
-const upload = multer({ storage: multer.memoryStorage() });
 type RequestWithContext = import("express").Request & {
   requestContext?: { userId?: string };
 };
@@ -22,17 +21,25 @@ router.get(
   "/today/:semesterId",
   protect({ role: "student", permissions: {} }),
   async (req, res) => {
-    const semesterId = requestParams(req).semesterId!;
-    const sectionId = req.query.sectionId as string | undefined;
-    const entries = await TimetableService.getTodayEntries(
-      semesterId,
-      undefined,
-      sectionId
-    );
-    res.json({
-      status: "success",
-      data: entries,
-    });
+    try {
+      const semesterId = requestParams(req).semesterId!;
+      const sectionId = req.query.sectionId as string | undefined;
+      const entries = await TimetableService.getTodayEntries(
+        semesterId,
+        undefined,
+        sectionId
+      );
+      res.json({
+        status: "success",
+        data: entries,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to fetch timetable",
+      });
+    }
   }
 );
 
@@ -41,24 +48,32 @@ router.get(
   "/weekly/:semesterId",
   protect({ role: "student", permissions: {} }),
   async (req, res) => {
-    const semesterId = requestParams(req).semesterId!;
-    const sectionId = req.query.sectionId as string | undefined;
-    const entries = await TimetableService.getEntriesBySemester(
-      semesterId,
-      undefined,
-      sectionId,
-      undefined,
-      "PUBLISHED"
-    );
-    const slots = await TimetableService.getSlotsForSection(
-      semesterId,
-      sectionId
-    );
-    res.json({
-      status: "success",
-      data: entries,
-      slots,
-    });
+    try {
+      const semesterId = requestParams(req).semesterId!;
+      const sectionId = req.query.sectionId as string | undefined;
+      const entries = await TimetableService.getEntriesBySemester(
+        semesterId,
+        undefined,
+        sectionId,
+        undefined,
+        "PUBLISHED"
+      );
+      const slots = await TimetableService.getSlotsForSection(
+        semesterId,
+        sectionId
+      );
+      res.json({
+        status: "success",
+        data: entries,
+        slots,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to fetch timetable",
+      });
+    }
   }
 );
 
@@ -67,14 +82,23 @@ router.get(
   "/download/:semesterId",
   protect({ role: "student", permissions: {} }),
   async (req, res) => {
-    const semesterId = requestParams(req).semesterId!;
-    const entries = await TimetableService.getEntriesBySemester(semesterId);
-    // Generate download response
-    res.json({
-      status: "success",
-      data: entries,
-      download: true,
-    });
+    try {
+      const semesterId = requestParams(req).semesterId!;
+      const entries = await TimetableService.getEntriesBySemester(semesterId);
+      res.json({
+        status: "success",
+        data: entries,
+        download: true,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to download timetable",
+      });
+    }
   }
 );
 
@@ -83,19 +107,28 @@ router.get(
   "/download/:semesterId/:sectionId",
   protect({ role: "student", permissions: {} }),
   async (req, res) => {
-    const semesterId = requestParams(req).semesterId!;
-    const sectionId = requestParams(req).sectionId!;
-    const entries = await TimetableService.getEntriesBySemester(
-      semesterId,
-      undefined,
-      sectionId
-    );
-    // Generate download response
-    res.json({
-      status: "success",
-      data: entries,
-      download: true,
-    });
+    try {
+      const semesterId = requestParams(req).semesterId!;
+      const sectionId = requestParams(req).sectionId!;
+      const entries = await TimetableService.getEntriesBySemester(
+        semesterId,
+        undefined,
+        sectionId
+      );
+      res.json({
+        status: "success",
+        data: entries,
+        download: true,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to download timetable",
+      });
+    }
   }
 );
 
@@ -170,19 +203,29 @@ router.post(
   "/",
   protect({ role: "department", permissions: {} }),
   async (req, res) => {
-    const userId = req.requestContext?.userId || "system";
-    const entry = await TimetableService.createEntry(
-      {
-        ...req.body,
-        academicYear: req.body.academicYear || "",
-        semesterId: req.body.semesterId,
-      } as import("@webcampus/api/src/services/timetable/timetable.service").CreateTimetableEntryDTO,
-      userId
-    );
-    res.json({
-      status: "success",
-      data: entry,
-    });
+    try {
+      const userId = req.requestContext?.userId || "system";
+      const entry = await TimetableService.createEntry(
+        {
+          ...req.body,
+          academicYear: req.body.academicYear || "",
+          semesterId: req.body.semesterId,
+        } as import("@webcampus/api/src/services/timetable/timetable.service").CreateTimetableEntryDTO,
+        userId
+      );
+      res.json({
+        status: "success",
+        data: entry,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to create timetable entry",
+      });
+    }
   }
 );
 
@@ -191,21 +234,29 @@ router.get(
   "/:semesterId",
   protect({ role: "department", permissions: {} }),
   async (req, res) => {
-    const semesterId = requestParams(req).semesterId!;
-    const query = req.query as Record<string, string | undefined>;
-    const departmentId = query.departmentId as string | undefined;
-    const sectionId = query.sectionId as string | undefined;
-    const facultyId = query.facultyId as string | undefined;
-    const entries = await TimetableService.getEntriesBySemester(
-      semesterId,
-      departmentId,
-      sectionId,
-      facultyId
-    );
-    res.json({
-      status: "success",
-      data: entries,
-    });
+    try {
+      const semesterId = requestParams(req).semesterId!;
+      const query = req.query as Record<string, string | undefined>;
+      const departmentId = query.departmentId as string | undefined;
+      const sectionId = query.sectionId as string | undefined;
+      const facultyId = query.facultyId as string | undefined;
+      const entries = await TimetableService.getEntriesBySemester(
+        semesterId,
+        departmentId,
+        sectionId,
+        facultyId
+      );
+      res.json({
+        status: "success",
+        data: entries,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to fetch timetable",
+      });
+    }
   }
 );
 
@@ -214,23 +265,31 @@ router.get(
   "/department/:departmentId",
   protect({ role: "department", permissions: {} }),
   async (req, res) => {
-    const departmentId = requestParams(req).departmentId!;
-    const query = req.query as Record<string, string | undefined>;
-    const semesterId = query.semesterId as string | undefined;
-    const sectionId = query.sectionId as string | undefined;
-    const facultyId = query.facultyId as string | undefined;
-    const dayOfWeek = query.dayOfWeek as string | undefined;
-    const entries = await TimetableService.getEntriesByDepartment(
-      departmentId,
-      semesterId,
-      sectionId,
-      facultyId,
-      dayOfWeek
-    );
-    res.json({
-      status: "success",
-      data: entries,
-    });
+    try {
+      const departmentId = requestParams(req).departmentId!;
+      const query = req.query as Record<string, string | undefined>;
+      const semesterId = query.semesterId as string | undefined;
+      const sectionId = query.sectionId as string | undefined;
+      const facultyId = query.facultyId as string | undefined;
+      const dayOfWeek = query.dayOfWeek as string | undefined;
+      const entries = await TimetableService.getEntriesByDepartment(
+        departmentId,
+        semesterId,
+        sectionId,
+        facultyId,
+        dayOfWeek
+      );
+      res.json({
+        status: "success",
+        data: entries,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to fetch timetable",
+      });
+    }
   }
 );
 
@@ -239,19 +298,27 @@ router.get(
   "/course/:courseId",
   protect({ role: "department", permissions: {} }),
   async (req, res) => {
-    const courseId = requestParams(req).courseId!;
-    const query = req.query as Record<string, string | undefined>;
-    const semesterId = query.semesterId as string | undefined;
-    const sectionId = query.sectionId as string | undefined;
-    const entries = await TimetableService.getEntriesByCourse(
-      courseId,
-      semesterId,
-      sectionId
-    );
-    res.json({
-      status: "success",
-      data: entries,
-    });
+    try {
+      const courseId = requestParams(req).courseId!;
+      const query = req.query as Record<string, string | undefined>;
+      const semesterId = query.semesterId as string | undefined;
+      const sectionId = query.sectionId as string | undefined;
+      const entries = await TimetableService.getEntriesByCourse(
+        courseId,
+        semesterId,
+        sectionId
+      );
+      res.json({
+        status: "success",
+        data: entries,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to fetch timetable",
+      });
+    }
   }
 );
 
@@ -260,14 +327,24 @@ router.put(
   "/:entryId",
   protect({ role: "department", permissions: {} }),
   async (req, res) => {
-    const entry = await TimetableService.updateEntry(
-      requestParams(req).entryId!,
-      req.body
-    );
-    res.json({
-      status: "success",
-      data: entry,
-    });
+    try {
+      const entry = await TimetableService.updateEntry(
+        requestParams(req).entryId!,
+        req.body
+      );
+      res.json({
+        status: "success",
+        data: entry,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to update timetable entry",
+      });
+    }
   }
 );
 
@@ -276,11 +353,21 @@ router.delete(
   "/:entryId",
   protect({ role: "department", permissions: {} }),
   async (req, res) => {
-    await TimetableService.deleteEntry(requestParams(req).entryId!);
-    res.json({
-      status: "success",
-      message: "Timetable entry deleted successfully",
-    });
+    try {
+      await TimetableService.deleteEntry(requestParams(req).entryId!);
+      res.json({
+        status: "success",
+        message: "Timetable entry deleted successfully",
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete timetable entry",
+      });
+    }
   }
 );
 
@@ -289,16 +376,24 @@ router.get(
   "/template/:semesterId",
   protect({ role: "department", permissions: {} }),
   async (req, res) => {
-    const semesterId = requestParams(req).semesterId!;
-    const sectionId = req.query.sectionId as string | undefined;
-    const templateData = await TimetableService.getTemplateData(
-      semesterId,
-      sectionId
-    );
-    res.json({
-      status: "success",
-      data: templateData,
-    });
+    try {
+      const semesterId = requestParams(req).semesterId!;
+      const sectionId = req.query.sectionId as string | undefined;
+      const templateData = await TimetableService.getTemplateData(
+        semesterId,
+        sectionId
+      );
+      res.json({
+        status: "success",
+        data: templateData,
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to fetch template",
+      });
+    }
   }
 );
 

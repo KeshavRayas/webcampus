@@ -205,27 +205,24 @@ export class Mark {
         throw new Error("Faculty profile not found");
       }
 
-      const existingMark = await db.mark.findUnique({
-        where: {
-          studentId_courseId: {
-            studentId: data.studentId,
-            courseId: data.courseId,
-          },
-        },
-      });
-
-      if (existingMark) {
-        return {
-          status: "error",
-          message: "Mark already exists for this student and course",
-          error: "Mark already exists for this student and course",
-        };
-      }
-
       await this.assertFacultyCanManageMark(faculty.id, data.courseId);
 
-      const mark = await db.mark.create({
-        data,
+      // Atomic check-and-create to prevent race condition duplicates
+      const mark = await db.$transaction(async (tx) => {
+        const existingMark = await tx.mark.findUnique({
+          where: {
+            studentId_courseId: {
+              studentId: data.studentId,
+              courseId: data.courseId,
+            },
+          },
+        });
+
+        if (existingMark) {
+          throw new Error("Mark already exists for this student and course");
+        }
+
+        return tx.mark.create({ data });
       });
 
       logger.info("Mark created successfully", { mark });

@@ -218,6 +218,7 @@ export class DepartmentStudentService {
           usn: record.usn,
           name: record.user.name ?? null,
           email: record.user.email ?? null,
+          departmentId: record.departmentId,
           departmentName: record.departmentName,
           currentSemester: record.currentSemester,
           academicYear: record.academicYear,

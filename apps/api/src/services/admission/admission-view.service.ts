@@ -436,7 +436,7 @@ export class AdmissionViewService {
           await db.$transaction(async (tx) => {
             const department = await tx.department.findUnique({
               where: { id: admission.departmentId },
-              select: { name: true, code: true },
+              select: { id: true, name: true, code: true },
             });
 
             if (!department) {
@@ -480,6 +480,7 @@ export class AdmissionViewService {
               await tx.student.update({
                 where: { id: existingStudent.id },
                 data: {
+                  departmentId: department.id,
                   departmentName: department.name,
                   currentSemester: semester.semesterNumber,
                   academicYear: semester.academicTerm.year,
@@ -522,6 +523,7 @@ export class AdmissionViewService {
               data: {
                 userId,
                 usn: finalStudentUsn,
+                departmentId: department.id,
                 departmentName: department.name,
                 currentSemester: semester.semesterNumber,
                 academicYear: semester.academicTerm.year,
@@ -743,6 +745,7 @@ export class AdmissionViewService {
           data: {
             userId,
             usn: finalUsn,
+            departmentId: department.id,
             departmentName: department.name,
             currentSemester: semester.semesterNumber,
             academicYear: semester.academicTerm.year,

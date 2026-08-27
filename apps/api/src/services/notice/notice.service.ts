@@ -21,7 +21,7 @@ export class NoticeService {
   static async listForStudent(userId: string) {
     const student = await prisma.student.findUnique({
       where: { userId },
-      select: { id: true, departmentName: true },
+      select: { id: true, departmentId: true, departmentName: true },
     });
     if (!student) return [];
 
@@ -34,10 +34,7 @@ export class NoticeService {
       return this.listAudience(latestSection.section.departmentId, "STUDENTS");
     }
 
-    return this.listAudienceByDepartmentName(
-      student.departmentName,
-      "STUDENTS"
-    );
+    return this.listAudience(student.departmentId, "STUDENTS");
   }
 
   static async listForFaculty(userId: string) {

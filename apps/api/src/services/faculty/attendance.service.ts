@@ -21,24 +21,6 @@ export class Attendance {
     data: CreateAttendanceType & { batchId?: string | null }
   ): Promise<BaseResponse<AttendanceResponseType>> {
     try {
-      // Swapped findUnique to findFirst to avoid outdated compound key TS errors
-      const existingAttendance = await db.attendance.findFirst({
-        where: {
-          studentId: data.studentId,
-          courseId: data.courseId,
-          batchId: data.batchId ?? null,
-        },
-      });
-
-      if (existingAttendance) {
-        return {
-          status: "error",
-          message:
-            "Attendance already exists for this student, course, and batch",
-          error: "Attendance already exists",
-        };
-      }
-
       const { PeCapacityService } = await import(
         "@webcampus/api/src/services/shared/pe-capacity.service"
       );
@@ -61,11 +43,28 @@ export class Attendance {
         );
       }
 
-      const attendance = await db.attendance.create({
-        data: {
-          ...data,
-          batchId: data.batchId ?? null,
-        } as any,
+      // Atomic check-and-create to prevent race condition duplicates
+      const attendance = await db.$transaction(async (tx) => {
+        const existingAttendance = await tx.attendance.findFirst({
+          where: {
+            studentId: data.studentId,
+            courseId: data.courseId,
+            batchId: data.batchId ?? null,
+          },
+        });
+
+        if (existingAttendance) {
+          throw new Error(
+            "Attendance already exists for this student, course, and batch"
+          );
+        }
+
+        return tx.attendance.create({
+          data: {
+            ...data,
+            batchId: data.batchId ?? null,
+          } as any,
+        });
       });
 
       return {

@@ -346,7 +346,6 @@ export class ProctorController {
 
       const result = await ProctorService.generateProctorGroups({
         departmentId: requestContext.departmentId,
-        departmentName: requestContext.departmentName || "",
         semesterId,
         studentsPerGroup: spg,
         action: action as "generate" | "regenerate",

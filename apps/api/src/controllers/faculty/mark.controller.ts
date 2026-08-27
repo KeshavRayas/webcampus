@@ -6,6 +6,7 @@ import { auth, fromNodeHeaders } from "@webcampus/auth";
 import { ERRORS } from "@webcampus/backend-utils/errors";
 import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
+import { db } from "@webcampus/db";
 import { UpdateMarkType } from "@webcampus/schemas/faculty";
 import { Request, Response } from "express";
 import { CourseApprovalError } from "../../services/shared/course-approval";
@@ -320,7 +321,9 @@ export class MarkController {
     try {
       const user = await resolveSessionUser(req);
 
-      const response = await Mark.saveAssessmentMarks(user.id, req.body);
+      const response = await db.$transaction((tx) =>
+        Mark.saveAssessmentMarks(user.id, req.body, tx)
+      );
       if (response.status === "success") {
         sendResponse({
           res,

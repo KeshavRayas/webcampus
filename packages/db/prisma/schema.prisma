@@ -220,9 +220,10 @@ model DepartmentUser {
 model Hod {
   id             String      @id @default(uuid())
   userId         String      @unique
+  departmentId   String?
   departmentName String?
   facultyId      String?     @unique
-  department     Department? @relation(fields: [departmentName], references: [name])
+  department     Department? @relation(fields: [departmentId], references: [id])
   faculty        Faculty?    @relation(fields: [facultyId], references: [id])
   user           User        @relation(fields: [userId], references: [id])
 }
@@ -285,6 +286,7 @@ model Student {
   id                         String                      @id @default(uuid())
   userId                     String                      @unique
   usn                        String                      @unique
+  departmentId               String
   departmentName             String
   currentSemester            Int
   academicYear               String
@@ -303,7 +305,7 @@ model Student {
   accounts                   Accounts[]
   hallTickets                HallTicket[]
   marks                      Mark[]
-  department                 Department                  @relation(fields: [departmentName], references: [name])
+  department                 Department                  @relation(fields: [departmentId], references: [id])
   user                       User                        @relation(fields: [userId], references: [id])
   feedbackResponses          FeedbackResponse[]
   studentSections            StudentSection[]
@@ -313,8 +315,8 @@ model Student {
   proctorGroupId    String?
   proctorGroup      ProctorGroup?       @relation(fields: [proctorGroupId], references: [id], onDelete: SetNull)
 
-  @@index([departmentName])
-  @@index([departmentName, currentSemester])
+  @@index([departmentId])
+  @@index([departmentId, currentSemester])
   @@index([semesterId])
   @@index([semesterNumber])
   @@index([programType])

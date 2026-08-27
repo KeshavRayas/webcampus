@@ -1,9 +1,18 @@
 import { auth } from "@webcampus/auth";
+import { ERRORS } from "@webcampus/backend-utils/errors";
+import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { Cycle, db } from "@webcampus/db";
 import { fromNodeHeaders } from "better-auth/node";
 import { Request, Response } from "express";
 import { resolveHODDepartment } from "../../services/hod/resolve-hod-department";
+
+const getStatusCode = (error: unknown): number => {
+  if (!(error instanceof Error)) return 500;
+  if (error.message === "Unauthorized") return 401;
+  if (error.message.includes("Unauthorized")) return 403;
+  return 500;
+};
 
 export const getDepartmentCourses = async (req: Request, res: Response) => {
   try {
@@ -11,14 +20,26 @@ export const getDepartmentCourses = async (req: Request, res: Response) => {
       headers: fromNodeHeaders(req.headers),
     });
     if (!session?.user?.id) {
-      return res.status(401).json({ error: "Unauthorized" });
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 401,
+        message: ERRORS.UNAUTHORIZED,
+        error: ERRORS.UNAUTHORIZED,
+      });
+      return;
     }
 
     const hodDepartment = await resolveHODDepartment(session.user.id);
     if (!hodDepartment) {
-      return res
-        .status(403)
-        .json({ error: "Unauthorized: No department attached to HOD" });
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 403,
+        message: "Unauthorized: No department attached to HOD",
+        error: "Unauthorized: No department attached to HOD",
+      });
+      return;
     }
 
     const { departmentId, departmentType } = hodDepartment;
@@ -71,14 +92,23 @@ export const getDepartmentCourses = async (req: Request, res: Response) => {
       credits: c.lectureCredits + c.tutorialCredits + c.practicalCredits,
     }));
 
-    res.json({
+    sendResponse({
+      res,
       status: "success",
+      statusCode: 200,
       message: "Department courses fetched successfully",
       data: mapped,
     });
   } catch (error: unknown) {
     logger.error("Failed to get department courses", { error });
-    res.status(500).json({ error: (error as Error).message });
+    sendResponse({
+      res,
+      status: "error",
+      statusCode: getStatusCode(error),
+      message:
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
   }
 };
 
@@ -88,14 +118,26 @@ export const getDepartmentSections = async (req: Request, res: Response) => {
       headers: fromNodeHeaders(req.headers),
     });
     if (!session?.user?.id) {
-      return res.status(401).json({ error: "Unauthorized" });
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 401,
+        message: ERRORS.UNAUTHORIZED,
+        error: ERRORS.UNAUTHORIZED,
+      });
+      return;
     }
 
     const hodDepartment = await resolveHODDepartment(session.user.id);
     if (!hodDepartment) {
-      return res
-        .status(403)
-        .json({ error: "Unauthorized: No department attached to HOD" });
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 403,
+        message: "Unauthorized: No department attached to HOD",
+        error: "Unauthorized: No department attached to HOD",
+      });
+      return;
     }
 
     const { departmentId, departmentType } = hodDepartment;
@@ -126,13 +168,22 @@ export const getDepartmentSections = async (req: Request, res: Response) => {
       select: { id: true, name: true },
     });
 
-    res.json({
+    sendResponse({
+      res,
       status: "success",
+      statusCode: 200,
       message: "Department sections fetched successfully",
       data: sections,
     });
   } catch (error: unknown) {
     logger.error("Failed to get department sections", { error });
-    res.status(500).json({ error: (error as Error).message });
+    sendResponse({
+      res,
+      status: "error",
+      statusCode: getStatusCode(error),
+      message:
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
   }
 };

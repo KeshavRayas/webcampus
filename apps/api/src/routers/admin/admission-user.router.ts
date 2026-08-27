@@ -1,18 +1,13 @@
 import { AdminAdmissionUserController } from "@webcampus/api/src/controllers/admin/admission-user.controller";
+import { upload } from "@webcampus/api/src/utils/upload";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   CreateAdmissionUserSchema,
   UpdateAdmissionUserSchema,
 } from "@webcampus/schemas/admin";
 import { Router } from "express";
-import multer from "multer";
 
 const router: Router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
-
-// 2. Initialize multer to keep the uploaded file in memory
-// const upload = multer({ storage: multer.memoryStorage() });
-
 // removed the duplicate line of code
 
 // --- CREATE ROUTE ---
