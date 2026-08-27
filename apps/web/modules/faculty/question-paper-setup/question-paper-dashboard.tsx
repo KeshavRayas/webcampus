@@ -27,8 +27,9 @@ import {
   FilterPanel,
 } from "@webcampus/ui/components/filter-builder";
 import axios from "axios";
-import { ClipboardList, Loader2, PlusCircle } from "lucide-react";
+import { ClipboardList, Loader2, PlusCircle, Settings2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ConfigureCODialog } from "./configure-co-dialog";
 import { QPSetupDialog } from "./qp-setup-dialog";
 import { useFacultyAcademicTerms } from "./use-faculty-terms";
 import { ViewAssessmentDialog } from "./view-assessment-dialog";
@@ -116,6 +117,8 @@ export const QuestionPaperDashboard = () => {
     id: string;
     courseName: string;
   } | null>(null);
+  const [configureCOCourse, setConfigureCOCourse] =
+    useState<CoordinatedCourse | null>(null);
 
   const { data: terms, isLoading: termsLoading } = useFacultyAcademicTerms();
 
@@ -376,9 +379,18 @@ export const QuestionPaperDashboard = () => {
                     </div>
 
                     <div className="space-y-3 pt-2">
-                      <p className="text-muted-foreground text-sm font-semibold uppercase tracking-wider">
-                        Assessments Configuration
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-muted-foreground text-sm font-semibold uppercase tracking-wider">
+                          Assessments Configuration
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setConfigureCOCourse(course)}
+                        >
+                          <Settings2 className="mr-2 h-4 w-4" /> Configure COs
+                        </Button>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {buildAssessmentSlots(course).map((slot) =>
                           renderAssessmentButton(course, slot)
@@ -400,6 +412,16 @@ export const QuestionPaperDashboard = () => {
             if (!open) setSetupContext(null);
           }}
           setupContext={setupContext}
+        />
+      )}
+
+      {configureCOCourse && (
+        <ConfigureCODialog
+          open={!!configureCOCourse}
+          onOpenChange={(open: boolean) => {
+            if (!open) setConfigureCOCourse(null);
+          }}
+          course={configureCOCourse}
         />
       )}
 

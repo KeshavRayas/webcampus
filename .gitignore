@@ -77,6 +77,9 @@ AGENTS.md
 plan.md
 deploy.md
 
+/scripts/bottleneck-test.ts
+/scripts/verify-rendering.py
+/scripts/load-test.ts
 # Prometheus file-SD targets are machine-specific:
 # `bun monitoring` generates api-dev.json locally; servers keep this dir empty.
 monitoring/prometheus/targets/*.json

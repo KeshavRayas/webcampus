@@ -42,6 +42,11 @@ playwright-report
 test-results
 .auth
 
-stress-tests/*
+# Load/stress testing (kept out of git; never ship)
+stress-tests
+
+/scripts/bottleneck-test.ts
+/scripts/verify-rendering.py
+/scripts/load-test.ts
+
 security-assessment.md
-stress-tests.zip

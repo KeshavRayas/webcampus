@@ -22,6 +22,7 @@ import { Router } from "express";
 import { getSections } from "../../controllers/admin/section.controller";
 import facultyRouter from "./faculty.router";
 import HallTicketRouter from "./hall-ticket.router";
+import ProgrammeOutcomeRouter from "./programme-outcome.router";
 import ProjectMappingRouter from "./project-mapping.router";
 
 const router: Router = Router();
@@ -64,6 +65,10 @@ router.use("/bonus-attendance", bonusAttendanceRouter);
 router.use("/hall-ticket", HallTicketRouter);
 
 router.use("/whatsapp", WhatsAppRouter);
+
+router.use("/programme-outcomes", ProgrammeOutcomeRouter);
+
+router.get("/sections", getSections);
 
 router.get(
   "/sections",
