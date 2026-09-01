@@ -442,15 +442,15 @@ export const AdminCourseMappingView = () => {
               return next;
             });
           }}
+          action={
+            <FilterActions
+              onApply={applyFilters}
+              onReset={resetFilters}
+              isApplyDisabled={!isApplyReady}
+              applyLabel="Start Mapping"
+            />
+          }
         />
-        <div className="mt-4 flex justify-end">
-          <FilterActions
-            onApply={applyFilters}
-            onReset={resetFilters}
-            isApplyDisabled={!isApplyReady}
-            applyLabel="Start Mapping"
-          />
-        </div>
       </FilterPanel>
 
       {selectedCourse &&

@@ -272,6 +272,7 @@ export const CourseMappingFilters = ({
       <FilterBuilder
         fields={filterFields}
         draftFilters={draftFilters}
+        className="[--filter-cols:3]"
         onDraftChange={(key, value) => {
           setDraftFilters((cur) => {
             const next = { ...cur, [key]: value };
@@ -286,14 +287,14 @@ export const CourseMappingFilters = ({
             return next;
           });
         }}
+        action={
+          <FilterActions
+            onApply={applyFilters}
+            onReset={resetFilters}
+            applyLabel="Start Mapping"
+          />
+        }
       />
-      <div className="mt-4 flex justify-end">
-        <FilterActions
-          onApply={applyFilters}
-          onReset={resetFilters}
-          applyLabel="Start Mapping"
-        />
-      </div>
     </FilterPanel>
   );
 };

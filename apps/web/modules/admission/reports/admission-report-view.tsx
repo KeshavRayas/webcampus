@@ -17,6 +17,12 @@ import {
 } from "@webcampus/schemas/constants";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@webcampus/ui/components/dropdown-menu";
 import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -468,12 +474,6 @@ export function AdmissionReportView({
     placeholderData: keepPreviousData,
   });
 
-  const { data: statsRows } = useQuery({
-    queryKey: ["admission-report-stats", reportType, appliedFilters],
-    queryFn: () => fetchAllReportRows(appliedFilters),
-    placeholderData: keepPreviousData,
-  });
-
   const total = data?.total ?? 0;
   const maxPage = Math.max(Math.ceil(total / pageSize) - 1, 0);
 
@@ -486,11 +486,6 @@ export function AdmissionReportView({
   const filterSummary = useMemo(
     () => buildAppliedFilterSummary(appliedFilters, { terms, departments }),
     [appliedFilters, terms, departments]
-  );
-
-  const statistics = useMemo(
-    () => buildReportStatistics(reportType, statsRows ?? []),
-    [reportType, statsRows]
   );
 
   const reportColumns = useMemo(
@@ -621,6 +616,11 @@ export function AdmissionReportView({
     }
   };
 
+  const generateReportBoth = async () => {
+    await generateReportExcel();
+    await generateReportPdf();
+  };
+
   useEffect(() => {
     if (!reportData) return;
     const node = reportRef.current;
@@ -645,7 +645,7 @@ export function AdmissionReportView({
 
   return (
     <div className="space-y-8">
-      <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
+      <div className="admission-surface space-y-6 p-5 shadow-sm sm:p-6">
         <div className="space-y-4">
           <AdmissionFilterBar
             simpleFields={simpleFilterFields}
@@ -656,16 +656,12 @@ export function AdmissionReportView({
             onReset={resetFilters}
             dialogTitle="Advanced Filters"
             dialogDescription={REPORT_DIALOG_DESCRIPTIONS[reportType]}
-            onGenerateReport={generateReportPdf}
-            reportButtonLabel={`Generate ${REPORT_TITLES[reportType]} PDF`}
-            onGenerateExcel={generateReportExcel}
-            reportExcelButtonLabel={`Generate ${REPORT_TITLES[reportType]} Excel`}
             fieldToggles={columnSelection}
             onToggleField={toggleColumn}
           />
         </div>
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-4 pt-2">
           <div>
             <h3 className="text-xl font-semibold tracking-tight">
               {REPORT_TITLES[reportType]}
@@ -675,9 +671,50 @@ export function AdmissionReportView({
               {ALWAYS_SHOWN_LABELS[reportType]}
             </p>
           </div>
-          {isFetching && (
-            <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
-          )}
+          <div className="admission-report-download flex shrink-0 items-center gap-2">
+            {isFetching && (
+              <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="admission-pill border px-4 py-2 text-sm font-semibold"
+                >
+                  Download
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="admission-theme-dialog min-w-40"
+              >
+                <DropdownMenuItem
+                  disabled
+                  className="rounded-full font-semibold"
+                >
+                  Download
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => void generateReportPdf()}
+                  className="rounded-full"
+                >
+                  PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => void generateReportExcel()}
+                  className="rounded-full"
+                >
+                  Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => void generateReportBoth()}
+                  className="rounded-full"
+                >
+                  Both
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {filterSummary.length > 0 && (
@@ -685,7 +722,7 @@ export function AdmissionReportView({
             {filterSummary.map((item) => (
               <div
                 key={item.label}
-                className="bg-muted text-muted-foreground rounded-md border px-3 py-1.5 text-sm"
+                className="admission-pill bg-muted px-3 py-1.5 text-sm"
               >
                 <span className="text-foreground font-semibold">
                   {item.label}:
@@ -695,22 +732,6 @@ export function AdmissionReportView({
             ))}
           </div>
         )}
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {statistics.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-card text-card-foreground rounded-lg border p-4"
-            >
-              <div className="text-muted-foreground text-xs font-medium uppercase">
-                {stat.label}
-              </div>
-              <div className="mt-1 text-xl font-bold tracking-tight">
-                {stat.value}
-              </div>
-            </div>
-          ))}
-        </div>
 
         <DataTable
           columns={tableColumns}

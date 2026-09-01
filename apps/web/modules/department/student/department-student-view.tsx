@@ -331,9 +331,8 @@ export const DepartmentStudentView = () => {
             }
           }}
           allValue={DEFAULT_FILTER_ALL_VALUE}
+          action={<FilterActions onApply={applyFilters} onReset={resetFilters} />}
         />
-
-        <FilterActions onApply={applyFilters} onReset={resetFilters} />
       </FilterPanel>
 
       {response.isFetching && (

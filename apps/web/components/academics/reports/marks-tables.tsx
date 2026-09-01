@@ -147,7 +147,7 @@ export const MarksReportTable = ({
         Loading report...
       </div>
     ) : (
-      <div className="text-muted-foreground flex min-h-[200px] items-center justify-center">
+      <div className="bg-card text-muted-foreground flex min-h-[200px] items-center justify-center rounded-lg border p-6">
         {emptyMessage}
       </div>
     )}

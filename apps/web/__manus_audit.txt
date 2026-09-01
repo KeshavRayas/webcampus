@@ -1,0 +1,446 @@
+﻿[apps\web\app\(protected)\admin\course-mapping\page.tsx:7] fallback={<div className="p-4 text-sm">Loading course mapping...</div>}
+[apps\web\app\(protected)\admin\elective-mapping\page.tsx:14] } from "@webcampus/ui/components/filter-builder";
+[apps\web\app\(protected)\admin\project-mapping\page.tsx:14] } from "@webcampus/ui/components/filter-builder";
+[apps\web\app\(protected)\coe\page.tsx:26] <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+[apps\web\app\(protected)\coe\page.tsx:44] <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+[apps\web\app\(protected)\coordinator\page.tsx:27] <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+[apps\web\app\(protected)\coordinator\page.tsx:45] <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+[apps\web\app\(protected)\department\course-mapping\page.tsx:7] fallback={<div className="p-4 text-sm">Loading course mapping...</div>}
+[apps\web\app\(protected)\department\proctor-mapping\page.tsx:1] import { DepartmentProctorMappingView } from "@/modules/department/proctor-mapping/department-proctor-mapping-view";
+[apps\web\app\(protected)\department\proctor-mapping\page.tsx:4] return <DepartmentProctorMappingView />;
+[apps\web\app\(protected)\department\timetable\page.tsx:187] <div className="grid gap-2 sm:grid-cols-4" key={slot.id}>
+[apps\web\app\(protected)\department\page.tsx:75] <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+[apps\web\app\(protected)\department\page.tsx:113] <div className="grid gap-6 lg:grid-cols-2">
+[apps\web\app\(protected)\department\page.tsx:148] <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+[apps\web\app\(protected)\faculty\proctor\page.tsx:1] import { FacultyProctorView } from "@/modules/faculty/proctor/faculty-proctor-view";
+[apps\web\app\(protected)\faculty\proctor\page.tsx:4] return <FacultyProctorView />;
+[apps\web\app\(protected)\faculty\page.tsx:34] <div className="grid gap-6 lg:grid-cols-2">
+[apps\web\app\(protected)\faculty\page.tsx:100] <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+[apps\web\app\(protected)\faculty\page.tsx:105] <Link href="/faculty/attendance/take">Take attendance</Link>
+[apps\web\app\(protected)\hod\page.tsx:26] <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+[apps\web\app\(protected)\hod\page.tsx:44] <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+[apps\web\app\(protected)\student\proctor\page.tsx:1] import { StudentProctorView } from "@/modules/student/proctor/student-proctor-view";
+[apps\web\app\(protected)\student\proctor\page.tsx:4] return <StudentProctorView />;
+[apps\web\app\(protected)\student\page.tsx:58] <div className="grid gap-4 md:grid-cols-3">
+[apps\web\app\(protected)\student\page.tsx:102] <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+[apps\web\app\(protected)\student\page.tsx:185] <CardContent className="grid gap-2 sm:grid-cols-2">
+[apps\web\modules\accounts\accounts-view.tsx:67] { id: "search_student", label: "Search Student" },
+[apps\web\modules\accounts\accounts-view.tsx:68] { id: "fee_structure", label: "Fee Structure" },
+[apps\web\modules\accounts\accounts-view.tsx:69] { id: "add_tuition_fee", label: "Add Tuition Fee" },
+[apps\web\modules\accounts\accounts-view.tsx:153] {/* Search Student */}
+[apps\web\modules\accounts\accounts-view.tsx:158] <CardTitle className="text-base">Search student by USN</CardTitle>
+[apps\web\modules\accounts\accounts-view.tsx:166] className="grid grid-cols-1 items-center gap-3 sm:grid-cols-2"
+[apps\web\modules\accounts\accounts-view.tsx:186] <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+[apps\web\modules\accounts\accounts-view.tsx:236] {/* Add Tuition Fee Form */}
+[apps\web\modules\accounts\accounts-view.tsx:256] <div key={key} className="grid gap-2 sm:grid-cols-[12rem_1fr] sm:items-center">
+[apps\web\modules\accounts\accounts-view.tsx:269] <div className="grid gap-2 sm:grid-cols-[12rem_1fr] sm:items-center">
+[apps\web\modules\accounts\accounts-view.tsx:281] <div className="grid gap-2 sm:grid-cols-[12rem_1fr] sm:items-center">
+[apps\web\modules\accounts\accounts-view.tsx:293] <div className="grid gap-2 sm:grid-cols-[12rem_1fr] sm:items-center">
+[apps\web\modules\accounts\accounts-view.tsx:309] <div className="grid gap-2 sm:grid-cols-[12rem_1fr] sm:items-center">
+[apps\web\modules\accounts\accounts-view.tsx:332] {/* Fee Structure */}
+[apps\web\modules\accounts\accounts-view.tsx:336] <CardTitle className="text-base">Fee structure</CardTitle>
+[apps\web\modules\accounts\accounts-view.tsx:342] <div className="grid grid-cols-1 gap-3">
+[apps\web\modules\accounts\accounts-view.tsx:347] <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
+[apps\web\modules\admin\academics\reports\admin-attendance-report-view.tsx:24] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\academics\reports\admin-condonation-report-view.tsx:22] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\academics\reports\admin-marks-report-view.tsx:20] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\attendance-windows\attendance-windows-view.tsx:22] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\attendance-windows\attendance-windows-view.tsx:315] <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
+[apps\web\modules\admin\bonus-attendance\bonus-attendance-view.tsx:11] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\bonus-attendance\bonus-attendance-view.tsx:252] semester. When open, faculty can take attendance for the configured
+[apps\web\modules\admin\bonus-attendance\bonus-attendance-view.tsx:286] className="md:grid-cols-2 xl:grid-cols-3"
+[apps\web\modules\admin\bonus-attendance\window-days-dialog.tsx:51] Faculty can take attendance for this many days starting from the day
+[apps\web\modules\admin\bonus-attendance\window-days-dialog.tsx:58] <div className="grid grid-cols-4 items-center gap-4">
+[apps\web\modules\admin\course-approvals\course-approvals-filters.tsx:8] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\course-coordinators\course-coordinator-filters.tsx:15] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\course-mapping\course-mapping-filters.tsx:8] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\course-mapping\course-mapping-grid.tsx:455] assignment, then save Course Mapping to commit.
+[apps\web\modules\admin\course-mapping\course-mapping-view.tsx:24] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\courses\admin-courses-view.tsx:19] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\dashboard\chart-area.tsx:74] <div className="gap 8 grid lg:grid-cols-[minmax(220px,0.72fr)_minmax(0,1.6fr)] lg:items-center">
+[apps\web\modules\admin\dashboard\section-cards.tsx:21] <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+[apps\web\modules\admin\faculty\admin-faculty-actions.tsx:214] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admin\faculty\admin-faculty-view.tsx:13] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\faculty\admin-faculty-view.tsx:181] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admin\hall-ticket\admin-hall-ticket-view.tsx:27] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\hall-ticket\admin-hall-ticket-view.tsx:128] ? `WCHT_VERIFY:${previewData.verificationToken}`
+[apps\web\modules\admin\registration-tracking\registration-tracking-view.tsx:12] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\registration-tracking\registration-tracking-view.tsx:263] className="md:grid-cols-2 xl:grid-cols-4"
+[apps\web\modules\admin\registration-windows\registration-windows-view.tsx:11] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\registration-windows\registration-windows-view.tsx:254] className="md:grid-cols-2 xl:grid-cols-3"
+[apps\web\modules\admin\semester\admin-semester-config-form.tsx:201] <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+[apps\web\modules\admin\semester\admin-semester-config-form.tsx:227] <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+[apps\web\modules\admin\semester\admin-semester-view.tsx:19] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\semester\admin-semester-view.tsx:207] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admin\students\admin-students-actions.tsx:420] <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[18rem_1fr]">
+[apps\web\modules\admin\students\admin-students-actions.tsx:496] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admin\students\admin-students-actions.tsx:552] <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admin\students\admin-students-actions.tsx:618] <div className="mb-4 grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-3">
+[apps\web\modules\admin\students\admin-students-actions.tsx:640] <div className="grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-2">
+[apps\web\modules\admin\students\admin-students-actions.tsx:667] <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admin\students\admin-students-actions.tsx:714] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admin\students\admin-students-actions.tsx:767] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admin\students\admin-students-actions.tsx:822] <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+[apps\web\modules\admin\students\admin-students-actions.tsx:893] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admin\students\admin-students-view.tsx:21] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admin\students\admin-students-view.tsx:312] <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+[apps\web\modules\admin\verification\admin-verification-settings-view.tsx:129] Faculty, HODs, and Admins can scan hall tickets to verify
+[apps\web\modules\admin\verification\admin-verification-settings-view.tsx:136] <div className="grid gap-4 sm:grid-cols-2">
+[apps\web\modules\admin\whatsapp\campaign-detail.tsx:88] <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
+[apps\web\modules\admin\whatsapp\send-view.tsx:264] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admin\whatsapp\send-view.tsx:365] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admin\whatsapp\send-view.tsx:425] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admin\whatsapp\send-view.tsx:507] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admin\whatsapp\send-view.tsx:750] <div className="grid grid-cols-2 gap-3 text-sm">
+[apps\web\modules\admin\whatsapp\template-form.tsx:219] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admission\admin\admin-admission-actions.tsx:413] <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[18rem_1fr]">
+[apps\web\modules\admission\admin\admin-admission-actions.tsx:499] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admission\admin\admin-admission-actions.tsx:576] <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admission\admin\admin-admission-actions.tsx:637] <div className="mb-4 grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-3">
+[apps\web\modules\admission\admin\admin-admission-actions.tsx:675] <div className="grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-2">
+[apps\web\modules\admission\admin\admin-admission-actions.tsx:722] <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admission\admin\admin-admission-actions.tsx:777] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admission\admin\admin-admission-actions.tsx:854] <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+[apps\web\modules\admission\admin\admin-admission-actions.tsx:925] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admission\admin\admission-view.tsx:25] import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admission\admin\admission-view.tsx:39] import { AdmissionFilterBar } from "../shared/admission-filter-bar";
+[apps\web\modules\admission\admission-instructor\admission-instructor-view.tsx:25] import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admission\admission-instructor\admission-instructor-view.tsx:45] import { AdmissionFilterBar } from "../shared/admission-filter-bar";
+[apps\web\modules\admission\applicant\admission-acknowledgement.tsx:253] .ack-details { width: 100%; table-layout: fixed; border-collapse: collapse; margin-bottom: 14px; }
+[apps\web\modules\admission\applicant\admission-acknowledgement.tsx:261] .ack-docs { width: 100%; border-collapse: collapse; }
+[apps\web\modules\admission\applicant\admission-document.tsx:437] .doc-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:261] <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:300] <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:450] <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:2091] <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:2221] <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:2353] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:2413] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:2576] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:2753] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:2915] <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:3147] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:3222] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:3248] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admission\applicant\applicant-admission-view.tsx:3997] <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+[apps\web\modules\admission\cancel-admission\cancel-admission-view.tsx:16] import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admission\cancel-admission\cancel-admission-view.tsx:25] import { AdmissionFilterBar } from "../shared/admission-filter-bar";
+[apps\web\modules\admission\change-admission-mode\change-admission-mode-actions.tsx:113] <div className="grid gap-4 md:grid-cols-2">
+[apps\web\modules\admission\fee-payment\fee-document.tsx:177] .fd-table { width: 100%; border-collapse: collapse; }
+[apps\web\modules\admission\fee-payment\fee-payment-view.tsx:32] import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admission\fee-payment\fee-payment-view.tsx:42] import { AdmissionFilterBar } from "../shared/admission-filter-bar";
+[apps\web\modules\admission\fee-payment\fee-payment-view.tsx:715] <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+[apps\web\modules\admission\fee-payment\fee-payment-view.tsx:836] Loading fee structure...
+[apps\web\modules\admission\reports\admission-report-view.tsx:26] import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admission\reports\admission-report-view.tsx:33] import { AdmissionFilterBar } from "../shared/admission-filter-bar";
+[apps\web\modules\admission\reports\reports-document.tsx:135] .ar-table { width: 100%; border-collapse: collapse; }
+[apps\web\modules\admission\setup\admission-setup-view.tsx:327] <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
+[apps\web\modules\admission\shared\admission-filter-bar.tsx:16] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admission\shared\admission-filter-bar.tsx:72] <div className="admission-filter-panel space-y-4">
+[apps\web\modules\admission\shared\admission-filter-bar.tsx:78] className="filter-builder-simple grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2"
+[apps\web\modules\admission\shared\admission-filter-bar.tsx:82] className={`admission-filter-actions ${actionSlot ? "has-create-action" : "three-actions"} flex flex-wrap items-center gap-2`}
+[apps\web\modules\admission\shared\admission-filter-bar.tsx:97] <DialogContent className="admission-filter-dialog sm:max-w-xl md:max-w-2xl">
+[apps\web\modules\admission\shared\admission-filter-bar.tsx:110] className="grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2"
+[apps\web\modules\admission\shared\admission-tab-filter-strip.tsx:3] import { AdmissionFilterBar } from "@/modules/admission/shared/admission-filter-bar";
+[apps\web\modules\admission\shared\admission-tab-filter-strip.tsx:4] import type { FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admission\upload-docs\upload-docs-actions.tsx:243] <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_1fr]">
+[apps\web\modules\admission\upload-docs\upload-docs-actions.tsx:270] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\admission\upload-docs\upload-docs-view.tsx:16] import { type FilterFieldConfig } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\admission\upload-docs\upload-docs-view.tsx:22] import { AdmissionFilterBar } from "../shared/admission-filter-bar";
+[apps\web\modules\auth\sign-in\auth-sign-in-view.tsx:99] <main className="grid min-h-svh grid-cols-1 bg-[var(--auth-bg)] lg:grid-cols-2">
+[apps\web\modules\department\course-approvals\course-approvals-filters.tsx:10] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\course-approvals\course-approvals-table.tsx:455] <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+[apps\web\modules\department\course-approvals\course-approvals-table.tsx:507] <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+[apps\web\modules\department\course-approvals\course-approvals-table.tsx:568] Course Mapping & Coordinators
+[apps\web\modules\department\course-coordinators\course-coordinator-filters.tsx:14] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\course-mapping\course-mapping-filters.tsx:17] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\course-mapping\course-mapping-grid.tsx:469] assignment, then save Course Mapping to commit.
+[apps\web\modules\department\courses\course-form-fields.tsx:321] <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+[apps\web\modules\department\courses\course-form-fields.tsx:419] <div className="grid grid-cols-4 gap-3">
+[apps\web\modules\department\courses\course-form-fields.tsx:453] <div className="grid max-w-[50%] grid-cols-2 gap-3 pr-2">
+[apps\web\modules\department\courses\course-form-fields.tsx:474] <div className="grid max-w-[50%] grid-cols-2 gap-3 pr-2">
+[apps\web\modules\department\courses\course-form-fields.tsx:492] <div className="grid grid-cols-3 gap-3">
+[apps\web\modules\department\courses\course-form-fields.tsx:528] <div className="grid grid-cols-2 gap-3">
+[apps\web\modules\department\courses\course-form-fields.tsx:546] <div className="grid grid-cols-2 gap-3">
+[apps\web\modules\department\courses\course-form-fields.tsx:569] <div className="grid grid-cols-2 gap-3">
+[apps\web\modules\department\courses\course-form-fields.tsx:669] <div className="grid grid-cols-2 gap-3">
+[apps\web\modules\department\courses\course-form-fields.tsx:803] <div className="grid grid-cols-2 gap-3">
+[apps\web\modules\department\courses\course-form-fields.tsx:829] <div className="grid grid-cols-2 gap-4">
+[apps\web\modules\department\courses\courses-view.tsx:19] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\elective-mapping\elective-mapping-department-page.tsx:14] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\elective-mapping\elective-mapping-detail-view.tsx:24] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\elective-project-mapping\combined-mapping-page.tsx:13] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\faculty\department-faculty-view.tsx:20] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\faculty\department-faculty-view.tsx:195] <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+[apps\web\modules\department\faculty\department-faculty-view.tsx:223] <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+[apps\web\modules\department\proctor-mapping\department-proctor-mapping-view.tsx:22] import { GenerateProctorGroupsDialog } from "./generate-proctor-groups-dialog";
+[apps\web\modules\department\proctor-mapping\department-proctor-mapping-view.tsx:23] import { ProctorGroupsTab } from "./proctor-groups-tab";
+[apps\web\modules\department\proctor-mapping\department-proctor-mapping-view.tsx:24] import { ProctorStudentsTab } from "./proctor-students-tab";
+[apps\web\modules\department\proctor-mapping\department-proctor-mapping-view.tsx:26] export const DepartmentProctorMappingView = () => {
+[apps\web\modules\department\proctor-mapping\department-proctor-mapping-view.tsx:49] <h2 className="text-2xl font-bold tracking-tight">Proctor Mapping</h2>
+[apps\web\modules\department\proctor-mapping\department-proctor-mapping-view.tsx:94] <GenerateProctorGroupsDialog />
+[apps\web\modules\department\proctor-mapping\department-proctor-mapping-view.tsx:104] <ProctorGroupsTab
+[apps\web\modules\department\proctor-mapping\department-proctor-mapping-view.tsx:109] <ProctorStudentsTab
+[apps\web\modules\department\proctor-mapping\generate-proctor-groups-dialog.tsx:29] export const GenerateProctorGroupsDialog = () => {
+[apps\web\modules\department\proctor-mapping\generate-proctor-groups-dialog.tsx:56] `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/generate`,
+[apps\web\modules\department\proctor-mapping\generate-proctor-groups-dialog.tsx:63] toast.success(data.message || "Proctor groups generated successfully");
+[apps\web\modules\department\proctor-mapping\generate-proctor-groups-dialog.tsx:64] queryClient.invalidateQueries({ queryKey: ["proctor-students"] });
+[apps\web\modules\department\proctor-mapping\generate-proctor-groups-dialog.tsx:65] queryClient.invalidateQueries({ queryKey: ["proctor-groups"] });
+[apps\web\modules\department\proctor-mapping\generate-proctor-groups-dialog.tsx:86] "Regenerating the proctor groups will replace the current automatic student distribution. Manual student movements may be lost. Are you sure?"
+[apps\web\modules\department\proctor-mapping\generate-proctor-groups-dialog.tsx:105] <DialogTitle>Generate Proctor Groups</DialogTitle>
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:34] export const ProctorGroupsTab = ({ semesterId }: { semesterId?: string }) => {
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:40] queryKey: ["proctor-groups", semesterId],
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:43] `${NEXT_PUBLIC_API_BASE_URL}/department/proctor`,
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:67] `${NEXT_PUBLIC_API_BASE_URL}/department/proctor`,
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:74] queryClient.invalidateQueries({ queryKey: ["proctor-groups"] });
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:79] toast.error(error.response?.data?.message || "Failed to create group");
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:92] `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/${id}`,
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:99] queryClient.invalidateQueries({ queryKey: ["proctor-groups"] });
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:110] `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/${id}`,
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:116] queryClient.invalidateQueries({ queryKey: ["proctor-groups"] });
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:127] <CardTitle>Manage Proctor Groups</CardTitle>
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:141] Create Group
+[apps\web\modules\department\proctor-mapping\proctor-groups-tab.tsx:165] No proctor groups created yet.
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:33] export const ProctorStudentsTab = ({ semesterId }: { semesterId?: string }) => {
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:40] queryKey: ["proctor-students", semesterId],
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:43] `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/students`,
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:54] queryKey: ["proctor-groups", semesterId],
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:57] `${NEXT_PUBLIC_API_BASE_URL}/department/proctor`,
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:70] proctorGroupId,
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:73] proctorGroupId: string | null;
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:76] `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/assign-students`,
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:77] { studentIds, proctorGroupId },
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:83] queryClient.invalidateQueries({ queryKey: ["proctor-students"] });
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:84] queryClient.invalidateQueries({ queryKey: ["proctor-groups"] });
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:116] proctorGroupId: selectedGroup === "unassigned" ? null : selectedGroup,
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:123] <CardTitle>Assign Students to Proctor Groups</CardTitle>
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:129] <SelectValue placeholder="Select a proctor group" />
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:186] (g: any) => g.id === student.proctorGroupId
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:212] value={student.proctorGroupId || "unassigned"}
+[apps\web\modules\department\proctor-mapping\proctor-students-tab.tsx:216] proctorGroupId:
+[apps\web\modules\department\project-mapping\project-mapping-department-page.tsx:13] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\project-mapping\project-mapping-detail-view.tsx:25] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\project-mapping\project-mapping-detail-view.tsx:916] <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+[apps\web\modules\department\section\department-section-view.tsx:18] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\section\generate-sections-dialog.tsx:453] className="bg-muted grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md p-3"
+[apps\web\modules\department\section\generate-sections-dialog.tsx:569] <div className="grid gap-3 md:grid-cols-2">
+[apps\web\modules\department\section\section-cards-view.tsx:192] <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+[apps\web\modules\department\student\department-student-view.tsx:21] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\department\student\department-student-view.tsx:281] <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+[apps\web\modules\faculty\attendance\components\attendance-edit-list.tsx:130] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\faculty\attendance\components\attendance-edit-list.tsx:257] <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+[apps\web\modules\faculty\attendance\components\attendance-form.tsx:212] Set date, course, section, and time slot to take attendance.
+[apps\web\modules\faculty\attendance\components\attendance-form.tsx:217] <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-5">
+[apps\web\modules\faculty\attendance\components\attendance-form.tsx:362] <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+[apps\web\modules\faculty\attendance\components\attendance-form.tsx:406] Take Attendance
+[apps\web\modules\faculty\attendance\components\manage-sessions-modal.tsx:120] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\faculty\attendance\components\manage-sessions-modal.tsx:226] <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+[apps\web\modules\faculty\attendance\attendance-report-shell.tsx:15] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\faculty\attendance\attendance-report-shell.tsx:346] <div className="grid w-full grid-cols-1 gap-4 md:max-w-md md:grid-cols-2 md:gap-2">
+[apps\web\modules\faculty\attendance\faculty-attendance-view.tsx:829] <DialogTitle>Take Attendance</DialogTitle>
+[apps\web\modules\faculty\attendance\faculty-attendance-view.tsx:835] <div className="bg-muted/20 grid grid-cols-1 gap-3 rounded-lg border p-4 text-sm md:grid-cols-2">
+[apps\web\modules\faculty\attendance\session-detail-modal.tsx:135] <div className="bg-muted/20 mx-6 mt-4 grid shrink-0 grid-cols-1 gap-3 rounded-lg border p-4 text-sm md:grid-cols-2">
+[apps\web\modules\faculty\attendance-freeze\attendance-freeze-view.tsx:10] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\faculty\attendance-windows\attendance-windows-view.tsx:11] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\faculty\attendance-windows\attendance-windows-view.tsx:256] <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\faculty\freezing\freezing-view.tsx:11] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\faculty\freezing\freezing-view.tsx:280] <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
+[apps\web\modules\faculty\handling\faculty-handling-view.tsx:28] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\faculty\handling\faculty-handling-view.tsx:643] <table className="w-full border-collapse">
+[apps\web\modules\faculty\marks\marks-view.tsx:20] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\faculty\marks-report\marks-report-shell.tsx:9] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\faculty\proctor\faculty-proctor-view.tsx:22] export const FacultyProctorView = () => {
+[apps\web\modules\faculty\proctor\faculty-proctor-view.tsx:26] queryKey: ["faculty-proctor-groups"],
+[apps\web\modules\faculty\proctor\faculty-proctor-view.tsx:29] `${NEXT_PUBLIC_API_BASE_URL}/faculty/proctor/students`,
+[apps\web\modules\faculty\proctor\faculty-proctor-view.tsx:40] <h2 className="text-2xl font-semibold tracking-tight">Proctor Mapping</h2>
+[apps\web\modules\faculty\proctor\faculty-proctor-view.tsx:43] No proctor groups assigned to you.
+[apps\web\modules\faculty\profile\ExperienceSection.tsx:96] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\faculty\profile\ExperienceSection.tsx:123] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\faculty\profile\ExperienceSection.tsx:231] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\faculty\profile\faculty-profile-view.tsx:81] <div className="mt-2 grid grid-cols-1 items-start gap-6 lg:grid-cols-[18rem_1fr]">
+[apps\web\modules\faculty\profile\FacultyDetailsCard.tsx:97] <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+[apps\web\modules\faculty\profile\FacultyDetailsCard.tsx:124] <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+[apps\web\modules\faculty\profile\FacultyDetailsCard.tsx:207] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\faculty\profile\FacultyDetailsCard.tsx:242] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\faculty\profile\PersonalInfoCard.tsx:95] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\faculty\profile\PersonalInfoCard.tsx:142] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\faculty\profile\PersonalInfoCard.tsx:197] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\faculty\profile\PersonalInfoCard.tsx:256] <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\faculty\profile\PersonalInfoCard.tsx:267] <div className="grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-2">
+[apps\web\modules\faculty\profile\PublicationsList.tsx:124] <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\faculty\profile\QualificationsTable.tsx:117] <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+[apps\web\modules\faculty\profile\QualificationsTable.tsx:178] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\faculty\question-paper-setup\question-paper-dashboard.tsx:28] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\faculty\question-paper-setup\question-paper-dashboard.tsx:357] <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+[apps\web\modules\feedback\feedback-config-view.tsx:502] <div className="grid gap-3 md:grid-cols-2">
+[apps\web\modules\feedback\feedback-report-view.tsx:207] <CardContent className="grid gap-3 md:grid-cols-4">
+[apps\web\modules\feedback\feedback-round-detail-view.tsx:25] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\feedback\feedback-round-detail-view.tsx:707] <div className="grid gap-3 md:grid-cols-4">
+[apps\web\modules\feedback\feedback-view.tsx:161] className="grid gap-2 sm:grid-cols-5"
+[apps\web\modules\feedback\feedback-view.tsx:216] <div className="grid gap-4 md:grid-cols-2">
+[apps\web\modules\hod\attendance-windows\attendance-windows-view.tsx:11] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\hod\attendance-windows\attendance-windows-view.tsx:372] <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\hod\condonation\condonation-view.tsx:22] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\hod\condonation\condonation-view.tsx:440] <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+[apps\web\modules\hod\condonation\hod-condonation-report-view.tsx:15] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\hod\courses\hod-courses-view.tsx:19] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\hod\faculty\hod-faculty-view.tsx:13] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\notices\notice-form.tsx:64] <div className="grid gap-3 sm:grid-cols-3">
+[apps\web\modules\sidebar\app-sidebar.tsx:64] (child) => child.name !== "Proctor Mapping"
+[apps\web\modules\student\attendance\student-attendance-view.tsx:19] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\student\attendance\student-attendance-view.tsx:244] <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+[apps\web\modules\student\courses\course-registration-view.tsx:158] Course registration closed, please contact your proctor for
+[apps\web\modules\student\hall-ticket\student-hall-ticket-view.tsx:85] ? `WCHT_VERIFY:${hallTicketData.verificationToken}`
+[apps\web\modules\student\marks\student-marks-view.tsx:16] } from "@webcampus/ui/components/filter-builder";
+[apps\web\modules\student\marks\student-marks-view.tsx:178] <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+[apps\web\modules\student\marks\student-marks-view.tsx:196] <div className="grid grid-cols-2 gap-3 text-sm">
+[apps\web\modules\student\proctor\student-proctor-view.tsx:14] export const StudentProctorView = () => {
+[apps\web\modules\student\proctor\student-proctor-view.tsx:17] const { data: proctorGroup, isLoading } = useQuery({
+[apps\web\modules\student\proctor\student-proctor-view.tsx:18] queryKey: ["student-proctor"],
+[apps\web\modules\student\proctor\student-proctor-view.tsx:21] `${NEXT_PUBLIC_API_BASE_URL}/student/proctor`,
+[apps\web\modules\student\proctor\student-proctor-view.tsx:28] if (isLoading) return <div className="p-4">Loading proctor details...</div>;
+[apps\web\modules\student\proctor\student-proctor-view.tsx:32] <h2 className="text-2xl font-semibold tracking-tight">Proctor Details</h2>
+[apps\web\modules\student\proctor\student-proctor-view.tsx:33] {!proctorGroup ? (
+[apps\web\modules\student\proctor\student-proctor-view.tsx:35] No proctor assigned yet.
+[apps\web\modules\student\proctor\student-proctor-view.tsx:40] <CardTitle>Group: {proctorGroup.groupNumber}</CardTitle>
+[apps\web\modules\student\proctor\student-proctor-view.tsx:43] {proctorGroup.faculty ? (
+[apps\web\modules\student\proctor\student-proctor-view.tsx:46] <strong>Name:</strong> {proctorGroup.faculty.user?.name}
+[apps\web\modules\student\proctor\student-proctor-view.tsx:49] <strong>Email:</strong> {proctorGroup.faculty.user?.email}
+[apps\web\modules\student\proctor\student-proctor-view.tsx:53] {proctorGroup.faculty.user?.phoneNumber || "N/A"}
+[apps\web\modules\student\profile\student-profile-view.tsx:223] <div className="mt-2 grid grid-cols-1 items-start gap-6 lg:grid-cols-[18rem_1fr]">
+[apps\web\modules\student\profile\student-profile-view.tsx:374] <div className="grid grid-cols-1 gap-4 py-2 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:579] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:727] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:786] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:831] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:900] <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:1052] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:1089] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:1169] <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:1283] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:1355] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\student\profile\student-profile-view.tsx:1398] <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+[apps\web\modules\support\support-view.tsx:159] <span>Attach files</span>
+[apps\web\modules\support\support-view.tsx:225] toast.error(getApiErrorMessage(error, "Unable to create ticket")),
+[apps\web\modules\support\support-view.tsx:236] <div className="grid gap-4 sm:grid-cols-2">
+[apps\web\modules\support\support-view.tsx:312] {mutation.isPending ? "Creating..." : "Create ticket"}
+[apps\web\modules\support\support-view.tsx:544] <div className="grid gap-6 lg:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.6fr)]">
+[apps\web\modules\support\support-view.tsx:674] Create ticket
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:5] useVerifyHallTicket,
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:112] const verifyMutation = useVerifyHallTicket();
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:123] const runVerify = (token: string) => {
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:124] verifyMutation.mutate(
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:138] if (!value.startsWith("WCHT_VERIFY:")) {
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:145] runVerify(value);
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:148] const handleManualVerify = () => {
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:151] if (!value.startsWith("WCHT_VERIFY:")) {
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:153] "Enter a full WCHT_VERIFY: token from a current hall ticket QR code."
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:157] runVerify(value);
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:166] const pending = verifyMutation.isPending;
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:175] Scan the QR code on a current hall ticket to verify identity and exam
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:190] <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2">
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:193] htmlFor="verify-token"
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:199] id="verify-token"
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:202] placeholder="WCHT_VERIFY:..."
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:207] onClick={() => void handleManualVerify()}
+[apps\web\modules\verification\hall-ticket-verification-view.tsx:214] Verify
+[apps\web\modules\verification\qr-scanner.tsx:230] <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-2">
+[apps\web\modules\verification\qr-scanner.tsx:249] Verify
+[packages\ui\src\components\calendar.tsx:86] table: "w-full border-collapse",
+[packages\ui\src\components\card.tsx:22] "@container/card-header has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-6",
+[packages\ui\src\components\filter-builder.tsx:114] className={cn("admin-filter-actions grid w-full grid-cols-2 gap-2", className)}
+[packages\ui\src\components\filter-builder.tsx:263] <div className="filter-builder-action-slot" data-filter-action="true">
+[packages\ui\src\components\sidebar.tsx:35] state: "expanded" | "collapsed";
+[packages\ui\src\components\sidebar.tsx:111] // We add a state so that we can do data-state="expanded" or "collapsed".
+[packages\ui\src\components\sidebar.tsx:113] const state = open ? "expanded" : "collapsed";
+[packages\ui\src\components\sidebar.tsx:211] data-collapsible={state === "collapsed" ? collapsible : ""}
+[packages\ui\src\components\sidebar.tsx:295] "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
+[packages\ui\src\components\sidebar.tsx:313] "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm",
+[packages\ui\src\components\sidebar.tsx:541] hidden={state !== "collapsed" || isMobile}
+[packages\ui\src\components\theme-switcher.tsx:19] <div className="inline-grid h-8 grid-cols-3 items-center overflow-hidden rounded-full border text-sm font-medium">
+[packages\ui\src\styles\globals.css:337] .admission-console .admission-filter-panel {
+[packages\ui\src\styles\globals.css:341] .admission-console .admission-filter-panel .filter-builder-simple {
+[packages\ui\src\styles\globals.css:345] .admission-console .admission-filter-actions {
+[packages\ui\src\styles\globals.css:351] .admission-console .admission-filter-actions.has-create-action {
+[packages\ui\src\styles\globals.css:355] .admission-console .admission-filter-actions.three-actions {
+[packages\ui\src\styles\globals.css:359] .admission-console .admission-filter-actions button {
+[packages\ui\src\styles\globals.css:367] .admission-console .admission-filter-actions button:hover {
+[packages\ui\src\styles\globals.css:372] .admission-instructor-console .admission-filter-actions {
+[packages\ui\src\styles\globals.css:381] .admission-instructor-console .admission-filter-actions.three-actions {
+[packages\ui\src\styles\globals.css:385] .admission-instructor-console .admission-filter-actions button {
+[packages\ui\src\styles\globals.css:394] .admission-instructor-console .admission-filter-actions button:hover {
+[packages\ui\src\styles\globals.css:399] .admission-instructor-console .admission-filter-actions,
+[packages\ui\src\styles\globals.css:400] .admission-instructor-console .admission-filter-actions.three-actions {
+[packages\ui\src\styles\globals.css:406] .admission-instructor-console .admission-filter-actions,
+[packages\ui\src\styles\globals.css:407] .admission-instructor-console .admission-filter-actions.three-actions {
+[packages\ui\src\styles\globals.css:412] .admission-filter-dialog {
+[packages\ui\src\styles\globals.css:419] .admission-filter-dialog [data-slot="select-trigger"],
+[packages\ui\src\styles\globals.css:420] .admission-filter-dialog [data-slot="popover-trigger"],
+[packages\ui\src\styles\globals.css:421] .admission-filter-dialog input {
+[packages\ui\src\styles\globals.css:429] .admission-filter-dialog button {
+[packages\ui\src\styles\globals.css:437] .admission-filter-dialog [data-slot="dialog-header"] {
+[packages\ui\src\styles\globals.css:442] .admission-filter-dialog [data-slot="dialog-close"] {
+[packages\ui\src\styles\globals.css:454] .admission-filter-dialog [data-slot="dialog-close"]:hover,
+[packages\ui\src\styles\globals.css:455] .admission-filter-dialog [data-slot="dialog-close"][data-state="open"] {
+[packages\ui\src\styles\globals.css:460] .admission-filter-dialog [data-slot="dialog-title"] {
+[packages\ui\src\styles\globals.css:465] .admission-filter-dialog [data-slot="checkbox"] {
+[packages\ui\src\styles\globals.css:469] .admission-filter-dialog [data-slot="dialog-description"],
+[packages\ui\src\styles\globals.css:470] .admission-filter-dialog label {
+[packages\ui\src\styles\globals.css:616] .admission-console .admission-filter-actions.has-create-action,
+[packages\ui\src\styles\globals.css:617] .admission-console .admission-filter-actions.three-actions {
+[packages\ui\src\styles\globals.css:628] .admission-console .admission-filter-actions.has-create-action,
+[packages\ui\src\styles\globals.css:629] .admission-console .admission-filter-actions.three-actions {
+[packages\ui\src\styles\globals.css:1149] .admission-console .admission-filter-actions {
+[packages\ui\src\styles\globals.css:1153] .admission-console .admission-filter-actions.has-create-action {
+[packages\ui\src\styles\globals.css:1158] .admission-console .admission-filter-actions,
+[packages\ui\src\styles\globals.css:1159] .admission-console .admission-filter-actions.has-create-action {
+[packages\ui\src\styles\globals.css:1165] .admission-console .admission-filter-actions,
+[packages\ui\src\styles\globals.css:1166] .admission-console .admission-filter-actions.has-create-action {
+[packages\ui\src\styles\globals.css:1227] .admission-filter-dialog {
+[packages\ui\src\styles\globals.css:1231] .admission-filter-dialog .filter-builder-simple,
+[packages\ui\src\styles\globals.css:1232] .admission-filter-dialog [data-slot="filter-builder"] {
+[packages\ui\src\styles\globals.css:1236] .admission-filter-dialog input:focus-visible,
+[packages\ui\src\styles\globals.css:1237] .admission-filter-dialog [data-slot="select-trigger"]:focus-visible,
+[packages\ui\src\styles\globals.css:1238] .admission-filter-dialog [data-slot="popover-trigger"]:focus-visible {
+[packages\ui\src\styles\globals.css:1252] .admission-filter-dialog input:focus-visible,
+[packages\ui\src\styles\globals.css:1253] .admission-filter-dialog [data-slot="select-trigger"]:focus-visible,
+[packages\ui\src\styles\globals.css:1254] .admission-filter-dialog [data-slot="popover-trigger"]:focus-visible {
+[packages\ui\src\styles\globals.css:1265] .admission-filter-dialog [data-slot="select-trigger"],
+[packages\ui\src\styles\globals.css:1266] .admission-filter-dialog [data-slot="popover-trigger"],
+[packages\ui\src\styles\globals.css:1267] .admission-filter-dialog input {
+[packages\ui\src\styles\globals.css:1275] .admission-filter-dialog [data-slot="select-trigger"] [data-placeholder],
+[packages\ui\src\styles\globals.css:1276] .admission-filter-dialog [data-slot="popover-trigger"] [data-placeholder],
+[packages\ui\src\styles\globals.css:1277] .admission-filter-dialog input::placeholder,
+[packages\ui\src\styles\globals.css:1278] .admission-filter-dialog textarea::placeholder {
+[packages\ui\src\styles\globals.css:1299] .admission-filter-dialog input,
+[packages\ui\src\styles\globals.css:1300] .admission-filter-dialog [data-slot="select-trigger"],
+[packages\ui\src\styles\globals.css:1301] .admission-filter-dialog [data-slot="popover-trigger"] {
+[packages\ui\src\styles\globals.css:1309] .admission-filter-dialog input:focus,
+[packages\ui\src\styles\globals.css:1310] .admission-filter-dialog input:focus-visible,
+[packages\ui\src\styles\globals.css:1311] .admission-filter-dialog [data-slot="select-trigger"]:focus,
+[packages\ui\src\styles\globals.css:1312] .admission-filter-dialog [data-slot="select-trigger"]:focus-visible,
+[packages\ui\src\styles\globals.css:1313] .admission-filter-dialog [data-slot="popover-trigger"]:focus,
+[packages\ui\src\styles\globals.css:1314] .admission-filter-dialog [data-slot="popover-trigger"]:focus-visible {
+[packages\ui\src\styles\globals.css:1322] .admission-filter-dialog input:focus,
+[packages\ui\src\styles\globals.css:1323] .admission-filter-dialog input:focus-visible,
+[packages\ui\src\styles\globals.css:1324] .admission-filter-dialog [data-slot="select-trigger"]:focus,
+[packages\ui\src\styles\globals.css:1325] .admission-filter-dialog [data-slot="select-trigger"]:focus-visible,
+[packages\ui\src\styles\globals.css:1326] .admission-filter-dialog [data-slot="popover-trigger"]:focus,
+[packages\ui\src\styles\globals.css:1327] .admission-filter-dialog [data-slot="popover-trigger"]:focus-visible,
+[packages\ui\src\styles\globals.css:1328] .admission-console .admission-filter-panel input:focus,
+[packages\ui\src\styles\globals.css:1329] .admission-console .admission-filter-panel input:focus-visible,
+[packages\ui\src\styles\globals.css:1330] .admission-console .admission-filter-panel [data-slot="select-trigger"]:focus,
+[packages\ui\src\styles\globals.css:1332] .admission-filter-panel
+[packages\ui\src\styles\globals.css:1334] .admission-console .admission-filter-panel [data-slot="popover-trigger"]:focus,
+[packages\ui\src\styles\globals.css:1336] .admission-filter-panel
+[packages\ui\src\styles\globals.css:1466] .admin-console .filter-builder-simple,
+[packages\ui\src\styles\globals.css:1478] .admin-console .filter-builder-simple,
+[packages\ui\src\styles\globals.css:1502] .admin-console .filter-builder-simple {
+[packages\ui\src\styles\globals.css:1675] .admin-console .filter-builder-action-slot {
+[packages\ui\src\styles\globals.css:1680] .admin-console .filter-builder-action-slot > * {
+[packages\ui\src\styles\globals.css:1810] .admin-console .filter-builder-action-slot, .admin-console .admin-filter-actions { min-height: 2.9rem; }
+[packages\ui\src\styles\globals.css:1811] .admin-console .filter-builder-action-slot > .admin-filter-actions { align-items: stretch; }
+[packages\ui\src\styles\globals.css:1965] .filter-builder-action-slot {
+[packages\ui\src\styles\globals.css:1970] .filter-builder-action-slot > * {
+[packages\ui\src\styles\globals.css:2004] .filter-builder-action-slot > .btn,
+[packages\ui\src\styles\globals.css:2005] .filter-builder-action-slot > button {

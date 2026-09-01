@@ -12,9 +12,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@webcampus/ui/components/sidebar";
-import { capitalize } from "@webcampus/ui/lib/utils";
+import { capitalize, cn } from "@webcampus/ui/lib/utils";
 import axios from "axios";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
@@ -69,23 +68,28 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return item;
   });
 
+  const isAdmissionsNav =
+    pathname.startsWith("/admission") ||
+    session.user.role === "admission" ||
+    session.user.role === "admission-instructor";
+  const isAdminNav = pathname.startsWith("/admin") || session.user.role === "admin";
+
   return (
-    <Sidebar variant="inset" {...props}>
+    <Sidebar
+      variant="inset"
+      className={cn(
+        "role-sidebar-nav",
+        isAdminNav ? "admin-sidebar-nav" : isAdmissionsNav ? "admission-sidebar-nav" : undefined
+      )}
+      {...props}
+    >
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/" className="flex items-center gap-2">
-                <div className="text-sidebar-primary-foreground relative flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Image
-                    src="/bmsce.svg"
-                    alt="BMSCE Logo"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">BMSCE</span>
+                  <span className="truncate font-medium">BMSU</span>
                   <span className="truncate text-xs">
                     {capitalize(String(session?.user.role))}
                   </span>

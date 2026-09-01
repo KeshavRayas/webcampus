@@ -523,12 +523,14 @@ export function FeedbackRoundDetailView({ roundId }: { roundId: string }) {
             draftFilters={draftFilters}
             onDraftChange={handleCard1DraftChange}
             allValue={DEFAULT_FILTER_ALL_VALUE}
-          />
-          <FilterActions
-            onApply={applyCard1Filters}
-            onReset={resetCard1Filters}
-            applyLabel="Apply Filters"
-            resetLabel="Reset Filters"
+            action={
+              <FilterActions
+                onApply={applyCard1Filters}
+                onReset={resetCard1Filters}
+                applyLabel="Apply Filters"
+                resetLabel="Reset Filters"
+              />
+            }
           />
 
           {appliedFilters.facultyId && appliedFilters.courseId ? (

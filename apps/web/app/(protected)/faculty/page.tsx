@@ -1,6 +1,7 @@
 "use client";
 
 import { useFacultyNotices } from "@/modules/notices/use-notices";
+import { RoleHero } from "@/modules/role-hero";
 import {
   useFacultyCurrentSemester,
   useFacultyTodayTimetable,
@@ -23,18 +24,13 @@ export default function FacultyDashboardPage() {
   const scheduleReady = Boolean(currentSemesterId);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div>
-        <p className="text-muted-foreground text-sm">
-          {new Date().toLocaleDateString()}
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Faculty dashboard
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Your teaching schedule and pending academic work
-        </p>
-      </div>
+    <div className="flex flex-1 flex-col gap-6">
+      <RoleHero
+        eyebrow="Faculty portal"
+        title="Your teaching day, at a glance."
+        description="Teach, mark attendance, and manage grades from one calm place."
+        image="/dashboard-faculty.png"
+      />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -65,7 +61,7 @@ export default function FacultyDashboardPage() {
                   : "Loading semester…"}
               </p>
             )}
-            <Button asChild className="mt-2" variant="outline">
+            <Button asChild className="mt-2 h-[3.15rem]" variant="outline">
               <Link href="/faculty/timetable">Open timetable</Link>
             </Button>
           </CardContent>
@@ -101,20 +97,20 @@ export default function FacultyDashboardPage() {
         <CardHeader>
           <CardTitle>Quick actions</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          <Button asChild variant="outline">
+        <CardContent className="dashboard-action-grid grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <Button asChild className="h-[3.15rem]" variant="outline">
             <Link href="/faculty/timetable">Timetable</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="h-[3.15rem]" variant="outline">
             <Link href="/faculty/attendance/take">Take attendance</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="h-[3.15rem]" variant="outline">
             <Link href="/faculty/marks">Enter marks</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="h-[3.15rem]" variant="outline">
             <Link href="/faculty/question-paper-setup">Question papers</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="h-[3.15rem]" variant="outline">
             <Link href="/faculty/profile">My profile</Link>
           </Button>
         </CardContent>

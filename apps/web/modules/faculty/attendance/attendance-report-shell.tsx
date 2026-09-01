@@ -328,59 +328,58 @@ export const AttendanceReportShell = ({
             draftFilters={draftFilters}
             onDraftChange={onDraftChange}
             allValue={DEFAULT_FILTER_ALL_VALUE}
+            action={
+              <FilterActions
+                onApply={onGetReport}
+                onReset={onResetFilters}
+                applyLabel="Get Report"
+                resetLabel="Reset"
+                isApplyDisabled={!hasRequiredFilters}
+                isResetDisabled={!hasRequiredFilters}
+              />
+            }
           />
 
-          {/* Action Row - Includes Percentage Filters inline if active */}
-          <div className="mt-6 flex flex-col items-end justify-between gap-4 md:flex-row md:items-end">
-            <div className="w-full md:w-auto">
-              {activeTab === "percentage" && (
-                <div className="md:w-75 grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="percentageFrom">Percentage From (%)</Label>
-                    <Input
-                      id="percentageFrom"
-                      type="number"
-                      min={0}
-                      max={100}
-                      placeholder="0"
-                      value={percentageFrom ?? ""}
-                      onChange={(e) =>
-                        onPercentageFilterChange?.(
-                          "percentageFrom",
-                          e.target.value
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="percentageTo">Percentage To (%)</Label>
-                    <Input
-                      id="percentageTo"
-                      type="number"
-                      min={0}
-                      max={100}
-                      placeholder="100"
-                      value={percentageTo ?? ""}
-                      onChange={(e) =>
-                        onPercentageFilterChange?.(
-                          "percentageTo",
-                          e.target.value
-                        )
-                      }
-                    />
-                  </div>
+          {/* Percentage Filters - From (half of first column) / To (other half) */}
+          <div className="mt-6">
+            {activeTab === "percentage" && (
+              <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 md:gap-2">
+                <div className="space-y-2">
+                  <Label htmlFor="percentageFrom">From</Label>
+                  <Input
+                    id="percentageFrom"
+                    type="number"
+                    min={0}
+                    max={100}
+                    placeholder="0"
+                    value={percentageFrom ?? ""}
+                    onChange={(e) =>
+                      onPercentageFilterChange?.(
+                        "percentageFrom",
+                        e.target.value
+                      )
+                    }
+                  />
                 </div>
-              )}
-            </div>
-
-            <FilterActions
-              onApply={onGetReport}
-              onReset={onResetFilters}
-              applyLabel="Get Report"
-              resetLabel="Reset"
-              isApplyDisabled={!hasRequiredFilters}
-              isResetDisabled={!hasRequiredFilters}
-            />
+                <div className="space-y-2">
+                  <Label htmlFor="percentageTo">To</Label>
+                  <Input
+                    id="percentageTo"
+                    type="number"
+                    min={0}
+                    max={100}
+                    placeholder="100"
+                    value={percentageTo ?? ""}
+                    onChange={(e) =>
+                      onPercentageFilterChange?.(
+                        "percentageTo",
+                        e.target.value
+                      )
+                    }
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </FilterPanel>
 

@@ -308,15 +308,15 @@ export const HodCoursesView = () => {
                   return next;
                 });
               }}
+              action={
+                <FilterActions
+                  onApply={applyFilters}
+                  onReset={resetFilters}
+                  isApplyDisabled={!isApplyReady}
+                  applyLabel="Apply Filters"
+                />
+              }
             />
-            <div className="mt-4 flex justify-end">
-              <FilterActions
-                onApply={applyFilters}
-                onReset={resetFilters}
-                isApplyDisabled={!isApplyReady}
-                applyLabel="Apply Filters"
-              />
-            </div>
           </FilterPanel>
 
           <div className="bg-card text-card-foreground rounded-xl border shadow-sm">

@@ -167,11 +167,13 @@ export default function AdminProjectMappingPage() {
           onDraftChange={(key, value) =>
             setDraftFilters((prev) => ({ ...prev, [key]: value }))
           }
-        />
-        <FilterActions
-          onApply={applyFilters}
-          onReset={resetFilters}
-          applyLabel="Apply Filters"
+          action={
+            <FilterActions
+              onApply={applyFilters}
+              onReset={resetFilters}
+              applyLabel="Apply Filters"
+            />
+          }
         />
       </FilterPanel>
 

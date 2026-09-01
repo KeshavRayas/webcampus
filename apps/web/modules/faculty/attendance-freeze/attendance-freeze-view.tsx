@@ -210,17 +210,19 @@ export const AttendanceFreezeView = () => {
           fields={filterFields}
           draftFilters={draftFilters}
           onDraftChange={handleFilterChange}
-        />
-        <FilterActions
-          onApply={handleApplyFilters}
-          onReset={handleResetFilters}
-          isApplyDisabled={
-            !draftFilters.academicTermId || !draftFilters.semesterId
-          }
-          isResetDisabled={
-            !draftFilters.academicTermId &&
-            !draftFilters.semesterId &&
-            !draftFilters.departmentId
+          action={
+            <FilterActions
+              onApply={handleApplyFilters}
+              onReset={handleResetFilters}
+              isApplyDisabled={
+                !draftFilters.academicTermId || !draftFilters.semesterId
+              }
+              isResetDisabled={
+                !draftFilters.academicTermId &&
+                !draftFilters.semesterId &&
+                !draftFilters.departmentId
+              }
+            />
           }
         />
       </FilterPanel>

@@ -27,7 +27,6 @@ import {
   TableRow,
 } from "@webcampus/ui/components/table";
 import axios from "axios";
-import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-toastify";
 
@@ -132,11 +131,12 @@ export const ProctorGroupsTab = ({ semesterId }: { semesterId?: string }) => {
             placeholder="e.g. PR-1"
             value={newGroup}
             onChange={(e) => setNewGroup(e.target.value)}
-            className="max-w-xs"
+            className="w-[200px]"
           />
           <Button
             onClick={() => createGroup.mutate(newGroup)}
             disabled={!newGroup || createGroup.isPending}
+            className="w-[200px]"
           >
             Create Group
           </Button>
@@ -181,7 +181,7 @@ export const ProctorGroupsTab = ({ semesterId }: { semesterId?: string }) => {
                           })
                         }
                       >
-                        <SelectTrigger className="w-[280px]">
+                        <SelectTrigger className="w-[200px]">
                           <SelectValue placeholder="Assign a faculty" />
                         </SelectTrigger>
                         <SelectContent>
@@ -198,7 +198,6 @@ export const ProctorGroupsTab = ({ semesterId }: { semesterId?: string }) => {
                     <TableCell>
                       <Button
                         variant="ghost"
-                        size="icon"
                         onClick={() => {
                           if (
                             confirm(
@@ -209,7 +208,7 @@ export const ProctorGroupsTab = ({ semesterId }: { semesterId?: string }) => {
                           }
                         }}
                       >
-                        <Trash2 className="text-destructive h-4 w-4" />
+                        Delete
                       </Button>
                     </TableCell>
                   </TableRow>

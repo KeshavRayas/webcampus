@@ -12,6 +12,7 @@ import {
 } from "@webcampus/ui/components/dialog";
 import { Form } from "@webcampus/ui/components/form";
 import { useIsMobile } from "@webcampus/ui/hooks/use-mobile";
+import { cn } from "@webcampus/ui/lib/utils";
 import { Plus } from "lucide-react";
 import React from "react";
 import { FieldValues, UseFormReturn } from "react-hook-form";
@@ -59,7 +60,7 @@ export const DialogForm = <T extends FieldValues>({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{renderTrigger()}</DialogTrigger>
-      <DialogContent className={contentClassName}>
+      <DialogContent className={cn("admin-dialog-content", contentClassName)}>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit)}

@@ -1,0 +1,44 @@
+apps/api/Dockerfile:33:# The hall-ticket service reads the BMSCE logo at runtime. Dev resolves it via a
+apps/api/Dockerfile:35:# to a fixed location and point at it via BMSCE_LOGO_PATH.
+apps/api/Dockerfile:36:RUN mkdir -p /app && cp apps/web/public/bmsce.svg /app/bmsce.svg
+apps/api/Dockerfile:37:ENV BMSCE_LOGO_PATH=/app/bmsce.svg \
+apps/api/scripts/backfill-current-student-emails.ts:88:    return `${baseLocalPart}@bmsce.ac.in`;
+apps/api/scripts/backfill-current-student-emails.ts:103:      return `${localPart}@bmsce.ac.in`;
+apps/api/scripts/backfill-current-student-emails.ts:110:      return `${localPart}@bmsce.ac.in`;
+apps/api/scripts/backfill-current-student-emails.ts:140:          endsWith: `.${departmentCode}${yearSuffix}@bmsce.ac.in`,
+apps/api/scripts/pe-test-run.ts:17:  { usn: "TBM26CS0001", email: "cassandra.cs26@bmsce.ac.in", section: "PA" },
+apps/api/scripts/pe-test-run.ts:18:  { usn: "TBM26CS0002", email: "jayson.cs26@bmsce.ac.in", section: "PA" },
+apps/api/scripts/pe-test-run.ts:19:  { usn: "TBM26CS0003", email: "jed.cs26@bmsce.ac.in", section: "PA" },
+apps/api/scripts/pe-test-run.ts:20:  { usn: "TBM26CS0004", email: "kristina.cs26@bmsce.ac.in", section: "PB" },
+apps/api/scripts/pe-test-run.ts:21:  { usn: "TBM26CS0005", email: "marques.cs26@bmsce.ac.in", section: "PB" },
+apps/api/scripts/pe-test-run.ts:22:  { usn: "TBM26CS0006", email: "roxane.cs26@bmsce.ac.in", section: "PB" },
+apps/api/scripts/pe-test-seed.ts:46:  { usn: "TBM26CS0001", email: "cassandra.cs26@bmsce.ac.in", section: "PA" },
+apps/api/scripts/pe-test-seed.ts:47:  { usn: "TBM26CS0002", email: "jayson.cs26@bmsce.ac.in", section: "PA" },
+apps/api/scripts/pe-test-seed.ts:48:  { usn: "TBM26CS0003", email: "jed.cs26@bmsce.ac.in", section: "PA" },
+apps/api/scripts/pe-test-seed.ts:49:  { usn: "TBM26CS0004", email: "kristina.cs26@bmsce.ac.in", section: "PB" },
+apps/api/scripts/pe-test-seed.ts:50:  { usn: "TBM26CS0005", email: "marques.cs26@bmsce.ac.in", section: "PB" },
+apps/api/scripts/pe-test-seed.ts:51:  { usn: "TBM26CS0006", email: "roxane.cs26@bmsce.ac.in", section: "PB" },
+apps/api/scripts/submit-mock-applicant.ts:408:    const email = `mock${attempt}.${deptCode}26@bmsce.ac.in`;
+apps/api/src/services/admission/student-email.ts:1:const STUDENT_EMAIL_DOMAIN = "bmsce.ac.in";
+apps/api/src/services/shared/hall-ticket.service.ts:19:      process.env.BMSCE_LOGO_PATH ??
+apps/api/src/services/shared/hall-ticket.service.ts:20:      path.resolve(__filename, "../../../../../../apps/web/public/bmsce.svg");
+apps/api/src/services/shared/hall-ticket.service.ts:25:    return "/bmsce.svg";
+apps/web/app/(public)/403/page.tsx:10:        src={"/bmsce.svg"}
+apps/web/app/(public)/403/page.tsx:11:        alt="BMSCE Logo"
+apps/web/app/layout.tsx:11:  title: "BMSCE - Webcampus",
+apps/web/modules/accounts/accounts-view.tsx:534:                  <span className="text-gray-800">sujanr.ec24@bmsce.ac.in</span>
+apps/web/modules/accounts/accounts-view.tsx:539:                        "sujanr.ec24@bmsce.ac.in",
+apps/web/modules/admission/admin/admission-view.tsx:482:                                  placeholder="student@bmsce.ac.in"
+apps/web/modules/admission/admission-instructor/admission-instructor-view.tsx:362:                                  placeholder="student@bmsce.ac.in"
+apps/web/modules/admission/applicant/applicant-admission-view.tsx:2543:                    placeholder="student@bmsce.ac.in"
+apps/web/modules/sidebar/app-sidebar.tsx:90:                    src="/bmsce.svg"
+apps/web/modules/sidebar/app-sidebar.tsx:91:                    alt="BMSCE Logo"
+apps/web/modules/sidebar/app-sidebar.tsx:97:                  <span className="truncate font-medium">BMSCE</span>
+packages/auth/src/templates/reset-password.html:37:          alt="BMSCE Logo"
+packages/auth/src/templates/reset-password.html:77:        We received a request to reset your password for your BMSCE Webcampus
+packages/auth/src/templates/reset-password.html:128:        &copy; 2025 BMSCE Webcampus. All rights reserved.
+packages/playwright-web/tests/auth/home.spec.ts:21:    const logo = page.locator('img[alt="Bmsce Logo"]');
+packages/playwright-web/tests/auth/home.spec.ts:23:    await expect(page.getByRole("link", { name: /BMSCE/i })).toBeVisible();
+packages/playwright-web/tests/auth/home.spec.ts:25:      page.getByRole("heading", { name: /BMSCE CAMPUS/i })
+packages/ui/src/lib/hall-ticket/template.tsx:69:  logoUrl = "/bmsce.svg",
+packages/ui/src/lib/hall-ticket/template.tsx:102:        <img src={logoUrl} alt="BMSCE" style={R(s.headerLogo)} />

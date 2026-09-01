@@ -160,8 +160,8 @@ export const CourseApprovalsFilters = ({
         fields={filterFields}
         draftFilters={draftFilters}
         onDraftChange={onDraftChange}
+        action={<FilterActions onApply={onApply} onReset={onReset} />}
       />
-      <FilterActions onApply={onApply} onReset={onReset} />
     </FilterPanel>
   );
 };

@@ -10,6 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { courseTypeLabel } from "@webcampus/schemas/constants";
 import { Alert, AlertDescription } from "@webcampus/ui/components/alert";
 import { Button } from "@webcampus/ui/components/button";
+import { Card, CardContent } from "@webcampus/ui/components/card";
 import {
   Form,
   FormControl,
@@ -109,21 +110,25 @@ export const CourseRegistrationView = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-card rounded-xl border p-6">
-        <p className="text-muted-foreground text-sm">
-          Loading course registration...
-        </p>
-      </div>
+      <Card className="course-registration-status overflow-hidden">
+        <CardContent className="p-6">
+          <p className="text-muted-foreground text-sm">
+            Loading course registration...
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
   if (isError) {
     return (
-      <div className="bg-secondary/20 rounded-xl border p-6 text-center">
-        <p className="text-muted-foreground text-sm">
-          {getApiErrorMessage(error, "Unable to load course registration")}
-        </p>
-      </div>
+      <Card className="course-registration-status overflow-hidden bg-secondary/20">
+        <CardContent className="p-6 text-center">
+          <p className="text-muted-foreground text-sm">
+            {getApiErrorMessage(error, "Unable to load course registration")}
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -143,7 +148,7 @@ export const CourseRegistrationView = () => {
         {history.map((item) => (
           <Alert
             key={`${item.academicTermId}_${item.semesterId}`}
-            className="border-green-500 bg-green-100 text-green-800"
+            className="border-green-500 bg-green-100 text-green-800 dark:border-green-400/40 dark:bg-green-950/40 dark:text-green-200"
           >
             <AlertDescription>
               Course registration for {item.academicTermLabel} -{" "}
@@ -153,7 +158,7 @@ export const CourseRegistrationView = () => {
         ))}
 
         {current && !current.hasRegistered && !current.isWindowOpen && (
-          <Alert className="border-red-500 bg-red-100 text-red-800">
+          <Alert className="border-red-500 bg-red-100 text-red-800 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-200">
             <AlertDescription>
               Course registration closed, please contact your proctor for
               instructions.

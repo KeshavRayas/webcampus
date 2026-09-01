@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
+import { Card, CardContent } from "@webcampus/ui/components/card";
 import {
   Table,
   TableBody,
@@ -113,7 +114,7 @@ export const EnrolledCoursesView = () => {
               setSelectedSemesterId(value === "all" ? undefined : value);
             }}
           >
-            <SelectTrigger id="semester-filter" className="w-72">
+            <SelectTrigger id="semester-filter" className="h-[3.15rem] w-72 rounded-full">
               <SelectValue placeholder="All semesters" />
             </SelectTrigger>
             <SelectContent>
@@ -129,23 +130,29 @@ export const EnrolledCoursesView = () => {
       )}
 
       {isLoading ? (
-        <div className="bg-card rounded-xl border p-6">
-          <p className="text-muted-foreground text-sm">
-            Loading enrolled courses...
-          </p>
-        </div>
+        <Card className="course-registration-status overflow-hidden">
+          <CardContent className="p-6">
+            <p className="text-muted-foreground text-sm">
+              Loading enrolled courses...
+            </p>
+          </CardContent>
+        </Card>
       ) : isError ? (
-        <div className="bg-secondary/20 rounded-xl border p-6 text-center">
-          <p className="text-muted-foreground text-sm">
-            {getApiErrorMessage(error, "Unable to load enrolled courses")}
-          </p>
-        </div>
+        <Card className="course-registration-status overflow-hidden bg-secondary/20">
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground text-sm">
+              {getApiErrorMessage(error, "Unable to load enrolled courses")}
+            </p>
+          </CardContent>
+        </Card>
       ) : allSemesters.length === 0 ? (
-        <div className="bg-card rounded-xl border p-6 text-center">
-          <p className="text-muted-foreground text-sm">
-            No enrolled courses found. Complete course registration first.
-          </p>
-        </div>
+        <Card className="course-registration-status overflow-hidden">
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground text-sm">
+              No enrolled courses found. Complete course registration first.
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-6">
           {allSemesters.map((group) => (

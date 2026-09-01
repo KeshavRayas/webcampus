@@ -243,15 +243,15 @@ export const AdminCourseCoordinatorFilters = ({
             return next;
           });
         }}
+        action={
+          <FilterActions
+            onApply={applyFilters}
+            onReset={resetFilters}
+            isApplyDisabled={!isApplyReady}
+            applyLabel="View Course"
+          />
+        }
       />
-      <div className="mt-4 flex justify-end">
-        <FilterActions
-          onApply={applyFilters}
-          onReset={resetFilters}
-          isApplyDisabled={!isApplyReady}
-          applyLabel="View Course"
-        />
-      </div>
     </FilterPanel>
   );
 };

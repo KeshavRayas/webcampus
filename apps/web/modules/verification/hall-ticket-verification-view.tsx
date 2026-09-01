@@ -187,8 +187,8 @@ export const HallTicketVerificationView = () => {
             <div className="bg-border h-px flex-1" />
           </div>
 
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex-1 space-y-2">
+          <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
               <label
                 htmlFor="verify-token"
                 className="text-muted-foreground text-xs"
@@ -200,12 +200,13 @@ export const HallTicketVerificationView = () => {
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
                 placeholder="WCHT_VERIFY:..."
-                className="bg-background w-full rounded-md border px-3 py-2 text-sm"
+                className="bg-background h-[3.15rem] w-full rounded-md border px-4 text-sm"
               />
             </div>
             <Button
               onClick={() => void handleManualVerify()}
               disabled={pending}
+              className="h-[3.15rem] w-full"
             >
               {pending ? (
                 <Loader2 className="mr-2 size-4 animate-spin" />

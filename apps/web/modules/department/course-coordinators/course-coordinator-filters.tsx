@@ -247,14 +247,14 @@ export const CourseCoordinatorFilters = ({
             return next;
           });
         }}
+        action={
+          <FilterActions
+            onApply={applyFilters}
+            onReset={resetFilters}
+            applyLabel="View Course"
+          />
+        }
       />
-      <div className="mt-4 flex justify-end">
-        <FilterActions
-          onApply={applyFilters}
-          onReset={resetFilters}
-          applyLabel="View Course"
-        />
-      </div>
     </FilterPanel>
   );
 };

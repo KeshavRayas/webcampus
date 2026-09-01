@@ -367,6 +367,7 @@ export const HODAttendanceWindowsView = () => {
               return { ...current, [key]: value };
             });
           }}
+          action={<FilterActions onApply={applyFilters} onReset={resetFilters} />}
         />
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           <Input
@@ -397,7 +398,6 @@ export const HODAttendanceWindowsView = () => {
                 ? "Freezing..."
                 : `Freeze Filtered (${filteredWindows.length})`}
             </Button>
-            <FilterActions onApply={applyFilters} onReset={resetFilters} />
           </div>
         </div>
       </FilterPanel>

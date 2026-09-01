@@ -227,7 +227,7 @@ export function QrScanner({ onResult, busy }: QrScannerProps) {
 
       <div className="space-y-2 rounded-lg border p-3">
         <Label htmlFor="manual-usn">Manual entry (USN)</Label>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-2">
           <Input
             id="manual-usn"
             value={manualValue}
@@ -237,12 +237,14 @@ export function QrScanner({ onResult, busy }: QrScannerProps) {
             }}
             placeholder="e.g. 1BM22CS001"
             disabled={busy}
+            className="w-full"
           />
           <Button
             type="button"
             variant="secondary"
             onClick={() => void handleManualSubmit()}
             disabled={busy || !manualValue.trim()}
+            className="w-full"
           >
             Verify
           </Button>

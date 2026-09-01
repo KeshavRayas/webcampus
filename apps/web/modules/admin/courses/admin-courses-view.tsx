@@ -313,11 +313,13 @@ export const AdminCoursesView = () => {
               return next;
             });
           }}
-        />
-        <FilterActions
-          onApply={applyFilters}
-          onReset={resetFilters}
-          isApplyDisabled={!isApplyReady}
+          action={
+            <FilterActions
+              onApply={applyFilters}
+              onReset={resetFilters}
+              isApplyDisabled={!isApplyReady}
+            />
+          }
         />
       </FilterPanel>
 

@@ -9,20 +9,20 @@
 @import "react-phone-number-input/style.css";
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.5282 0.2628 262.87);
-  --primary-foreground: oklch(0.985 0 0);
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+  --primary: #1a1a1a;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.5282 0.2628 262.87);
+  --secondary-foreground: #1a1a1a;
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
   --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.5282 0.2628 262.87);
+  --accent-foreground: #1a1a1a;
   --destructive: oklch(0.426 0.145 29.44);
   --destructive-foreground: oklch(0.945 0.022 50);
   --border: oklch(0.922 0 0);
@@ -33,28 +33,63 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.650rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.5282 0.2628 262.87);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --radius: 0.65rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1a1a1a;
+  --sidebar-primary: #1a1a1a;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.5282 0.2628 262.87);
+  --sidebar-accent-foreground: #1a1a1a;
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
   --toastify-color-info: oklch(0.5282 0.2628 262.87) !important;
   --toastify-color-success: #46a758 !important;
+  --auth-bg: #ffffff;
+  --auth-surface: #f4f4f5;
+  --auth-surface-strong: #ffffff;
+  --auth-surface-2: #e4e4e7;
+  --auth-border: #d4d4d8;
+  --auth-foreground: #1a1a1a;
+  --auth-foreground-muted: #52525b;
+  --auth-icon: #71717a;
+  --auth-muted: #71717a;
+  --auth-muted-2: #52525b;
+  --auth-footer: #71717a;
+  --auth-accent: #1a1a1a;
+  --auth-accent-foreground: #ffffff;
+  --auth-link: #1a1a1a;
+}
+
+/*
+ * Scoped theme for the public auth surface (role select, sign-in,
+ * forgot/reset password, trust login). Overrides the shared design
+ * tokens locally so shadcn primitives (Button, Input, etc.) render in
+ * the Uber-inspired black/white palette here, while every other
+ * (protected) route keeps the original brand color untouched.
+ */
+.auth-shell {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --primary: #1a1a1a;
+  --primary-foreground: #ffffff;
+  --secondary-foreground: #1a1a1a;
+  --accent-foreground: #1a1a1a;
+  --muted-foreground: oklch(0.46 0 0);
+  --border: oklch(0.88 0 0);
+  --input: oklch(0.88 0 0);
+  --ring: #1a1a1a;
+  --radius: 0.85rem;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: #1a1a1a;
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
+  --card: #1a1a1a;
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
+  --popover: #1a1a1a;
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.5282 0.2628 262.87);
+  --primary-foreground: #1a1a1a;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -79,6 +114,20 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --auth-bg: #1a1a1a;
+  --auth-surface: #202022;
+  --auth-surface-strong: #252527;
+  --auth-surface-2: #373739;
+  --auth-border: #4a4a4c;
+  --auth-foreground: #f7f7f7;
+  --auth-foreground-muted: #b4b4b8;
+  --auth-icon: #a6a6a9;
+  --auth-muted: #96969b;
+  --auth-muted-2: #77777b;
+  --auth-footer: #747479;
+  --auth-accent: #f7f7f7;
+  --auth-accent-foreground: #1a1a1a;
+  --auth-link: #f1f1f1;
 }
 
 @theme inline {
@@ -128,6 +177,471 @@
     @apply bg-background text-foreground;
   }
 }
+
+.admission-hero {
+  position: relative;
+  min-height: 238px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 1.15rem;
+  isolation: isolate;
+  background-color: var(--card);
+  background-image: url("/admissions.png");
+  background-position: right center;
+  background-size: cover;
+}
+
+.admission-hero::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, #000 86%, transparent) 0%,
+    color-mix(in oklab, #000 62%, transparent) 18%,
+    color-mix(in oklab, #000 10%, transparent) 38%,
+    transparent 52%
+  );
+}
+
+.dark .admission-hero::before {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, #fff 86%, transparent) 0%,
+    color-mix(in oklab, #fff 62%, transparent) 18%,
+    color-mix(in oklab, #fff 10%, transparent) 38%,
+    transparent 52%
+  );
+}
+
+.admission-hero-copy {
+  color: #fff;
+}
+
+.dark .admission-hero-copy {
+  color: #0b0b0b;
+}
+
+.admission-console .admission-hero-copy > p:last-child {
+  color: currentColor;
+  opacity: 0.82;
+}
+
+.admission-hero-copy {
+  display: flex;
+  max-width: 31rem;
+  min-height: 238px;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem 2.25rem;
+}
+
+.admission-eyebrow {
+  margin: 0 0 1rem;
+  color: color-mix(in oklab, currentColor 72%, transparent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.admission-hero h1 {
+  margin: 0;
+  max-width: 25rem;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+}
+
+.admission-hero-copy > p:last-child {
+  max-width: 25rem;
+  margin: 0.9rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.admission-console {
+  --primary: oklch(0.145 0 0);
+  --primary-foreground: oklch(1 0 0);
+  --radius: 1.15rem;
+  font-family:
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.dark .admission-console {
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.145 0 0);
+}
+
+.admission-console .admission-panel,
+.admission-console > div > .bg-card,
+.admission-console > .bg-card {
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+  box-shadow: 0 12px 32px color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+
+.admission-console .admission-hero {
+  min-height: 272px;
+}
+
+.admission-console .admission-hero-copy {
+  min-height: 272px;
+}
+
+.admission-console .admission-hero h1 {
+  max-width: 25rem;
+  font-size: clamp(1.8rem, 3vw, 2.55rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+}
+
+.admission-console .admission-eyebrow,
+.admission-console label {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.admission-console [data-slot="select-trigger"],
+.admission-console input,
+.admission-console textarea {
+  min-height: 3.15rem;
+  border-radius: 1.15rem;
+  border-color: color-mix(in oklab, var(--foreground) 20%, transparent);
+  padding-left: 1.05rem;
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%);
+  box-shadow: none;
+}
+
+.admission-console [data-slot="popover-trigger"] {
+  padding-left: 1.05rem;
+}
+
+.admission-console button:not([data-slot="sidebar-trigger"]),
+.admission-console a[role="tab"] {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.admission-console .admission-filter-panel {
+  margin-bottom: 1.1rem;
+}
+
+.admission-console .admission-filter-panel .filter-builder-simple {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admission-console .admission-filter-actions {
+  display: grid;
+  margin-top: 0.35rem;
+  gap: 0.65rem;
+}
+
+.admission-console .admission-filter-actions.has-create-action {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admission-console .admission-filter-actions.three-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admission-console .admission-filter-actions button {
+  width: 100%;
+  min-height: 2.85rem;
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.admission-console .admission-filter-actions button:hover {
+  background: color-mix(in oklab, var(--foreground) 84%, transparent);
+}
+
+/* Admission-instructor filter action row: equal columns, same height as fields */
+.admission-instructor-console .admission-filter-actions {
+  display: grid;
+  width: 100%;
+  margin-top: 0.35rem;
+  gap: 0.65rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.admission-instructor-console .admission-filter-actions.three-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admission-instructor-console .admission-filter-actions button {
+  width: 100%;
+  min-height: 3.15rem;
+  border-radius: 999px;
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.admission-instructor-console .admission-filter-actions button:hover {
+  background: color-mix(in oklab, var(--foreground) 84%, transparent);
+}
+
+@media (max-width: 768px) {
+  .admission-instructor-console .admission-filter-actions,
+  .admission-instructor-console .admission-filter-actions.three-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .admission-instructor-console .admission-filter-actions,
+  .admission-instructor-console .admission-filter-actions.three-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admission-filter-dialog {
+  border-radius: 1.15rem;
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.admission-filter-dialog [data-slot="select-trigger"],
+.admission-filter-dialog [data-slot="popover-trigger"],
+.admission-filter-dialog input {
+  min-height: 2.85rem;
+  border-radius: 999px;
+  border-color: color-mix(in oklab, var(--foreground) 20%, transparent);
+  padding-left: 1.05rem;
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%);
+}
+
+.admission-filter-dialog button {
+  min-height: 2.75rem;
+  border-radius: 999px;
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.admission-filter-dialog [data-slot="dialog-header"] {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.admission-filter-dialog [data-slot="dialog-close"] {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.admission-filter-dialog [data-slot="dialog-close"]:hover,
+.admission-filter-dialog [data-slot="dialog-close"][data-state="open"] {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.admission-filter-dialog [data-slot="dialog-title"] {
+  border: 0;
+  text-decoration: none;
+}
+
+.admission-filter-dialog [data-slot="checkbox"] {
+  display: none;
+}
+
+.admission-filter-dialog [data-slot="dialog-description"],
+.admission-filter-dialog label {
+  color: var(--muted-foreground);
+}
+
+.admission-console .admission-report-header {
+  margin-top: 0.35rem;
+}
+
+.admission-console .admission-report-download {
+  margin-top: 0;
+}
+
+.admission-console .admission-report-table {
+  margin-top: 1.5rem;
+}
+
+.admission-console
+  .admission-report-download
+  [data-slot="dropdown-menu-content"] {
+  min-width: 12rem;
+  border-radius: 1.15rem;
+  padding: 0.35rem;
+}
+
+.admission-sidebar-nav [data-sidebar="menu-button"] {
+  min-height: 2.65rem;
+  border-radius: 0.8rem;
+  font-size: 0.88rem;
+  letter-spacing: -0.01em;
+}
+
+.admission-sidebar-nav .admission-nav-group + .admission-nav-group {
+  margin-top: 0.75rem;
+}
+
+.admission-sidebar-nav [data-sidebar="menu-button"][data-active="true"] {
+  background: color-mix(in oklab, var(--sidebar-foreground) 9%, transparent);
+  color: var(--sidebar-foreground);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--sidebar-foreground) 5%, transparent);
+}
+
+.admission-sidebar-nav [data-sidebar="group-label"] {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.admission-console .admission-setup [data-slot="card"] {
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+  box-shadow: 0 10px 28px color-mix(in oklab, var(--foreground) 4%, transparent);
+}
+
+.admission-console .admission-setup [data-slot="card-header"] {
+  padding-bottom: 0.75rem;
+}
+
+.admission-console .admission-setup [data-slot="card-title"] {
+  letter-spacing: -0.02em;
+}
+
+.admission-console .admission-setup label {
+  color: var(--foreground);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admission-console .admission-setup input {
+  max-width: none;
+  min-height: 2.9rem;
+  border-radius: 999px;
+  padding-left: 1.05rem;
+}
+
+.admission-console .admission-setup [data-slot="badge"] {
+  border: 1px solid color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+  padding: 0.45rem 0.7rem 0.45rem 0.85rem;
+  font-weight: 600;
+}
+
+.admission-console .admission-setup [data-slot="badge"] button {
+  width: auto;
+  min-height: 0;
+  padding: 0.1rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--foreground);
+}
+
+.admission-console
+  .admission-setup
+  button:not([data-variant="destructive"]):not([data-slot="dialog-close"]) {
+  min-height: 2.75rem;
+  border-color: var(--foreground);
+  border-radius: 999px;
+  background: var(--foreground);
+  color: var(--background);
+  font-weight: 600;
+}
+
+.admission-console
+  .admission-setup
+  button:not([data-variant="destructive"]):hover {
+  background: color-mix(in oklab, var(--foreground) 84%, transparent);
+}
+
+.admission-console .admission-setup button[data-variant="destructive"] {
+  border-radius: 999px;
+}
+
+.admission-console table thead tr {
+  border-bottom-color: color-mix(in oklab, var(--foreground) 12%, transparent);
+}
+
+.admission-console table tbody tr {
+  border-bottom-color: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.admission-console table th {
+  color: var(--muted-foreground);
+  vertical-align: middle;
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.admission-console table td {
+  vertical-align: middle;
+  padding-top: 0.95rem;
+  padding-bottom: 0.95rem;
+}
+
+.admission-console [data-state="active"] {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+@media (max-width: 768px) {
+  .admission-console .admission-filter-actions.has-create-action,
+  .admission-console .admission-filter-actions.three-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .admission-console .admission-hero,
+  .admission-console .admission-hero-copy {
+    min-height: 300px;
+  }
+
+  .admission-console .admission-filter-actions.has-create-action,
+  .admission-console .admission-filter-actions.three-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .admission-hero {
+    min-height: 280px;
+    background-position: 68% center;
+  }
+
+  .admission-hero-copy {
+    min-height: 280px;
+    padding: 1.5rem;
+  }
+}
 .phone-input {
   display: flex;
   width: 100%;
@@ -152,4 +666,1512 @@
 
 .phone-input .PhoneInputInput {
   width: 100%;
+}
+
+/* Shared admissions treatment for secondary flows and dialogs. */
+.admission-theme-dialog {
+  border: 1px solid color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 1.15rem;
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 24px 80px
+    color-mix(in oklab, var(--foreground) 14%, transparent);
+}
+
+.admission-theme-dialog [data-slot="dialog-header"] {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.admission-theme-dialog [data-slot="dialog-title"] {
+  letter-spacing: -0.025em;
+}
+
+.admission-theme-dialog [data-slot="dialog-close"] {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.admission-theme-dialog [data-slot="dialog-close"]:hover {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.admission-theme-dialog input,
+.admission-theme-dialog textarea,
+.admission-theme-dialog [data-slot="select-trigger"],
+.admission-theme-dialog [data-slot="popover-trigger"] {
+  min-height: 2.85rem;
+  border-radius: 999px;
+  border-color: color-mix(in oklab, var(--foreground) 20%, transparent);
+  padding-left: 1.05rem;
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%);
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.admission-theme-dialog textarea {
+  min-height: 6rem;
+  border-radius: 1.15rem;
+  padding-top: 0.85rem;
+}
+
+.admission-theme-dialog button:not([data-slot="dialog-close"]),
+.admission-theme-primary,
+.admission-cancel-trigger {
+  min-height: 2.75rem;
+  border-radius: 999px;
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+  font-weight: 600;
+}
+
+.admission-theme-dialog button[data-variant="outline"],
+.admission-theme-dialog .admission-theme-footer button:first-child {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.admission-theme-dialog button:hover,
+.admission-theme-primary:hover,
+.admission-cancel-trigger:hover {
+  background: color-mix(in oklab, var(--foreground) 84%, transparent);
+  color: var(--background);
+}
+
+.admission-theme-dialog [data-slot="dialog-footer"] {
+  gap: 0.65rem;
+  border-top: 0;
+}
+
+.admission-document-card,
+.admission-document-profile {
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+}
+
+.admission-upload-control {
+  border-color: color-mix(in oklab, var(--foreground) 24%, transparent);
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%);
+}
+
+.admission-document-card [data-slot="badge"],
+.admission-theme-dialog [data-slot="badge"],
+.admission-console table [data-slot="badge"] {
+  border: 1px solid color-mix(in oklab, var(--foreground) 22%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+}
+
+.admission-document-card a {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.admission-theme-dialog .admission-create-choice {
+  min-height: 0;
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 1.15rem !important;
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  text-align: left;
+  box-shadow: none;
+}
+
+.admission-theme-dialog .admission-create-choice:hover {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+}
+
+.admission-sidebar-nav [data-sidebar="menu-button"][data-active="true"] {
+  border-radius: 999px;
+}
+
+.admission-console .admission-cancel-trigger:disabled {
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  background: color-mix(in oklab, var(--foreground) 10%, transparent);
+  color: var(--muted-foreground);
+}
+
+.admission-console .admission-theme-control {
+  border-radius: 999px;
+}
+
+.admission-console .admission-theme-dialog table,
+.admission-console .admission-theme-dialog [data-slot="scroll-area"] {
+  max-width: 100%;
+}
+
+.admission-console [data-slot="table-container"] {
+  overflow-x: visible;
+}
+
+.admission-console table {
+  width: 100%;
+  min-width: 0;
+}
+
+.admission-fill-form {
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+  color: var(--foreground);
+}
+
+.admission-fill-form input,
+.admission-fill-form textarea,
+.admission-fill-form [data-slot="select-trigger"],
+.admission-fill-form .PhoneInputInput,
+.admission-fill-form .phone-input {
+  min-height: 3.15rem;
+  border-radius: 999px;
+  border-color: color-mix(in oklab, var(--foreground) 20%, transparent);
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%);
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.admission-fill-form textarea {
+  min-height: 6rem;
+  padding-top: 0.85rem;
+}
+
+.admission-fill-form [class*="rounded-lg"],
+.admission-fill-form [class*="rounded-xl"] {
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+}
+
+.admission-fill-form .admission-fill-tabs {
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%);
+  padding: 0.25rem;
+}
+
+.admission-fill-form .admission-fill-tab {
+  border-radius: 1.15rem;
+}
+
+.admission-fill-form .admission-fill-tab[data-state="active"] {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+@media (max-width: 640px) {
+  .admission-theme-dialog {
+    border-radius: 1rem;
+  }
+}
+
+.admission-fill-form .admission-fill-tabs {
+  min-height: 4.25rem;
+  align-items: stretch;
+  gap: 0.4rem;
+  border: 1px solid color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 1.15rem;
+  padding: 0.4rem;
+}
+
+.admission-fill-form .admission-fill-tab {
+  min-height: 3.35rem;
+  flex: 1 1 9rem;
+  border-radius: 1.15rem;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.admission-fill-form .admission-fill-actions {
+  margin-top: 0.5rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.admission-fill-form .admission-fill-actions > button {
+  min-height: 3.15rem;
+  border-radius: 999px;
+  border-color: var(--foreground);
+  font-weight: 600;
+}
+
+.admission-fill-form
+  .admission-fill-actions
+  > button:not([data-variant="outline"]) {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.admission-fill-form .admission-fill-actions > button[data-variant="outline"] {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.admission-fill-form .admission-address-choice {
+  min-height: 3.15rem;
+  border-color: color-mix(in oklab, var(--foreground) 20%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%);
+}
+
+.admission-fill-form .admission-verification-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.admission-fill-form .admission-verification-stack > div {
+  width: 100%;
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 1.15rem;
+}
+
+.admission-fill-form .admission-verification-stack [class*="h-[70vh]"] {
+  min-height: 32rem;
+  border-color: color-mix(in oklab, var(--foreground) 20%, transparent);
+  border-radius: 1.15rem;
+}
+
+.admission-fill-form .admission-verification-stack button,
+.admission-fill-form .admission-verification-stack a {
+  min-height: 3rem;
+  border-radius: 1.15rem;
+  border-color: var(--foreground);
+  font-weight: 600;
+}
+
+.admission-fill-form
+  .admission-verification-stack
+  button[data-variant="outline"],
+.admission-fill-form .admission-verification-stack a[data-variant="outline"] {
+  background: transparent;
+  color: var(--foreground);
+}
+
+@media (max-width: 640px) {
+  .admission-fill-form .admission-fill-tab {
+    flex-basis: 45%;
+  }
+}
+
+/* Final applicant-form consistency pass: every interactive control uses the same pill geometry. */
+.admission-fill-form input,
+.admission-fill-form textarea,
+.admission-fill-form select,
+.admission-fill-form [data-slot="select-trigger"],
+.admission-fill-form [data-slot="popover-trigger"],
+.admission-fill-form .PhoneInput,
+.admission-fill-form .PhoneInputInput,
+.admission-fill-form .phone-input {
+  border-radius: 9999px !important;
+}
+
+.admission-fill-form textarea {
+  min-height: 3.25rem;
+  padding-top: 0.95rem;
+}
+
+.admission-fill-form .admission-fill-tabs,
+.admission-fill-form .admission-fill-tab,
+.admission-fill-form .admission-fill-actions > button,
+.admission-fill-form .admission-address-choice,
+.admission-fill-form .admission-verification-stack > div,
+.admission-fill-form .admission-verification-stack [class*="h-[70vh]"],
+.admission-fill-form button,
+.admission-fill-form a {
+  border-radius: 9999px !important;
+}
+
+.admission-fill-form .admission-fill-actions > button,
+.admission-fill-form .admission-verification-stack button,
+.admission-fill-form .admission-verification-stack a {
+  min-height: 3.15rem;
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+  font-weight: 600;
+}
+
+.admission-fill-form .admission-fill-actions > button[data-variant="outline"],
+.admission-fill-form
+  .admission-verification-stack
+  button[data-variant="outline"],
+.admission-fill-form .admission-verification-stack a[data-variant="outline"] {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.admission-fill-form .admission-fill-actions > button:hover,
+.admission-fill-form .admission-verification-stack button:hover,
+.admission-fill-form .admission-verification-stack a:hover {
+  background: color-mix(in oklab, var(--foreground) 84%, transparent);
+  color: var(--background);
+}
+
+.admission-fill-form > form > div {
+  color: var(--foreground);
+}
+
+.admission-fill-form > form > div > div[class*="border"],
+.admission-fill-form > form > div [class*="bg-muted"],
+.admission-fill-form > form > div [class*="bg-background"] {
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+}
+
+.admission-fill-form > form > div:first-child,
+.admission-fill-form > form > div:last-child {
+  border-radius: 1.15rem;
+}
+
+/* Verification previews are document panels, not pill controls. */
+.admission-fill-form .admission-verification-stack > div,
+.admission-fill-form .admission-verification-stack [class*="h-[70vh]"],
+.admission-fill-form .admission-pdf-viewer {
+  border-radius: 1.15rem !important;
+}
+
+.admission-fill-form .admission-photo-action {
+  display: inline-flex;
+  min-height: 3.15rem;
+  align-items: center;
+  border: 1px solid var(--foreground);
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--foreground);
+  padding: 0.75rem 1.15rem;
+  font-weight: 600;
+}
+
+.admission-fill-form .admission-photo-action:hover {
+  background: color-mix(in oklab, var(--foreground) 10%, transparent);
+  color: var(--foreground);
+}
+
+.admission-fill-form .admission-verification-stack > div:first-child,
+.admission-fill-form .admission-verification-stack > div:nth-child(2) {
+  border-radius: 1.15rem !important;
+}
+
+/* Requested restrained controls: dropdowns follow their surrounding surface. */
+[data-slot="select-content"],
+[data-slot="popover-content"],
+[data-slot="dropdown-menu-content"] {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+[data-slot="select-trigger"],
+[data-slot="popover-trigger"] {
+  background: var(--background);
+}
+
+[data-slot="pagination"],
+[data-slot="pagination-content"] {
+  background: var(--background);
+  border-color: var(--border);
+}
+
+[data-slot="pagination-link"],
+[data-slot="pagination-previous"],
+[data-slot="pagination-next"] {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+[data-slot="pagination-link"][data-active="true"] {
+  background: var(--background);
+  color: var(--foreground);
+  border-color: var(--foreground);
+}
+
+/* Final admissions-wide geometry: controls are pills; containers remain rounded rectangles. */
+.admission-console
+  button:not([data-slot="dialog-close"]):not(.admission-icon-button),
+.admission-console [role="button"]:not(.admission-icon-button),
+.admission-console [data-slot="badge"],
+.admission-console input,
+.admission-console textarea,
+.admission-console [data-slot="select-trigger"],
+.admission-console [data-slot="popover-trigger"],
+.admission-console [data-slot="combobox"] {
+  border-radius: 999px;
+}
+
+.admission-console textarea {
+  min-height: 6rem;
+  padding-top: 0.85rem;
+}
+
+.admission-console .admission-icon-button,
+.admission-theme-dialog .admission-icon-button {
+  width: 2rem;
+  min-height: 2rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.admission-console .admission-icon-button:hover,
+.admission-theme-dialog .admission-icon-button:hover {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+}
+
+.admission-console .admission-create-choice,
+.admission-theme-dialog .admission-create-choice {
+  border-radius: 1.15rem !important;
+}
+
+.admission-console [data-slot="dialog-content"],
+.admission-console [data-slot="card"],
+.admission-console [data-slot="table-container"],
+.admission-console .admission-panel,
+.admission-console .admission-document-card,
+.admission-console .admission-document-profile,
+.admission-console .admission-upload-control {
+  border-radius: 1.15rem;
+}
+
+.admission-console .admission-filter-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admission-console .admission-filter-actions.has-create-action {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 768px) {
+  .admission-console .admission-filter-actions,
+  .admission-console .admission-filter-actions.has-create-action {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .admission-console .admission-filter-actions,
+  .admission-console .admission-filter-actions.has-create-action {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Admissions portal surfaces: all interactive controls and badges are pills. */
+.admission-theme-dialog [data-slot="dropdown-menu-item"],
+.admission-theme-dialog [role="menuitem"],
+.admission-theme-dialog [data-slot="badge"],
+.admission-theme-dialog button:not([data-slot="dialog-close"]),
+.admission-theme-dialog a {
+  border-radius: 999px;
+}
+
+.admission-theme-dialog [data-slot="dropdown-menu-item"]:disabled,
+.admission-theme-dialog [role="menuitem"][aria-disabled="true"] {
+  opacity: 0.65;
+}
+
+.admission-report-download,
+.admission-report-download > button,
+.admission-report-download [data-slot="dropdown-menu-trigger"] {
+  border-radius: 999px;
+}
+
+.admission-report-download [data-slot="dropdown-menu-content"] {
+  border-radius: 1.15rem;
+  padding: 0.35rem;
+}
+
+.admission-report-download [data-slot="dropdown-menu-item"] {
+  border-radius: 999px;
+}
+
+.admission-theme-dialog .admission-create-choice {
+  border-radius: 999px !important;
+}
+
+.admission-theme-dialog .admission-icon-button {
+  min-height: 2rem;
+  width: 2rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.admission-theme-dialog .admission-icon-button:hover {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--foreground);
+}
+
+/* Create-admission choices are intentionally rounded rectangles, not pills. */
+.admission-theme-dialog .admission-create-choice {
+  border-radius: 1.15rem !important;
+}
+
+/* Keep advanced-filter focus outlines fully visible inside the dialog. */
+.admission-filter-dialog {
+  overflow: visible;
+}
+
+.admission-filter-dialog .filter-builder-simple,
+.admission-filter-dialog [data-slot="filter-builder"] {
+  overflow: visible;
+}
+
+.admission-filter-dialog input:focus-visible,
+.admission-filter-dialog [data-slot="select-trigger"]:focus-visible,
+.admission-filter-dialog [data-slot="popover-trigger"]:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--foreground) 38%, transparent);
+  outline-offset: 2px;
+}
+
+.admission-cancellation-textarea {
+  border-radius: 1.15rem !important;
+}
+
+/* Final filter visibility pass: thin, inset focus borders avoid clipped rings. */
+.admission-console input:focus-visible,
+.admission-console textarea:focus-visible,
+.admission-console [data-slot="select-trigger"]:focus-visible,
+.admission-console [data-slot="popover-trigger"]:focus-visible,
+.admission-filter-dialog input:focus-visible,
+.admission-filter-dialog [data-slot="select-trigger"]:focus-visible,
+.admission-filter-dialog [data-slot="popover-trigger"]:focus-visible {
+  outline: none;
+  border-color: color-mix(in oklab, var(--foreground) 42%, var(--background));
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--foreground) 42%, var(--background));
+}
+
+.admission-console [data-slot="select-trigger"],
+.admission-console [data-slot="popover-trigger"],
+.admission-console input,
+.admission-console textarea,
+.admission-filter-dialog [data-slot="select-trigger"],
+.admission-filter-dialog [data-slot="popover-trigger"],
+.admission-filter-dialog input {
+  color: color-mix(in oklab, var(--foreground) 72%, var(--background));
+}
+
+.admission-console [data-slot="select-trigger"] [data-placeholder],
+.admission-console [data-slot="popover-trigger"] [data-placeholder],
+.admission-console input::placeholder,
+.admission-console textarea::placeholder,
+.admission-filter-dialog [data-slot="select-trigger"] [data-placeholder],
+.admission-filter-dialog [data-slot="popover-trigger"] [data-placeholder],
+.admission-filter-dialog input::placeholder,
+.admission-filter-dialog textarea::placeholder {
+  color: color-mix(in oklab, var(--foreground) 58%, var(--background));
+  opacity: 1;
+}
+
+[data-slot="select-content"],
+[data-slot="popover-content"] {
+  color: color-mix(in oklab, var(--foreground) 72%, var(--background));
+}
+
+[data-slot="select-item"],
+[data-slot="command-item"] {
+  color: color-mix(in oklab, var(--foreground) 72%, var(--background));
+}
+
+[data-slot="select-item"][data-highlighted],
+[data-slot="command-item"][data-selected="true"] {
+  color: var(--foreground);
+}
+
+/* Filter dialogs use their own contained border; no external focus ring. */
+.admission-filter-dialog input,
+.admission-filter-dialog [data-slot="select-trigger"],
+.admission-filter-dialog [data-slot="popover-trigger"] {
+  border-width: 1px;
+  border-style: solid;
+  border-color: color-mix(in oklab, var(--foreground) 38%, var(--background));
+  box-shadow: none;
+  outline: none;
+}
+
+.admission-filter-dialog input:focus,
+.admission-filter-dialog input:focus-visible,
+.admission-filter-dialog [data-slot="select-trigger"]:focus,
+.admission-filter-dialog [data-slot="select-trigger"]:focus-visible,
+.admission-filter-dialog [data-slot="popover-trigger"]:focus,
+.admission-filter-dialog [data-slot="popover-trigger"]:focus-visible {
+  border-width: 1px;
+  border-color: color-mix(in oklab, var(--foreground) 56%, var(--background));
+  box-shadow: none;
+  outline: none;
+}
+
+/* Single-border correction: suppress every external focus ring and offset layer. */
+.admission-filter-dialog input:focus,
+.admission-filter-dialog input:focus-visible,
+.admission-filter-dialog [data-slot="select-trigger"]:focus,
+.admission-filter-dialog [data-slot="select-trigger"]:focus-visible,
+.admission-filter-dialog [data-slot="popover-trigger"]:focus,
+.admission-filter-dialog [data-slot="popover-trigger"]:focus-visible,
+.admission-console .admission-filter-panel input:focus,
+.admission-console .admission-filter-panel input:focus-visible,
+.admission-console .admission-filter-panel [data-slot="select-trigger"]:focus,
+.admission-console
+  .admission-filter-panel
+  [data-slot="select-trigger"]:focus-visible,
+.admission-console .admission-filter-panel [data-slot="popover-trigger"]:focus,
+.admission-console
+  .admission-filter-panel
+  [data-slot="popover-trigger"]:focus-visible {
+  border: 1px solid
+    color-mix(in oklab, var(--foreground) 56%, var(--background)) !important;
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-offset-width: 0px !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+}
+
+/* Admin console: monochrome rounded system */
+.admin-console {
+  --primary: #171717;
+  --primary-foreground: #ffffff;
+  --radius: 1.15rem;
+  color: var(--foreground);
+  font-family:
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.dark .admin-console {
+  --primary: #f5f5f5;
+  --primary-foreground: #171717;
+}
+
+.admin-hero {
+  position: relative;
+  min-height: clamp(220px, 24vw, 286px);
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  border-radius: 1.35rem;
+  background-color: var(--card);
+  background-image: url("/admin-hero.png");
+  background-position: center right;
+  background-size: cover;
+  box-shadow: 0 16px 40px color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.admin-hero::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    var(--card) 0%,
+    color-mix(in oklab, var(--card) 96%, transparent) 17%,
+    color-mix(in oklab, var(--card) 50%, transparent) 38%,
+    transparent 62%
+  );
+}
+
+.admin-hero-copy {
+  display: flex;
+  max-width: 32rem;
+  min-height: clamp(220px, 24vw, 286px);
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem clamp(1.25rem, 4vw, 3rem);
+}
+
+.admin-eyebrow {
+  margin: 0 0 0.85rem;
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.admin-hero h1 {
+  max-width: 25rem;
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.3rem);
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+}
+
+.admin-hero-copy > p:last-child {
+  max-width: 25rem;
+  margin: 1rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.96rem;
+  line-height: 1.5;
+}
+
+.admin-page-content {
+  padding-top: 1.25rem;
+}
+
+.admin-console [data-slot="card"] {
+  border-color: color-mix(in oklab, var(--foreground) 13%, transparent);
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+  box-shadow: 0 12px 30px color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+
+.admin-console [data-slot="select-trigger"],
+.admin-console [data-slot="popover-trigger"],
+.admin-console input,
+.admin-console textarea {
+  min-height: 2.9rem;
+  border-radius: 999px;
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  background: color-mix(in oklab, var(--background) 92%, var(--foreground) 2%);
+  box-shadow: none;
+}
+
+.admin-console button:not([data-slot="sidebar-trigger"]),
+.admin-console [role="tab"],
+.admin-console [data-slot="badge"] {
+  border-radius: 999px;
+}
+
+.admin-console label,
+.admin-console [data-slot="card-description"] {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-console .filter-builder-simple,
+.admin-console .admin-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-console .admin-filter-grid > *:last-child[data-create-action="true"] {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 768px) {
+  .admin-console .filter-builder-simple,
+  .admin-console .admin-filter-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.admin-console .admin-filter-grid[data-filter-count="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.admin-console .admin-filter-grid[data-filter-count="4"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.admin-console .admin-filter-grid[data-filter-count="5"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.admin-console .admin-filter-grid[data-filter-count="6"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.admin-console .admin-filter-grid[data-filter-count="7"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 767px) {
+  .admin-console .admin-filter-grid[data-filter-count],
+  .admin-console .filter-builder-simple {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-hero {
+    background-position: 68% center;
+  }
+  .admin-hero::before {
+    background: linear-gradient(
+      90deg,
+      var(--card) 0%,
+      color-mix(in oklab, var(--card) 76%, transparent) 58%,
+      transparent 100%
+    );
+  }
+}
+
+.admin-console .admin-pill-button,
+.admin-console button[data-create-action="true"] {
+  min-height: 2.9rem;
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+  font-weight: 700;
+}
+
+.admin-console .admin-pill-button:hover,
+.admin-console button[data-create-action="true"]:hover {
+  background: color-mix(in oklab, var(--foreground) 82%, transparent);
+}
+
+.admin-console .admin-pill-chart {
+  display: grid;
+  min-height: 15rem;
+  grid-template-columns: repeat(var(--bar-count, 8), minmax(0, 1fr));
+  align-items: end;
+  gap: clamp(0.45rem, 1vw, 0.9rem);
+  padding: 1.25rem 0.25rem 0.5rem;
+}
+
+.admin-console .admin-pill-chart > * {
+  width: min(100%, 1.35rem);
+  height: var(--bar-height, 40%);
+  justify-self: center;
+  border-radius: 999px;
+  background: var(--foreground);
+  opacity: 0.88;
+  transition:
+    height 180ms ease,
+    opacity 180ms ease;
+}
+
+.admin-console .admin-pill-chart > *:hover {
+  opacity: 1;
+}
+
+.admin-sidebar-nav [data-sidebar="menu-button"] {
+  min-height: 2.55rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.admin-sidebar-nav [data-sidebar="group-label"] {
+  color: var(--muted-foreground);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.admin-sidebar-nav [data-sidebar="menu-button"][data-active="true"] {
+  background: var(--sidebar-foreground);
+  color: var(--sidebar);
+  box-shadow: none;
+}
+
+/* Admin refinements aligned with the admission console */
+.admin-hero {
+  min-height: 272px;
+  border: 0;
+  border-radius: 1.15rem;
+  background-position: right center;
+  box-shadow: 0 12px 32px color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+
+.admin-hero::before {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, #000 86%, transparent) 0%,
+    color-mix(in oklab, #000 62%, transparent) 18%,
+    color-mix(in oklab, #000 10%, transparent) 38%,
+    transparent 52%
+  );
+}
+
+.admin-hero-copy {
+  min-height: 272px;
+  max-width: 31rem;
+  color: #fff;
+  padding: 2rem 2.25rem;
+}
+
+.admin-eyebrow {
+  margin-bottom: 1rem;
+  color: color-mix(in oklab, currentColor 72%, transparent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.admin-hero h1 {
+  max-width: 25rem;
+  font-size: clamp(1.8rem, 3vw, 2.55rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+}
+
+.admin-hero-copy > p:last-child {
+  max-width: 25rem;
+  margin-top: 0.9rem;
+  color: currentColor;
+  font-size: 0.95rem;
+  opacity: 0.82;
+}
+
+.admin-sidebar-nav [data-sidebar="menu-button"][data-active="true"] {
+  background: color-mix(in oklab, var(--sidebar-foreground) 9%, transparent);
+  color: var(--sidebar-foreground);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--sidebar-foreground) 5%, transparent);
+}
+
+.admin-dialog-content {
+  border-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+  box-shadow: 0 18px 48px
+    color-mix(in oklab, var(--foreground) 12%, transparent);
+}
+
+.admin-dialog-content [data-slot="dialog-title"] {
+  letter-spacing: -0.03em;
+}
+
+.admin-dialog-content label {
+  color: var(--foreground);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-dialog-content input,
+.admin-dialog-content [data-slot="select-trigger"] {
+  min-height: 3.15rem;
+  border-radius: 1.15rem;
+  border-color: color-mix(in oklab, var(--foreground) 20%, transparent);
+  padding-left: 1.05rem;
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%);
+  box-shadow: none;
+}
+
+.admin-dialog-content button:not([data-slot="dialog-close"]) {
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.admin-dialog-content [data-slot="dialog-footer"] button:last-child {
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.admin-console .filter-builder-action-slot {
+  display: flex;
+  align-items: end;
+}
+
+.admin-console .filter-builder-action-slot > * {
+  width: 100%;
+}
+
+.admin-console .admin-filter-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.admin-console .admin-filter-actions button {
+  width: 100%;
+  min-height: 2.9rem;
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+  font-weight: 700;
+}
+
+.admin-console .admin-filter-actions button:hover {
+  background: color-mix(in oklab, var(--foreground) 82%, transparent);
+}
+
+.admin-console .admin-pill-chart {
+  position: relative;
+  min-height: 17rem;
+  align-items: end;
+  gap: clamp(0.65rem, 1.6vw, 1.2rem);
+  padding: 1.5rem 0.6rem 0.5rem;
+  isolation: isolate;
+}
+
+.admin-console .admin-pill-chart::before {
+  position: absolute;
+  right: 0;
+  bottom: 0.5rem;
+  left: 0;
+  z-index: -1;
+  height: 1px;
+  content: "";
+  background: color-mix(in oklab, var(--foreground) 15%, transparent);
+}
+
+.admin-console .admin-pill-chart > * {
+  position: relative;
+  width: min(100%, 1.55rem);
+  min-height: 1.25rem;
+  border: 1px solid color-mix(in oklab, var(--foreground) 18%, transparent);
+  background: linear-gradient(
+    to top,
+    var(--foreground) 0 72%,
+    color-mix(in oklab, var(--foreground) 36%, var(--background)) 72% 100%
+  );
+  box-shadow: 0 8px 16px color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+
+.admin-console .admin-pill-chart > *::after {
+  position: absolute;
+  right: 50%;
+  bottom: 0.42rem;
+  width: 0.32rem;
+  height: 0.32rem;
+  content: "";
+  border-radius: 999px;
+  background: var(--background);
+  opacity: 0.7;
+  transform: translateX(50%);
+}
+
+.admin-console .admin-term-card {
+  border-left: 0;
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+}
+
+.admin-console .admin-term-status {
+  border: 1px solid color-mix(in oklab, var(--foreground) 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 767px) {
+  .admin-hero-copy {
+    padding: 2rem 1.25rem;
+  }
+  .admin-hero::before {
+    background: linear-gradient(
+      90deg,
+      color-mix(in oklab, #000 82%, transparent) 0%,
+      color-mix(in oklab, #000 45%, transparent) 58%,
+      transparent 100%
+    );
+  }
+}
+
+.admin-dashboard-chart [data-slot="card-header"] { align-items: flex-start; }
+.admin-ring-panel, .admin-composed-panel { min-width: 0; }
+.admin-ring-panel { display: flex; flex-direction: column; align-items: center; border-right: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent); padding-right: clamp(1rem, 3vw, 2rem); }
+.admin-chart-kicker { color: var(--muted-foreground); font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.admin-ring-wrap { position: relative; width: min(100%, 16rem); margin: 1rem auto; }
+.admin-ring-visual { aspect-ratio: 1; width: 100%; border-radius: 50%; background: radial-gradient(circle at center, var(--card) 0 39%, transparent 40%), conic-gradient(from -90deg, color-mix(in oklab, var(--foreground) 30%, transparent) 0 30%, transparent 30% 33%, color-mix(in oklab, var(--foreground) 55%, transparent) 33% 55%, transparent 55% 58%, var(--foreground) 58% 73%, transparent 73% 100%); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 9%, transparent); }
+.admin-ring-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+.admin-ring-center strong { font-size: 2rem; font-weight: 800; letter-spacing: -.06em; line-height: 1; }
+.admin-ring-center span, .admin-chart-total span { color: var(--muted-foreground); font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.admin-ring-legend, .admin-composed-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: .45rem .85rem; color: var(--muted-foreground); font-size: .72rem; }
+.admin-ring-legend span, .admin-composed-legend span { display: inline-flex; align-items: center; gap: .35rem; }
+.admin-ring-legend b { color: var(--foreground); font-weight: 700; }
+.admin-legend-dot, .admin-legend-swatch { display: inline-block; flex: 0 0 auto; background: var(--foreground); }
+.admin-legend-dot { width: .45rem; height: .45rem; border-radius: 999px; }
+.admin-chart-total { display: flex; align-items: flex-end; flex-direction: column; }
+.admin-chart-total strong { font-size: 1.25rem; font-weight: 800; letter-spacing: -.04em; }
+.admin-composed-chart-wrap { margin-top: 1rem; width: 100%; overflow: hidden; }
+.admin-composed-chart-wrap svg { display: block; width: 100%; min-width: 30rem; height: auto; }
+.admin-chart-grid-line { stroke: color-mix(in oklab, var(--foreground) 10%, transparent); stroke-dasharray: 3 6; stroke-width: 1; }
+.admin-chart-bar { fill: color-mix(in oklab, var(--foreground) 18%, transparent); }
+.admin-chart-line { stroke: var(--foreground); stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; }
+.admin-chart-point { fill: var(--background); stroke: var(--foreground); stroke-width: 2.5; }
+.admin-chart-axis-label { fill: var(--muted-foreground); font-size: 11px; font-weight: 600; }
+.admin-legend-swatch { width: .65rem; height: .65rem; }
+.admin-legend-swatch-bar { border-radius: .2rem; opacity: .35; }
+.admin-legend-swatch-line { height: .18rem; border-radius: 999px; }
+[data-slot="dialog-content"] { border-color: color-mix(in oklab, var(--foreground) 18%, transparent); border-radius: 1.15rem; background: color-mix(in oklab, var(--card) 96%, transparent); box-shadow: 0 18px 48px color-mix(in oklab, var(--foreground) 12%, transparent); }
+[data-slot="dialog-content"] [data-slot="select-trigger"], [data-slot="dialog-content"] [data-slot="popover-trigger"], [data-slot="dialog-content"] input { min-height: 3.15rem; border-radius: 999px; border-color: color-mix(in oklab, var(--foreground) 20%, transparent); padding-left: 1.05rem; background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%); box-shadow: none; }
+[data-slot="dialog-content"] textarea { min-height: 6rem; border-radius: 1.15rem; padding-top: 0.85rem; padding-left: 1.05rem; border-color: color-mix(in oklab, var(--foreground) 20%, transparent); background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%); box-shadow: none; }
+[data-slot="dialog-content"] button:not([data-slot="dialog-close"]) { min-height: 2.85rem; border-radius: 999px; font-weight: 600; }
+.admin-console .filter-builder-action-slot, .admin-console .admin-filter-actions { min-height: 2.9rem; }
+.admin-console .filter-builder-action-slot > .admin-filter-actions { align-items: stretch; }
+
+/* =====================================================================
+   ROLE CONSOLE — global monochrome/pill treatment for every role
+   The single canonical style used across all role dashboards. Interactive
+   controls (buttons, badges, single-line inputs, selects, tabs) are pills
+   (999px); containers and long-form inputs (cards, dialogs, tables,
+   textareas) stay rounded rectangles (1.15rem). Matches the admission and
+   admin consoles exactly.
+   ===================================================================== */
+.role-console {
+  --primary: oklch(0.145 0 0);
+  --primary-foreground: oklch(1 0 0);
+  --radius: 1.15rem;
+  font-family:
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.dark .role-console {
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.145 0 0);
+}
+
+/* Containers, dialogs, cards, tables — rounded rectangles */
+.role-console [data-slot="card"],
+.role-console [data-slot="dialog-content"],
+.role-console [data-slot="table-container"] {
+  border-color: color-mix(in oklab, var(--foreground) 13%, transparent);
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+  box-shadow: 0 12px 30px color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+
+/* Single-line inputs & dropdown triggers — pills */
+.role-console [data-slot="select-trigger"],
+.role-console [data-slot="popover-trigger"],
+.role-console [data-slot="combobox"],
+.role-console input:not([type="checkbox"]):not([type="radio"]),
+.role-console select {
+  min-height: 3.15rem;
+  border-radius: 999px;
+  border-color: color-mix(in oklab, var(--foreground) 20%, transparent);
+  padding-left: 1.05rem;
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%);
+  box-shadow: none;
+}
+
+/* Long-form / multi-line inputs stay rounded rectangles */
+.role-console textarea {
+  min-height: 6rem;
+  border-radius: 1.15rem;
+  padding-top: 0.85rem;
+  padding-left: 1.05rem;
+  border-color: color-mix(in oklab, var(--foreground) 20%, transparent);
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 2%);
+  box-shadow: none;
+}
+
+/* Buttons, badges, tabs — pills */
+.role-console button:not([data-slot="sidebar-trigger"]):not([data-slot="dialog-close"]),
+.role-console [role="tab"],
+.role-console a[role="tab"],
+.role-console [data-slot="badge"],
+.role-console [role="button"] {
+  border-radius: 999px;
+}
+
+/* Micro uppercase labels */
+.role-console label,
+.role-console [data-slot="card-description"] {
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Table header micro labels + comfortable rows */
+.role-console table th {
+  color: var(--muted-foreground);
+  vertical-align: middle;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.role-console table td {
+  vertical-align: middle;
+  padding-top: 0.95rem;
+  padding-bottom: 0.95rem;
+}
+
+.role-console table thead tr {
+  border-bottom-color: color-mix(in oklab, var(--foreground) 12%, transparent);
+}
+
+.role-console table tbody tr {
+  border-bottom-color: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.role-console button[data-state="active"],
+.role-console [role="tab"][data-state="active"],
+.role-console a[role="tab"][data-state="active"],
+.role-console [role="button"][data-state="active"] {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+/* Radix renders the visible tab panel with data-state="active" as well.
+   It is content, not an interactive control, so it must never inherit the
+   active-tab background. */
+.role-console [data-slot="tabs-content"][data-state="active"] {
+  background: transparent;
+  color: inherit;
+}
+
+/* Student course loading and empty states must retain a complete card edge. */
+.role-console .course-registration-status {
+  border-radius: 1.15rem;
+  background: var(--card);
+}
+
+/* Shared control geometry: Button may render as either <button> or <a>
+   through `asChild`, so style both the native element and its data slot.
+   `!important` deliberately wins over page-local rounded-corner utilities. */
+button,
+[data-slot="button"],
+[data-slot="badge"],
+[role="button"],
+[role="tab"],
+[data-slot="select-trigger"],
+[data-slot="popover-trigger"],
+[data-slot="combobox"],
+input:not([type="checkbox"]):not([type="radio"]),
+select {
+  border-radius: 999px !important;
+}
+
+/* Dashboard quick actions mirror filter rows: every action fills one equal
+   grid cell instead of shrinking to the label's width. */
+.dashboard-action-grid > [data-slot="button"] {
+  width: 100%;
+  min-height: 3.15rem;
+  height: 3.15rem;
+}
+
+/* Sidebar navigation — pills + micro labels */
+.role-sidebar-nav [data-sidebar="menu-button"] {
+  min-height: 2.55rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.role-sidebar-nav [data-sidebar="group-label"] {
+  color: var(--muted-foreground);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.role-sidebar-nav [data-sidebar="menu-button"][data-active="true"] {
+  background: color-mix(in oklab, var(--sidebar-foreground) 9%, transparent);
+  color: var(--sidebar-foreground);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--sidebar-foreground) 5%, transparent);
+}
+
+/* Filter grid — auto-arranges columns from the number of fields + action
+   cell (--filter-cols computed by FilterGrid). Mobile stacks, tablet doubles,
+   desktop uses the computed column count so buttons match field width. */
+.role-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  align-items: end;
+}
+
+@media (min-width: 640px) {
+  .role-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .role-filter-grid {
+    grid-template-columns: repeat(var(--filter-cols, 4), minmax(0, 1fr));
+  }
+}
+
+/* Action cell sits in the flow (field width), buttons fill it; aligns to
+   the bottom of the row like the neighbouring fields. */
+.filter-builder-action-slot {
+  display: flex;
+  align-items: end;
+}
+
+.filter-builder-action-slot > * {
+  width: 100%;
+}
+
+.role-console .admin-filter-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.role-console .admin-filter-actions button {
+  width: 100%;
+  min-height: 3.15rem;
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+  font-weight: 700;
+}
+
+.role-console .admin-filter-actions button:hover {
+  background: color-mix(in oklab, var(--foreground) 82%, transparent);
+}
+
+.role-console .admin-filter-actions button:last-child {
+  background: transparent;
+  color: var(--foreground);
+}
+
+.role-console .admin-filter-actions button:last-child:hover {
+  background: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+/* Single filter action buttons (e.g. create) are pill, full cell width. */
+.filter-builder-action-slot > .btn,
+.filter-builder-action-slot > button {
+  width: 100%;
+  min-height: 3.15rem;
+  border-radius: 999px;
+}
+
+/* The academic-term screen has three filters and a paired action cell. */
+@media (min-width: 1024px) {
+  .role-filter-grid.admin-semester-filter-grid {
+    display: contents;
+  }
+}
+
+/* Read-only single-line detail values shown as monochrome pills. */
+.role-data-pill {
+  border: 1px solid color-mix(in oklab, var(--foreground) 20%, transparent);
+  background: color-mix(in oklab, var(--background) 88%, var(--foreground) 3%);
+  color: var(--foreground);
+  min-height: 2.45rem;
+}
+
+/* Global portal-safe treatment for menus (portaled outside .role-console):
+   dropdown / select / command / combobox items and pagination as pills. */
+[data-slot="dropdown-menu-content"] [data-slot="dropdown-menu-item"],
+[data-slot="dropdown-menu-content"] [role="menuitem"],
+[data-slot="select-content"] [data-slot="select-item"],
+[data-slot="popover-content"] [data-slot="command-item"],
+[data-slot="popover-content"] [role="menuitem"] {
+  border-radius: 999px;
+}
+
+[data-slot="dropdown-menu-content"] {
+  border-radius: 1.15rem;
+  background: var(--background);
+  color: var(--foreground);
+  padding: 0.35rem;
+}
+
+/* =====================================================================
+   ROLE HERO — the illustration banner shown only on each role's first
+   (dashboard) page. Black gradient in light theme, white gradient in dark.
+   ===================================================================== */
+.role-hero {
+  position: relative;
+  min-height: 272px;
+  overflow: hidden;
+  isolation: isolate;
+  border: 0;
+  border-radius: 1.15rem;
+  background-color: var(--card);
+  background-image: var(--role-hero-image, url("/admissions.png"));
+  background-position: right center;
+  background-size: cover;
+  box-shadow: 0 12px 32px color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+
+.role-hero::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, #000 86%, transparent) 0%,
+    color-mix(in oklab, #000 62%, transparent) 18%,
+    color-mix(in oklab, #000 10%, transparent) 38%,
+    transparent 52%
+  );
+}
+
+.dark .role-hero::before {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, #fff 86%, transparent) 0%,
+    color-mix(in oklab, #fff 62%, transparent) 18%,
+    color-mix(in oklab, #fff 10%, transparent) 38%,
+    transparent 52%
+  );
+}
+
+.role-hero-copy {
+  display: flex;
+  max-width: 31rem;
+  min-height: 272px;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem 2.25rem;
+  color: #fff;
+}
+
+.dark .role-hero-copy {
+  color: #0b0b0b;
+}
+
+.role-hero-eyebrow {
+  margin: 0 0 1rem;
+  color: color-mix(in oklab, currentColor 72%, transparent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.role-hero h1 {
+  max-width: 25rem;
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.55rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+}
+
+.role-hero-copy > p:last-child {
+  max-width: 25rem;
+  margin: 0.9rem 0 0;
+  color: currentColor;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  opacity: 0.82;
+}
+
+@media (max-width: 640px) {
+  .role-hero {
+    min-height: 280px;
+    background-position: 68% center;
+  }
+  .role-hero-copy {
+    min-height: 280px;
+    padding: 1.5rem;
+  }
 }

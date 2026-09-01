@@ -378,11 +378,10 @@ export const MarksView = () => {
               fields={filterFields}
               draftFilters={draftFilters}
               onDraftChange={handleDraftChange}
-              className="md:grid-cols-4"
+              action={
+                <FilterActions onApply={handleApply} onReset={handleReset} />
+              }
             />
-            <div className="mt-4 flex justify-end">
-              <FilterActions onApply={handleApply} onReset={handleReset} />
-            </div>
           </FilterPanel>
         </CardContent>
       </Card>

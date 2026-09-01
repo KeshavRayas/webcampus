@@ -1,9 +1,9 @@
 "use client";
-"use client";
 
 import { authClient } from "@/lib/auth-client";
 import { AdmissionView } from "@/modules/admission/admin/admission-view";
 import { ApplicantAdmissionView } from "@/modules/admission/applicant/applicant-admission-view";
+import { AdmissionConsoleShell } from "@/modules/admission/shared/admission-console-shell";
 import React, { Suspense } from "react";
 
 export default function AdmissionPage() {
@@ -24,14 +24,18 @@ export default function AdmissionPage() {
     : "Create student admission shells and track application status.";
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{heading}</h1>
-        <p className="text-muted-foreground text-sm">{description}</p>
-      </div>
+    <AdmissionConsoleShell
+      title={heading}
+      description={description}
+      showHero
+    >
       <Suspense>
-        {isApplicant ? <ApplicantAdmissionView /> : <AdmissionView />}
+        {isApplicant ? (
+          <ApplicantAdmissionView />
+        ) : (
+          <AdmissionView showFilters />
+        )}
       </Suspense>
-    </div>
+    </AdmissionConsoleShell>
   );
 }

@@ -117,17 +117,19 @@ export const HodFacultyView = () => {
                   setAppliedSearch(value);
                 }
               }}
-            />
-            <FilterActions
-              onApply={() => {
-                setAppliedSearch(draftFilters.search);
-              }}
-              onReset={() => {
-                setDraftFilters(EMPTY_FILTERS);
-                setAppliedSearch("");
-              }}
-              applyLabel="Search"
-              resetLabel="Reset"
+              action={
+                <FilterActions
+                  onApply={() => {
+                    setAppliedSearch(draftFilters.search);
+                  }}
+                  onReset={() => {
+                    setDraftFilters(EMPTY_FILTERS);
+                    setAppliedSearch("");
+                  }}
+                  applyLabel="Search"
+                  resetLabel="Reset"
+                />
+              }
             />
           </FilterPanel>
           {isLoading ? (

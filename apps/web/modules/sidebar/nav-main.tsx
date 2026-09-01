@@ -45,7 +45,6 @@ export function NavMain({ items }: NavMainProps) {
                       tooltip={item.name}
                       isActive={isParentActive}
                     >
-                      <item.icon />
                       <span>{item.name}</span>
                       <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
@@ -118,7 +117,6 @@ export function NavMain({ items }: NavMainProps) {
             <SidebarMenuItem key={item.name}>
               <SidebarMenuButton asChild isActive={pathname === item.url}>
                 <Link href={item.url}>
-                  <item.icon />
                   <span>{item.name}</span>
                 </Link>
               </SidebarMenuButton>

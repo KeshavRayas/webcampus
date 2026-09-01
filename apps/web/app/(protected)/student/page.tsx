@@ -2,6 +2,7 @@
 
 import { useStudentNotices } from "@/modules/notices/use-notices";
 import { useStudentProfile } from "@/modules/student/profile/use-student-profile";
+import { RoleHero } from "@/modules/role-hero";
 import { downloadTimetablePdf } from "@/modules/timetable/timetable-pdf";
 import {
   useStudentTimetable,
@@ -46,20 +47,13 @@ export default function StudentDashboardPage() {
     });
   };
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div>
-        <p className="text-muted-foreground text-sm">
-          {new Date().toLocaleDateString()}
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome, {studentName}
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Semester{" "}
-          {profile.data?.semesterNumber ?? profile.data?.currentSemester ?? "-"}{" "}
-          · {profile.data?.departmentName ?? "-"}
-        </p>
-      </div>
+    <div className="flex flex-1 flex-col gap-6">
+      <RoleHero
+        eyebrow="Student portal"
+        title={`Welcome, ${studentName}`}
+        description={`Semester ${profile.data?.semesterNumber ?? profile.data?.currentSemester ?? "-"} · ${profile.data?.departmentName ?? "Your academic workspace"}`}
+        image="/dashboard-students.png"
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -109,7 +103,7 @@ export default function StudentDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Today's timetable</CardTitle>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild className="h-[3.15rem]" variant="outline">
               <Link href="/student/timetable">
                 Full timetable
                 <ExternalLink />
@@ -188,11 +182,11 @@ export default function StudentDashboardPage() {
         <CardHeader>
           <CardTitle>Quick actions</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-2 sm:grid-cols-2">
+        <CardContent className="dashboard-action-grid grid gap-2 sm:grid-cols-3">
           {quickActions.map(({ label, href, icon: Icon }) => (
             <Button
               asChild
-              className="justify-start"
+              className="h-[3.15rem] justify-start"
               key={href}
               variant="outline"
             >
@@ -203,7 +197,7 @@ export default function StudentDashboardPage() {
             </Button>
           ))}
           <Button
-            className="justify-start"
+            className="h-[3.15rem] justify-start"
             disabled={!weeklyTimetable.data?.entries.length}
             onClick={handleDownload}
             variant="outline"

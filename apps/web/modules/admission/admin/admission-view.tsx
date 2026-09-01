@@ -391,20 +391,26 @@ export const AdmissionView = ({
             onDraftChange={updateDraftFilter}
             onApply={applyFilters}
             onReset={resetFilters}
+            actionSlot={
+              !hideAddForm && canCreate ? (
+                <Button
+                  type="button"
+                  disabled={!draftFilters.semester}
+                  onClick={() => setIsCreateDialogOpen(true)}
+                >
+                  Create Admission
+                </Button>
+              ) : null
+            }
           />
 
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <>
             {!hideAddForm && canCreate && (
               <Dialog
                 open={isCreateDialogOpen}
                 onOpenChange={handleCreateDialogOpenChange}
               >
-                <DialogTrigger asChild>
-                  <Button disabled={!draftFilters.semester}>
-                    Create Admission
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent className="admission-theme-dialog sm:max-w-lg">
                   {createChoice === null ? (
                     <>
                       <DialogHeader>
@@ -417,7 +423,7 @@ export const AdmissionView = ({
                       <div className="grid gap-3">
                         <button
                           type="button"
-                          className="bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
+                          className="admission-create-choice rounded-xl border p-4 text-left transition"
                           onClick={() => setCreateChoice("profile")}
                         >
                           <p className="font-medium">
@@ -430,7 +436,7 @@ export const AdmissionView = ({
                         </button>
                         <button
                           type="button"
-                          className="bg-card hover:bg-accent rounded-lg border p-4 text-left transition"
+                          className="admission-create-choice rounded-xl border p-4 text-left transition"
                           onClick={() => {
                             setCreateChoice(null);
                             setIsCreateDialogOpen(false);
@@ -473,7 +479,7 @@ export const AdmissionView = ({
                               <FormControl>
                                 <Input
                                   type="email"
-                                  placeholder="student@bmsce.ac.in"
+                                  placeholder="student@bmsu.ac.in"
                                   {...field}
                                   value={field.value ?? ""}
                                 />
@@ -502,7 +508,7 @@ export const AdmissionView = ({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+                                    className="admission-icon-button absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
                                     onClick={() => setShowPassword((v) => !v)}
                                   >
                                     {showPassword ? (
@@ -521,6 +527,7 @@ export const AdmissionView = ({
                           <Button
                             type="button"
                             variant="outline"
+                            className="!rounded-md !border-border !bg-background !text-foreground hover:!bg-accent"
                             onClick={() => setCreateChoice(null)}
                           >
                             Back
@@ -528,6 +535,7 @@ export const AdmissionView = ({
                           <Button
                             type="submit"
                             disabled={form.formState.isSubmitting}
+                            className="!rounded-md !border-border !bg-background !text-foreground hover:!bg-accent"
                           >
                             Create Profile
                           </Button>
@@ -538,7 +546,7 @@ export const AdmissionView = ({
                 </DialogContent>
               </Dialog>
             )}
-          </div>
+          </>
         </div>
 
         {!hideAddForm && canCreate && !draftFilters.semester && (

@@ -1,10 +1,18 @@
 import { ChartAreaInteractive } from "@/modules/admin/dashboard/chart-area";
 import { SectionCards } from "@/modules/admin/dashboard/section-cards";
+import { RoleHero } from "@/modules/role-hero";
 import React from "react";
 
 const AdmindDashboardPage = () => {
   return (
     <div className="flex flex-1 flex-col">
+      <RoleHero
+        eyebrow="BMSU administration"
+        title="Run the campus with clarity."
+        description="One calm workspace for people, academics, and every operational decision."
+        image="/dashboard-admin.png"
+        className="mb-6"
+      />
       <div className="@container/main flex flex-1 flex-col gap-2">
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
           <SectionCards />

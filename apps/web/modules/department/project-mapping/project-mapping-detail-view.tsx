@@ -877,13 +877,15 @@ export function ProjectMappingDetailView({
                   [key]: value,
                 }))
               }
-            />
-            <FilterActions
-              onApply={() => setAppliedStudentFilters(draftStudentFilters)}
-              onReset={() => {
-                setDraftStudentFilters(EMPTY_STUDENT_FILTERS);
-                setAppliedStudentFilters(EMPTY_STUDENT_FILTERS);
-              }}
+              action={
+                <FilterActions
+                  onApply={() => setAppliedStudentFilters(draftStudentFilters)}
+                  onReset={() => {
+                    setDraftStudentFilters(EMPTY_STUDENT_FILTERS);
+                    setAppliedStudentFilters(EMPTY_STUDENT_FILTERS);
+                  }}
+                />
+              }
             />
           </FilterPanel>
 
@@ -952,17 +954,19 @@ export function ProjectMappingDetailView({
                   onDraftChange={(key, value) =>
                     setDraftGroupFilters((prev) => ({ ...prev, [key]: value }))
                   }
-                />
-                <FilterActions
-                  onApply={() => {
-                    setPage(1);
-                    setAppliedGroupFilters(draftGroupFilters);
-                  }}
-                  onReset={() => {
-                    setDraftGroupFilters(EMPTY_GROUP_FILTERS);
-                    setAppliedGroupFilters(EMPTY_GROUP_FILTERS);
-                    setPage(1);
-                  }}
+                  action={
+                    <FilterActions
+                      onApply={() => {
+                        setPage(1);
+                        setAppliedGroupFilters(draftGroupFilters);
+                      }}
+                      onReset={() => {
+                        setDraftGroupFilters(EMPTY_GROUP_FILTERS);
+                        setAppliedGroupFilters(EMPTY_GROUP_FILTERS);
+                        setPage(1);
+                      }}
+                    />
+                  }
                 />
               </FilterPanel>
 

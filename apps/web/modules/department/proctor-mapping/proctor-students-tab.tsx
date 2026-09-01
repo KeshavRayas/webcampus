@@ -125,7 +125,7 @@ export const ProctorStudentsTab = ({ semesterId }: { semesterId?: string }) => {
       <CardContent className="space-y-6">
         <div className="flex items-center gap-4">
           <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-            <SelectTrigger className="w-[280px]">
+            <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Select a proctor group" />
             </SelectTrigger>
             <SelectContent>
@@ -218,7 +218,7 @@ export const ProctorStudentsTab = ({ semesterId }: { semesterId?: string }) => {
                             });
                           }}
                         >
-                          <SelectTrigger className="w-[180px]">
+                          <SelectTrigger className="w-[200px]">
                             <SelectValue placeholder="Move to group" />
                           </SelectTrigger>
                           <SelectContent>

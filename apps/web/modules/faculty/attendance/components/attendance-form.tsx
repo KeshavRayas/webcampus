@@ -199,7 +199,7 @@ export const AttendanceForm = ({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onClick={(event) => event.currentTarget.showPicker?.()}
-        className="bg-background h-11 w-full cursor-pointer rounded-xl"
+        className="h-[3.15rem] w-full cursor-pointer rounded-md"
       />
     </div>
   );
@@ -214,7 +214,7 @@ export const AttendanceForm = ({
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-5">
           <div className="space-y-2">
             <Label
               htmlFor="attendance-session-date"
@@ -235,7 +235,7 @@ export const AttendanceForm = ({
                 onDateChange(value ? new Date(`${value}T00:00:00`) : undefined);
               }}
               onClick={(event) => event.currentTarget.showPicker?.()}
-              className="block h-11 w-full cursor-pointer rounded-xl"
+              className="block h-[3.15rem] w-full cursor-pointer rounded-md"
             />
           </div>
 
@@ -252,7 +252,7 @@ export const AttendanceForm = ({
             >
               <SelectTrigger
                 id="attendance-course"
-                className="bg-background/60 h-11 rounded-xl border-white/10"
+                className="h-[3.15rem] rounded-md"
               >
                 <SelectValue placeholder="Select course" />
               </SelectTrigger>
@@ -280,7 +280,7 @@ export const AttendanceForm = ({
               >
                 <SelectTrigger
                   id="attendance-section"
-                  className="bg-background/60 h-11 rounded-xl border-white/10"
+                  className="h-[3.15rem] rounded-md"
                 >
                   <SelectValue placeholder="Select elective batch" />
                 </SelectTrigger>
@@ -299,7 +299,7 @@ export const AttendanceForm = ({
               >
                 <SelectTrigger
                   id="attendance-section"
-                  className="bg-background/60 h-11 rounded-xl border-white/10"
+                  className="h-[3.15rem] rounded-md"
                 >
                   <SelectValue placeholder="Select section" />
                 </SelectTrigger>
@@ -317,7 +317,7 @@ export const AttendanceForm = ({
             )}
           </div>
 
-          <fieldset className="space-y-3 md:col-span-3">
+          <fieldset className="space-y-3">
             <legend className="text-muted-foreground text-xs uppercase tracking-wide">
               Time Slot
             </legend>
@@ -337,7 +337,7 @@ export const AttendanceForm = ({
                 }
               }}
             >
-              <SelectTrigger className="bg-background/60 h-11 w-full rounded-xl border-white/10 md:w-1/3">
+              <SelectTrigger className="h-[3.15rem] w-full rounded-md">
                 <SelectValue placeholder="Select Time Slot" />
               </SelectTrigger>
               <SelectContent>
@@ -359,7 +359,7 @@ export const AttendanceForm = ({
             </Select>
 
             {form.timingMode === "CUSTOM" && (
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 md:w-2/3">
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <TimeInputField
                   id="attendance-custom-start"
                   label="Start Time"
@@ -392,21 +392,25 @@ export const AttendanceForm = ({
               <p className="text-destructive text-sm">{customTimingError}</p>
             ) : null}
           </fieldset>
+
+          <div className="space-y-2">
+            <span className="hidden text-muted-foreground text-xs uppercase tracking-wide md:block">
+              &nbsp;
+            </span>
+            <Button
+              type="button"
+              onClick={onTakeAttendance}
+              disabled={isTakeAttendanceDisabled}
+              className="h-[3.15rem] w-full"
+            >
+              Take Attendance
+            </Button>
+          </div>
         </div>
 
         {overlapError ? (
           <p className="text-destructive text-sm">{overlapError}</p>
         ) : null}
-
-        <div className="border-border/60 flex flex-wrap items-center justify-end gap-3 border-t pt-4">
-          <Button
-            type="button"
-            onClick={onTakeAttendance}
-            disabled={isTakeAttendanceDisabled}
-          >
-            Take Attendance
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );

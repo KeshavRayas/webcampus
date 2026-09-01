@@ -1,16 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 
 export default function Page() {
   return (
     <div className="min-h-150 flex flex-col items-center justify-center space-y-4 py-12">
-      <Image
-        width={60}
-        height={60}
-        src={"/bmsce.svg"}
-        alt="BMSCE Logo"
-        className="h-16 w-16"
-      />
       <div className="space-y-2 text-center">
         <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl">
           Access Denied

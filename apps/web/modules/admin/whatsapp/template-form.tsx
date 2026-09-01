@@ -377,6 +377,7 @@ export const TemplateForm = ({
             <Switch
               checked={form.isActive}
               onCheckedChange={(checked) => set("isActive", checked)}
+              className="min-h-6!"
             />
             <Label>Active</Label>
           </div>

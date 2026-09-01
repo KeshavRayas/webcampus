@@ -310,15 +310,16 @@ export const AttendanceWindowsView = () => {
               return { ...current, [key]: value };
             });
           }}
+          action={<FilterActions onApply={applyFilters} onReset={resetFilters} />}
         />
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
           <Input
             placeholder="Search by department, HOD, or course code..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-9"
+            className="h-[3.15rem] w-full"
           />
-          <div className="flex flex-wrap items-center gap-2 md:col-span-1 md:justify-end xl:col-span-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               onClick={handleBulkUnfreezeClick}
@@ -327,11 +328,14 @@ export const AttendanceWindowsView = () => {
                 !windowsQueryEnabled ||
                 filteredWindows.length === 0
               }
+              className="h-[3.15rem] w-full"
             >
               {isUnfreezing
                 ? "Unfreezing..."
                 : `Unfreeze Filtered (${filteredWindows.length})`}
             </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={handleBulkFreezeClick}
               disabled={
@@ -339,12 +343,12 @@ export const AttendanceWindowsView = () => {
                 !windowsQueryEnabled ||
                 filteredWindows.length === 0
               }
+              className="h-[3.15rem] w-full"
             >
               {isFreezing
                 ? "Freezing..."
                 : `Freeze Filtered (${filteredWindows.length})`}
             </Button>
-            <FilterActions onApply={applyFilters} onReset={resetFilters} />
           </div>
         </div>
       </FilterPanel>

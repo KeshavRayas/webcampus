@@ -8,7 +8,7 @@ import { ToastContainer } from "react-toastify";
 const manrope = Manrope({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "BMSCE - Webcampus",
+  title: "BMSU - Webcampus",
 };
 
 export default function RootLayout({

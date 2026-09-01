@@ -231,7 +231,7 @@ export function UploadDocsActions({ admission }: Props) {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
+      <DialogContent className="admission-theme-dialog max-h-[90vh] overflow-y-auto sm:max-w-6xl">
         <DialogHeader>
           <DialogTitle>Admission Documents</DialogTitle>
 

@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import axios from "axios";
-import { Wand2 } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "react-toastify";
 
@@ -97,8 +96,7 @@ export const GenerateProctorGroupsDialog = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="default">
-          <Wand2 className="mr-2 h-4 w-4" />
+        <Button variant="default" className="w-[200px]">
           Generate Groups
         </Button>
       </DialogTrigger>

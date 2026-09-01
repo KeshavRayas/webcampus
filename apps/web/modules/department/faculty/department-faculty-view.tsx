@@ -151,7 +151,6 @@ export const DepartmentFacultyView = () => {
       type: "text",
       inputId: "department-faculty-name",
       placeholder: "Search by faculty name",
-      className: "xl:col-span-2",
     },
     {
       key: "email",
@@ -193,8 +192,8 @@ export const DepartmentFacultyView = () => {
   if (!session) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Skeleton className="h-10 w-full xl:col-span-2" />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
@@ -221,8 +220,8 @@ export const DepartmentFacultyView = () => {
   if (response.isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Skeleton className="h-10 w-full xl:col-span-2" />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
@@ -262,9 +261,8 @@ export const DepartmentFacultyView = () => {
             }
           }}
           allValue={DEFAULT_FILTER_ALL_VALUE}
+          action={<FilterActions onApply={applyFilters} onReset={resetFilters} />}
         />
-
-        <FilterActions onApply={applyFilters} onReset={resetFilters} />
       </FilterPanel>
 
       {response.isFetching && (

@@ -630,13 +630,15 @@ export const ElectiveMappingDetailView = ({
               onDraftChange={(key, value) =>
                 setDraftFilters((prev) => ({ ...prev, [key]: value }))
               }
-            />
-            <FilterActions
-              onApply={() => setAppliedFilters(draftFilters)}
-              onReset={() => {
-                setDraftFilters(EMPTY_STUDENT_FILTERS);
-                setAppliedFilters(EMPTY_STUDENT_FILTERS);
-              }}
+              action={
+                <FilterActions
+                  onApply={() => setAppliedFilters(draftFilters)}
+                  onReset={() => {
+                    setDraftFilters(EMPTY_STUDENT_FILTERS);
+                    setAppliedFilters(EMPTY_STUDENT_FILTERS);
+                  }}
+                />
+              }
             />
           </FilterPanel>
           <div className="flex flex-wrap items-end gap-2">

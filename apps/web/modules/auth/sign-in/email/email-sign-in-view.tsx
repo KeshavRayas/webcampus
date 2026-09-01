@@ -45,6 +45,7 @@ export const EmailSignIn = () => {
                 <FormControl>
                   <Input
                     {...field}
+                    className="admission-field"
                     placeholder={
                       isStudent
                         ? "Enter your student email"
@@ -74,6 +75,7 @@ export const EmailSignIn = () => {
                   <FormControl>
                     <PasswordInput
                       {...field}
+                      className="admission-field bg-muted"
                       placeholder="Enter your password"
                     />
                   </FormControl>
@@ -86,7 +88,7 @@ export const EmailSignIn = () => {
           <Button
             disabled={form.formState.isSubmitting}
             type="submit"
-            className="w-full"
+            className="admission-action admission-action-primary w-full"
           >
             {form.formState.isSubmitting ? "Signing in..." : "Continue"}
           </Button>

@@ -1,15 +1,16 @@
 import { AdmissionInstructorView } from "@/modules/admission/admission-instructor/admission-instructor-view";
+import { RoleHero } from "@/modules/role-hero";
 import React, { Suspense } from "react";
 
 export default function AddAdmissionPage() {
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Create Admission</h1>
-        <p className="text-muted-foreground text-sm">
-          Create student admission shells and track application status.
-        </p>
-      </div>
+    <div className="flex flex-col gap-6">
+      <RoleHero
+        eyebrow="Admission instructor"
+        title="Create admissions, in real time."
+        description="Create admission shells and track applications here."
+        image="/dashboard-admission-instructor.png"
+      />
       <Suspense>
         <AdmissionInstructorView />
       </Suspense>

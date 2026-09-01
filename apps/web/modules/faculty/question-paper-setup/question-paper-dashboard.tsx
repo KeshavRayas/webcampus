@@ -334,11 +334,12 @@ export const QuestionPaperDashboard = () => {
             }
             setDraftFilters((prev) => ({ ...prev, [key]: value }));
           }}
-          className={isFirstYearUg ? "md:grid-cols-3" : "md:grid-cols-2"}
-        />
-        <FilterActions
-          onApply={handleApplyFilters}
-          onReset={handleResetFilters}
+          action={
+            <FilterActions
+              onApply={handleApplyFilters}
+              onReset={handleResetFilters}
+            />
+          }
         />
       </FilterPanel>
 

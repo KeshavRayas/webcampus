@@ -261,10 +261,10 @@ export const RegistrationTrackingView = () => {
             });
           }}
           className="md:grid-cols-2 xl:grid-cols-4"
+          action={
+            <FilterActions onApply={applyFilters} onReset={resetFilters} />
+          }
         />
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <FilterActions onApply={applyFilters} onReset={resetFilters} />
-        </div>
       </FilterPanel>
 
       {!queryEnabled ? (

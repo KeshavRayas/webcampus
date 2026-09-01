@@ -163,14 +163,14 @@ export const CourseApprovalsFilters = ({
         onDraftChange={(key, value) => {
           setDraftFilters((cur) => ({ ...cur, [key]: value }));
         }}
+        action={
+          <FilterActions
+            onApply={applyFilters}
+            onReset={resetFilters}
+            applyLabel="View Approvals"
+          />
+        }
       />
-      <div className="mt-4 flex justify-end">
-        <FilterActions
-          onApply={applyFilters}
-          onReset={resetFilters}
-          applyLabel="View Approvals"
-        />
-      </div>
     </FilterPanel>
   );
 };

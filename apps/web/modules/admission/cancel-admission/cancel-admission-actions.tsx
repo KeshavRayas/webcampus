@@ -83,7 +83,7 @@ export function CancelAdmissionActions({
           Cancel Admission
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="admission-theme-dialog">
         <DialogHeader>
           <DialogTitle>Cancel Admission</DialogTitle>
           <DialogDescription>
@@ -132,7 +132,7 @@ export function CancelAdmissionActions({
               placeholder="Add additional context for this cancellation"
               maxLength={2000}
               rows={3}
-              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[60px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="admission-cancellation-textarea border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[60px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
         </div>

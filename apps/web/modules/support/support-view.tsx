@@ -155,20 +155,26 @@ function FilePicker({
 }) {
   return (
     <div className="space-y-2">
-      <label className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 text-sm font-medium">
-        <Paperclip className="size-4" />
-        <span>Attach files</span>
-        <input
-          type="file"
-          multiple
-          className="sr-only"
-          onChange={(event) => {
-            const selected = Array.from(event.target.files ?? []);
-            onChange([...files, ...selected].slice(0, 5));
-            event.target.value = "";
-          }}
-        />
-      </label>
+      <Button
+        variant="outline"
+        className="rounded-full"
+        asChild
+      >
+        <label className="cursor-pointer">
+          <Paperclip className="size-4" />
+          <span>Attach files</span>
+          <input
+            type="file"
+            multiple
+            className="sr-only"
+            onChange={(event) => {
+              const selected = Array.from(event.target.files ?? []);
+              onChange([...files, ...selected].slice(0, 5));
+              event.target.value = "";
+            }}
+          />
+        </label>
+      </Button>
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {files.map((file, index) => (
@@ -249,7 +255,7 @@ function CreateTicketForm({
             maxLength={200}
           />
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 sm:col-span-2">
           <label htmlFor="ticket-category" className="text-sm font-medium">
             Category
           </label>
@@ -259,7 +265,7 @@ function CreateTicketForm({
             onChange={(event) =>
               setCategory(event.target.value as TicketCategory)
             }
-            className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
+            className="border-input bg-background h-11 w-full rounded-full border px-4 text-sm"
           >
             {categories.map((item) => (
               <option key={item.value} value={item.value}>
@@ -268,7 +274,7 @@ function CreateTicketForm({
             ))}
           </select>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 sm:col-span-2">
           <label htmlFor="ticket-priority" className="text-sm font-medium">
             Priority
           </label>
@@ -278,7 +284,7 @@ function CreateTicketForm({
             onChange={(event) =>
               setPriority(event.target.value as TicketPriority)
             }
-            className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
+            className="border-input bg-background h-11 w-full rounded-full border px-4 text-sm"
           >
             {(Object.keys(priorityLabels) as TicketPriority[]).map((item) => (
               <option key={item} value={item}>
@@ -308,9 +314,8 @@ function CreateTicketForm({
       <Button
         type="submit"
         disabled={mutation.isPending}
-        className="w-full sm:w-auto"
+        className="w-full rounded-full sm:w-auto"
       >
-        <Ticket className="mr-2 size-4" />
         {mutation.isPending ? "Creating..." : "Create ticket"}
       </Button>
     </form>
@@ -515,10 +520,9 @@ export function SupportView() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 pb-8">
       <div className="bg-card relative overflow-hidden rounded-2xl border p-6 shadow-sm sm:p-8">
-        <div className="absolute -right-12 -top-16 size-56 rounded-full bg-sky-100/70 blur-3xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-primary mb-3 flex items-center gap-2">
+            <div className="text-muted-foreground mb-3 flex items-center gap-2">
               <LifeBuoy className="size-5" />
               <span className="text-xs font-semibold uppercase tracking-[0.2em]">
                 Raise an issue
@@ -537,9 +541,8 @@ export function SupportView() {
               setShowCreate(true);
               setSelectedTicketId(null);
             }}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="w-full sm:w-auto rounded-full"
           >
-            <Ticket className="mr-2 size-4" />
             Raise an issue
           </Button>
         </div>
@@ -662,7 +665,7 @@ export function SupportView() {
             />
           ) : (
             <div className="flex min-h-[450px] flex-col items-center justify-center text-center">
-              <div className="mb-4 rounded-full bg-sky-100 p-4 text-sky-600">
+              <div className="bg-muted mb-4 rounded-full p-4 text-muted-foreground">
                 <LifeBuoy className="size-8" />
               </div>
               <h2 className="text-xl font-semibold">Select a ticket</h2>
@@ -673,9 +676,8 @@ export function SupportView() {
               <Button
                 onClick={() => setShowCreate(true)}
                 variant="outline"
-                className="mt-5"
+                className="mt-5 w-full rounded-full sm:w-auto"
               >
-                <Ticket className="mr-2 size-4" />
                 Create ticket
               </Button>
             </div>

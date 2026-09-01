@@ -189,82 +189,82 @@ export const AdminSemesterView = () => {
   return (
     <div>
       <Page>
-        <PageHeader title="Semesters & Academic Terms">
-          <DialogForm
-            title="Create Academic Term"
-            trigger={"Create Term"}
-            form={form}
-            onSubmit={onSubmit}
-          >
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {SemesterTypeSchema.options.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option.charAt(0).toUpperCase() + option.slice(1)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="year"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Year</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Year" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {years.map((year) => (
-                          <SelectItem key={year} value={year}>
-                            {year}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </DialogForm>
-        </PageHeader>
+        <PageHeader title="Semesters & Academic Terms">{null}</PageHeader>
         <PageContent>
-          <FilterPanel>
+          <FilterPanel className="admin-semester-filter-panel grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <FilterBuilder
+              className="admin-semester-filter-grid"
               fields={semesterFilterFields}
               draftFilters={draftFilters}
               onDraftChange={handleFilterChange}
               allValue={DEFAULT_FILTER_ALL_VALUE}
             />
-            <div className="flex w-full justify-end pt-2">
-              <Button variant="ghost" size="sm" onClick={resetFilters}>
+            <div className="col-start-auto row-start-auto grid grid-cols-2 gap-2 pt-0 lg:!mt-0 lg:col-start-4 lg:row-start-1 [&_button]:h-[3.15rem]">
+              <DialogForm
+                title="Create Academic Term"
+                trigger="Create Term"
+                form={form}
+                onSubmit={onSubmit}
+              >
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Type</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select Type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {SemesterTypeSchema.options.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option.charAt(0).toUpperCase() +
+                                  option.slice(1)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="year"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Year</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select Year" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {years.map((year) => (
+                              <SelectItem key={year} value={year}>
+                                {year}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </DialogForm>
+              <Button variant="outline" onClick={resetFilters}>
                 Clear Filters
               </Button>
             </div>

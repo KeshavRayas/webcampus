@@ -522,15 +522,15 @@ export const AdminMarksReportView = ({
               return next;
             });
           }}
+          action={
+            <FilterActions
+              onApply={applyFilters}
+              onReset={resetFilters}
+              isApplyDisabled={!isApplyReady}
+              applyLabel="Get Report"
+            />
+          }
         />
-        <div className="mt-4 flex justify-end">
-          <FilterActions
-            onApply={applyFilters}
-            onReset={resetFilters}
-            isApplyDisabled={!isApplyReady}
-            applyLabel="Get Report"
-          />
-        </div>
       </FilterPanel>
 
       {hasAppliedFilters && (

@@ -588,6 +588,11 @@ export const sidebarConfig: Record<Role, SidebarData> = {
     navMain: {
       items: [
         {
+          name: "Create Admission",
+          url: "/admission",
+          icon: LayoutDashboard,
+        },
+        {
           name: "Admission Setup",
           url: "/admission/setup",
           icon: Settings2,
@@ -596,11 +601,6 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Cancel Admission",
           url: "/admission/cancel-admission",
           icon: GraduationCap,
-        },
-        {
-          name: "Create Admission",
-          url: "/admission",
-          icon: LayoutDashboard,
         },
         {
           name: "Fee Payment",

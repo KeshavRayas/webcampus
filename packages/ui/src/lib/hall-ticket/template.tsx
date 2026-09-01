@@ -99,7 +99,7 @@ export function HallTicketTemplate({
   return (
     <div style={R(s.page)}>
       <div style={R(s.header)}>
-        <img src={logoUrl} alt="BMSCE" style={R(s.headerLogo)} />
+        <img src={logoUrl} alt="BMSU" style={R(s.headerLogo)} />
         <div style={R(s.headerCenter)}>
           <div style={R(s.collegeName)}>B.M.S. College of Engineering</div>
           <div style={R(s.collegeSubtitle)}>

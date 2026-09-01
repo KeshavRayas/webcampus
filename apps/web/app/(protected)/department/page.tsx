@@ -2,6 +2,7 @@
 
 import { apiClient } from "@/lib/api-client";
 import { useDepartmentNotices } from "@/modules/notices/use-notices";
+import { RoleHero } from "@/modules/role-hero";
 import { useQuery } from "@tanstack/react-query";
 import type { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
@@ -64,18 +65,13 @@ export default function DepartmentDashboardPage() {
   const value = (loading: boolean, count?: number) =>
     loading ? "..." : (count ?? 0);
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div>
-        <p className="text-muted-foreground text-sm">
-          {new Date().toLocaleDateString()}
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Department dashboard
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          {department.data?.name ?? "Academic operations for your department"}
-        </p>
-      </div>
+    <div className="flex flex-1 flex-col gap-6">
+      <RoleHero
+        eyebrow="Department portal"
+        title={department.data?.name ?? "Run your department with clarity."}
+        description="Faculty, students, courses, and notices under one roof."
+        image="/dashboard-department.png"
+      />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {
@@ -149,7 +145,7 @@ export default function DepartmentDashboardPage() {
         <CardHeader>
           <CardTitle>Quick actions</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="dashboard-action-grid grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Button asChild variant="outline">
             <Link href="/department/timetable">Manage timetable</Link>
           </Button>

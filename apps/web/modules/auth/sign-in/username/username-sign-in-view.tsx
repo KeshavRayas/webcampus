@@ -40,6 +40,7 @@ export const UsernameSignIn = ({ role }: { role: "applicant" }) => {
                 <FormControl>
                   <Input
                     {...field}
+                    className="admission-field"
                     type="email"
                     placeholder="Enter your primary email"
                   />
@@ -66,6 +67,7 @@ export const UsernameSignIn = ({ role }: { role: "applicant" }) => {
                   <FormControl>
                     <PasswordInput
                       {...field}
+                      className="admission-field bg-muted"
                       placeholder="Enter your password"
                     />
                   </FormControl>
@@ -78,7 +80,7 @@ export const UsernameSignIn = ({ role }: { role: "applicant" }) => {
           <Button
             disabled={form.formState.isSubmitting}
             type="submit"
-            className="w-full"
+            className="admission-action admission-action-primary w-full"
           >
             {form.formState.isSubmitting ? "Signing in..." : "Continue"}
           </Button>

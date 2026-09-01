@@ -31,15 +31,15 @@ export const AdminCourseMappingFilters = ({
         fields={filterFields}
         draftFilters={draftFilters}
         onDraftChange={onDraftChange}
+        action={
+          <FilterActions
+            onApply={onApply}
+            onReset={onReset}
+            isApplyDisabled={!isApplyReady}
+            applyLabel="Start Mapping"
+          />
+        }
       />
-      <div className="mt-4 flex justify-end">
-        <FilterActions
-          onApply={onApply}
-          onReset={onReset}
-          isApplyDisabled={!isApplyReady}
-          applyLabel="Start Mapping"
-        />
-      </div>
     </FilterPanel>
   );
 };

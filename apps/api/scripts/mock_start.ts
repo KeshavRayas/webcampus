@@ -955,6 +955,71 @@ class MockStarter {
     }
   }
 
+  public async seedRemainingRoleUsers(): Promise<void> {
+    const remainingRoles: Array<{
+      name: string;
+      username: string;
+      email: string;
+      role:
+        | "hod"
+        | "coordinator"
+        | "trust"
+        | "applicant"
+        | "student";
+    }> = [
+      {
+        name: "HOD",
+        username: "hod",
+        email: "hod@webcampus.com",
+        role: "hod",
+      },
+      {
+        name: "Coordinator",
+        username: "coordinator",
+        email: "coordinator@webcampus.com",
+        role: "coordinator",
+      },
+      {
+        name: "Trust",
+        username: "trust",
+        email: "trust@webcampus.com",
+        role: "trust",
+      },
+      {
+        name: "Applicant",
+        username: "applicant",
+        email: "applicant@webcampus.com",
+        role: "applicant",
+      },
+      {
+        name: "Student",
+        username: "student",
+        email: "student@webcampus.com",
+        role: "student",
+      },
+    ];
+
+    for (const userData of remainingRoles) {
+      try {
+        const result = await this.ensureUser({
+          ...userData,
+          password: DEFAULT_PASSWORD,
+          image: IMAGE_URL,
+        });
+
+        logger.info(
+          `${result.created ? "Created" : "Updated"} ${userData.role} user ${userData.email}`
+        );
+      } catch (error) {
+        logger.error(
+          `Failed to seed ${userData.role} user ${userData.email}: ${
+            (error as Error).message
+          }`
+        );
+      }
+    }
+  }
+
   public async run(): Promise<void> {
     await this.signIn();
     const departmentIdByCode = await this.seedDepartments();
@@ -963,6 +1028,7 @@ class MockStarter {
     await this.seedAdmissionUsers();
     await this.seedAccountsUser();
     await this.seedCoeUser();
+    await this.seedRemainingRoleUsers();
     logger.info("mock_start script completed successfully.");
   }
 }

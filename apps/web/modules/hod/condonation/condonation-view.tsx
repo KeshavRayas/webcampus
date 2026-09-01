@@ -435,6 +435,7 @@ export const CondonationView = () => {
               return { ...current, [key]: value };
             });
           }}
+          action={<FilterActions onApply={applyFilters} onReset={resetFilters} />}
         />
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           <Input
@@ -443,9 +444,6 @@ export const CondonationView = () => {
             onChange={(e) => setSearch(e.target.value)}
             className="h-9"
           />
-          <div className="flex flex-wrap items-center gap-2 md:col-span-2 md:justify-end">
-            <FilterActions onApply={applyFilters} onReset={resetFilters} />
-          </div>
         </div>
       </FilterPanel>
 

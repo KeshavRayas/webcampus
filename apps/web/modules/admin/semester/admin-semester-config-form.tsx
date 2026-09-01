@@ -148,10 +148,10 @@ export const AdminSemesterConfigForm = ({
         </label>
         <Popover>
           {/* Issue 2: Allow typing directly via native date input while keeping Popover UI */}
-          <div className="border-input focus-within:ring-ring flex items-center rounded-md border bg-transparent shadow-sm focus-within:ring-1">
+          <div className="border-input focus-within:ring-ring flex items-center rounded-full border bg-transparent shadow-sm focus-within:ring-1">
             <input
               type="date"
-              className="placeholder:text-muted-foreground flex h-9 w-full bg-transparent px-3 py-1 text-sm outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:opacity-0"
+              className="placeholder:text-muted-foreground flex h-[3.15rem] w-full bg-transparent px-3 py-1 text-sm outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:opacity-0"
               value={value ? dayjs(value).format("YYYY-MM-DD") : ""}
               onChange={(e) => {
                 if (e.target.value) {
@@ -166,7 +166,7 @@ export const AdminSemesterConfigForm = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 rounded-l-none hover:bg-transparent"
+                className="text-muted-foreground hover:text-foreground h-[3.15rem] w-[3.15rem] shrink-0 rounded-l-none hover:bg-transparent"
               >
                 <CalendarIcon className="h-4 w-4 opacity-50" />
               </Button>
@@ -249,7 +249,7 @@ export const AdminSemesterConfigForm = ({
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={isPending}>
+        <Button className="h-[3.15rem]" onClick={handleSave} disabled={isPending}>
           {isPending ? "Saving..." : "Save Configurations"}
         </Button>
       </div>

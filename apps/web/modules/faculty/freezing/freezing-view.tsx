@@ -275,44 +275,43 @@ export const FreezingView = () => {
               return { ...current, [key]: value };
             });
           }}
+          action={<FilterActions onApply={applyFilters} onReset={resetFilters} />}
         />
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
           <Input
             placeholder="Search by course code, name, or section..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-9"
+            className="h-[3.15rem] md:col-span-3"
           />
-          <div className="flex flex-wrap items-center gap-2 md:col-span-2 md:justify-end">
-            <Button
-              onClick={() => {
-                const appliedDomain = appliedFilters.sectionId
-                  ? sections.find((s) => s.id === appliedFilters.sectionId)
-                      ?.domain
-                  : undefined;
-                bulkFreeze({
-                  academicTermId: appliedFilters.academicTermId,
-                  semesterId: appliedFilters.semesterId,
-                  ...(appliedFilters.sectionId && appliedDomain === "group"
-                    ? { electiveBatchId: appliedFilters.sectionId }
-                    : {}),
-                  ...(appliedFilters.sectionId && appliedDomain !== "group"
-                    ? { sectionId: appliedFilters.sectionId }
-                    : {}),
-                });
-              }}
-              disabled={
-                isMutating ||
-                !windowsQueryEnabled ||
-                filteredWindows.length === 0
-              }
-            >
-              {isBulkFreezing
-                ? "Freezing..."
-                : `Freeze Filtered (${filteredWindows.length})`}
-            </Button>
-            <FilterActions onApply={applyFilters} onReset={resetFilters} />
-          </div>
+          <Button
+            onClick={() => {
+              const appliedDomain = appliedFilters.sectionId
+                ? sections.find((s) => s.id === appliedFilters.sectionId)
+                    ?.domain
+                : undefined;
+              bulkFreeze({
+                academicTermId: appliedFilters.academicTermId,
+                semesterId: appliedFilters.semesterId,
+                ...(appliedFilters.sectionId && appliedDomain === "group"
+                  ? { electiveBatchId: appliedFilters.sectionId }
+                  : {}),
+                ...(appliedFilters.sectionId && appliedDomain !== "group"
+                  ? { sectionId: appliedFilters.sectionId }
+                  : {}),
+              });
+            }}
+            disabled={
+              isMutating ||
+              !windowsQueryEnabled ||
+              filteredWindows.length === 0
+            }
+            className="h-[3.15rem] w-full"
+          >
+            {isBulkFreezing
+              ? "Freezing..."
+              : `Freeze Filtered (${filteredWindows.length})`}
+          </Button>
         </div>
       </FilterPanel>
 

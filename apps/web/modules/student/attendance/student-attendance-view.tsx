@@ -226,8 +226,8 @@ export const StudentAttendanceView = () => {
             }
             setDraftFilters((prev) => ({ ...prev, [key]: value }));
           }}
+          action={<FilterActions onApply={handleApply} onReset={handleReset} />}
         />
-        <FilterActions onApply={handleApply} onReset={handleReset} />
       </FilterPanel>
 
       {appliedFilters.semesterId && (

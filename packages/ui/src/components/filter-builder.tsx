@@ -58,16 +58,35 @@ export function FilterPanel({
   );
 }
 
+export function computeFilterGridCols(cellCount: number): number {
+  if (cellCount <= 1) return 1;
+  if (cellCount === 2) return 2;
+  if (cellCount === 3) return 3;
+  if (cellCount === 4) return 4;
+  if (cellCount === 5) return 5;
+  if (cellCount === 6) return 3;
+  if (cellCount === 7) return 4;
+  if (cellCount === 8) return 4;
+  if (cellCount === 9) return 3;
+  if (cellCount === 10) return 5;
+  if (cellCount === 11) return 4;
+  if (cellCount === 12) return 4;
+  return 4;
+}
+
 export function FilterGrid({
   className,
+  cols,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & { cols?: number }) {
   return (
     <div
-      className={cn(
-        "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4",
-        className
-      )}
+      className={cn("role-filter-grid grid gap-x-4 gap-y-4", className)}
+      style={
+        cols
+          ? ({ "--filter-cols": String(cols) } as React.CSSProperties)
+          : undefined
+      }
       {...props}
     />
   );
@@ -91,7 +110,9 @@ export function FilterActions({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-wrap justify-end gap-2", className)}>
+    <div
+      className={cn("admin-filter-actions grid w-full grid-cols-2 gap-2", className)}
+    >
       <Button type="button" onClick={onApply} disabled={isApplyDisabled}>
         {applyLabel}
       </Button>
@@ -115,6 +136,7 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
   className,
   toggles,
   onToggle,
+  action,
 }: {
   fields: FilterFieldConfig<TFilters>[];
   draftFilters: TFilters;
@@ -123,6 +145,7 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
   className?: string;
   toggles?: Record<string, boolean>;
   onToggle?: (columnKey: string) => void;
+  action?: React.ReactNode;
 }) {
   const renderFieldLabel = (
     field: FilterFieldConfig<TFilters>,
@@ -146,8 +169,11 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
     return <Label>{field.label}</Label>;
   };
 
+  const hasAction = Boolean(action);
+  const cols = computeFilterGridCols(fields.length + (hasAction ? 1 : 0));
+
   return (
-    <FilterGrid className={className}>
+    <FilterGrid className={className} cols={cols} data-filter-count={fields.length}>
       {fields.map((field) => {
         const filterKey = field.key;
         const rawValue = draftFilters[filterKey];
@@ -233,6 +259,11 @@ export function FilterBuilder<TFilters extends Record<string, string>>({
           </div>
         );
       })}
+      {action ? (
+        <div className="filter-builder-action-slot" data-filter-action="true">
+          {action}
+        </div>
+      ) : null}
     </FilterGrid>
   );
 }

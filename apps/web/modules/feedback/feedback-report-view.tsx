@@ -113,7 +113,7 @@ export function FeedbackReportView({
     enabled: reportEnabled,
   });
   const selectClass =
-    "border-input bg-background h-9 rounded-md border px-3 text-sm";
+    "border-input bg-background h-[3.15rem] w-full rounded-md border px-4 text-sm";
   const canSelectFaculty =
     role === "admin" || role === "hod" || role === "department";
   const rows = data.map((row) => ({
@@ -204,7 +204,7 @@ export function FeedbackReportView({
         <CardHeader>
           <CardTitle>Filters</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
+        <CardContent className="grid gap-3 md:grid-cols-4">
           <select
             className={selectClass}
             value={draftFilters.academicTermId}
@@ -307,9 +307,11 @@ export function FeedbackReportView({
               </option>
             ))}
           </select>
-          <div className="flex gap-2 md:col-span-3">
-            <Button onClick={applyFilters}>Apply Filters</Button>
-            <Button variant="outline" onClick={resetFilters}>
+          <div className="flex gap-2 md:col-span-1">
+            <Button className="h-[3.15rem] flex-1" onClick={applyFilters}>
+              Apply
+            </Button>
+            <Button className="h-[3.15rem] flex-1" variant="outline" onClick={resetFilters}>
               Reset
             </Button>
           </div>
@@ -319,7 +321,7 @@ export function FeedbackReportView({
         <Card>
           <CardContent className="text-muted-foreground p-6 text-sm">
             Select an academic term, semester, and at least one filter, then
-            click Apply Filters to load the report.
+            click Apply to load the report.
           </CardContent>
         </Card>
       ) : isLoading ? (

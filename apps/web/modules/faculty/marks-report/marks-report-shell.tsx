@@ -176,15 +176,15 @@ export const MarksReportShell = ({
           fields={filterFields}
           draftFilters={draftFilters}
           onDraftChange={onDraftChange}
+          action={
+            <FilterActions
+              onApply={onGetReport}
+              onReset={onResetFilters}
+              isApplyDisabled={!hasRequiredFilters}
+              applyLabel="Get Report"
+            />
+          }
         />
-        <div className="mt-4 flex justify-end">
-          <FilterActions
-            onApply={onGetReport}
-            onReset={onResetFilters}
-            isApplyDisabled={!hasRequiredFilters}
-            applyLabel="Get Report"
-          />
-        </div>
       </FilterPanel>
       <main>
         {children || (

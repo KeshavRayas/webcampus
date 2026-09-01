@@ -24,7 +24,25 @@ const PhoneInputComponent = React.forwardRef<
 
 PhoneInputComponent.displayName = "PhoneInputComponent";
 
-export function PhoneNumberInput({ className, ...props }: Props) {
+const normalizePhoneValue = (value: string | undefined) => {
+  if (!value) return value;
+
+  const trimmed = value.trim();
+  if (trimmed.startsWith("+")) return trimmed;
+
+  const digits = trimmed.replace(/\D/g, "");
+  if (/^[6-9]\d{9}$/.test(digits)) return `+91${digits}`;
+  if (/^91[6-9]\d{9}$/.test(digits)) return `+${digits}`;
+
+  return undefined;
+};
+
+export function PhoneNumberInput({
+  className,
+  value,
+  defaultValue,
+  ...props
+}: Props) {
   return (
     <PhoneInput
       international
@@ -32,6 +50,8 @@ export function PhoneNumberInput({ className, ...props }: Props) {
       countryCallingCodeEditable={false}
       inputComponent={PhoneInputComponent}
       className={cn("phone-input", className)}
+      value={normalizePhoneValue(value)}
+      defaultValue={normalizePhoneValue(defaultValue)}
       {...props}
     />
   );

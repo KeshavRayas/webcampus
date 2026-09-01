@@ -364,8 +364,8 @@ export const CoursesView: React.FC = () => {
 
             updateDraftFilter(key, value);
           }}
+          action={<FilterActions onApply={applyFilters} onReset={resetFilters} />}
         />
-        <FilterActions onApply={applyFilters} onReset={resetFilters} />
       </FilterPanel>
 
       {/* Render the semester blocks if an instance is selected */}

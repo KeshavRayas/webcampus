@@ -252,6 +252,9 @@ export const RegistrationWindowsView = () => {
             });
           }}
           className="md:grid-cols-2 xl:grid-cols-3"
+          action={
+            <FilterActions onApply={applyFilters} onReset={resetFilters} />
+          }
         />
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <Button
@@ -265,7 +268,6 @@ export const RegistrationWindowsView = () => {
           >
             {isCreating ? "Creating..." : "Create Window"}
           </Button>
-          <FilterActions onApply={applyFilters} onReset={resetFilters} />
         </div>
       </FilterPanel>
 

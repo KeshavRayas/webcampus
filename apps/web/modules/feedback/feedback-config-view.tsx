@@ -81,7 +81,7 @@ function DateTimePickerField({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="border-input focus-within:ring-ring text-muted-foreground flex h-9 w-full items-center justify-between rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-within:ring-1"
+          className="border-input focus-within:ring-ring text-muted-foreground flex h-[3.15rem] w-full items-center justify-between rounded-md border bg-transparent px-3 text-sm shadow-sm outline-none focus-within:ring-1"
         >
           <span>
             {value
@@ -111,7 +111,7 @@ function DateTimePickerField({
             <ClockIcon className="text-muted-foreground h-4 w-4" />
             <input
               type="time"
-              className="border-input focus-within:ring-ring flex h-9 w-full items-center rounded-md border bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-within:ring-1"
+              className="border-input focus-within:ring-ring flex h-[3.15rem] w-full items-center rounded-md border bg-transparent px-3 text-sm shadow-sm outline-none focus-within:ring-1"
               value={timePart}
               onChange={(event) =>
                 onChange(datePart ? `${datePart}T${event.target.value}` : "")
@@ -360,7 +360,7 @@ export function FeedbackConfigView() {
         </CardHeader>
         <CardContent>
           <select
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            className="border-input bg-background h-[3.15rem] w-full rounded-md border px-4 text-sm"
             value={academicTermId}
             onChange={(event) => {
               setAcademicTermId(event.target.value);
@@ -376,7 +376,7 @@ export function FeedbackConfigView() {
             ))}
           </select>
           <select
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            className="border-input bg-background h-[3.15rem] w-full rounded-md border px-4 text-sm"
             value={semesterId}
             onChange={(event) => setSemesterId(event.target.value)}
             disabled={!academicTermId}
@@ -397,7 +397,7 @@ export function FeedbackConfigView() {
         </CardHeader>
         <CardContent className="space-y-3">
           <select
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            className="border-input bg-background h-[3.15rem] w-full rounded-md border px-4 text-sm"
             value={presetId}
             onChange={(event) => {
               setPresetId(event.target.value);
@@ -439,6 +439,7 @@ export function FeedbackConfigView() {
           <Button
             onClick={saveQuestionSet}
             disabled={!academicTermId || !semesterId || !presetId || locked}
+            className="w-full"
           >
             Save question set
           </Button>
@@ -490,7 +491,7 @@ export function FeedbackConfigView() {
                       </span>
                     )}
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       onClick={() => void removeRound(round)}
                       disabled={rounds.length === 1}
                     >
@@ -521,16 +522,18 @@ export function FeedbackConfigView() {
               </div>
             );
           })}
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Button
               onClick={addRound}
               disabled={!academicTermId || !semesterId}
+              className="w-full"
             >
               Add round
             </Button>
             <Button
               onClick={saveRounds}
               disabled={!academicTermId || !semesterId}
+              className="w-full"
             >
               Save rounds
             </Button>

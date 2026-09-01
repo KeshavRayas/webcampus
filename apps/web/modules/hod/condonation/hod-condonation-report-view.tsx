@@ -472,15 +472,15 @@ export const HodCondonationReportView = () => {
           fields={filterFields}
           draftFilters={draftFilters}
           onDraftChange={updateDraftFilter}
+          action={
+            <FilterActions
+              onApply={onGetReport}
+              onReset={onResetFilters}
+              isApplyDisabled={!hasRequiredDraftFilters}
+              applyLabel="Get Report"
+            />
+          }
         />
-        <div className="mt-4 flex justify-end">
-          <FilterActions
-            onApply={onGetReport}
-            onReset={onResetFilters}
-            isApplyDisabled={!hasRequiredDraftFilters}
-            applyLabel="Get Report"
-          />
-        </div>
       </FilterPanel>
 
       {shouldShowReportResults ? (

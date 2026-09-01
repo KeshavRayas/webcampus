@@ -407,8 +407,8 @@ export const AdminHallTicketView = () => {
                 setAppliedFilters((prev) => ({ ...prev, search: value }));
               }
             }}
+            action={<FilterActions onApply={handleApply} onReset={handleReset} />}
           />
-          <FilterActions onApply={handleApply} onReset={handleReset} />
         </FilterPanel>
         <div className="text-muted-foreground flex items-center justify-center gap-2 rounded-lg border p-12 text-sm">
           <Loader2 className="size-4 animate-spin" /> Loading...
@@ -472,8 +472,8 @@ export const AdminHallTicketView = () => {
               setAppliedFilters((prev) => ({ ...prev, search: value }));
             }
           }}
+          action={<FilterActions onApply={handleApply} onReset={handleReset} />}
         />
-        <FilterActions onApply={handleApply} onReset={handleReset} />
       </FilterPanel>
 
       {!queryEnabled ? (

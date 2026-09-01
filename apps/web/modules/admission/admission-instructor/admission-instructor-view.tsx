@@ -267,7 +267,7 @@ export const AdmissionInstructorView = ({
   );
 
   return (
-    <div className="space-y-8">
+    <div className="admission-instructor-console space-y-8">
       <div className="bg-card text-card-foreground space-y-6 rounded-lg border p-6 shadow-sm">
         <div className="space-y-4">
           <AdmissionFilterBar
@@ -277,20 +277,18 @@ export const AdmissionInstructorView = ({
             onDraftChange={updateDraftFilter}
             onApply={applyFilters}
             onReset={resetFilters}
-          />
-
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            {!hideAddForm && canCreate && (
-              <Dialog
-                open={isCreateDialogOpen}
-                onOpenChange={handleCreateDialogOpenChange}
-              >
+            actionSlot={
+              !hideAddForm && canCreate ? (
+                <Dialog
+                  open={isCreateDialogOpen}
+                  onOpenChange={handleCreateDialogOpenChange}
+                >
                 <DialogTrigger asChild>
                   <Button disabled={!draftFilters.semester}>
                     Create Admission
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent className="admission-theme-dialog sm:max-w-lg">
                   {createChoice === null ? (
                     <>
                       <DialogHeader>
@@ -359,7 +357,7 @@ export const AdmissionInstructorView = ({
                               <FormControl>
                                 <Input
                                   type="email"
-                                  placeholder="student@bmsce.ac.in"
+                                  placeholder="student@bmsu.ac.in"
                                   {...field}
                                   value={field.value ?? ""}
                                 />
@@ -407,6 +405,7 @@ export const AdmissionInstructorView = ({
                           <Button
                             type="button"
                             variant="outline"
+                            className="!rounded-md !border-border !bg-background !text-foreground hover:!bg-accent"
                             onClick={() => setCreateChoice(null)}
                           >
                             Back
@@ -414,6 +413,7 @@ export const AdmissionInstructorView = ({
                           <Button
                             type="submit"
                             disabled={form.formState.isSubmitting}
+                            className="!rounded-md !border-border !bg-background !text-foreground hover:!bg-accent"
                           >
                             Create Profile
                           </Button>
@@ -423,8 +423,9 @@ export const AdmissionInstructorView = ({
                   )}
                 </DialogContent>
               </Dialog>
-            )}
-          </div>
+              ) : undefined
+            }
+          />
         </div>
 
         {!hideAddForm && canCreate && !draftFilters.semester && (

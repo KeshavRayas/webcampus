@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
-import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AdminSemesterConfigForm } from "./admin-semester-config-form";
 import { useDeleteAcademicTerm } from "./use-academic-term";
@@ -74,34 +74,14 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
 
   return (
     <>
-      <Card
-        className="mb-4 border-l-4 shadow-sm"
-        style={{
-          borderLeftColor:
-            lifecycleStatus === "ACTIVE"
-              ? "#4ade80"
-              : lifecycleStatus === "ARCHIVED"
-                ? "#94a3b8"
-                : "#e2e8f0",
-        }}
-      >
+      <Card className="admin-term-card mb-4 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b pb-3">
           <div>
             <div className="flex items-center gap-3">
               <CardTitle className="text-xl">
                 {term.type.toUpperCase()} {term.year}
               </CardTitle>
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium tracking-wide ${
-                  lifecycleStatus === "ACTIVE"
-                    ? "bg-green-100 text-green-800"
-                    : lifecycleStatus === "ARCHIVED"
-                      ? "bg-slate-100 text-slate-700"
-                      : "bg-amber-100 text-amber-800"
-                }`}
-              >
-                {lifecycleStatus}
-              </span>
+              <span className="admin-term-status">{lifecycleStatus}</span>
             </div>
             {/* Issue 4: Show both configured and active statuses below each other */}
             <CardDescription className="mt-2 flex flex-col gap-1">
@@ -110,15 +90,16 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
               </span>
 
               {/* Highlight the active semester in Black Bold */}
-              <span className="font-bold text-black dark:text-white">
+              <span className="text-foreground font-semibold">
                 Active: {activeSummaryString}
               </span>
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <Button
-              variant="destructive"
+              variant="outline"
               size="sm"
+              className="border-foreground bg-foreground text-background hover:bg-foreground/85 hover:text-background min-w-[7.5rem]"
               onClick={() => setIsDeleteDialogOpen(true)}
               disabled={isDeleting}
             >
@@ -131,23 +112,14 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
             <Button
               variant="outline"
               size="sm"
+              className="min-w-[7.5rem]"
               onClick={() => setIsExpanded(!isExpanded)}
               disabled={isArchived} // Issue 5: Disable config if archived
               title={
                 isArchived ? "Archived terms cannot be configured" : undefined
               }
             >
-              {isExpanded ? (
-                <>
-                  <span className="hidden md:inline-block">Collapse</span>{" "}
-                  <ChevronUp className="h-4 w-4 md:ml-2" />
-                </>
-              ) : (
-                <>
-                  <span className="hidden md:inline-block">Configure</span>{" "}
-                  <ChevronDown className="h-4 w-4 md:ml-2" />
-                </>
-              )}
+              <span className="hidden md:inline-block">Configure</span>
             </Button>
           </div>
         </CardHeader>

@@ -12,9 +12,13 @@ import {
 export const StudentCoursesTabs = () => {
   return (
     <Tabs defaultValue="registration" className="space-y-6">
-      <TabsList>
-        <TabsTrigger value="registration">Course Registration</TabsTrigger>
-        <TabsTrigger value="enrolled">Enrolled Courses</TabsTrigger>
+      <TabsList className="rounded-full p-1">
+        <TabsTrigger className="rounded-full px-4" value="registration">
+          Course Registration
+        </TabsTrigger>
+        <TabsTrigger className="rounded-full px-4" value="enrolled">
+          Enrolled Courses
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="registration">

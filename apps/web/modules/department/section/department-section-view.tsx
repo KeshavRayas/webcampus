@@ -316,8 +316,8 @@ export const DepartmentSectionView = () => {
 
             updateDraftFilter(key, value);
           }}
+          action={<FilterActions onApply={applyFilters} onReset={resetFilters} />}
         />
-        <FilterActions onApply={applyFilters} onReset={resetFilters} />
       </FilterPanel>
 
       {isRestrictedForNonBasic ? (

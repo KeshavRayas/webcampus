@@ -1,0 +1,15 @@
+﻿package.json
+app\layout.tsx
+app\(auth)\layout.tsx
+app\(protected)\layout.tsx
+app\(protected)\admin\layout.tsx
+modules\admin\course-approvals\course-approvals-filters.tsx
+modules\admin\course-coordinators\course-coordinator-filters.tsx
+modules\admin\course-mapping\course-mapping-filters.tsx
+modules\admin\whatsapp\multi-select.tsx
+modules\admission\shared\admission-filter-bar.tsx
+modules\admission\shared\admission-tab-filter-strip.tsx
+modules\auth\user-button\user-button-menu.tsx
+modules\department\course-approvals\course-approvals-filters.tsx
+modules\department\course-coordinators\course-coordinator-filters.tsx
+modules\department\course-mapping\course-mapping-filters.tsx

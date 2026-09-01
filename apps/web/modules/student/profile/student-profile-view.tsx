@@ -125,10 +125,22 @@ const DataField = ({
   label: string;
   value?: React.ReactNode;
 }) => {
+  const asPill =
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    value !== "No Data Available";
   return (
     <div className="space-y-1">
       <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="break-words font-medium">{value || "No Data Available"}</p>
+      {asPill ? (
+        <span className="role-data-pill inline-flex max-w-full items-center rounded-full px-3 py-1 text-sm font-medium">
+          {value}
+        </span>
+      ) : (
+        <p className="break-words font-medium">
+          {value || "No Data Available"}
+        </p>
+      )}
     </div>
   );
 };
