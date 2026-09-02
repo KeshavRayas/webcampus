@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { UpdateDepartmentSchema } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 // import { Upload } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -51,7 +51,6 @@ export const EditDepartmentDialog = ({
   department,
 }: EditDepartmentDialogProps) => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const form = useForm<z.infer<typeof UpdateDepartmentSchema>>({
@@ -96,11 +95,10 @@ export const EditDepartmentDialog = ({
         formData.append("logo", logoFile);
       }
 
-      return await axios.patch<BaseResponse<unknown>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/department/${department.id}`,
+      return await apiClient.patch<BaseResponse<unknown>>(
+        `/admin/department/${department.id}`,
         formData,
         {
-          withCredentials: true,
           headers: {
             "Content-Type": "multipart/form-data",
           },

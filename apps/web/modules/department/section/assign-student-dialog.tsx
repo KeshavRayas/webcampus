@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { Button } from "@webcampus/ui/components/button";
 import { Checkbox } from "@webcampus/ui/components/checkbox";
 import {
@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { UserPlus } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { toast } from "react-toastify";
@@ -52,7 +52,6 @@ export const AssignStudentDialog = ({
   academicYear,
 }: AssignStudentDialogProps) => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -64,11 +63,10 @@ export const AssignStudentDialog = ({
   const { data: studentList = [], isLoading } = useQuery({
     queryKey: ["unassigned-students", sectionId, semesterId, academicYear],
     queryFn: async () => {
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/unassigned-students`,
+      const res = await apiClient.get(
+        `/department/section/unassigned-students`,
         {
           params: { semesterId, academicYear },
-          withCredentials: true,
         }
       );
       // Extract the 'students' array from the response object
@@ -114,11 +112,7 @@ export const AssignStudentDialog = ({
         studentIds: Array.from(selectedIds),
         academicYear,
       };
-      return axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/assign-students`,
-        payload,
-        { withCredentials: true }
-      );
+      return apiClient.post(`/department/section/assign-students`, payload);
     },
     onSuccess: () => {
       toast.success(`Assigned ${selectedIds.size} student(s) successfully`);

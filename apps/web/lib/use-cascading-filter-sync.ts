@@ -79,7 +79,10 @@ export function useCascadingFilterSync<
       return;
     }
   }, [
-    filters,
+    filters.academicTerm,
+    filters.semester,
+    filters.departmentId,
+    filters.departmentName,
     setFilters,
     options.academicTerms,
     options.semesters,

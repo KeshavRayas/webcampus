@@ -246,8 +246,7 @@ const FeePaymentStaffView = () => {
     queryKey: ["fee-payments", appliedFilters],
     queryFn: async () => {
       const response = await apiClient.get<BaseResponse<FeePaymentResponse[]>>(
-        `/admission${query ? `?${query}` : ""}`,
-        { withCredentials: true }
+        `/admission${query ? `?${query}` : ""}`
       );
       if (response.data.status === "error") {
         throw new Error(response.data.message);
@@ -488,8 +487,7 @@ const FeePaymentStaffView = () => {
     setIsFetchingFee(true);
     apiClient
       .get<BaseResponse<{ feeAmount: number }>>(
-        `/admission/fee-structure?${params.toString()}`,
-        { withCredentials: true }
+        `/admission/fee-structure?${params.toString()}`
       )
       .then((response) => {
         if (response.data.status === "success" && response.data.data != null) {

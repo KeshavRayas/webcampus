@@ -12,10 +12,7 @@ export const useExitAdmission = () => {
     mutationFn: async (id: string) => {
       const res = await apiClient.patch<BaseResponse<unknown>>(
         `/admission/${id}/exit`,
-        {},
-        {
-          withCredentials: true,
-        }
+        {}
       );
 
       if (res.data.status === "error") {

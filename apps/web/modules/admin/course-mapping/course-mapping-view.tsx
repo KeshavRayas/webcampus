@@ -1,6 +1,7 @@
 "use client";
 
 import { AuditHistoryDialog } from "@/components/admin/audit-history-dialog";
+import { apiClient } from "@/lib/api-client";
 import {
   createFilterQueryString,
   getFiltersFromSearchParams,
@@ -9,7 +10,6 @@ import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CourseMappingStatusItemType,
   CourseResponseDTO,
@@ -22,7 +22,6 @@ import {
   FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { Download, ShieldCheck, Upload } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -57,7 +56,6 @@ type ExtractedExcelRow = {
 };
 
 export const AdminCourseMappingView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -191,9 +189,9 @@ export const AdminCourseMappingView = () => {
         return [];
       }
 
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{ courses: CourseMappingStatusItemType[] }>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/status`, {
+      >(`/admin/course-assignment/status`, {
         params: {
           departmentId: draftFilters.departmentId,
           departmentName: draftFilters.departmentName,
@@ -203,7 +201,6 @@ export const AdminCourseMappingView = () => {
             ? { cycle: draftFilters.cycle }
             : {}),
         },
-        withCredentials: true,
       });
 
       if (res.data.status === "success" && res.data.data?.courses) {
@@ -292,14 +289,13 @@ export const AdminCourseMappingView = () => {
       appliedFilters.departmentName,
     ],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<CourseResponseDTO>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course/${appliedFilters.courseId}`,
+      const res = await apiClient.get<BaseResponse<CourseResponseDTO>>(
+        `/admin/course/${appliedFilters.courseId}`,
         {
           params: {
             departmentId: appliedFilters.departmentId,
             departmentName: appliedFilters.departmentName,
           },
-          withCredentials: true,
         }
       );
       if (res.data.status === "success") {
@@ -324,8 +320,8 @@ export const AdminCourseMappingView = () => {
     if (!selectedCourse || !appliedFilters.semesterId) return;
     try {
       setIsProcessingExcel(true);
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/excel/template`,
+      const res = await apiClient.get(
+        `/admin/course-assignment/excel/template`,
         {
           params: {
             courseId: selectedCourse.id,
@@ -334,7 +330,6 @@ export const AdminCourseMappingView = () => {
             departmentId: appliedFilters.departmentId,
           },
           responseType: "blob",
-          withCredentials: true,
         }
       );
 
@@ -367,12 +362,11 @@ export const AdminCourseMappingView = () => {
       formData.append("file", file);
       formData.append("departmentId", appliedFilters.departmentId);
 
-      const res = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/excel/upload`,
+      const res = await apiClient.post(
+        `/admin/course-assignment/excel/upload`,
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
-          withCredentials: true,
         }
       );
 

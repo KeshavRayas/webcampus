@@ -1,5 +1,6 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import {
   createFilterQueryString,
   getFiltersFromSearchParams,
@@ -8,7 +9,6 @@ import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useDebounce } from "@/lib/use-debounce";
 import { useDepartments } from "@/lib/use-departments";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { AdminStudentResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
@@ -20,7 +20,7 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import { Skeleton } from "@webcampus/ui/components/skeleton";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
@@ -51,8 +51,6 @@ export const AdminStudentsView = () => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const { data: termsData } = useAcademicTerms();
   const terms = termsData ?? [];
   const { data: departments = [] } = useDepartments();
@@ -159,11 +157,10 @@ export const AdminStudentsView = () => {
           : {}),
       };
 
-      const res = await axios.get<BaseResponse<AdminStudentResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/student`,
+      const res = await apiClient.get<BaseResponse<AdminStudentResponseType[]>>(
+        `/admin/student`,
         {
           params: apiFilters,
-          withCredentials: true,
         }
       );
 

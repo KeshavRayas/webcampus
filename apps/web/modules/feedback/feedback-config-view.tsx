@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useSemestersByTerm } from "@/modules/admin/semester/use-semester-config";
 import { dayjs } from "@webcampus/common/dayjs";
-import { frontendEnv } from "@webcampus/common/env";
 import { Button } from "@webcampus/ui/components/button";
 import { Calendar } from "@webcampus/ui/components/calendar";
 import {
@@ -12,13 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@webcampus/ui/components/card";
+import { ConfirmDialog } from "@webcampus/ui/components/confirm-dialog";
 import { Input } from "@webcampus/ui/components/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@webcampus/ui/components/popover";
-import axios from "axios";
+import { isAxiosError } from "axios";
 import { CalendarIcon, ClockIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
@@ -59,7 +60,7 @@ const emptyRounds = (): RoundState[] => [
 ];
 
 const errorMessage = (error: unknown, fallback: string) =>
-  axios.isAxiosError(error)
+  isAxiosError(error)
     ? (error.response?.data?.message ?? fallback)
     : error instanceof Error
       ? error.message
@@ -127,7 +128,6 @@ function DateTimePickerField({
 export function FeedbackConfigView() {
   const { data: loadedTerms } = useAcademicTerms();
   const terms = loadedTerms ?? [];
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [academicTermId, setAcademicTermId] = useState("");
   const [semesterId, setSemesterId] = useState("");
   const { data: loadedSemesters } = useSemestersByTerm(academicTermId);
@@ -139,75 +139,67 @@ export function FeedbackConfigView() {
   const [locked, setLocked] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(false);
 
-  const loadTermConfig = useCallback(
-    (termId: string, semester: string) => {
-      setLoadingConfig(true);
-      void axios
-        .get(
-          `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/configuration/term/${termId}/semester/${semester}`,
-          { withCredentials: true }
-        )
-        .then((response) => {
-          const config = response.data.data;
-          setPresetId(config?.presetId ?? "");
-          setQuestions(
-            config?.questions?.length
-              ? config.questions.map(
-                  (question: {
-                    questionNumber: number;
-                    questionText: string;
-                  }) => ({
-                    questionNumber: question.questionNumber,
-                    questionText: question.questionText,
-                  })
-                )
-              : []
+  const loadTermConfig = useCallback((termId: string, semester: string) => {
+    setLoadingConfig(true);
+    void apiClient
+      .get(`/admin/feedback/configuration/term/${termId}/semester/${semester}`)
+      .then((response) => {
+        const config = response.data.data;
+        setPresetId(config?.presetId ?? "");
+        setQuestions(
+          config?.questions?.length
+            ? config.questions.map(
+                (question: {
+                  questionNumber: number;
+                  questionText: string;
+                }) => ({
+                  questionNumber: question.questionNumber,
+                  questionText: question.questionText,
+                })
+              )
+            : []
+        );
+        const hasRounds = config?.rounds?.length > 0;
+        setLocked(Boolean(config?.isLocked) || hasRounds);
+        if (hasRounds) {
+          setRounds(
+            (
+              config.rounds as Array<{
+                id: string;
+                roundNumber: number;
+                name: string;
+                startsAt: string;
+                endsAt: string;
+                isEnabled: boolean;
+              }>
+            ).map((saved) => ({
+              id: saved.id,
+              roundNumber: saved.roundNumber,
+              name: saved.name || `Round ${saved.roundNumber}`,
+              startsAt: saved.startsAt.slice(0, 16),
+              endsAt: saved.endsAt.slice(0, 16),
+              isEnabled: saved.isEnabled,
+            }))
           );
-          const hasRounds = config?.rounds?.length > 0;
-          setLocked(Boolean(config?.isLocked) || hasRounds);
-          if (hasRounds) {
-            setRounds(
-              (
-                config.rounds as Array<{
-                  id: string;
-                  roundNumber: number;
-                  name: string;
-                  startsAt: string;
-                  endsAt: string;
-                  isEnabled: boolean;
-                }>
-              ).map((saved) => ({
-                id: saved.id,
-                roundNumber: saved.roundNumber,
-                name: saved.name || `Round ${saved.roundNumber}`,
-                startsAt: saved.startsAt.slice(0, 16),
-                endsAt: saved.endsAt.slice(0, 16),
-                isEnabled: saved.isEnabled,
-              }))
-            );
-          } else {
-            setRounds(emptyRounds());
-          }
-        })
-        .catch(() => {
-          setPresetId("");
-          setQuestions([]);
+        } else {
           setRounds(emptyRounds());
-          setLocked(false);
-        })
-        .finally(() => setLoadingConfig(false));
-    },
-    [NEXT_PUBLIC_API_BASE_URL]
-  );
+        }
+      })
+      .catch(() => {
+        setPresetId("");
+        setQuestions([]);
+        setRounds(emptyRounds());
+        setLocked(false);
+      })
+      .finally(() => setLoadingConfig(false));
+  }, []);
 
   useEffect(() => {
-    void axios
-      .get(`${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/presets`, {
-        withCredentials: true,
-      })
+    void apiClient
+      .get(`/admin/feedback/presets`)
       .then((response) => setPresets(response.data.data ?? []))
       .catch(() => setPresets([]));
-  }, [NEXT_PUBLIC_API_BASE_URL]);
+  }, []);
 
   useEffect(() => {
     if (!academicTermId || !semesterId) {
@@ -227,11 +219,11 @@ export function FeedbackConfigView() {
   const saveQuestionSet = async () => {
     if (!academicTermId || !semesterId || !presetId) return;
     try {
-      await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/configuration/term`,
-        { academicTermId, semesterId, presetId },
-        { withCredentials: true }
-      );
+      await apiClient.post(`/admin/feedback/configuration/term`, {
+        academicTermId,
+        semesterId,
+        presetId,
+      });
       toast.success("Feedback question set saved");
       loadTermConfig(academicTermId, semesterId);
     } catch (error) {
@@ -255,16 +247,11 @@ export function FeedbackConfigView() {
           isEnabled: round.isEnabled,
         };
         if (round.id) {
-          await axios.patch(
-            `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/rounds/${round.id}`,
-            payload,
-            { withCredentials: true }
-          );
+          await apiClient.patch(`/admin/feedback/rounds/${round.id}`, payload);
         } else {
-          const response = await axios.post(
-            `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/rounds`,
-            payload,
-            { withCredentials: true }
+          const response = await apiClient.post(
+            `/admin/feedback/rounds`,
+            payload
           );
           setRounds((current) =>
             current.map((item) =>
@@ -288,11 +275,7 @@ export function FeedbackConfigView() {
   ) => {
     if (!round.id) return;
     try {
-      await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/rounds/${round.id}/${action}`,
-        {},
-        { withCredentials: true }
-      );
+      await apiClient.post(`/admin/feedback/rounds/${round.id}/${action}`, {});
       setRounds((current) =>
         current.map((item) =>
           item.id === round.id
@@ -322,26 +305,32 @@ export function FeedbackConfigView() {
     ]);
   };
 
-  const removeRound = async (round: RoundState) => {
-    const confirmMessage = round.id
-      ? `Delete ${round.name || `Round ${round.roundNumber}`}? This will remove all responses collected for it.`
-      : `Remove ${round.name || `Round ${round.roundNumber}`}?`;
-    if (!window.confirm(confirmMessage)) return;
+  const [pendingDeleteRound, setPendingDeleteRound] =
+    useState<RoundState | null>(null);
+
+  const confirmRemoveRound = async () => {
+    const round = pendingDeleteRound;
+    if (!round) return;
     if (round.id) {
       try {
-        await axios.delete(
-          `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/rounds/${round.id}`,
-          { withCredentials: true }
-        );
+        await apiClient.delete(`/admin/feedback/rounds/${round.id}`);
         toast.success("Feedback round deleted");
       } catch (error) {
         toast.error(errorMessage(error, "Could not delete round"));
         return;
+      } finally {
+        setPendingDeleteRound(null);
       }
+    } else {
+      setPendingDeleteRound(null);
     }
     setRounds((current) =>
       current.filter((item) => item.roundNumber !== round.roundNumber)
     );
+  };
+
+  const removeRound = (round: RoundState) => {
+    setPendingDeleteRound(round);
   };
 
   return (
@@ -537,6 +526,26 @@ export function FeedbackConfigView() {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!pendingDeleteRound}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteRound(null);
+        }}
+        title={
+          pendingDeleteRound?.id
+            ? `Delete ${pendingDeleteRound.name || `Round ${pendingDeleteRound.roundNumber}`}?`
+            : `Remove ${pendingDeleteRound?.name || `Round ${pendingDeleteRound?.roundNumber ?? ""}`}?`
+        }
+        description={
+          pendingDeleteRound?.id
+            ? "This will remove all responses collected for it. This action cannot be undone."
+            : undefined
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => void confirmRemoveRound()}
+      />
     </div>
   );
 }

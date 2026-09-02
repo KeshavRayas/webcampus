@@ -1,7 +1,7 @@
 "use client";
 
 import { AuditHistoryDialog } from "@/components/admin/audit-history-dialog";
-import { frontendEnv } from "@webcampus/common/env";
+import { apiClient } from "@/lib/api-client";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { format } from "date-fns";
 import { useState } from "react";
 import { toast } from "react-toastify";
@@ -33,7 +33,6 @@ export const CourseReviewSheet = ({
   onClose,
   onSuccess,
 }: CourseReviewSheetProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [revisionNotes, setRevisionNotes] = useState("");
   const [showRevisionInput, setShowRevisionInput] = useState(false);
@@ -47,16 +46,12 @@ export const CourseReviewSheet = ({
   const handleApprove = async () => {
     setIsSubmitting(true);
     try {
-      const res = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/approve`,
-        {
-          semesterId: group.semesterId,
-          departmentId: group.departmentId,
-          departmentName: group.departmentName,
-          cycle: group.cycle,
-        },
-        { withCredentials: true }
-      );
+      const res = await apiClient.post(`/department/course/approve`, {
+        semesterId: group.semesterId,
+        departmentId: group.departmentId,
+        departmentName: group.departmentName,
+        cycle: group.cycle,
+      });
 
       if (res.data.status === "success") {
         toast.success(res.data.message);
@@ -84,17 +79,13 @@ export const CourseReviewSheet = ({
 
     setIsSubmitting(true);
     try {
-      const res = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/request-revision`,
-        {
-          semesterId: group.semesterId,
-          departmentId: group.departmentId,
-          departmentName: group.departmentName,
-          cycle: group.cycle,
-          reviewerNotes: revisionNotes,
-        },
-        { withCredentials: true }
-      );
+      const res = await apiClient.post(`/department/course/request-revision`, {
+        semesterId: group.semesterId,
+        departmentId: group.departmentId,
+        departmentName: group.departmentName,
+        cycle: group.cycle,
+        reviewerNotes: revisionNotes,
+      });
 
       if (res.data.status === "success") {
         toast.success(res.data.message);

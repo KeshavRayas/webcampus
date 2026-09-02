@@ -14,7 +14,7 @@ env:
   # Shared env for install/build (bun/postinstall/prisma generate + next build)
   DATABASE_URL: "postgresql://postgres:example@localhost:6432/webcampus?connection_limit=20&pgbouncer=true"
   DATABASE_UNPOOLED_URL: "postgresql://postgres:example@localhost:5432/webcampus"
-  BETTER_AUTH_SECRET: "ci-dummy-secret-for-checks"
+  BETTER_AUTH_SECRET: "ci-dummy-secret-for-checks-32-chars-long!!"
   NEXT_PUBLIC_API_BASE_URL: "http://localhost:8080"
   NEXT_PUBLIC_FRONTEND_URL: "http://localhost:3000"
 

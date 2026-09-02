@@ -1,15 +1,15 @@
 "use client";
 
 import type { CondonationReportData } from "@/components/academics/reports/condonation-tables";
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import type {
   HODCondonationCourse,
   HODCondonationFilters,
   HODCondonationStudentRow,
 } from "@webcampus/schemas/hod";
 import type { BaseResponse, ErrorResponse } from "@webcampus/types/api";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
 export type { HODCondonationFilters, HODCondonationStudentRow };
@@ -42,13 +42,11 @@ export const useHODCondonationStudents = (
   status: "pending" | "approved",
   enabled: boolean
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: buildQueryKey(status, filters),
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<HODCondonationStudentRow[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/condonation/students`,
+      const res = await apiClient.get<BaseResponse<HODCondonationStudentRow[]>>(
+        `/hod/condonation/students`,
         {
           params: {
             academicTermId: filters.academicTermId,
@@ -58,7 +56,6 @@ export const useHODCondonationStudents = (
             ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
             ...(filters.search ? { search: filters.search } : {}),
           },
-          withCredentials: true,
         }
       );
 
@@ -78,16 +75,13 @@ export const useHODCondonationCourses = (
   semesterId: string | undefined,
   enabled: boolean
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["hod-condonation-courses", semesterId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<HODCondonationCourse[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/condonation/courses`,
+      const res = await apiClient.get<BaseResponse<HODCondonationCourse[]>>(
+        `/hod/condonation/courses`,
         {
           params: semesterId ? { semesterId } : {},
-          withCredentials: true,
         }
       );
       if (res.data.status === "success") return res.data.data || [];
@@ -114,16 +108,14 @@ export const useHODCondonationReport = (
   } | null,
   enabled: boolean
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["hod-condonation-report", filters],
     queryFn: async (): Promise<CondonationReportData> => {
       if (!filters) {
         throw new Error("Missing report filters");
       }
-      const res = await axios.get<BaseResponse<CondonationReportData>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/condonation/report`,
+      const res = await apiClient.get<BaseResponse<CondonationReportData>>(
+        `/hod/condonation/report`,
         {
           params: {
             academicTermId: filters.academicTermId,
@@ -132,7 +124,6 @@ export const useHODCondonationReport = (
             ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
             ...(filters.cycle ? { cycle: filters.cycle } : {}),
           },
-          withCredentials: true,
         }
       );
       if (res.data.status === "success" && res.data.data) {
@@ -147,15 +138,13 @@ export const useHODCondonationReport = (
 };
 
 export const useHODApproveCondonation = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (attendanceId: string) => {
-      return axios.patch<BaseResponse<HODCondonationApproveResponse>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/condonation/${attendanceId}`,
-        {},
-        { withCredentials: true }
+      return apiClient.patch<BaseResponse<HODCondonationApproveResponse>>(
+        `/hod/condonation/${attendanceId}`,
+        {}
       );
     },
     onSuccess: (res) => {
@@ -171,15 +160,13 @@ export const useHODApproveCondonation = () => {
 };
 
 export const useHODRevokeCondonation = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (attendanceId: string) => {
-      return axios.patch<BaseResponse<HODCondonationRevokeResponse>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/condonation/${attendanceId}/revoke`,
-        {},
-        { withCredentials: true }
+      return apiClient.patch<BaseResponse<HODCondonationRevokeResponse>>(
+        `/hod/condonation/${attendanceId}/revoke`,
+        {}
       );
     },
     onSuccess: (res) => {

@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { AcademicTermResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import {
@@ -17,24 +17,22 @@ import {
   TabsList,
   TabsTrigger,
 } from "@webcampus/ui/components/tabs";
-import axios from "axios";
 import { useState } from "react";
 import { GenerateProctorGroupsDialog } from "./generate-proctor-groups-dialog";
 import { ProctorGroupsTab } from "./proctor-groups-tab";
 import { ProctorStudentsTab } from "./proctor-students-tab";
 
 export const DepartmentProctorMappingView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [termId, setTermId] = useState<string>("all");
   const [semesterId, setSemesterId] = useState<string>("all");
 
   const { data: terms } = useQuery({
     queryKey: ["academic-terms"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<AcademicTermResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
-        { withCredentials: true }
-      );
+      const res =
+        await apiClient.get<BaseResponse<AcademicTermResponseType[]>>(
+          `/admin/semester`
+        );
       if (res.data.status === "success") return res.data.data;
       return [] as AcademicTermResponseType[];
     },

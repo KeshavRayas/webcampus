@@ -1,11 +1,10 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
-import axios from "axios";
 import { Lock, UnlockKeyhole } from "lucide-react";
 import { useState } from "react";
 import { CourseDetailsCard } from "./course-details-card";
@@ -16,7 +15,6 @@ import {
 import { CourseMappingGrid } from "./course-mapping-grid";
 
 export const CourseMappingView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: session } = authClient.useSession();
 
   const isAdmin = session?.user?.role === "admin";
@@ -29,11 +27,9 @@ export const CourseMappingView = () => {
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{ type: string; name: string; id: string }>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`, {
-        withCredentials: true,
-      });
+      >(`/department/section/department-info`);
       if (res.data.status === "success") return res.data.data;
       return null;
     },

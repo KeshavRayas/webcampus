@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   AcademicTermResponseType,
   SemesterConfigResponseType,
@@ -33,7 +33,8 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
+import { isAxiosError } from "axios";
 import { Wand2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
@@ -75,7 +76,6 @@ export const GenerateSectionsDialog = ({
 }: GenerateSectionsDialogProps) => {
   const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const departmentName = session?.user?.name ?? "";
 
   const [open, setOpen] = useState(false);
@@ -93,12 +93,9 @@ export const GenerateSectionsDialog = ({
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
-        {
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get<
+        BaseResponse<{ type: string; name: string }>
+      >(`/department/section/department-info`);
       if (res.data.status === "success") return res.data.data;
       return { type: "DEGREE_GRANTING", name: "" };
     },
@@ -108,10 +105,10 @@ export const GenerateSectionsDialog = ({
   const { data: terms, isLoading: isLoadingTerms } = useQuery({
     queryKey: ["academic-terms"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<AcademicTermResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
-        { withCredentials: true }
-      );
+      const res =
+        await apiClient.get<BaseResponse<AcademicTermResponseType[]>>(
+          `/admin/semester`
+        );
       if (res.data.status === "success") return res.data.data;
       return [] as AcademicTermResponseType[];
     },
@@ -170,13 +167,11 @@ export const GenerateSectionsDialog = ({
   } = useQuery({
     queryKey: ["unassigned-counts", termId, semesterNumber],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<UnassignedDepartmentCount[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/unassigned-counts`,
-        {
-          params: { termId, semesterNumber },
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get<
+        BaseResponse<UnassignedDepartmentCount[]>
+      >(`/department/section/unassigned-counts`, {
+        params: { termId, semesterNumber },
+      });
       if (res.data.status === "success") return res.data.data;
       return [] as UnassignedDepartmentCount[];
     },
@@ -193,11 +188,10 @@ export const GenerateSectionsDialog = ({
   const { data: unassignedData } = useQuery({
     queryKey: ["unassigned-count", semesterId, departmentName],
     queryFn: async () => {
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{ count: number; semesterNumber: number }>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/department/section/unassigned-count`, {
+      >(`/department/section/unassigned-count`, {
         params: { semesterId, departmentName },
-        withCredentials: true,
       });
       if (res.data.status === "success") return res.data.data;
       return { count: 0, semesterNumber: 0 };
@@ -290,15 +284,14 @@ export const GenerateSectionsDialog = ({
       selectedAllocations,
     ],
     queryFn: async () => {
-      const res = await axios.post<BaseResponse<DetailedPreviewSection[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/preview-sections`,
+      const res = await apiClient.post<BaseResponse<DetailedPreviewSection[]>>(
+        `/department/section/preview-sections`,
         {
           semesterId,
           cycle: selectedCycle,
           studentsPerSection: cycleStudentsPerSection,
           allocations: selectedAllocations,
-        },
-        { withCredentials: true }
+        }
       );
 
       if (res.data.status === "success") {
@@ -317,11 +310,7 @@ export const GenerateSectionsDialog = ({
 
   const standardMutation = useMutation({
     mutationFn: async (values: GenerateSectionsDTO) => {
-      return await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/generate`,
-        values,
-        { withCredentials: true }
-      );
+      return await apiClient.post(`/department/section/generate`, values);
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<unknown>>) => {
       toast.success(data.data.message);
@@ -558,7 +547,7 @@ export const GenerateSectionsDialog = ({
                       </div>
                     ) : isDetailedPreviewError ? (
                       <div className="bg-muted rounded-md p-3 text-sm text-red-600">
-                        {axios.isAxiosError(detailedPreviewError)
+                        {isAxiosError(detailedPreviewError)
                           ? detailedPreviewError.response?.data?.message ||
                             detailedPreviewError.response?.data?.error ||
                             "Failed to load detailed preview. Please retry."

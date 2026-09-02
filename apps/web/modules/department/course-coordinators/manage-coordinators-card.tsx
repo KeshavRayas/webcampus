@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@webcampus/ui/components/card";
 import { MultiCombobox } from "@webcampus/ui/molecules/multi-combobox";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { Loader2, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
@@ -44,7 +44,6 @@ export const ManageCoordinatorsCard = ({
   course,
   isLocked = false,
 }: ManageCoordinatorsCardProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const [selectedFacultyIds, setSelectedFacultyIds] = useState<string[]>([]);
@@ -53,9 +52,8 @@ export const ManageCoordinatorsCard = ({
   const { data: rawFaculty, isLoading: loadingFaculty } = useQuery({
     queryKey: ["mapped-faculty", course.id],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<FacultyData[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/${course.id}/mapped-faculty`,
-        { withCredentials: true }
+      const res = await apiClient.get<BaseResponse<FacultyData[]>>(
+        `/department/course/${course.id}/mapped-faculty`
       );
       return res.data.status === "success" && res.data.data
         ? res.data.data
@@ -70,9 +68,8 @@ export const ManageCoordinatorsCard = ({
   const { data: rawCoordinators, isLoading: loadingCoordinators } = useQuery({
     queryKey: ["course-coordinators", course.id],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<CoordinatorEntry[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/${course.id}/coordinators`,
-        { withCredentials: true }
+      const res = await apiClient.get<BaseResponse<CoordinatorEntry[]>>(
+        `/department/course/${course.id}/coordinators`
       );
       return res.data.status === "success" && res.data.data
         ? res.data.data
@@ -102,11 +99,9 @@ export const ManageCoordinatorsCard = ({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      return axios.put(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/${course.id}/coordinators`,
-        { facultyIds: selectedFacultyIds },
-        { withCredentials: true }
-      );
+      return apiClient.put(`/department/course/${course.id}/coordinators`, {
+        facultyIds: selectedFacultyIds,
+      });
     },
     onSuccess: (res) => {
       toast.success(res.data.message || "Coordinators saved successfully");

@@ -141,8 +141,7 @@ export const AdmissionView = ({
       };
       const query = createFilterQueryString(apiFilters);
       const res = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
-        `/admission${query ? `?${query}` : ""}`,
-        { withCredentials: true }
+        `/admission${query ? `?${query}` : ""}`
       );
       if (res.data.status === "success") return res.data.data;
       return [];
@@ -196,8 +195,7 @@ export const AdmissionView = ({
       queryFn: async () => {
         if (!selectedSemesterId) return [] as AdmissionResponse[];
         const res = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
-          `/admission/semester/${selectedSemesterId}`,
-          { withCredentials: true }
+          `/admission/semester/${selectedSemesterId}`
         );
         if (res.data.status === "success" && Array.isArray(res.data.data)) {
           return res.data.data;

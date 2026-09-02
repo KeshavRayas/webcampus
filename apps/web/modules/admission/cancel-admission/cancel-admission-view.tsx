@@ -387,8 +387,7 @@ export function CancelAdmissionView() {
 
 async function fetchAdmissions(query: string): Promise<AdmissionResponse[]> {
   const response = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
-    `/admission${query ? `?${query}` : ""}`,
-    { withCredentials: true }
+    `/admission${query ? `?${query}` : ""}`
   );
   if (response.data.status === "error") {
     throw new Error(response.data.message);

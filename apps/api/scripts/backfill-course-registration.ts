@@ -1,10 +1,25 @@
-import "dotenv/config";
-import { db } from "@webcampus/db";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
 import {
   isPeFull,
   peCourseCapacity,
 } from "../src/services/shared/pe-capacity.service";
 import { strategyFor } from "../src/services/student/registration-strategies";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+// Load root .env when script is invoked without `bun --env-file=../../.env`
+// (Prisma validates DATABASE_URL at client construction, so must run before `db` import)
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: resolve(__dirname, "../../../.env") });
+}
+if (!process.env.DATABASE_URL) {
+  console.error(
+    "DATABASE_URL missing — run via: bun --env-file=../../.env run tsx scripts/backfill-course-registration.ts --dry-run"
+  );
+}
+const { db } = await import("@webcampus/db");
 
 const DRY_RUN = process.argv.includes("--dry-run");
 

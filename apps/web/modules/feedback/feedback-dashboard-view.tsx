@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Card,
@@ -17,7 +17,6 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
-import axios from "axios";
 import Link from "next/link";
 
 type DashboardRound = {
@@ -54,18 +53,11 @@ const formatDate = (value: string) =>
   });
 
 export function FeedbackDashboardView() {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["feedback-dashboard"],
     queryFn: async () =>
-      (
-        await axios.get(
-          `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/dashboard`,
-          {
-            withCredentials: true,
-          }
-        )
-      ).data.data as DashboardRound[],
+      (await apiClient.get(`/admin/feedback/dashboard`)).data
+        .data as DashboardRound[],
   });
 
   if (isLoading)

@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -28,24 +28,19 @@ const createAccountsUserSchema = z.object({
 });
 
 export const useAccountsUsersQuery = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: accountsUsersQueryKey,
     queryFn: async () => {
-      const response = await axios.get<{
+      const response = await apiClient.get<{
         status: string;
         data: AccountsUser[];
-      }>(`${NEXT_PUBLIC_API_BASE_URL}/admin/accounts`, {
-        withCredentials: true,
-      });
+      }>(`/admin/accounts`);
       return response.data.data;
     },
   });
 };
 
 export const useAccountsUsers = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const form = useForm<CreateAccountsUserFormValues>({
@@ -61,14 +56,9 @@ export const useAccountsUsers = () => {
 
   const { mutateAsync: create, isPending: isCreating } = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/accounts`,
-        formData,
-        {
-          withCredentials: true,
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
+      const response = await apiClient.post(`/admin/accounts`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -109,7 +99,6 @@ export const useAccountsUsers = () => {
 };
 
 export const useAccountsUserEdit = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const { mutateAsync: onEdit, isPending: isEditing } = useMutation({
@@ -120,11 +109,10 @@ export const useAccountsUserEdit = () => {
       id: string;
       formData: FormData;
     }) => {
-      const response = await axios.patch(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/accounts/${id}`,
+      const response = await apiClient.patch(
+        `/admin/accounts/${id}`,
         formData,
         {
-          withCredentials: true,
           headers: { "Content-Type": "multipart/form-data" },
         }
       );
@@ -145,15 +133,11 @@ export const useAccountsUserEdit = () => {
 };
 
 export const useAccountsUserDelete = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const { mutateAsync: onDelete, isPending: isDeleting } = useMutation({
     mutationFn: async (id: string) => {
-      const response = await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/accounts/${id}`,
-        { withCredentials: true }
-      );
+      const response = await apiClient.delete(`/admin/accounts/${id}`);
       return response.data;
     },
     onSuccess: () => {

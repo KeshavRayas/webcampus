@@ -133,8 +133,7 @@ export const AdmissionInstructorView = ({
       };
       const query = createFilterQueryString(apiFilters);
       const res = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
-        `/admission${query ? `?${query}` : ""}`,
-        { withCredentials: true }
+        `/admission${query ? `?${query}` : ""}`
       );
       if (res.data.status === "success") return res.data.data;
       return [];

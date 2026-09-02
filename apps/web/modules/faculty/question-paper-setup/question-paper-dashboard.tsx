@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   RegistrationWindowCycleSchema,
   type AcademicTermResponseType,
@@ -26,7 +26,6 @@ import {
   FilterFieldConfig,
   FilterPanel,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { ClipboardList, Loader2, PlusCircle, Settings2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ConfigureCODialog } from "./configure-co-dialog";
@@ -109,7 +108,6 @@ const isFirstYearUgSemester = (semester?: {
   FIRST_YEAR_UG_SEMESTERS.has(semester.semesterNumber);
 
 export const QuestionPaperDashboard = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const [setupContext, setSetupContext] = useState<SetupContext | null>(null);
@@ -236,14 +234,13 @@ export const QuestionPaperDashboard = () => {
   const { data: courses, isLoading: coursesLoading } = useQuery({
     queryKey: ["coordinated-courses", appliedFilters.semesterId, appliedCycle],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<CoordinatedCourse[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment/coordinated-courses`,
+      const res = await apiClient.get<BaseResponse<CoordinatedCourse[]>>(
+        `/faculty/assessment/coordinated-courses`,
         {
           params: {
             semesterId: appliedFilters.semesterId,
             ...(appliedCycle && { cycle: appliedCycle }),
           },
-          withCredentials: true,
         }
       );
       if (res.data.status === "success" && "data" in res.data) {

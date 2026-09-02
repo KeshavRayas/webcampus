@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse, ErrorResponse } from "@webcampus/types/api";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
 export interface BonusAttendanceWindowRow {
@@ -43,13 +43,11 @@ export const useBonusAttendanceWindows = (
   filters: BonusAttendanceFilters,
   enabled: boolean
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["admin-bonus-attendance-windows", filters],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<BonusAttendanceWindowRow[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/bonus-attendance`,
+      const res = await apiClient.get<BaseResponse<BonusAttendanceWindowRow[]>>(
+        `/admin/bonus-attendance`,
         {
           params: {
             academicTermId: filters.academicTermId,
@@ -59,7 +57,6 @@ export const useBonusAttendanceWindows = (
               : {}),
             ...(filters.cycle ? { cycle: filters.cycle } : {}),
           },
-          withCredentials: true,
         }
       );
 
@@ -74,15 +71,13 @@ export const useBonusAttendanceWindows = (
 };
 
 export const useCreateBonusAttendanceWindow = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload: CreateBonusAttendancePayload) => {
-      return axios.post<BaseResponse<BonusAttendanceWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/bonus-attendance`,
-        payload,
-        { withCredentials: true }
+      return apiClient.post<BaseResponse<BonusAttendanceWindowRow>>(
+        `/admin/bonus-attendance`,
+        payload
       );
     },
     onSuccess: (res) => {
@@ -101,15 +96,13 @@ export const useCreateBonusAttendanceWindow = () => {
 };
 
 export const useToggleBonusAttendanceWindow = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, isOpen }: { id: string; isOpen: boolean }) => {
-      return axios.patch<BaseResponse<BonusAttendanceWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/bonus-attendance/${id}/toggle`,
-        { isOpen },
-        { withCredentials: true }
+      return apiClient.patch<BaseResponse<BonusAttendanceWindowRow>>(
+        `/admin/bonus-attendance/${id}/toggle`,
+        { isOpen }
       );
     },
     onSuccess: (res) => {
@@ -128,15 +121,13 @@ export const useToggleBonusAttendanceWindow = () => {
 };
 
 export const useUpdateBonusAttendanceWindow = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, days }: UpdateBonusAttendancePayload) => {
-      return axios.patch<BaseResponse<BonusAttendanceWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/bonus-attendance/${id}`,
-        { days },
-        { withCredentials: true }
+      return apiClient.patch<BaseResponse<BonusAttendanceWindowRow>>(
+        `/admin/bonus-attendance/${id}`,
+        { days }
       );
     },
     onSuccess: (res) => {

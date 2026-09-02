@@ -1,14 +1,15 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CreateAssessmentSchema,
   CreateAssessmentType,
 } from "@webcampus/schemas/faculty";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
+import { ConfirmDialog } from "@webcampus/ui/components/confirm-dialog";
 import {
   Form,
   FormControl,
@@ -24,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { Copy, Loader2, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -50,7 +51,6 @@ const inferNumberOfParts = (
 };
 
 export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [isCopying, setIsCopying] = useState(false);
   const [computedTotal, setComputedTotal] = useState(0);
@@ -61,9 +61,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
   const outcomesQuery = useQuery({
     queryKey: ["programme-outcomes", course.id],
     queryFn: async () => {
-      return await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/programme-outcomes?courseId=${course.id}`,
-        { withCredentials: true }
+      return await apiClient.get(
+        `/faculty/programme-outcomes?courseId=${course.id}`
       );
     },
   });
@@ -71,9 +70,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
   const coQuery = useQuery({
     queryKey: ["course-outcomes", course.id],
     queryFn: async () => {
-      return await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/course-outcomes?courseId=${course.id}`,
-        { withCredentials: true }
+      return await apiClient.get(
+        `/faculty/course-outcomes?courseId=${course.id}`
       );
     },
   });
@@ -410,21 +408,20 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
     });
   };
 
-  const handleCopyFrom = async (assessmentId: string) => {
-    if (
-      !window.confirm(
-        "This will overwrite your current questions. Are you sure?"
-      )
-    ) {
-      return;
-    }
+  const [pendingCopyId, setPendingCopyId] = useState<string | null>(null);
 
+  const handleCopyFrom = async (assessmentId: string) => {
+    setPendingCopyId(assessmentId);
+    return;
+  };
+
+  const confirmCopyFrom = async () => {
+    const assessmentId = pendingCopyId;
+    if (!assessmentId) return;
+    setPendingCopyId(null);
     setIsCopying(true);
     try {
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment/${assessmentId}`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get(`/faculty/assessment/${assessmentId}`);
 
       const data = res.data.data;
       if (data && data.questions) {
@@ -466,11 +463,7 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
 
   const mutation = useMutation({
     mutationFn: async (values: CreateAssessmentType) => {
-      return await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment`,
-        values,
-        { withCredentials: true }
-      );
+      return await apiClient.post(`/faculty/assessment`, values);
     },
     onSuccess: () => {
       toast.success(`${assessmentTitle} configured successfully`);
@@ -927,6 +920,18 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
           </div>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={!!pendingCopyId}
+        onOpenChange={(open) => {
+          if (!open) setPendingCopyId(null);
+        }}
+        title="Overwrite current questions?"
+        description="This will overwrite your current questions. This action cannot be undone."
+        confirmLabel="Overwrite"
+        variant="destructive"
+        onConfirm={() => void confirmCopyFrom()}
+      />
     </Form>
   );
 };

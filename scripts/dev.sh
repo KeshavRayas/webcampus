@@ -1,13 +1,7 @@
 #!/bin/bash
 set -e
 
-cleanup() {
-  echo "Stopping dev processes..."
-  taskkill //F //IM node.exe 2>/dev/null || true
-  taskkill //F //IM bun.exe 2>/dev/null || true
-}
-
-trap cleanup INT TERM EXIT
+# turbo dev (persistent:true) handles SIGINT/SIGTERM; no manual pkill needed
 
 # Print banner
 bunx tsx scripts/banner.ts

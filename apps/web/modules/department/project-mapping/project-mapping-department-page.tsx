@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import type { BaseResponse } from "@webcampus/types/api";
 import {
   FilterActions,
@@ -11,7 +11,6 @@ import {
   FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
 import { ProjectMappingListView } from "./project-mapping-list-view";
 
@@ -37,7 +36,6 @@ type RawSemester = {
 };
 
 export function ProjectMappingDepartmentPage() {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: terms } = useAcademicTerms();
 
   const [draftFilters, setDraftFilters] =
@@ -48,9 +46,8 @@ export function ProjectMappingDepartmentPage() {
   const { data: semesterOptions = [] } = useQuery<SemesterOption[]>({
     queryKey: ["semesters-by-term", draftFilters.termId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<RawSemester[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester/${draftFilters.termId}/semesters`,
-        { withCredentials: true }
+      const res = await apiClient.get<BaseResponse<RawSemester[]>>(
+        `/admin/semester/${draftFilters.termId}/semesters`
       );
       const data = res.data.status === "success" ? (res.data.data ?? []) : [];
       return data.map((s) => ({

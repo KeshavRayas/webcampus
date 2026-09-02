@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import type { BaseResponse, ErrorResponse } from "@webcampus/types/api";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
 export type AttendanceWindowDisplayState =
@@ -63,8 +63,6 @@ export const useAttendanceWindows = (
   filters: AttendanceWindowFilters,
   enabled: boolean
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["admin-attendance-windows", filters],
     queryFn: async () => {
@@ -75,11 +73,10 @@ export const useAttendanceWindows = (
       if (filters.departmentId) {
         params.departmentId = filters.departmentId;
       }
-      const res = await axios.get<BaseResponse<AttendanceWindowRow[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/attendance-windows`,
+      const res = await apiClient.get<BaseResponse<AttendanceWindowRow[]>>(
+        `/admin/attendance-windows`,
         {
           params,
-          withCredentials: true,
         }
       );
 
@@ -95,15 +92,13 @@ export const useAttendanceWindows = (
 };
 
 export const useBulkFreezeAttendanceWindows = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload: AttendanceWindowBulkPayload) => {
-      return axios.post<BaseResponse<{ updated: number }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/attendance-windows/freeze`,
-        payload,
-        { withCredentials: true }
+      return apiClient.post<BaseResponse<{ updated: number }>>(
+        `/admin/attendance-windows/freeze`,
+        payload
       );
     },
     onSuccess: (res) => {
@@ -119,15 +114,13 @@ export const useBulkFreezeAttendanceWindows = () => {
 };
 
 export const useBulkUnfreezeAttendanceWindows = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload: AttendanceWindowBulkPayload) => {
-      return axios.post<BaseResponse<{ updated: number }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/attendance-windows/unfreeze`,
-        payload,
-        { withCredentials: true }
+      return apiClient.post<BaseResponse<{ updated: number }>>(
+        `/admin/attendance-windows/unfreeze`,
+        payload
       );
     },
     onSuccess: (res) => {
@@ -145,7 +138,6 @@ export const useBulkUnfreezeAttendanceWindows = () => {
 };
 
 export const useFreezeAssignment = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -153,10 +145,9 @@ export const useFreezeAssignment = () => {
       const path = target.courseAssignmentId
         ? `/admin/attendance-windows/course-assignment/${target.courseAssignmentId}/freeze`
         : `/admin/attendance-windows/elective-batch/${target.electiveBatchFacultyId ?? ""}/freeze`;
-      const res = await axios.post<BaseResponse<AttendanceWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}${path}`,
-        {},
-        { withCredentials: true }
+      const res = await apiClient.post<BaseResponse<AttendanceWindowRow>>(
+        `${path}`,
+        {}
       );
       return res;
     },
@@ -173,7 +164,6 @@ export const useFreezeAssignment = () => {
 };
 
 export const useUnfreezeAssignment = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -181,11 +171,7 @@ export const useUnfreezeAssignment = () => {
       const path = target.courseAssignmentId
         ? `/admin/attendance-windows/course-assignment/${target.courseAssignmentId}/unfreeze`
         : `/admin/attendance-windows/elective-batch/${target.electiveBatchFacultyId ?? ""}/unfreeze`;
-      return axios.post<BaseResponse<AttendanceWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}${path}`,
-        {},
-        { withCredentials: true }
-      );
+      return apiClient.post<BaseResponse<AttendanceWindowRow>>(`${path}`, {});
     },
     onSuccess: (res) => {
       toast.success(res.data.message);

@@ -1,8 +1,8 @@
 "use client";
 
 import { ReasonDialog } from "@/components/admin/reason-dialog";
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CourseMappingByCourseItemType,
   CourseResponseDTO,
@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { Combobox } from "@webcampus/ui/molecules/combobox";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
@@ -75,7 +75,6 @@ export const AdminCourseMappingGrid = ({
   excelExtractedData,
   onExcelDataConsumed,
 }: AdminCourseMappingGridProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const isBatchManaged =
@@ -93,11 +92,10 @@ export const AdminCourseMappingGrid = ({
   const { data: rawSections, isLoading: loadingSections } = useQuery({
     queryKey: ["admin-mapping-sections", departmentId, semesterId, cycle],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<SectionData[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/sections`,
+      const res = await apiClient.get<BaseResponse<SectionData[]>>(
+        `/admin/course-assignment/sections`,
         {
           params: { semesterId, departmentId, departmentName, cycle },
-          withCredentials: true,
         }
       );
 
@@ -113,11 +111,10 @@ export const AdminCourseMappingGrid = ({
   const { data: rawFaculty, isLoading: loadingFaculty } = useQuery({
     queryKey: ["admin-mapping-faculty", departmentId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<FacultyData[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/faculty`,
+      const res = await apiClient.get<BaseResponse<FacultyData[]>>(
+        `/admin/course-assignment/faculty`,
         {
           params: { departmentId, departmentName },
-          withCredentials: true,
         }
       );
 
@@ -133,9 +130,9 @@ export const AdminCourseMappingGrid = ({
   const { data: rawExistingMappings, isLoading: loadingExisting } = useQuery({
     queryKey: ["admin-course-mapping", course.id, semesterId, academicYear],
     queryFn: async () => {
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<CourseMappingByCourseItemType[]>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/by-course`, {
+      >(`/admin/course-assignment/by-course`, {
         params: {
           courseId: course.id,
           semesterId,
@@ -143,7 +140,6 @@ export const AdminCourseMappingGrid = ({
           departmentId,
           departmentName,
         },
-        withCredentials: true,
       });
 
       return res.data.status === "success" && res.data.data
@@ -365,11 +361,7 @@ export const AdminCourseMappingGrid = ({
       payload.reason = reason;
     }
 
-    return axios.post(
-      `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/upsert`,
-      payload,
-      { withCredentials: true }
-    );
+    return apiClient.post(`/admin/course-assignment/upsert`, payload);
   };
 
   const saveMutation = useMutation({

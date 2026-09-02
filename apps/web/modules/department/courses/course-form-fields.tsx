@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { COURSE_TYPE_LABELS, COURSE_TYPES } from "@webcampus/schemas/constants";
 import {
   CreateCourseDTO,
@@ -23,7 +23,6 @@ import {
 } from "@webcampus/ui/components/radio-group";
 import { Combobox, ComboboxOption } from "@webcampus/ui/molecules/combobox";
 import { MultiCombobox } from "@webcampus/ui/molecules/multi-combobox";
-import axios from "axios";
 import React, { useEffect, useRef } from "react";
 import { UseFormReturn, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -221,20 +220,17 @@ export const CourseFormFields = ({
     control: form.control,
     name: "projectGroupingScope",
   });
-
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: departments = [] } = useQuery({
     queryKey: ["course-form-departments", apiPath],
     queryFn: async () => {
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{ id: string; name: string; code: string }[]>
       >(
-        `${NEXT_PUBLIC_API_BASE_URL}/${
+        `/${
           apiPath === "admin"
             ? "admin/department"
             : "department/course/departments"
-        }`,
-        { withCredentials: true }
+        }`
       );
       if (res.data.status === "success") return res.data.data ?? [];
       return [];
@@ -250,19 +246,18 @@ export const CourseFormFields = ({
       departmentId ?? "",
     ],
     queryFn: async () => {
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{
           eligibleStudents: number;
           configuredCapacity: number;
           remainingSeats: number;
         }>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/${apiPath}/course/pe-capacity-summary`, {
+      >(`/${apiPath}/course/pe-capacity-summary`, {
         params: {
           semesterId,
           ...(cycle && cycle !== "NONE" ? { cycle } : {}),
           ...(apiPath === "admin" && departmentId ? { departmentId } : {}),
         },
-        withCredentials: true,
       });
       if (res.data.status === "success") return res.data.data;
       return null;

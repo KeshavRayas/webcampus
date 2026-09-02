@@ -5,6 +5,7 @@ import {
   AttendancePercentageTable,
   AttendanceStatusTable,
 } from "@/components/academics/reports/attendance-tables";
+import { apiClient } from "@/lib/api-client";
 import {
   createFilterQueryString,
   getFiltersFromSearchParams,
@@ -14,7 +15,6 @@ import { useDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import type { DetailedReportData } from "@/modules/faculty/attendance/attendance-report-types";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import {
   FilterActions,
@@ -25,7 +25,6 @@ import {
 import { Input } from "@webcampus/ui/components/input";
 import { Label } from "@webcampus/ui/components/label";
 import { Tabs, TabsList, TabsTrigger } from "@webcampus/ui/components/tabs";
-import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -76,7 +75,6 @@ export const AdminAttendanceReportView = ({
   fixedDepartmentId?: string;
   fixedDepartmentName?: string;
 } = {}) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -181,9 +179,9 @@ export const AdminAttendanceReportView = ({
     ],
     queryFn: async () => {
       if (!draftFilters.departmentId || !draftFilters.semesterId) return [];
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{ id: string; code: string; name: string }[]>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/courses`, {
+      >(`/admin/academics/reports/courses`, {
         params: {
           departmentId: draftFilters.departmentId,
           semesterId: draftFilters.semesterId,
@@ -191,7 +189,6 @@ export const AdminAttendanceReportView = ({
             ? { cycle: draftFilters.cycle }
             : {}),
         },
-        withCredentials: true,
       });
       if (res.data.status === "success") return res.data.data ?? [];
       return [];
@@ -216,9 +213,9 @@ export const AdminAttendanceReportView = ({
         !draftFilters.courseId
       )
         return [];
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{ id: string; name: string; isElectiveBatch?: boolean }[]>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/sections`, {
+      >(`/admin/academics/reports/sections`, {
         params: {
           departmentId: draftFilters.departmentId,
           semesterId: draftFilters.semesterId,
@@ -227,7 +224,6 @@ export const AdminAttendanceReportView = ({
             ? { cycle: draftFilters.cycle }
             : {}),
         },
-        withCredentials: true,
       });
       if (res.data.status === "success") return res.data.data ?? [];
       return [];
@@ -292,14 +288,13 @@ export const AdminAttendanceReportView = ({
     ],
     queryFn: async () => {
       if (!hasAppliedFilters) return null;
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/attendance/status`,
+      const res = await apiClient.get(
+        `/admin/academics/reports/attendance/status`,
         {
           params: {
             courseId: appliedFilters.courseId,
             sectionId: appliedFilters.sectionId,
           },
-          withCredentials: true,
         }
       );
       return res.data.data;
@@ -320,14 +315,13 @@ export const AdminAttendanceReportView = ({
       ],
       queryFn: async () => {
         if (!hasAppliedFilters) return null;
-        const res = await axios.get<BaseResponse<DetailedReportData>>(
-          `${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/attendance/detailed`,
+        const res = await apiClient.get<BaseResponse<DetailedReportData>>(
+          `/admin/academics/reports/attendance/detailed`,
           {
             params: {
               courseId: appliedFilters.courseId,
               sectionId: appliedFilters.sectionId,
             },
-            withCredentials: true,
           }
         );
         return res.data.status === "success" ? res.data.data : null;

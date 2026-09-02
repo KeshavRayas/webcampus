@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import type { BaseResponse } from "@webcampus/types/api";
 import {
   FilterActions,
@@ -11,7 +11,6 @@ import {
   FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
 import { CombinedMappingListView } from "./combined-mapping-list-view";
 
@@ -37,7 +36,6 @@ export function CombinedMappingPage({
 }: {
   basePath: "/department" | "/admin";
 }) {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: terms } = useAcademicTerms();
   const isAdmin = basePath === "/admin";
 
@@ -49,11 +47,10 @@ export function CombinedMappingPage({
   const { data: departments } = useQuery({
     queryKey: ["admin-departments"],
     queryFn: async () => {
-      const res = await axios.get<
-        BaseResponse<{ id: string; name: string; code: string }[]>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/department`, {
-        withCredentials: true,
-      });
+      const res =
+        await apiClient.get<
+          BaseResponse<{ id: string; name: string; code: string }[]>
+        >(`/admin/department`);
       return res.data.status === "success" ? (res.data.data ?? []) : [];
     },
     enabled: isAdmin,
@@ -74,13 +71,11 @@ export function CombinedMappingPage({
   const { data: semesterOptions = [] } = useQuery<SemesterOption[]>({
     queryKey: ["semesters-by-term", draftTermId],
     queryFn: async () => {
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<
           { id: string; semesterNumber: number; programType: string }[]
         >
-      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/semester/${draftTermId}/semesters`, {
-        withCredentials: true,
-      });
+      >(`/admin/semester/${draftTermId}/semesters`);
       const data = res.data.status === "success" ? (res.data.data ?? []) : [];
       return data.map((s) => ({
         id: s.id,

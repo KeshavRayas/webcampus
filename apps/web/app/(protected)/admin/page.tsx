@@ -2,7 +2,7 @@ import { ChartAreaInteractive } from "@/modules/admin/dashboard/chart-area";
 import { SectionCards } from "@/modules/admin/dashboard/section-cards";
 import React from "react";
 
-const AdmindDashboardPage = () => {
+const AdminDashboardPage = () => {
   return (
     <div className="flex flex-1 flex-col">
       <div className="@container/main flex flex-1 flex-col gap-2">
@@ -15,4 +15,4 @@ const AdmindDashboardPage = () => {
   );
 };
 
-export default AdmindDashboardPage;
+export default AdminDashboardPage;

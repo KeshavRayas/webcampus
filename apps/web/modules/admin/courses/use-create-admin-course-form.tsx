@@ -1,14 +1,14 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CreateCourseDTO,
   CreateCourseSchema,
 } from "@webcampus/schemas/department";
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { useEffect } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
@@ -23,8 +23,6 @@ export const useCreateAdminCourseForm = (
   defaultCycle: CourseCycle
 ) => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const form = useForm<CreateCourseDTO>({
     resolver: zodResolver(CreateCourseSchema) as Resolver<CreateCourseDTO>,
     defaultValues: {
@@ -72,9 +70,7 @@ export const useCreateAdminCourseForm = (
 
   const { mutate } = useMutation({
     mutationFn: async (values: CreateCourseDTO) => {
-      return axios.post(`${NEXT_PUBLIC_API_BASE_URL}/admin/course`, values, {
-        withCredentials: true,
-      });
+      return apiClient.post(`/admin/course`, values);
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);

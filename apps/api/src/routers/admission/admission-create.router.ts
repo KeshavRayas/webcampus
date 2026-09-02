@@ -1,6 +1,9 @@
 import { AdmissionCreateController } from "@webcampus/api/src/controllers/admission/admission-create.controller";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
-import { CreateAdmissionShellSchema } from "@webcampus/schemas/admission";
+import {
+  CreateAdmissionShellSchema,
+  SubmitApplicationSchema,
+} from "@webcampus/schemas/admission";
 import { Router } from "express";
 import multer from "multer";
 
@@ -59,6 +62,7 @@ router.put(
     permissions: { admission: ["update"] },
   }),
   upload.fields(applicationUploadFields),
+  validateRequest(SubmitApplicationSchema),
   AdmissionCreateController.submit
 );
 
@@ -69,6 +73,7 @@ router.post(
     permissions: { admission: ["create"] },
   }),
   upload.fields(applicationUploadFields),
+  validateRequest(SubmitApplicationSchema),
   AdmissionCreateController.staffSubmit
 );
 

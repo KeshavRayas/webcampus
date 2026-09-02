@@ -4,6 +4,7 @@ import {
   CondonationReportTable,
   type CondonationReportData,
 } from "@/components/academics/reports/condonation-tables";
+import { apiClient } from "@/lib/api-client";
 import {
   createFilterQueryString,
   getFiltersFromSearchParams,
@@ -12,7 +13,6 @@ import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import {
   FilterActions,
@@ -20,7 +20,6 @@ import {
   FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -71,7 +70,6 @@ export const AdminCondonationReportView = ({
   fixedDepartmentId?: string;
   fixedDepartmentName?: string;
 } = {}) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -167,9 +165,9 @@ export const AdminCondonationReportView = ({
     ],
     queryFn: async () => {
       if (!draftFilters.departmentId || !draftFilters.semesterId) return [];
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{ id: string; code: string; name: string }[]>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/courses`, {
+      >(`/admin/academics/reports/courses`, {
         params: {
           departmentId: draftFilters.departmentId,
           semesterId: draftFilters.semesterId,
@@ -177,7 +175,6 @@ export const AdminCondonationReportView = ({
             ? { cycle: draftFilters.cycle }
             : {}),
         },
-        withCredentials: true,
       });
       return res.data.status === "success" ? (res.data.data ?? []) : [];
     },
@@ -200,9 +197,9 @@ export const AdminCondonationReportView = ({
         !draftFilters.courseId
       )
         return [];
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{ id: string; name: string; isElectiveBatch?: boolean }[]>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/sections`, {
+      >(`/admin/academics/reports/sections`, {
         params: {
           departmentId: draftFilters.departmentId,
           semesterId: draftFilters.semesterId,
@@ -211,7 +208,6 @@ export const AdminCondonationReportView = ({
             ? { cycle: draftFilters.cycle }
             : {}),
         },
-        withCredentials: true,
       });
       return res.data.status === "success" ? (res.data.data ?? []) : [];
     },
@@ -263,14 +259,13 @@ export const AdminCondonationReportView = ({
     ],
     queryFn: async () => {
       if (!hasAppliedFilters) return null;
-      const res = await axios.get<BaseResponse<CondonationReportData>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/academics/reports/condonation/detailed`,
+      const res = await apiClient.get<BaseResponse<CondonationReportData>>(
+        `/admin/academics/reports/condonation/detailed`,
         {
           params: {
             courseId: appliedFilters.courseId,
             sectionId: appliedFilters.sectionId,
           },
-          withCredentials: true,
         }
       );
       return res.data.status === "success" ? res.data.data : null;

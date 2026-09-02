@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CourseMappingStatusResponseType,
   CourseResponseDTO,
@@ -15,7 +15,6 @@ import {
   FilterFieldConfig,
   FilterPanel,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -51,8 +50,6 @@ export const CourseMappingFilters = ({
   onAppliedFiltersChange,
   onCourseSelect,
 }: CourseMappingFiltersProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
 
   // Fetch academic terms
@@ -66,9 +63,10 @@ export const CourseMappingFilters = ({
   const { data: rawDepartments } = useQuery({
     queryKey: ["departments-list"],
     queryFn: async () => {
-      const res = await axios.get<
-        BaseResponse<Array<{ id: string; name: string; type: string }>>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/department`, { withCredentials: true });
+      const res =
+        await apiClient.get<
+          BaseResponse<Array<{ id: string; name: string; type: string }>>
+        >(`/department`);
       return res.data.status === "success" && res.data.data
         ? res.data.data
         : [];
@@ -134,9 +132,9 @@ export const CourseMappingFilters = ({
       )
         return [];
 
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<CourseMappingStatusResponseType>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/status`, {
+      >(`/department/course-assignment/status`, {
         params: {
           semesterId: draftFilters.semesterId,
           departmentName: activeDepartmentName,
@@ -145,7 +143,6 @@ export const CourseMappingFilters = ({
             ? { cycle: draftFilters.cycle }
             : {}),
         },
-        withCredentials: true,
       });
       if (res.data.status === "success" && res.data.data?.courses) {
         return res.data.data.courses;
@@ -174,9 +171,8 @@ export const CourseMappingFilters = ({
     if (!term) return;
 
     try {
-      const res = await axios.get<BaseResponse<CourseResponseDTO>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/${draftFilters.courseId}`,
-        { withCredentials: true }
+      const res = await apiClient.get<BaseResponse<CourseResponseDTO>>(
+        `/department/course/${draftFilters.courseId}`
       );
       if (res.data.status === "success" && res.data.data) {
         onCourseSelect(res.data.data);

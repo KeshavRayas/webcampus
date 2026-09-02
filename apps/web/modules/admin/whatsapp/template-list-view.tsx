@@ -3,6 +3,7 @@
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import { Card, CardContent } from "@webcampus/ui/components/card";
+import { ConfirmDialog } from "@webcampus/ui/components/confirm-dialog";
 import {
   Table,
   TableBody,
@@ -47,6 +48,9 @@ export const TemplateListView = () => {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<MessageTemplate | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MessageTemplate | null>(
+    null
+  );
 
   const handleSubmit = async (data: TemplateFormValues) => {
     if (editing) {
@@ -59,9 +63,14 @@ export const TemplateListView = () => {
   };
 
   const handleDelete = async (template: MessageTemplate) => {
-    if (!window.confirm(`Delete template "${template.name}"?`)) return;
+    setDeleteTarget(template);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteMutation.mutateAsync(template.id);
+      await deleteMutation.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
     } catch {
       toast.error("Failed to delete template");
     }
@@ -177,6 +186,18 @@ export const TemplateListView = () => {
         editing={editing}
         onSubmit={handleSubmit}
         submitting={createMutation.isPending || updateMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={`Delete template "${deleteTarget?.name ?? ""}"?`}
+        description="This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDelete}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import {
   createFilterQueryString,
@@ -8,7 +9,6 @@ import {
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { DepartmentStudentResponseType } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
@@ -20,7 +20,6 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import { Skeleton } from "@webcampus/ui/components/skeleton";
-import axios from "axios";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { departmentStudentColumns } from "./department-student-columns";
@@ -48,8 +47,6 @@ export const DepartmentStudentView = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data: session } = authClient.useSession();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   // Track if we've checked authorization after hydration
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -115,11 +112,10 @@ export const DepartmentStudentView = () => {
         ...(appliedFilters.section ? { section: appliedFilters.section } : {}),
       };
 
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<DepartmentStudentResponseType[]>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/department/student`, {
+      >(`/department/student`, {
         params: apiFilters,
-        withCredentials: true,
       });
 
       if (res.data.status === "success" && Array.isArray(res.data.data)) {

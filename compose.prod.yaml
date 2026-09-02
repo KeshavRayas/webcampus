@@ -14,6 +14,11 @@ services:
     image: postgres:15-alpine
     container_name: webcampus-prod-db
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     shm_size: 128mb
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -33,6 +38,11 @@ services:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: webcampus-prod-minio
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -56,6 +66,11 @@ services:
     image: edoburu/pgbouncer:v1.25.2-p0
     container_name: webcampus-prod-pgbouncer
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     environment:
       DB_USER: ${POSTGRES_USER:-postgres}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -77,6 +92,11 @@ services:
     image: redis:7-alpine
     container_name: webcampus-prod-redis
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     command: redis-server --maxmemory 1gb --maxmemory-policy allkeys-lru --appendonly yes
     volumes:
       - redis_data:/data
@@ -90,6 +110,11 @@ services:
   migrate:
     image: ghcr.io/keshavrayas/webcampus/api:${IMAGE_TAG:-latest}
     restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     env_file: .env
     environment:
       NODE_ENV: production
@@ -110,6 +135,11 @@ services:
     image: ghcr.io/keshavrayas/webcampus/api:${IMAGE_TAG:-latest}
     container_name: webcampus-prod-api
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     env_file: .env
     environment:
       NODE_ENV: production
@@ -141,6 +171,11 @@ services:
     image: ghcr.io/keshavrayas/webcampus/web:${IMAGE_TAG:-latest}
     container_name: webcampus-prod-web
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     env_file: .env
     environment:
       NODE_ENV: production

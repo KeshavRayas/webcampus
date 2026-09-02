@@ -11,9 +11,7 @@ export const usePortAdmission = () => {
   const mutation = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
       const response = await apiClient.post<BaseResponse<unknown>>(
-        `/admission/${id}/port`,
-        {},
-        { withCredentials: true }
+        `/admission/${id}/port`
       );
 
       if (response.data.status === "error") {

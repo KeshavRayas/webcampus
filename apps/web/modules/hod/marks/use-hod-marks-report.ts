@@ -1,11 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import type { MarksReportData } from "@/modules/faculty/marks-report/marks-report-types";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
-import axios from "axios";
-
-const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
 export type HODMarksFilterOptions = {
   academicTerms: { id: string; year: string; type: "odd" | "even" }[];
@@ -28,10 +25,7 @@ export const useHODMarksFilterOptions = () => {
   return useQuery({
     queryKey: ["hod-marks-filter-options"],
     queryFn: async (): Promise<HODMarksFilterOptions> => {
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/marks-report/filter-options`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get(`/hod/marks-report/filter-options`);
       return res.data.data;
     },
   });
@@ -42,13 +36,9 @@ export const useHODMarksCourses = (semesterId: string, cycle: string) => {
     queryKey: ["hod-marks-courses", semesterId, cycle],
     queryFn: async () => {
       if (!semesterId) return [];
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/marks-report/courses`,
-        {
-          params: { semesterId, ...(cycle ? { cycle } : {}) },
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get(`/hod/marks-report/courses`, {
+        params: { semesterId, ...(cycle ? { cycle } : {}) },
+      });
       return res.data.data as { id: string; code: string; name: string }[];
     },
     enabled: !!semesterId,
@@ -64,17 +54,13 @@ export const useHODMarksSections = (
     queryKey: ["hod-marks-sections", semesterId, courseId, cycle],
     queryFn: async () => {
       if (!courseId) return [];
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/marks-report/sections`,
-        {
-          params: {
-            semesterId,
-            courseId,
-            ...(cycle ? { cycle } : {}),
-          },
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get(`/hod/marks-report/sections`, {
+        params: {
+          semesterId,
+          courseId,
+          ...(cycle ? { cycle } : {}),
+        },
+      });
       return res.data.data as {
         id: string;
         name: string;
@@ -90,13 +76,9 @@ export const useHODMarksAssessments = (courseId: string) => {
     queryKey: ["hod-marks-assessments", courseId],
     queryFn: async (): Promise<HODMarksAssessment[]> => {
       if (!courseId) return [];
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/marks-report/assessments`,
-        {
-          params: { courseId },
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get(`/hod/marks-report/assessments`, {
+        params: { courseId },
+      });
       return res.data.data;
     },
     enabled: !!courseId,
@@ -117,19 +99,15 @@ export const useHODMarksReportData = (
       if (!filters) {
         throw new Error("Missing report filters");
       }
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/marks-report/report`,
-        {
-          params: {
-            courseId: filters.courseId,
-            sectionId: filters.sectionId,
-            ...(filters.assessmentId
-              ? { assessmentId: filters.assessmentId }
-              : {}),
-          },
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get(`/hod/marks-report/report`, {
+        params: {
+          courseId: filters.courseId,
+          sectionId: filters.sectionId,
+          ...(filters.assessmentId
+            ? { assessmentId: filters.assessmentId }
+            : {}),
+        },
+      });
       return res.data.data;
     },
     enabled:

@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Card,
@@ -14,7 +14,7 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@webcampus/ui/components/radio-group";
-import axios from "axios";
+import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -56,15 +56,13 @@ export function FeedbackView() {
   } | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["student-feedback"],
     queryFn: async () =>
-      (
-        await axios.get(`${NEXT_PUBLIC_API_BASE_URL}/student/feedback`, {
-          withCredentials: true,
-        })
-      ).data.data as { rounds: Round[]; assignments: Assignment[] },
+      (await apiClient.get(`/student/feedback`)).data.data as {
+        rounds: Round[];
+        assignments: Assignment[];
+      },
   });
 
   useEffect(() => {
@@ -81,23 +79,19 @@ export function FeedbackView() {
       if (!selected) throw new Error("Select a course first");
       if (Object.keys(answers).length !== selected.round.questions.length)
         throw new Error("Answer all questions before submitting");
-      return axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/student/feedback/submit`,
-        {
-          ...(selected.assignment.electiveBatchFacultyId
-            ? {
-                electiveBatchFacultyId:
-                  selected.assignment.electiveBatchFacultyId,
-              }
-            : { courseAssignmentId: selected.assignment.id }),
-          feedbackRoundId: selected.round.id,
-          answers: selected.round.questions.map((question) => ({
-            questionId: question.id,
-            score: answers[question.id],
-          })),
-        },
-        { withCredentials: true }
-      );
+      return apiClient.post(`/student/feedback/submit`, {
+        ...(selected.assignment.electiveBatchFacultyId
+          ? {
+              electiveBatchFacultyId:
+                selected.assignment.electiveBatchFacultyId,
+            }
+          : { courseAssignmentId: selected.assignment.id }),
+        feedbackRoundId: selected.round.id,
+        answers: selected.round.questions.map((question) => ({
+          questionId: question.id,
+          score: answers[question.id],
+        })),
+      });
     },
     onSuccess: () => {
       toast.success("Feedback submitted successfully");
@@ -107,7 +101,7 @@ export function FeedbackView() {
     },
     onError: (error: unknown) =>
       toast.error(
-        axios.isAxiosError(error)
+        isAxiosError(error)
           ? (error.response?.data?.message ?? error.response?.data?.error)
           : error instanceof Error
             ? error.message

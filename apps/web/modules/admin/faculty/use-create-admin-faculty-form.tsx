@@ -1,12 +1,12 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { createUserSchema } from "@webcampus/schemas/admin";
 import { CreateFacultySchema } from "@webcampus/schemas/faculty";
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { useEffect, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
@@ -18,7 +18,6 @@ type FormType = z.infer<typeof FormSchema>;
 
 export const useCreateAdminFacultyForm = (departmentId: string) => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -69,16 +68,11 @@ export const useCreateAdminFacultyForm = (departmentId: string) => {
         formData.append("image", imageFile);
       }
 
-      return await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/faculty`,
-        formData,
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      return await apiClient.post(`/admin/faculty`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);

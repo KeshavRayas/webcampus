@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CreateProgrammeOutcomeSchema,
   CreateProgrammeOutcomeType,
@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { Switch } from "@webcampus/ui/components/switch";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { Loader2 } from "lucide-react";
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -57,17 +57,15 @@ export const ProgrammeOutcomeDialog = ({
   defaultDepartmentId = "",
   defaultType = "PO",
 }: ProgrammeOutcomeDialogProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const isEditing = !!outcome;
 
   const departmentsQuery = useQuery({
     queryKey: ["department"],
     queryFn: async () => {
-      return await axios.get<SuccessResponse<{ id: string; name: string }[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/department`,
-        { withCredentials: true }
-      );
+      return await apiClient.get<
+        SuccessResponse<{ id: string; name: string }[]>
+      >(`/admin/department`);
     },
   });
 
@@ -119,17 +117,12 @@ export const ProgrammeOutcomeDialog = ({
   const mutation = useMutation({
     mutationFn: async (values: CreateProgrammeOutcomeType) => {
       if (isEditing) {
-        return await axios.put(
-          `${NEXT_PUBLIC_API_BASE_URL}/admin/programme-outcomes/${outcome.id}`,
-          values,
-          { withCredentials: true }
+        return await apiClient.put(
+          `/admin/programme-outcomes/${outcome.id}`,
+          values
         );
       }
-      return await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/programme-outcomes`,
-        values,
-        { withCredentials: true }
-      );
+      return await apiClient.post(`/admin/programme-outcomes`, values);
     },
     onSuccess: () => {
       toast.success(

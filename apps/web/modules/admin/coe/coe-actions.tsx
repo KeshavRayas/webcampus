@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { UpdateAdminUserSchema } from "@webcampus/schemas/admin";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -29,7 +29,7 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { MoreHorizontal } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -41,7 +41,6 @@ import { CoeUser } from "./coe-types";
 type UpdateCoeFormValues = z.infer<typeof UpdateAdminUserSchema>;
 
 export const CoeActions = ({ user }: { user: CoeUser }) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -96,16 +95,11 @@ export const CoeActions = ({ user }: { user: CoeUser }) => {
         formData.append("photo", photoFile);
       }
 
-      const response = await axios.put(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe/${user.id}`,
-        formData,
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const response = await apiClient.put(`/admin/coe/${user.id}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       return response.data;
     },
@@ -120,12 +114,7 @@ export const CoeActions = ({ user }: { user: CoeUser }) => {
 
   const { mutateAsync: deleteCoe, isPending: isDeleting } = useMutation({
     mutationFn: async () => {
-      const response = await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe/${user.id}`,
-        {
-          withCredentials: true,
-        }
-      );
+      const response = await apiClient.delete(`/admin/coe/${user.id}`);
       return response.data;
     },
     onSuccess: () => {

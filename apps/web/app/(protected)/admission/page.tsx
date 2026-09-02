@@ -1,5 +1,4 @@
 "use client";
-"use client";
 
 import { authClient } from "@/lib/auth-client";
 import { AdmissionView } from "@/modules/admission/admin/admission-view";

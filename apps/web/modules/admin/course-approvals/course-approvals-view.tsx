@@ -1,12 +1,11 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
-import { frontendEnv } from "@webcampus/common/env";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
-import axios from "axios";
 import { useMemo, useState } from "react";
 import { getApprovalBadgeConfig } from "./course-approval-status";
 import { CourseApprovalsFilters } from "./course-approvals-filters";
@@ -53,7 +52,6 @@ const EMPTY_FILTERS = {
 };
 
 export const CourseApprovalsView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [selectedGroup, setSelectedGroup] = useState<GroupedCourse | null>(
     null
   );
@@ -69,12 +67,7 @@ export const CourseApprovalsView = () => {
   } = useQuery({
     queryKey: ["admin-course-approvals"],
     queryFn: async () => {
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/pending-submissions`,
-        {
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get(`/department/course/pending-submissions`);
       return res.data.data;
     },
   });

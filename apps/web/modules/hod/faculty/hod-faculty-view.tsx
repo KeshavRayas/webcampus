@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
@@ -12,7 +12,6 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import { Page, PageContent, PageHeader } from "@webcampus/ui/components/page";
-import axios from "axios";
 import { Eye, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -42,7 +41,6 @@ const FACULTY_FILTER_FIELDS: FilterFieldConfig<FacultyFilters>[] = [
 ];
 
 export const HodFacultyView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [draftFilters, setDraftFilters] =
     useState<FacultyFilters>(EMPTY_FILTERS);
   const [appliedSearch, setAppliedSearch] = useState("");
@@ -50,11 +48,10 @@ export const HodFacultyView = () => {
   const { data: response, isLoading } = useQuery({
     queryKey: ["hod-faculty-list", appliedSearch],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<HodFacultyItem[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/faculty`,
+      const res = await apiClient.get<BaseResponse<HodFacultyItem[]>>(
+        `/hod/faculty`,
         {
           params: appliedSearch ? { search: appliedSearch } : undefined,
-          withCredentials: true,
         }
       );
       return res.data;

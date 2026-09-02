@@ -87,6 +87,8 @@ export default function DepartmentTimetablePage() {
     try {
       await apiClient.put(`/timetable/template/${semesterId}`, { slots });
       toast.success("Timetable template saved successfully");
+      void queryClient.invalidateQueries({ queryKey: ["timetable-template"] });
+      void queryClient.invalidateQueries({ queryKey: ["timetable"] });
     } catch (error) {
       toast.error(
         getApiErrorMessage(error, "Failed to save timetable template")
@@ -112,6 +114,15 @@ export default function DepartmentTimetablePage() {
         queryKey: ["department-timetable"],
       });
       void queryClient.invalidateQueries({ queryKey: ["timetable-template"] });
+      void queryClient.invalidateQueries({ queryKey: ["timetable"] });
+      void queryClient.invalidateQueries({ queryKey: ["student-timetable"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["student-timetable-today"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["faculty-timetable"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["faculty-timetable-today"],
+      });
     } catch (error) {
       toast.error(
         getApiErrorMessage(error, "Failed to import timetable entries")

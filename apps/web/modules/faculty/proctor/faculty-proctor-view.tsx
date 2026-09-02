@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   Card,
   CardContent,
@@ -17,18 +17,12 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
-import axios from "axios";
 
 export const FacultyProctorView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const { data: groups, isLoading } = useQuery({
     queryKey: ["faculty-proctor-groups"],
     queryFn: async () => {
-      const res = await axios.get<any>(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/proctor/students`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get<any>(`/faculty/proctor/students`);
       return res.data.data || [];
     },
   });

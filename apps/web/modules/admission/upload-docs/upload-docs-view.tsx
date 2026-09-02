@@ -113,10 +113,7 @@ export function UploadDocsView() {
       const query = createFilterQueryString(apiFilters);
 
       const res = await apiClient.get<BaseResponse<UploadDocsResponse[]>>(
-        `/admission${query ? `?${query}` : ""}`,
-        {
-          withCredentials: true,
-        }
+        `/admission${query ? `?${query}` : ""}`
       );
 
       if (res.data.status === "success") {

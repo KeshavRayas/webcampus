@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Card,
@@ -26,12 +26,10 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
-import axios from "axios";
 import { useState } from "react";
 import { toast } from "react-toastify";
 
 export const ProctorStudentsTab = ({ semesterId }: { semesterId?: string }) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>("unassigned");
@@ -39,13 +37,9 @@ export const ProctorStudentsTab = ({ semesterId }: { semesterId?: string }) => {
   const { data: students, isLoading: studentsLoading } = useQuery({
     queryKey: ["proctor-students", semesterId],
     queryFn: async () => {
-      const res = await axios.get<any>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/students`,
-        {
-          params: { semesterId },
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get<any>(`/department/proctor/students`, {
+        params: { semesterId },
+      });
       return res.data.data || [];
     },
   });
@@ -53,13 +47,9 @@ export const ProctorStudentsTab = ({ semesterId }: { semesterId?: string }) => {
   const { data: groups } = useQuery({
     queryKey: ["proctor-groups", semesterId],
     queryFn: async () => {
-      const res = await axios.get<any>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/proctor`,
-        {
-          params: { semesterId },
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get<any>(`/department/proctor`, {
+        params: { semesterId },
+      });
       return res.data.data || [];
     },
   });
@@ -72,11 +62,10 @@ export const ProctorStudentsTab = ({ semesterId }: { semesterId?: string }) => {
       studentIds: string[];
       proctorGroupId: string | null;
     }) => {
-      const res = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/assign-students`,
-        { studentIds, proctorGroupId },
-        { withCredentials: true }
-      );
+      const res = await apiClient.post(`/department/proctor/assign-students`, {
+        studentIds,
+        proctorGroupId,
+      });
       return res.data;
     },
     onSuccess: () => {

@@ -14,6 +14,7 @@
     "submit:mock-applicant": "bun --env-file=../../.env run tsx scripts/submit-mock-applicant.ts",
     "cleanup:mock-applicants": "bun --env-file=../../.env run tsx scripts/cleanup-mock-applicants.ts",
     "rewrite:admission-usn": "bun --env-file=../../.env run tsx scripts/rewrite-admission-usn.ts",
+    "backfill:course-registration": "bun --env-file=../../.env run tsx scripts/backfill-course-registration.ts",
     "backfill:current-student-emails": "bun --env-file=../../.env run tsx scripts/backfill-current-student-emails.ts",
     "check-types": "tsc --noEmit --pretty",
     "format:write": "prettier --write \"**/*.{ts,tsx,mdx}\" --cache",

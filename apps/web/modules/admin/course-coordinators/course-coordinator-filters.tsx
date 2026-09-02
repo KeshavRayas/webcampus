@@ -1,10 +1,10 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import {
@@ -13,7 +13,6 @@ import {
   FilterFieldConfig,
   FilterPanel,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -47,8 +46,6 @@ export const AdminCourseCoordinatorFilters = ({
   onAppliedFiltersChange,
   onCourseSelect,
 }: CourseCoordinatorFiltersProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
 
   const { data: rawTerms } = useAcademicTerms();
@@ -102,15 +99,14 @@ export const AdminCourseCoordinatorFilters = ({
     queryFn: async () => {
       if (!draftFilters.departmentId || !draftFilters.semesterId) return [];
 
-      const res = await axios.get<BaseResponse<CourseResponseDTO[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course/branch`,
+      const res = await apiClient.get<BaseResponse<CourseResponseDTO[]>>(
+        `/admin/course/branch`,
         {
           params: {
             departmentId: draftFilters.departmentId,
             semesterId: draftFilters.semesterId,
             ...(draftFilters.cycle ? { cycle: draftFilters.cycle } : {}),
           },
-          withCredentials: true,
         }
       );
       if (res.data.status === "success" && res.data.data) {
@@ -140,14 +136,13 @@ export const AdminCourseCoordinatorFilters = ({
     }
 
     try {
-      const res = await axios.get<BaseResponse<CourseResponseDTO>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course/${draftFilters.courseId}`,
+      const res = await apiClient.get<BaseResponse<CourseResponseDTO>>(
+        `/admin/course/${draftFilters.courseId}`,
         {
           params: {
             departmentId: draftFilters.departmentId,
             departmentName: draftFilters.departmentName,
           },
-          withCredentials: true,
         }
       );
       if (res.data.status === "success" && res.data.data) {

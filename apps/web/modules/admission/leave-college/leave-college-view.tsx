@@ -13,12 +13,8 @@ export function LeaveCollegeView() {
   const { data: admissions, isLoading } = useQuery({
     queryKey: ["leave-college-admissions"],
     queryFn: async () => {
-      const res = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
-        "/admission",
-        {
-          withCredentials: true,
-        }
-      );
+      const res =
+        await apiClient.get<BaseResponse<AdmissionResponse[]>>("/admission");
 
       if (res.data.status === "success") {
         return res.data.data ?? [];

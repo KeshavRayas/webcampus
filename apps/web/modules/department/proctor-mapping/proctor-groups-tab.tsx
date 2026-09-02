@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Card,
@@ -26,26 +26,20 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
-import axios from "axios";
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-toastify";
 
 export const ProctorGroupsTab = ({ semesterId }: { semesterId?: string }) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [newGroup, setNewGroup] = useState("");
 
   const { data: groups, isLoading } = useQuery({
     queryKey: ["proctor-groups", semesterId],
     queryFn: async () => {
-      const res = await axios.get<any>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/proctor`,
-        {
-          params: { semesterId },
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get<any>(`/department/proctor`, {
+        params: { semesterId },
+      });
       return res.data.data || [];
     },
   });
@@ -53,21 +47,14 @@ export const ProctorGroupsTab = ({ semesterId }: { semesterId?: string }) => {
   const { data: faculties } = useQuery({
     queryKey: ["department-faculties"],
     queryFn: async () => {
-      const res = await axios.get<any>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/faculty`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get<any>(`/department/faculty`);
       return res.data.data || [];
     },
   });
 
   const createGroup = useMutation({
     mutationFn: async (groupNumber: string) => {
-      const res = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/proctor`,
-        { groupNumber },
-        { withCredentials: true }
-      );
+      const res = await apiClient.post(`/department/proctor`, { groupNumber });
       return res.data;
     },
     onSuccess: () => {
@@ -88,11 +75,9 @@ export const ProctorGroupsTab = ({ semesterId }: { semesterId?: string }) => {
       id: string;
       facultyId: string | null;
     }) => {
-      const res = await axios.put(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/${id}`,
-        { facultyId },
-        { withCredentials: true }
-      );
+      const res = await apiClient.put(`/department/proctor/${id}`, {
+        facultyId,
+      });
       return res.data;
     },
     onSuccess: () => {
@@ -106,10 +91,7 @@ export const ProctorGroupsTab = ({ semesterId }: { semesterId?: string }) => {
 
   const deleteGroup = useMutation({
     mutationFn: async (id: string) => {
-      const res = await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/${id}`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.delete(`/department/proctor/${id}`);
       return res.data;
     },
     onSuccess: () => {

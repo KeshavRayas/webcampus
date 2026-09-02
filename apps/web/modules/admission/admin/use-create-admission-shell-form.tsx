@@ -1,15 +1,15 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import type { DepartmentOption } from "@/lib/use-departments";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CreateAdmissionShellSchema,
   CreateAdmissionShellType,
 } from "@webcampus/schemas/admission";
 import { ErrorResponse } from "@webcampus/types/api";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "react-toastify";
@@ -23,8 +23,6 @@ export const useCreateAdmissionShellForm = (
   departments: DepartmentOption[]
 ) => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const form = useForm<CreateAdmissionShellType>({
     resolver: zodResolver(CreateAdmissionShellSchema),
     defaultValues: {
@@ -77,11 +75,7 @@ export const useCreateAdmissionShellForm = (
 
   const { mutate } = useMutation({
     mutationFn: async (values: CreateAdmissionShellPayload) => {
-      return await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admission/shell`,
-        values,
-        { withCredentials: true }
-      );
+      return await apiClient.post(`/admission/shell`, values);
     },
     onSuccess: () => {
       toast.success("Admission shell created! Applicant can now log in.");

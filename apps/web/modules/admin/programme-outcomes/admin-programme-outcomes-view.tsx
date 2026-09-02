@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { SuccessResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
@@ -14,7 +14,6 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { Skeleton } from "@webcampus/ui/components/skeleton";
-import axios from "axios";
 import { Plus } from "lucide-react";
 import React, { useState } from "react";
 import { adminProgrammeOutcomeColumns } from "./admin-programme-outcomes-columns";
@@ -22,7 +21,6 @@ import { ProgrammeOutcomeDialog } from "./programme-outcome-dialog";
 import { ProgrammeOutcomeTableItem } from "./types";
 
 export const AdminProgrammeOutcomesView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const [programType, setProgramType] = useState<"UG" | "PG">("UG");
@@ -32,21 +30,17 @@ export const AdminProgrammeOutcomesView = () => {
   const departmentsQuery = useQuery({
     queryKey: ["department"],
     queryFn: async () => {
-      return await axios.get<SuccessResponse<{ id: string; name: string }[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/department`,
-        { withCredentials: true }
-      );
+      return await apiClient.get<
+        SuccessResponse<{ id: string; name: string }[]>
+      >(`/admin/department`);
     },
   });
 
   const response = useQuery({
     queryKey: ["programme-outcomes"],
     queryFn: async () => {
-      return await axios.get<SuccessResponse<ProgrammeOutcomeTableItem[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/programme-outcomes`,
-        {
-          withCredentials: true,
-        }
+      return await apiClient.get<SuccessResponse<ProgrammeOutcomeTableItem[]>>(
+        `/admin/programme-outcomes`
       );
     },
   });

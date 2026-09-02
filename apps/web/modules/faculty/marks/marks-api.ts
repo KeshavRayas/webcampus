@@ -1,6 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import { BaseResponse } from "@webcampus/types/api";
-import axios from "axios";
+import { isAxiosError } from "axios";
 
 interface ExcelImportError {
   row: number;
@@ -115,7 +115,7 @@ export const uploadMarksExcel = async (
     }
   } catch (error) {
     const errors = (
-      axios.isAxiosError(error)
+      isAxiosError(error)
         ? (error.response?.data as { data?: { errors?: ExcelImportError[] } })
             ?.data?.errors
         : undefined

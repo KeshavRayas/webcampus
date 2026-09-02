@@ -1,3 +1,4 @@
+import { getOrSet, invalidatePrefix } from "@webcampus/common/cache";
 import { db } from "@webcampus/db";
 
 type TimetableWhere = Record<string, unknown>;
@@ -170,6 +171,8 @@ export class TimetableService {
       },
     });
 
+    await invalidatePrefix("cache:timetable:");
+
     return entry as TimetableEntry;
   }
 
@@ -194,21 +197,24 @@ export class TimetableService {
       where.status = status;
     }
 
-    return db.timetableEntry.findMany({
-      where,
-      include: {
-        semester: {
-          include: {
-            academicTerm: true,
+    const cacheKey = `cache:timetable:semester:${semesterId}:${departmentId ?? ""}:${sectionId ?? ""}:${facultyId ?? ""}:${status ?? ""}`;
+    return getOrSet(cacheKey, 300, () =>
+      db.timetableEntry.findMany({
+        where,
+        include: {
+          semester: {
+            include: {
+              academicTerm: true,
+            },
           },
+          course: true,
+          faculty: true,
+          department: true,
+          section: true,
         },
-        course: true,
-        faculty: true,
-        department: true,
-        section: true,
-      },
-      orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
-    });
+        orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
+      })
+    );
   }
 
   static async getEntriesByDepartment(
@@ -232,19 +238,22 @@ export class TimetableService {
       where.dayOfWeek = dayOfWeek;
     }
 
-    return db.timetableEntry.findMany({
-      where,
-      include: {
-        semester: {
-          include: {
-            academicTerm: true,
+    const cacheKey = `cache:timetable:department:${departmentId}:${semesterId ?? ""}:${sectionId ?? ""}:${facultyId ?? ""}:${dayOfWeek ?? ""}`;
+    return getOrSet(cacheKey, 300, () =>
+      db.timetableEntry.findMany({
+        where,
+        include: {
+          semester: {
+            include: {
+              academicTerm: true,
+            },
           },
+          course: true,
+          faculty: true,
         },
-        course: true,
-        faculty: true,
-      },
-      orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
-    });
+        orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
+      })
+    );
   }
 
   static async getEntriesByCourse(
@@ -260,20 +269,23 @@ export class TimetableService {
       where.sectionId = sectionId;
     }
 
-    return db.timetableEntry.findMany({
-      where,
-      include: {
-        semester: {
-          include: {
-            academicTerm: true,
+    const cacheKey = `cache:timetable:course:${courseId}:${semesterId ?? ""}:${sectionId ?? ""}`;
+    return getOrSet(cacheKey, 300, () =>
+      db.timetableEntry.findMany({
+        where,
+        include: {
+          semester: {
+            include: {
+              academicTerm: true,
+            },
           },
+          faculty: true,
+          department: true,
+          section: true,
         },
-        faculty: true,
-        department: true,
-        section: true,
-      },
-      orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
-    });
+        orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
+      })
+    );
   }
 
   static async getEntriesByFaculty(
@@ -281,47 +293,50 @@ export class TimetableService {
     semesterId?: string,
     dayOfWeek?: string
   ) {
-    const labAssignments = await db.courseAssignment.findMany({
-      where: {
-        facultyId,
-        assignmentType: "LAB",
-        ...(semesterId ? { section: { semesterId } } : {}),
-      },
-      select: { courseId: true, sectionId: true },
-    });
-
-    const where: TimetableWhere = {
-      OR: [
-        { facultyId },
-        ...labAssignments.map((assignment) => ({
-          classType: "LAB",
-          courseId: assignment.courseId,
-          sectionId: assignment.sectionId,
-        })),
-      ],
-      status: "PUBLISHED",
-    };
-    if (semesterId) {
-      where.semesterId = semesterId;
-    }
-    if (dayOfWeek) {
-      where.dayOfWeek = dayOfWeek;
-    }
-
-    return db.timetableEntry.findMany({
-      where,
-      include: {
-        semester: {
-          include: {
-            academicTerm: true,
-          },
+    const cacheKey = `cache:timetable:faculty:${facultyId}:${semesterId ?? ""}:${dayOfWeek ?? ""}`;
+    return getOrSet(cacheKey, 300, async () => {
+      const labAssignments = await db.courseAssignment.findMany({
+        where: {
+          facultyId,
+          assignmentType: "LAB",
+          ...(semesterId ? { section: { semesterId } } : {}),
         },
-        course: true,
-        faculty: { include: { user: { select: { name: true } } } },
-        department: true,
-        section: true,
-      },
-      orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
+        select: { courseId: true, sectionId: true },
+      });
+
+      const where: TimetableWhere = {
+        OR: [
+          { facultyId },
+          ...labAssignments.map((assignment) => ({
+            classType: "LAB",
+            courseId: assignment.courseId,
+            sectionId: assignment.sectionId,
+          })),
+        ],
+        status: "PUBLISHED",
+      };
+      if (semesterId) {
+        where.semesterId = semesterId;
+      }
+      if (dayOfWeek) {
+        where.dayOfWeek = dayOfWeek;
+      }
+
+      return db.timetableEntry.findMany({
+        where,
+        include: {
+          semester: {
+            include: {
+              academicTerm: true,
+            },
+          },
+          course: true,
+          faculty: { include: { user: { select: { name: true } } } },
+          department: true,
+          section: true,
+        },
+        orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
+      });
     });
   }
 
@@ -341,41 +356,44 @@ export class TimetableService {
       | "FRIDAY"
       | "SATURDAY";
 
-    const where: TimetableWhere = {
-      semesterId,
-      dayOfWeek,
-      status: "PUBLISHED",
-    };
-    if (sectionId) {
-      where.sectionId = sectionId;
-    }
-    if (facultyId) {
-      const labAssignments = await db.courseAssignment.findMany({
-        where: {
-          facultyId,
-          assignmentType: "LAB",
-          section: { semesterId },
-        },
-        select: { courseId: true, sectionId: true },
-      });
-      where.OR = [
-        { facultyId },
-        ...labAssignments.map((assignment) => ({
-          classType: "LAB",
-          courseId: assignment.courseId,
-          sectionId: assignment.sectionId,
-        })),
-      ];
-    }
+    const cacheKey = `cache:timetable:today:${semesterId}:${dayOfWeek}:${facultyId ?? ""}:${sectionId ?? ""}`;
+    return getOrSet(cacheKey, 300, async () => {
+      const where: TimetableWhere = {
+        semesterId,
+        dayOfWeek,
+        status: "PUBLISHED",
+      };
+      if (sectionId) {
+        where.sectionId = sectionId;
+      }
+      if (facultyId) {
+        const labAssignments = await db.courseAssignment.findMany({
+          where: {
+            facultyId,
+            assignmentType: "LAB",
+            section: { semesterId },
+          },
+          select: { courseId: true, sectionId: true },
+        });
+        where.OR = [
+          { facultyId },
+          ...labAssignments.map((assignment) => ({
+            classType: "LAB",
+            courseId: assignment.courseId,
+            sectionId: assignment.sectionId,
+          })),
+        ];
+      }
 
-    return db.timetableEntry.findMany({
-      where,
-      include: {
-        course: true,
-        faculty: { include: { user: { select: { name: true } } } },
-        section: true,
-      },
-      orderBy: [{ startTime: "asc" }],
+      return db.timetableEntry.findMany({
+        where,
+        include: {
+          course: true,
+          faculty: { include: { user: { select: { name: true } } } },
+          section: true,
+        },
+        orderBy: [{ startTime: "asc" }],
+      });
     });
   }
 
@@ -441,6 +459,8 @@ export class TimetableService {
       },
     });
 
+    await invalidatePrefix("cache:timetable:");
+
     return entry as TimetableEntry;
   }
 
@@ -448,6 +468,7 @@ export class TimetableService {
     await db.timetableEntry.delete({
       where: { id: entryId },
     });
+    await invalidatePrefix("cache:timetable:");
   }
 
   static async getTemplateData(
@@ -460,83 +481,119 @@ export class TimetableService {
     rooms: string[];
     slots: unknown;
   }> {
-    const where: TimetableWhere = { semesterId };
-    if (sectionId) {
-      where.sectionId = sectionId;
-    }
+    const cacheKey = `cache:timetable:template:${semesterId}:${sectionId ?? ""}`;
+    return getOrSet(cacheKey, 600, async () => {
+      const where: TimetableWhere = { semesterId };
+      if (sectionId) {
+        where.sectionId = sectionId;
+      }
 
-    const courses = await db.course.findMany({
-      where: {
-        semesterId,
-      },
-      include: {
-        department: true,
-        semester: {
-          include: {
-            academicTerm: true,
+      const courses = await db.course.findMany({
+        where: {
+          semesterId,
+        },
+        include: {
+          department: true,
+          semester: {
+            include: {
+              academicTerm: true,
+            },
+          },
+          assignments: {
+            where: sectionId ? { sectionId } : undefined,
+            include: {
+              faculty: { include: { user: { select: { name: true } } } },
+              section: { select: { id: true, name: true } },
+            },
+          },
+          electiveBatches: {
+            include: {
+              facultyAssignment: {
+                include: {
+                  faculty: { include: { user: { select: { name: true } } } },
+                },
+              },
+            },
           },
         },
-        assignments: {
-          where: sectionId ? { sectionId } : undefined,
-          include: {
-            faculty: { include: { user: { select: { name: true } } } },
-            section: { select: { id: true, name: true } },
-          },
-        },
-      },
-      orderBy: { code: "asc" },
-    });
+        orderBy: { code: "asc" },
+      });
 
-    const sections = sectionId
-      ? []
-      : await db.section.findMany({
-          where: { semesterId },
-          include: { _count: { select: { courses: true } } },
-        });
+      const sections = sectionId
+        ? []
+        : await db.section.findMany({
+            where: { semesterId },
+            include: { _count: { select: { courses: true } } },
+          });
 
-    const faculty = await db.faculty.findMany({
-      include: { user: { select: { name: true, email: true } } },
-    });
+      const faculty = await db.faculty.findMany({
+        include: { user: { select: { name: true, email: true } } },
+      });
 
-    const rooms = await db.timetableEntry.findMany({
-      where: { semesterId },
-      select: { roomNumber: true },
-    });
+      const rooms = await db.timetableEntry.findMany({
+        where: { semesterId },
+        select: { roomNumber: true },
+      });
 
-    const timetableTemplate = await db.timetableTemplate.findFirst({
-      where: { semesterId },
-    });
-    return {
-      courses: courses.map(
-        (course: {
-          assignments: Array<{
-            faculty: {
+      const timetableTemplate = await db.timetableTemplate.findFirst({
+        where: { semesterId },
+      });
+      return {
+        courses: courses.map(
+          (course: {
+            assignments: Array<{
+              faculty: {
+                id: string;
+                shortName: string;
+                user: { name: string | null } | null;
+              };
+              sectionId: string;
+              section: { id: string; name: string };
+              assignmentType: "THEORY" | "LAB";
+            }>;
+            electiveBatches: Array<{
               id: string;
-              shortName: string;
-              user: { name: string | null } | null;
-            };
-            sectionId: string;
-            section: { id: string; name: string };
-            assignmentType: "THEORY" | "LAB";
-          }>;
-          [key: string]: unknown;
-        }) => ({
-          ...course,
-          handlingFaculty: course.assignments.map((assignment) => ({
-            id: assignment.faculty.id,
-            name: assignment.faculty.user?.name ?? assignment.faculty.shortName,
-            shortName: assignment.faculty.shortName,
-            sectionId: assignment.sectionId,
-            sectionName: assignment.section?.name,
-            assignmentType: assignment.assignmentType,
-          })),
-        })
-      ),
-      sections,
-      faculty,
-      rooms: rooms.map((r: { roomNumber: string }) => r.roomNumber),
-      slots: timetableTemplate?.slots ?? [],
-    };
+              sectionId: string | null;
+              facultyAssignment: {
+                faculty: {
+                  id: string;
+                  shortName: string;
+                  user: { name: string | null } | null;
+                };
+              } | null;
+            }>;
+            [key: string]: unknown;
+          }) => ({
+            ...course,
+            handlingFaculty: course.assignments.map((assignment) => ({
+              id: assignment.faculty.id,
+              name:
+                assignment.faculty.user?.name ?? assignment.faculty.shortName,
+              shortName: assignment.faculty.shortName,
+              sectionId: assignment.sectionId,
+              sectionName: assignment.section?.name,
+              assignmentType: assignment.assignmentType,
+            })),
+            handlingFacultyElective: course.electiveBatches
+              .filter((b) => b.facultyAssignment)
+              .map((b) => ({
+                id: b.facultyAssignment!.faculty.id,
+                name:
+                  b.facultyAssignment!.faculty.user?.name ??
+                  b.facultyAssignment!.faculty.shortName,
+                shortName: b.facultyAssignment!.faculty.shortName,
+                sectionId: b.sectionId ?? "",
+                sectionName: undefined as string | undefined,
+                assignmentType: "THEORY" as const,
+              })),
+          })
+        ),
+        sections,
+        faculty,
+        rooms: rooms.map((r: { roomNumber: string }) => r.roomNumber),
+        slots: timetableTemplate?.slots ?? [],
+      };
+    });
   }
 
   static async saveTemplate(
@@ -544,30 +601,35 @@ export class TimetableService {
     semesterId: string,
     slots: Slot[]
   ): Promise<unknown> {
-    return db.timetableTemplate.upsert({
+    const result = await db.timetableTemplate.upsert({
       where: { departmentId_semesterId: { departmentId, semesterId } },
       create: { departmentId, semesterId, slots },
       update: { slots },
     });
+    await invalidatePrefix("cache:timetable:");
+    return result;
   }
 
   static async getSlotsForSection(
     semesterId: string,
     sectionId?: string
   ): Promise<Slot[]> {
-    let departmentId: string | undefined;
-    if (sectionId) {
-      const section = await db.section.findUnique({
-        where: { id: sectionId },
-        select: { departmentId: true },
+    const cacheKey = `cache:timetable:slots:${semesterId}:${sectionId ?? ""}`;
+    return getOrSet(cacheKey, 600, async () => {
+      let departmentId: string | undefined;
+      if (sectionId) {
+        const section = await db.section.findUnique({
+          where: { id: sectionId },
+          select: { departmentId: true },
+        });
+        departmentId = section?.departmentId;
+      }
+      const template = await db.timetableTemplate.findFirst({
+        where: { semesterId, ...(departmentId ? { departmentId } : {}) },
+        select: { slots: true },
       });
-      departmentId = section?.departmentId;
-    }
-    const template = await db.timetableTemplate.findFirst({
-      where: { semesterId, ...(departmentId ? { departmentId } : {}) },
-      select: { slots: true },
+      return (template?.slots ?? []) as Slot[];
     });
-    return (template?.slots ?? []) as Slot[];
   }
 
   static async importEntries(
@@ -624,7 +686,7 @@ export class TimetableService {
       throw new Error(`Timetable import aborted:\n- ${errors.join("\n- ")}`);
     }
 
-    return db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       await tx.timetableEntry.deleteMany({
         where: { departmentId, semesterId },
       });
@@ -652,5 +714,9 @@ export class TimetableService {
 
       return { createdCount: createdCodes.length, createdCodes };
     });
+
+    await invalidatePrefix("cache:timetable:");
+
+    return result;
   }
 }

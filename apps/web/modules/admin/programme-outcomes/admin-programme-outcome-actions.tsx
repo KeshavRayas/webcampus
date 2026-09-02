@@ -1,8 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { Button } from "@webcampus/ui/components/button";
+import { ConfirmDialog } from "@webcampus/ui/components/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@webcampus/ui/components/dropdown-menu";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { MoreHorizontal, Pencil, Trash } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "react-toastify";
@@ -23,18 +24,13 @@ export const AdminProgrammeOutcomeActions = ({
 }: {
   outcome: ProgrammeOutcomeTableItem;
 }) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/programme-outcomes/${outcome.id}`,
-        {
-          withCredentials: true,
-        }
-      );
+      await apiClient.delete(`/admin/programme-outcomes/${outcome.id}`);
     },
     onSuccess: () => {
       toast.success("Outcome deleted successfully");
@@ -64,13 +60,7 @@ export const AdminProgrammeOutcomeActions = ({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-            onClick={() => {
-              if (
-                window.confirm("Are you sure you want to delete this outcome?")
-              ) {
-                deleteMutation.mutate();
-              }
-            }}
+            onClick={() => setShowDeleteConfirm(true)}
           >
             <Trash className="mr-2 h-4 w-4" />
             Delete
@@ -82,6 +72,19 @@ export const AdminProgrammeOutcomeActions = ({
         isOpen={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         outcome={outcome}
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete this outcome?"
+        description="This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          deleteMutation.mutate();
+        }}
       />
     </>
   );

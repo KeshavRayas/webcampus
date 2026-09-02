@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import {
   AlertDialog,
@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -166,8 +166,7 @@ export const ElectiveMappingDetailView = ({
   basePath,
   departmentId,
 }: ElectiveMappingDetailViewProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const apiBase = `${NEXT_PUBLIC_API_BASE_URL}${basePath}/elective-mapping`;
+  const apiBase = `${basePath}/elective-mapping`;
   const queryClient = useQueryClient();
 
   const [draftFilters, setDraftFilters] = useState<StudentFilters>(
@@ -188,11 +187,10 @@ export const ElectiveMappingDetailView = ({
   const { data, isLoading } = useQuery({
     queryKey: ["elective-mapping-detail", courseId, departmentId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<DetailData>>(
+      const res = await apiClient.get<BaseResponse<DetailData>>(
         `${apiBase}/${courseId}`,
         {
           params: { departmentId },
-          withCredentials: true,
         }
       );
       if (res.data.status !== "success" || !res.data.data) {
@@ -213,13 +211,12 @@ export const ElectiveMappingDetailView = ({
     ],
     queryFn: async () => {
       if (!data) return [] as PePeer[];
-      const res = await axios.get<BaseResponse<PePeer[]>>(apiBase, {
+      const res = await apiClient.get<BaseResponse<PePeer[]>>(apiBase, {
         params: {
           semesterId: data.semesterId,
           ...(data.cycle ? { cycle: data.cycle } : {}),
           ...(basePath === "/admin" && departmentId ? { departmentId } : {}),
         },
-        withCredentials: true,
       });
       if (res.data.status !== "success") return [];
       return (res.data.data ?? []).filter((p) => p.courseId !== data.courseId);
@@ -359,16 +356,12 @@ export const ElectiveMappingDetailView = ({
           studentId,
           electiveBatchId: electiveBatchId!,
         }));
-      return axios.put(
-        `${apiBase}/save`,
-        {
-          courseId,
-          electiveMappingVersion: data.electiveMappingVersion,
-          assignments,
-          departmentId,
-        },
-        { withCredentials: true }
-      );
+      return apiClient.put(`${apiBase}/save`, {
+        courseId,
+        electiveMappingVersion: data.electiveMappingVersion,
+        assignments,
+        departmentId,
+      });
     },
     onSuccess: (res) => {
       toast.success(res.data.message);
@@ -394,17 +387,13 @@ export const ElectiveMappingDetailView = ({
       if (!overrideStudentId || !overrideToCourseId) {
         throw new Error("Select student and target PE");
       }
-      return axios.post(
-        `${apiBase}/override-pe`,
-        {
-          studentId: overrideStudentId,
-          fromCourseId: courseId,
-          toCourseId: overrideToCourseId,
-          fromCourseVersion: data?.electiveMappingVersion,
-          departmentId,
-        },
-        { withCredentials: true }
-      );
+      return apiClient.post(`${apiBase}/override-pe`, {
+        studentId: overrideStudentId,
+        fromCourseId: courseId,
+        toCourseId: overrideToCourseId,
+        fromCourseVersion: data?.electiveMappingVersion,
+        departmentId,
+      });
     },
     onSuccess: (res) => {
       toast.success(res.data.message);
@@ -426,11 +415,11 @@ export const ElectiveMappingDetailView = ({
 
   const csvMutation = useMutation({
     mutationFn: async (rows: CsvRow[]) => {
-      return axios.post(
-        `${apiBase}/validate-csv`,
-        { courseId, rows, departmentId },
-        { withCredentials: true }
-      );
+      return apiClient.post(`${apiBase}/validate-csv`, {
+        courseId,
+        rows,
+        departmentId,
+      });
     },
     onSuccess: (res) => {
       const assignments = res.data?.data?.assignments as
@@ -495,11 +484,10 @@ export const ElectiveMappingDetailView = ({
 
   const renameMutation = useMutation({
     mutationFn: async (payload: { electiveBatchId: string; name: string }) => {
-      return axios.post(
-        `${apiBase}/rename-batch`,
-        { ...payload, departmentId },
-        { withCredentials: true }
-      );
+      return apiClient.post(`${apiBase}/rename-batch`, {
+        ...payload,
+        departmentId,
+      });
     },
     onSuccess: (res) => {
       toast.success(res.data.message);
@@ -518,11 +506,10 @@ export const ElectiveMappingDetailView = ({
 
   const deleteBatchMutation = useMutation({
     mutationFn: async (electiveBatchId: string) => {
-      return axios.post(
-        `${apiBase}/delete-batch`,
-        { electiveBatchId, departmentId },
-        { withCredentials: true }
-      );
+      return apiClient.post(`${apiBase}/delete-batch`, {
+        electiveBatchId,
+        departmentId,
+      });
     },
     onSuccess: (res) => {
       toast.success(res.data.message);

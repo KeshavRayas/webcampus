@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -18,7 +18,6 @@ export const CreateCoeUserSchema = z.object({
 });
 
 export const useCoeUsers = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const form = useForm<z.infer<typeof CreateCoeUserSchema>>({
@@ -34,14 +33,9 @@ export const useCoeUsers = () => {
 
   const { mutateAsync: create, isPending: isCreating } = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe`,
-        formData,
-        {
-          withCredentials: true,
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
+      const response = await apiClient.post(`/admin/coe`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -78,7 +72,6 @@ export const useCoeUsers = () => {
 };
 
 export const useCoeUserEdit = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const { mutateAsync: onEdit, isPending: isEditing } = useMutation({
@@ -89,14 +82,9 @@ export const useCoeUserEdit = () => {
       id: string;
       formData: FormData;
     }) => {
-      const response = await axios.patch(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe/${id}`,
-        formData,
-        {
-          withCredentials: true,
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
+      const response = await apiClient.patch(`/admin/coe/${id}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -112,15 +100,11 @@ export const useCoeUserEdit = () => {
 };
 
 export const useCoeUserDelete = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const { mutateAsync: onDelete, isPending: isDeleting } = useMutation({
     mutationFn: async (id: string) => {
-      const response = await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe/${id}`,
-        { withCredentials: true }
-      );
+      const response = await apiClient.delete(`/admin/coe/${id}`);
       return response.data;
     },
     onSuccess: () => {

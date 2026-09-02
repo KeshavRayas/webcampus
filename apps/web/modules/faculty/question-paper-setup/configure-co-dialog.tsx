@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   UpdateCourseOutcomesSchema,
   UpdateCourseOutcomesType,
@@ -22,7 +22,7 @@ import {
   FormItem,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -40,15 +40,13 @@ export const ConfigureCODialog = ({
   onOpenChange,
   course,
 }: ConfigureCODialogProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ["course-outcomes", course.id],
     queryFn: async () => {
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/course-outcomes?courseId=${course.id}`,
-        { withCredentials: true }
+      const res = await apiClient.get(
+        `/faculty/course-outcomes?courseId=${course.id}`
       );
       return res.data.data;
     },
@@ -76,11 +74,7 @@ export const ConfigureCODialog = ({
 
   const mutation = useMutation({
     mutationFn: async (values: UpdateCourseOutcomesType) => {
-      return await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/course-outcomes`,
-        values,
-        { withCredentials: true }
-      );
+      return await apiClient.post(`/faculty/course-outcomes`, values);
     },
     onSuccess: () => {
       toast.success("Course outcomes updated successfully");

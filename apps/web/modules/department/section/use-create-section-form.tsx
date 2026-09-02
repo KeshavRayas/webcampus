@@ -1,9 +1,8 @@
 "use client";
 
-import { stripDepartmentOwnershipFields } from "@/lib/api-client";
+import { apiClient, stripDepartmentOwnershipFields } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CreateSectionSchema,
   CreateSectionType,
@@ -11,7 +10,7 @@ import {
   GenerateCycleSectionsSchema,
 } from "@webcampus/schemas/department";
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { useEffect } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "react-toastify";
@@ -45,7 +44,6 @@ export const useCreateSectionForm = (
   options: UseCreateSectionFormOptions = {}
 ) => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const departmentName = options.fixedDepartmentName ?? "AUTH_SCOPED";
   const semesterId = options.fixedSemesterId ?? "";
 
@@ -59,13 +57,7 @@ export const useCreateSectionForm = (
   });
   const createSectionMutation = useMutation({
     mutationFn: async (data: DepartmentScopedCreateSectionPayload) => {
-      return await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section`,
-        data,
-        {
-          withCredentials: true,
-        }
-      );
+      return await apiClient.post(`/department/section`, data);
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);
@@ -90,8 +82,6 @@ export const useCreateCycleSectionsForm = (
   options: UseCreateCycleSectionsFormOptions
 ) => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const form = useForm<GenerateCycleSectionsDTO>({
     resolver: zodResolver(GenerateCycleSectionsSchema),
     defaultValues: {
@@ -137,11 +127,7 @@ export const useCreateCycleSectionsForm = (
 
   const generateCycleMutation = useMutation({
     mutationFn: async (data: GenerateCycleSectionsDTO) => {
-      return await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/generate-cycle`,
-        data,
-        { withCredentials: true }
-      );
+      return await apiClient.post(`/department/section/generate-cycle`, data);
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<unknown>>) => {
       toast.success(data.data.message);

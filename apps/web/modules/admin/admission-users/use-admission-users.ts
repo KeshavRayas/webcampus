@@ -1,13 +1,14 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CreateAdmissionUserSchema,
   UpdateAdmissionUserSchema,
 } from "@webcampus/schemas/admin";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
+import { isAxiosError } from "axios";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
@@ -19,7 +20,6 @@ type UpdateAdmissionUserFormValues = z.infer<typeof UpdateAdmissionUserSchema>;
 export const useAdmissionUsers = (
   defaultRole: "admission" | "admission-instructor" = "admission"
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
 
@@ -48,11 +48,10 @@ export const useAdmissionUsers = (
       formData.append("role", data.role);
       formData.append("photo", photoFile);
 
-      const response = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users`,
+      const response = await apiClient.post(
+        `/admin/admission-users`,
         formData,
         {
-          withCredentials: true,
           headers: {
             "Content-Type": "multipart/form-data",
           },
@@ -67,7 +66,7 @@ export const useAdmissionUsers = (
       setPhotoFile(null);
     },
     onError: (error: unknown) => {
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to create user");
       } else if (error instanceof Error) {
         toast.error(error.message);
@@ -85,7 +84,6 @@ export const useAdmissionUsers = (
 };
 
 export const useAdmissionUserUpdate = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [photoFile, setPhotoFile] = useState<File | null>(null);
 
@@ -112,11 +110,10 @@ export const useAdmissionUserUpdate = () => {
         formData.append("photo", photoFile);
       }
 
-      const response = await axios.put(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users/${id}`,
+      const response = await apiClient.put(
+        `/admin/admission-users/${id}`,
         formData,
         {
-          withCredentials: true,
           headers: {
             "Content-Type": "multipart/form-data",
           },
@@ -138,7 +135,6 @@ export const useAdmissionUserUpdate = () => {
 };
 
 export const useAdmissionUserEdit = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const { mutateAsync: onEdit, isPending: isEditing } = useMutation({
@@ -150,11 +146,10 @@ export const useAdmissionUserEdit = () => {
       id: string;
       formData: FormData;
     }) => {
-      const response = await axios.patch(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users/${id}`,
+      const response = await apiClient.patch(
+        `/admin/admission-users/${id}`,
         formData,
         {
-          withCredentials: true,
           headers: {
             "Content-Type": "multipart/form-data",
           },
@@ -175,15 +170,11 @@ export const useAdmissionUserEdit = () => {
 };
 
 export const useAdmissionUserDelete = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const { mutateAsync: onDelete, isPending: isDeleting } = useMutation({
     mutationFn: async (id: string) => {
-      const response = await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users/${id}`,
-        { withCredentials: true }
-      );
+      const response = await apiClient.delete(`/admin/admission-users/${id}`);
       return response.data;
     },
     onSuccess: () => {

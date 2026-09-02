@@ -69,7 +69,7 @@ admin.get(
 const report: ExpressRouter = Router();
 report.use(
   protect({
-    role: ["faculty", "hod", "department", "coe", "admin"],
+    role: ["faculty", "hod", "department", "coe", "admin", "coordinator"],
     permissions: { feedback: ["read"] },
   })
 );

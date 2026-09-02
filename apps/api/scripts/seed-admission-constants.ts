@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { invalidatePrefix } from "@webcampus/common/cache";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import {
@@ -20,8 +21,19 @@ function buildRows(): AdmissionConstantRow[] {
 
   for (const mode of admissionModes) {
     const claimed = categoriesClaimed[mode] as readonly string[];
+    if (!claimed?.length) {
+      throw new Error(`No categoriesClaimed defined for mode ${mode}`);
+    }
     const allotted = (categoriesAllotted[mode] ?? claimed) as readonly string[];
+    if (!allotted.length) {
+      throw new Error(`No categoriesAllotted defined for mode ${mode}`);
+    }
     const modeQuotas = (quotas[mode] ?? []) as readonly string[];
+    if (!modeQuotas.length) {
+      throw new Error(
+        `No quotas defined for mode ${mode} — add entry to packages/schemas/src/constants/admission-options.ts`
+      );
+    }
     const defaultAllotted = allotted[0] ?? "GM";
 
     for (const quota of modeQuotas) {
@@ -65,6 +77,15 @@ async function seedAdmissionConstants(): Promise<void> {
   }
 
   logger.info(`Admission constants seeding complete: ${count} rows ensured.`);
+
+  try {
+    await invalidatePrefix("cache:admission-constants:");
+    logger.info("Admission constants cache invalidated");
+  } catch (error) {
+    logger.warn(
+      `Cache invalidation failed (non-fatal): ${(error as Error).message}`
+    );
+  }
 }
 
 seedAdmissionConstants()

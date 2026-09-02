@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   AcademicTermResponseType,
   CreateAcademicTermType,
@@ -12,7 +12,7 @@ import {
   ErrorResponse,
   SuccessResponse,
 } from "@webcampus/types/api";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
 export const useAcademicTerms = (
@@ -24,8 +24,6 @@ export const useAcademicTerms = (
   },
   options?: { enabled?: boolean }
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["academic-terms", filters ?? {}],
     queryFn: async () => {
@@ -38,11 +36,10 @@ export const useAcademicTerms = (
           : {}),
       };
 
-      const res = await axios.get<BaseResponse<AcademicTermResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
+      const res = await apiClient.get<BaseResponse<AcademicTermResponseType[]>>(
+        `/admin/semester`,
         {
           params,
-          withCredentials: true,
         }
       );
       if (res.data.status === "success") {
@@ -56,15 +53,13 @@ export const useAcademicTerms = (
 };
 
 export const useCreateAcademicTerm = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: CreateAcademicTermType) => {
-      return await axios.post<SuccessResponse<AcademicTermResponseType>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
-        data,
-        { withCredentials: true }
+      return await apiClient.post<SuccessResponse<AcademicTermResponseType>>(
+        `/admin/semester`,
+        data
       );
     },
     onSuccess: (res) => {
@@ -78,7 +73,6 @@ export const useCreateAcademicTerm = () => {
 };
 
 export const useUpdateAcademicTerm = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -89,10 +83,9 @@ export const useUpdateAcademicTerm = () => {
       id: string;
       data: CreateAcademicTermType;
     }) => {
-      return await axios.put<SuccessResponse<AcademicTermResponseType>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester/${id}`,
-        data,
-        { withCredentials: true }
+      return await apiClient.put<SuccessResponse<AcademicTermResponseType>>(
+        `/admin/semester/${id}`,
+        data
       );
     },
     onSuccess: (res) => {
@@ -108,14 +101,12 @@ export const useUpdateAcademicTerm = () => {
 };
 
 export const useDeleteAcademicTerm = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      return await axios.delete<SuccessResponse<null>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester/${id}`,
-        { withCredentials: true }
+      return await apiClient.delete<SuccessResponse<null>>(
+        `/admin/semester/${id}`
       );
     },
     onSuccess: (res) => {

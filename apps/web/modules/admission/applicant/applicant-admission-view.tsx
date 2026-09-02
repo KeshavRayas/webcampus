@@ -1,10 +1,10 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useAdmissionConstants } from "@/lib/use-admission-constants";
 import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   admissionTypes,
   counsellingRounds,
@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { Tabs, TabsList, TabsTrigger } from "@webcampus/ui/components/tabs";
-import axios, { isAxiosError } from "axios";
+import { isAxiosError } from "axios";
 import { City, Country, State } from "country-state-city";
 import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
@@ -566,7 +566,6 @@ export const ApplicantAdmissionView = ({
   initialEmail?: string;
   initialApplicationId?: string;
 }) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const router = useRouter();
   const pathname = usePathname();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -747,10 +746,10 @@ export const ApplicantAdmissionView = ({
   } = useQuery({
     queryKey: ["admission-me"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<ApplicantAdmissionData>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admission/me`,
-        { withCredentials: true }
-      );
+      const res =
+        await apiClient.get<BaseResponse<ApplicantAdmissionData>>(
+          `/admission/me`
+        );
       if (res.data.status === "success") return res.data.data;
       return null;
     },
@@ -761,9 +760,8 @@ export const ApplicantAdmissionView = ({
   const { data: fetchedStaffAdmission } = useQuery({
     queryKey: ["admission-by-application", initialApplicationId, staffMode],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<ApplicantAdmissionData[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admission?applicationId=${encodeURIComponent(initialApplicationId)}`,
-        { withCredentials: true }
+      const res = await apiClient.get<BaseResponse<ApplicantAdmissionData[]>>(
+        `/admission?applicationId=${encodeURIComponent(initialApplicationId)}`
       );
       if (res.data.status === "success") {
         const list = res.data.data;
@@ -823,6 +821,10 @@ export const ApplicantAdmissionView = ({
 
     setIsSubmitting(true);
 
+    formData.set(
+      "studiedKannadaIn10th",
+      studiedKannadaEnabled ? "true" : "false"
+    );
     formData.set("nri", nriEnabled ? "true" : "false");
     formData.set("disability", disabilityEnabled ? "true" : "false");
     formData.set(
@@ -898,11 +900,10 @@ export const ApplicantAdmissionView = ({
     formData.set("diplomaInstituteCity", diplomaCity);
     formData.set("diplomaInstituteState", diplomaState);
     try {
-      await axios({
+      await apiClient({
         method: staffMode ? "post" : "put",
-        url: `${NEXT_PUBLIC_API_BASE_URL}/admission/${staffMode ? "admission-submit" : "submit"}`,
+        url: `/admission/${staffMode ? "admission-submit" : "submit"}`,
         data: formData,
-        withCredentials: true,
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -1376,8 +1377,6 @@ export const ApplicantAdmissionView = ({
       cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   };
-
-  
 
   const saveAndNext = (step: StepKey) => {
     const currentIndex = STEP_ORDER.indexOf(step);
@@ -3444,9 +3443,6 @@ export const ApplicantAdmissionView = ({
                 </Label>
                 <Select
                   name="studiedKannadaIn10th"
-                  value={studiedKannadaEnabled ? "true" : "false"}
-                />
-                <Select
                   value={studiedKannadaEnabled ? "true" : "false"}
                   onValueChange={(value) =>
                     setStudiedKannadaEnabled(value === "true")

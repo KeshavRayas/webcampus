@@ -73,18 +73,23 @@ const DataField = ({
   label: string;
   value?: string | number | boolean | Date | null;
 }) => {
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+
   let displayValue = "-";
   if (value !== undefined && value !== null && value !== "") {
     if (typeof value === "boolean") {
       displayValue = value ? "Yes" : "No";
     } else if (value instanceof Date) {
-      displayValue = value.toLocaleDateString();
+      displayValue = mounted ? value.toLocaleDateString() : "-";
     } else if (
       typeof value === "string" &&
       !isNaN(Date.parse(value)) &&
       value.includes("T")
     ) {
-      displayValue = new Date(value).toLocaleDateString();
+      displayValue = mounted
+        ? new Date(value).toLocaleDateString()
+        : String(value).slice(0, 10);
     } else {
       displayValue = String(value);
     }
@@ -93,9 +98,7 @@ const DataField = ({
   return (
     <div className="space-y-1">
       <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="break-words font-medium" suppressHydrationWarning>
-        {displayValue}
-      </p>
+      <p className="break-words font-medium">{displayValue}</p>
     </div>
   );
 };

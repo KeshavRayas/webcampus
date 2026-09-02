@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
-import { frontendEnv } from "@webcampus/common/env";
 import { courseTypeLabel } from "@webcampus/schemas/constants";
 import {
   CourseResponseDTO,
@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@webcampus/ui/components/dropdown-menu";
 import { Form } from "@webcampus/ui/components/form";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
@@ -56,7 +56,6 @@ const CourseRowActions = ({
   selectedCycle,
 }: RowActionProps) => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -103,17 +102,13 @@ const CourseRowActions = ({
 
   const updateMutation = useMutation({
     mutationFn: async (values: CreateCourseDTO) => {
-      return axios.put(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course`,
-        {
-          id: course.id,
-          ...values,
-          departmentName,
-          cycle: selectedCycle,
-          version: course.version,
-        },
-        { withCredentials: true }
-      );
+      return apiClient.put(`/admin/course`, {
+        id: course.id,
+        ...values,
+        departmentName,
+        cycle: selectedCycle,
+        version: course.version,
+      });
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);
@@ -140,9 +135,8 @@ const CourseRowActions = ({
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      return axios.delete(`${NEXT_PUBLIC_API_BASE_URL}/admin/course`, {
+      return apiClient.delete(`/admin/course`, {
         data: { id: course.id, version: course.version },
-        withCredentials: true,
       });
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
