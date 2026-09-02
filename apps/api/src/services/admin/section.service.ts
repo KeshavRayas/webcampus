@@ -1,7 +1,10 @@
 import { DepartmentContextResolver } from "@webcampus/api/src/services/shared/department-context-resolver.service";
 import { logger } from "@webcampus/common/logger";
 import { db, Prisma } from "@webcampus/db";
-import { CreateSectionType, SectionResponseType } from "@webcampus/schemas/department";
+import {
+  CreateSectionType,
+  SectionResponseType,
+} from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import { ProjectMappingService } from "../department/project-mapping.service";
 
@@ -19,6 +22,7 @@ export class AdminSectionService {
       supplementaryOfferingId?: string;
       registrationType?: "SUPPLEMENTARY" | "REGULAR";
     },
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     adminUserId?: string
   ): Promise<BaseResponse<SectionResponseType>> {
     try {
@@ -35,7 +39,8 @@ export class AdminSectionService {
           academicTerm: { select: { type: true } },
         },
       });
-      const isSupplementaryTerm = semester?.academicTerm.type === "supplementary";
+      const isSupplementaryTerm =
+        semester?.academicTerm.type === "supplementary";
 
       const section = await db.$transaction(async (tx) => {
         const created = await tx.section.create({
@@ -65,7 +70,10 @@ export class AdminSectionService {
       logger.info(response);
       return response;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
         throw new Error("Section already exists");
       }
       if (error instanceof Error) throw error;
@@ -85,7 +93,9 @@ export class AdminSectionService {
 
     const whereClause: Prisma.SectionWhereInput = {
       ...(query.semesterId ? { semesterId: query.semesterId } : {}),
-      ...(query.cycle ? { cycle: query.cycle as import("@webcampus/db").Cycle } : {}),
+      ...(query.cycle
+        ? { cycle: query.cycle as import("@webcampus/db").Cycle }
+        : {}),
       ...(query.name ? { name: query.name } : {}),
       department: { is: { id: resolvedDepartment.departmentId } },
     };
@@ -98,22 +108,36 @@ export class AdminSectionService {
     };
   }
 
-  static async deleteSection(id: string, departmentId: string): Promise<BaseResponse<null>> {
+  static async deleteSection(
+    id: string,
+    departmentId: string
+  ): Promise<BaseResponse<null>> {
     const resolvedDepartment = await DepartmentContextResolver.resolve({
       source: "admin.section.delete",
       departmentId,
     });
 
     const existing = await db.section.findFirst({
-      where: { id, department: { is: { id: resolvedDepartment.departmentId } } },
+      where: {
+        id,
+        department: { is: { id: resolvedDepartment.departmentId } },
+      },
       include: {
-        _count: { select: { studentSections: true, courses: true, ClassSession: true } },
+        _count: {
+          select: { studentSections: true, courses: true, ClassSession: true },
+        },
       },
     });
 
     if (!existing) throw new Error("Section not found");
-    if (existing._count.courses > 0) throw new Error("Cannot delete section: Courses are mapped to this section.");
-    if (existing._count.ClassSession > 0) throw new Error("Cannot delete section: Class sessions have been recorded for this section.");
+    if (existing._count.courses > 0)
+      throw new Error(
+        "Cannot delete section: Courses are mapped to this section."
+      );
+    if (existing._count.ClassSession > 0)
+      throw new Error(
+        "Cannot delete section: Class sessions have been recorded for this section."
+      );
 
     const reconcileScope = {
       departmentId: resolvedDepartment.departmentId,
@@ -124,9 +148,16 @@ export class AdminSectionService {
       await tx.studentSection.deleteMany({ where: { sectionId: id } });
       await tx.batch.deleteMany({ where: { sectionId: id } });
       await tx.section.delete({ where: { id } });
-      await ProjectMappingService.reconcileProjectGroupsForScope({ tx, ...reconcileScope });
+      await ProjectMappingService.reconcileProjectGroupsForScope({
+        tx,
+        ...reconcileScope,
+      });
     });
 
-    return { status: "success", message: "Section deleted successfully", data: null };
+    return {
+      status: "success",
+      message: "Section deleted successfully",
+      data: null,
+    };
   }
 }

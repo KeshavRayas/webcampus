@@ -47,6 +47,7 @@ interface CourseMappingGridProps {
   cycle: string;
   isLocked?: boolean;
   isAdmin?: boolean;
+  isSupplementaryTerm?: boolean;
 }
 
 type SectionMappingState = {
@@ -66,6 +67,7 @@ export const CourseMappingGrid = ({
   cycle,
   isLocked = false,
   isAdmin = false,
+  isSupplementaryTerm = false,
 }: CourseMappingGridProps) => {
   const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
@@ -78,8 +80,8 @@ export const CourseMappingGrid = ({
   const isDepartmentWidePw =
     isPw && course.projectGroupingScope === "DEPARTMENT_WIDE";
 
-  const isVisuallyLocked = isLocked && !isAdmin;
-  const isSuperEdit = isLocked && isAdmin;
+  const isVisuallyLocked = (isLocked && !isAdmin) || isSupplementaryTerm;
+  const isSuperEdit = isLocked && isAdmin && !isSupplementaryTerm;
 
   const hasTheory = ["INTEGRATED", "NON_INTEGRATED", "NCMC"].includes(
     course.courseMode
@@ -408,6 +410,12 @@ export const CourseMappingGrid = ({
   });
 
   const handleSaveClick = () => {
+    if (isSupplementaryTerm) {
+      toast.error(
+        "This is a supplementary term — faculty assignments are managed in Courses → Supplementary Sections, not here."
+      );
+      return;
+    }
     if (isSuperEdit) {
       setShowReasonDialog(true);
     } else {

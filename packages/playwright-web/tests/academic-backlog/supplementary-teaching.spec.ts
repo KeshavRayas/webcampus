@@ -242,32 +242,17 @@ test("Supplementary teaching flow pins attendance and CIE to supplementary attem
     data?: { id: string };
   }>(`${PATHS.suppOfferings}/${cseOffering.data?.id}/sections`, {
     name: `SUP-CSE-${suffix}`,
+    facultyId: facultyXProfile.id,
   });
   const matSection = await adminApi.post<{
     status: string;
     data?: { id: string };
   }>(`${PATHS.suppOfferings}/${matOffering.data?.id}/sections`, {
     name: `SUP-MAT-${suffix}`,
+    facultyId: facultyYProfile.id,
   });
   expect(cseSection.status).toBe("success");
   expect(matSection.status).toBe("success");
-
-  for (const [sectionId, facultyId] of [
-    [cseSection.data?.id as string, facultyXProfile.id],
-    [matSection.data?.id as string, facultyYProfile.id],
-  ]) {
-    const mapped = await adminApi.put<{ status: string }>(PATHS.upsertMapping, {
-      courseId: sectionId === cseSection.data?.id ? cse101.id : mat102.id,
-      semesterId: suppHostSem1.id,
-      academicYear: "2025-26",
-      sectionMappings: [{ sectionId, theoryFacultyId: facultyId }],
-      isSuperEdit: true,
-      departmentId: department.id,
-      departmentName: department.name,
-      reason: "Supplementary teaching mapping",
-    });
-    expect(mapped.status).toBe("success");
-  }
 
   await openRegistrationWindow(adminApi, {
     registrationType: "SUPPLEMENTARY",

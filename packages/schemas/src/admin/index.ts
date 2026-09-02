@@ -14,4 +14,3 @@ export * from "./semester.schema";
 export * from "./student.schema";
 export * from "./user.schema";
 export * from "./whatsapp.schema";
-export * from "./exam-registration.schema";

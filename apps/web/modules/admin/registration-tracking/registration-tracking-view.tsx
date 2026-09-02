@@ -1,6 +1,7 @@
 "use client";
 
 import { useDepartments } from "@/lib/use-departments";
+import { useSupplementaryRegistrations } from "@/modules/admin/courses/use-supplementary-admin";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
@@ -18,6 +19,12 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@webcampus/ui/components/tabs";
 import { useMemo, useState } from "react";
 import { StudentCoursesSheet } from "./student-courses-sheet";
 import {
@@ -114,6 +121,18 @@ export const RegistrationTrackingView = () => {
 
   const registeredCount = students.filter((s) => s.isRegistered).length;
   const pendingCount = students.filter((s) => !s.isRegistered).length;
+
+  const [activeTab, setActiveTab] = useState<"regular" | "supplementary">(
+    "regular"
+  );
+
+  const supplementaryEnabled = appliedFilters.academicTermId.length > 0;
+  const {
+    data: supplementaryRegistrations = [],
+    isLoading: isLoadingSupplementary,
+  } = useSupplementaryRegistrations(
+    supplementaryEnabled ? appliedFilters.academicTermId : undefined
+  );
 
   const filterFields = useMemo<FilterFieldConfig<TrackingFilterState>[]>(() => {
     const primaryFields: FilterFieldConfig<TrackingFilterState>[] = [
@@ -267,92 +286,156 @@ export const RegistrationTrackingView = () => {
         </div>
       </FilterPanel>
 
-      {!queryEnabled ? (
-        <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
-          Select Academic Term and Semester, then apply filters to view
-          registration status.
-        </div>
-      ) : isLoading ? (
-        <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
-          Loading registration tracking data...
-        </div>
-      ) : students.length === 0 ? (
-        <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
-          No students found for the selected filters.
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-muted-foreground">
-              Total: <strong>{students.length}</strong>
-            </span>
-            <Badge variant="default" className="bg-green-600">
-              Registered: {registeredCount}
-            </Badge>
-            <Badge variant="secondary" className="bg-yellow-500 text-black">
-              Pending: {pendingCount}
-            </Badge>
-          </div>
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as "regular" | "supplementary")}
+      >
+        <TabsList>
+          <TabsTrigger value="regular">Regular Registrations</TabsTrigger>
+          <TabsTrigger value="supplementary">
+            Supplementary Registrations
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="regular" className="space-y-4 pt-4">
+          {!queryEnabled ? (
+            <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
+              Select Academic Term and Semester, then apply filters to view
+              registration status.
+            </div>
+          ) : isLoading ? (
+            <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
+              Loading registration tracking data...
+            </div>
+          ) : students.length === 0 ? (
+            <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
+              No students found for the selected filters.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-muted-foreground">
+                  Total: <strong>{students.length}</strong>
+                </span>
+                <Badge variant="default" className="bg-green-600">
+                  Registered: {registeredCount}
+                </Badge>
+                <Badge variant="secondary" className="bg-yellow-500 text-black">
+                  Pending: {pendingCount}
+                </Badge>
+              </div>
 
-          <div className="overflow-hidden rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student Name</TableHead>
-                  <TableHead>USN</TableHead>
-                  <TableHead>Student Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Courses</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.map((student) => (
-                  <TableRow key={student.studentId}>
-                    <TableCell className="font-medium">
-                      {student.studentName}
-                    </TableCell>
-                    <TableCell>{student.usn}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {student.studentEmail}
-                    </TableCell>
-                    <TableCell>
-                      {student.isRegistered ? (
-                        <Badge variant="default" className="bg-green-600">
-                          Registered
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="secondary"
-                          className="bg-yellow-500 text-black"
-                        >
-                          Pending
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {student.isRegistered
-                        ? `${student.registeredCourseCount} courses`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {student.isRegistered && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedStudent(student)}
-                        >
-                          View Courses
-                        </Button>
-                      )}
-                    </TableCell>
+              <div className="overflow-hidden rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student Name</TableHead>
+                      <TableHead>USN</TableHead>
+                      <TableHead>Student Email</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Courses</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.map((student) => (
+                      <TableRow key={student.studentId}>
+                        <TableCell className="font-medium">
+                          {student.studentName}
+                        </TableCell>
+                        <TableCell>{student.usn}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {student.studentEmail}
+                        </TableCell>
+                        <TableCell>
+                          {student.isRegistered ? (
+                            <Badge variant="default" className="bg-green-600">
+                              Registered
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="secondary"
+                              className="bg-yellow-500 text-black"
+                            >
+                              Pending
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {student.isRegistered
+                            ? `${student.registeredCourseCount} courses`
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {student.isRegistered && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedStudent(student)}
+                            >
+                              View Courses
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </TabsContent>
+        <TabsContent value="supplementary" className="space-y-4 pt-4">
+          {!supplementaryEnabled ? (
+            <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
+              Select an Academic Term and apply filters to view supplementary
+              registrations.
+            </div>
+          ) : isLoadingSupplementary ? (
+            <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
+              Loading supplementary registrations...
+            </div>
+          ) : supplementaryRegistrations.length === 0 ? (
+            <div className="text-muted-foreground rounded-lg border p-8 text-center text-sm">
+              No supplementary registrations for this term.
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>USN</TableHead>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Course</TableHead>
+                    <TableHead>Credits</TableHead>
+                    <TableHead>Semester</TableHead>
+                    <TableHead>Registered At</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </>
-      )}
+                </TableHeader>
+                <TableBody>
+                  {supplementaryRegistrations.map((registration) => (
+                    <TableRow key={registration.id}>
+                      <TableCell className="font-medium">
+                        {registration.usn}
+                      </TableCell>
+                      <TableCell>{registration.studentName}</TableCell>
+                      <TableCell>
+                        {registration.code} — {registration.courseName}
+                      </TableCell>
+                      <TableCell>{registration.totalCredits}</TableCell>
+                      <TableCell>{registration.semesterLabel}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {new Date(
+                          registration.registrationDate
+                        ).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <StudentCoursesSheet
         open={!!selectedStudent}

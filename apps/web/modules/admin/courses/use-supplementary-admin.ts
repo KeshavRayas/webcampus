@@ -14,6 +14,7 @@ export interface SupplementaryOfferingItem {
   name: string;
   courseType: string;
   totalCredits: number;
+  departmentId: string;
 }
 
 export interface SupplementaryRegistrationItem {
@@ -166,7 +167,11 @@ export const useCreateSupplementarySection = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: { offeringId: string; name: string }) => {
+    mutationFn: async (payload: {
+      offeringId: string;
+      name: string;
+      facultyId: string;
+    }) => {
       const { offeringId, ...body } = payload;
 
       return axios.post<BaseResponse<SupplementarySectionItem>>(
@@ -179,6 +184,9 @@ export const useCreateSupplementarySection = () => {
       toast.success(res.data.message);
       queryClient.invalidateQueries({
         queryKey: ["admin-supplementary-sections"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["admin-supplementary-demand"],
       });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
@@ -214,6 +222,9 @@ export const useAssignSupplementaryStudents = () => {
       toast.success(`${payload.message} (${placedCount} placed)`);
       queryClient.invalidateQueries({
         queryKey: ["admin-supplementary-sections"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["admin-supplementary-demand"],
       });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
@@ -284,6 +295,9 @@ export const useAddSupplementaryOffering = () => {
       queryClient.invalidateQueries({
         queryKey: ["admin-supplementary-offerings"],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["admin-supplementary-demand"],
+      });
     },
     onError: (error: AxiosError<ErrorResponse>) => {
       toast.error(
@@ -306,6 +320,9 @@ export const useDeleteSupplementaryOffering = () => {
       toast.success(res.data.message);
       queryClient.invalidateQueries({
         queryKey: ["admin-supplementary-offerings"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["admin-supplementary-demand"],
       });
     },
     onError: (error: AxiosError<ErrorResponse>) => {

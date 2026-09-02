@@ -49,6 +49,7 @@ interface AdminCourseMappingGridProps {
   cycle: string;
   isBasicSciences: boolean;
   isLocked?: boolean;
+  isSupplementaryTerm?: boolean;
   excelExtractedData?: { section: string; facultyName: string }[] | null;
   onExcelDataConsumed?: () => void;
 }
@@ -72,6 +73,7 @@ export const AdminCourseMappingGrid = ({
   cycle,
   isBasicSciences,
   isLocked = false,
+  isSupplementaryTerm = false,
   excelExtractedData,
   onExcelDataConsumed,
 }: AdminCourseMappingGridProps) => {
@@ -406,6 +408,12 @@ export const AdminCourseMappingGrid = ({
   });
 
   const handleSaveClick = () => {
+    if (isSupplementaryTerm) {
+      toast.error(
+        "This is a supplementary term — faculty assignments are managed in Courses → Supplementary Sections, not here."
+      );
+      return;
+    }
     if (isLocked) {
       setShowReasonDialog(true);
     } else {
@@ -510,6 +518,7 @@ export const AdminCourseMappingGrid = ({
                             }
                             placeholder="Select faculty"
                             className="min-w-50 w-full"
+                            disabled={isSupplementaryTerm}
                           />
                         </td>
                       </tr>
@@ -520,13 +529,18 @@ export const AdminCourseMappingGrid = ({
             </>
           )}
           <div className="flex justify-end">
-            <Button onClick={handleSaveClick} disabled={saveMutation.isPending}>
+            <Button
+              onClick={handleSaveClick}
+              disabled={saveMutation.isPending || isSupplementaryTerm}
+            >
               {saveMutation.isPending && (
                 <Loader2 className="mr-2 size-4 animate-spin" />
               )}
-              {isLocked
-                ? `Super Edit & Save ${isPw ? "Project Group Mapping" : "Batch Mapping"}`
-                : `Save ${isPw ? "Project Group Mapping" : "Batch Mapping"}`}
+              {isSupplementaryTerm
+                ? "Read-only — use Courses → Supplementary Sections"
+                : isLocked
+                  ? `Super Edit & Save ${isPw ? "Project Group Mapping" : "Batch Mapping"}`
+                  : `Save ${isPw ? "Project Group Mapping" : "Batch Mapping"}`}
             </Button>
           </div>
         </div>
@@ -603,6 +617,7 @@ export const AdminCourseMappingGrid = ({
                           }
                           placeholder="Select Section Faculty"
                           className="bg-background"
+                          disabled={isSupplementaryTerm}
                         />
                       </td>
                     )}
@@ -626,6 +641,7 @@ export const AdminCourseMappingGrid = ({
                               }
                               placeholder={`Select ${batchName} Faculty`}
                               className="bg-background text-xs"
+                              disabled={isSupplementaryTerm}
                             />
                           </td>
                         );
@@ -640,13 +656,15 @@ export const AdminCourseMappingGrid = ({
         <div className="flex justify-end pt-4">
           <Button
             onClick={handleSaveClick}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || isSupplementaryTerm}
             size="lg"
           >
             {saveMutation.isPending && (
               <Loader2 className="mr-2 size-4 animate-spin" />
             )}
-            Save Mappings
+            {isSupplementaryTerm
+              ? "Read-only — use Courses → Supplementary Sections"
+              : "Save Mappings"}
           </Button>
         </div>
       </div>

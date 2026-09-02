@@ -20,6 +20,7 @@ export interface SupplementaryOfferingItem {
   name: string;
   courseType: string;
   totalCredits: number;
+  departmentId: string;
 }
 
 export interface SupplementaryRegistrationItem {
@@ -154,6 +155,7 @@ export class SupplementaryService {
               name: true,
               courseType: true,
               totalCredits: true,
+              departmentId: true,
             },
           },
         },
@@ -170,6 +172,7 @@ export class SupplementaryService {
           name: offering.course.name,
           courseType: offering.course.courseType,
           totalCredits: offering.course.totalCredits,
+          departmentId: offering.course.departmentId,
         })),
       };
     } catch (error) {
@@ -208,6 +211,7 @@ export class SupplementaryService {
           courseType: true,
           totalCredits: true,
           approvalStatus: true,
+          departmentId: true,
           semester: { select: { semesterNumber: true } },
         },
       });
@@ -264,6 +268,7 @@ export class SupplementaryService {
           name: course.name,
           courseType: course.courseType,
           totalCredits: course.totalCredits,
+          departmentId: course.departmentId,
         },
       };
     } catch (error) {
@@ -652,101 +657,85 @@ export class SupplementaryService {
           name,
           semesterId: hostSemester.id,
           departmentId: offering.course.departmentId,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           cycle: offering.course.cycle as any,
           supplementaryOfferingId: offering.id,
           registrationType: "SUPPLEMENTARY",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
         undefined
       );
       const section = (sectionRes as unknown as { data: { id: string } }).data;
 
-      // Hybrid (Card C): auto-inherit faculty mapping from original term's CourseAssignments.
-      // Copies distinct THEORY assignments for the same course into the new SUP section,
-      // mapping to the SUP host semester/year. Idempotent via unique constraint.
-      try {
-        const originalAssignments = await db.courseAssignment.findMany({
-          where: {
-            courseId: offering.courseId,
-            assignmentType: "THEORY",
-            batchId: null,
-          },
-          select: {
-            facultyId: true,
-            departmentId: true,
-            assignmentType: true,
-          },
-        });
+      // Manual faculty assignment for supplementary sections (replaces auto-inherit).
+      // Validates faculty exists and belongs to same department as the course.
+      const faculty = await db.faculty.findUnique({
+        where: { id: input.facultyId },
+        select: { id: true, departmentId: true },
+      });
 
-        const distinctFacultyIds = Array.from(
-          new Set(originalAssignments.map((a) => a.facultyId))
-        );
-
-        if (distinctFacultyIds.length > 0) {
-          const supSemester = await db.semester.findUnique({
-            where: { id: hostSemester.id },
-            select: {
-              semesterNumber: true,
-              academicTerm: { select: { year: true } },
-            },
-          });
-
-          const semesterNumber =
-            supSemester?.semesterNumber ??
-            offering.course.semester.semesterNumber;
-          const academicYear =
-            supSemester?.academicTerm.year ?? offering.academicTerm.year;
-
-          for (const facultyId of distinctFacultyIds) {
-            try {
-              await db.courseAssignment.create({
-                data: {
-                  courseId: offering.courseId,
-                  departmentId: offering.course.departmentId,
-                  facultyId,
-                  sectionId: section.id,
-                  batchId: null,
-                  assignmentType: "THEORY",
-                  semester: semesterNumber,
-                  academicYear,
-                },
-              });
-            } catch (e: unknown) {
-              if (
-                typeof e === "object" &&
-                e !== null &&
-                "code" in e &&
-                (e as { code?: string }).code === "P2002"
-              ) {
-                // already inherited — idempotent
-                continue;
-              }
-              throw e;
-            }
-          }
-
-          if (distinctFacultyIds.length > 0) {
-            logger.info(
-              "Supplementary section auto-inherited faculty mapping",
-              {
-                sectionId: section.id,
-                offeringId: offering.id,
-                courseId: offering.courseId,
-                facultyCount: distinctFacultyIds.length,
-              }
-            );
-          }
-        }
-      } catch (inheritError) {
-        // Non-fatal: section is already created; log and continue so the API still returns success
-        logger.warn("Failed to auto-inherit supplementary faculty mapping", {
-          offeringId: offering.id,
-          sectionId: section.id,
-          error:
-            inheritError instanceof Error
-              ? inheritError.message
-              : String(inheritError),
-        });
+      if (!faculty) {
+        // Roll back section to avoid orphan if faculty invalid
+        await db.section.delete({ where: { id: section.id } }).catch(() => {});
+        throw new Error("Faculty not found");
       }
+
+      if (faculty.departmentId !== offering.course.departmentId) {
+        await db.section.delete({ where: { id: section.id } }).catch(() => {});
+        throw new Error(
+          "Faculty must belong to the same department as the course"
+        );
+      }
+
+      const supSemester = await db.semester.findUnique({
+        where: { id: hostSemester.id },
+        select: {
+          semesterNumber: true,
+          academicTerm: { select: { year: true } },
+        },
+      });
+
+      const semesterNumber =
+        supSemester?.semesterNumber ?? offering.course.semester.semesterNumber;
+      const academicYear =
+        supSemester?.academicTerm.year ?? offering.academicTerm.year;
+
+      try {
+        await db.courseAssignment.create({
+          data: {
+            courseId: offering.courseId,
+            departmentId: offering.course.departmentId,
+            facultyId: faculty.id,
+            sectionId: section.id,
+            batchId: null,
+            assignmentType: "THEORY",
+            semester: semesterNumber,
+            academicYear,
+          },
+        });
+      } catch (e: unknown) {
+        // On duplicate assignment, clean up section and surface 409
+        if (
+          typeof e === "object" &&
+          e !== null &&
+          "code" in e &&
+          (e as { code?: string }).code === "P2002"
+        ) {
+          await db.section
+            .delete({ where: { id: section.id } })
+            .catch(() => {});
+          throw new Error("Faculty assignment already exists for this section");
+        }
+        await db.section.delete({ where: { id: section.id } }).catch(() => {});
+        throw e;
+      }
+
+      logger.info("Supplementary section faculty assigned", {
+        sectionId: section.id,
+        offeringId: offering.id,
+        courseId: offering.courseId,
+        facultyId: faculty.id,
+      });
 
       const created = await db.section.findUnique({
         where: { id: section.id },

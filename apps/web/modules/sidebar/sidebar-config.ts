@@ -164,14 +164,6 @@ export const sidebarConfig: Record<Role, SidebarData> = {
               url: "/admin/promotion",
             },
             {
-              name: "Supplementary",
-              url: "/admin/supplementary",
-            },
-            {
-              name: "Exam Registrations",
-              url: "/admin/exam-registrations",
-            },
-            {
               name: "Feedback",
               url: "/admin/academics/feedback",
               children: [

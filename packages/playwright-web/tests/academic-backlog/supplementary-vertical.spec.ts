@@ -149,11 +149,16 @@ test("Supplementary registration places only registered students into per-course
   });
   expect(heavyOffering.status).toBe("success");
   expect(matOffering.status).toBe("success");
+  const facultyForSup = await testDb.faculty.findFirstOrThrow({
+    where: { departmentId: department.id },
+    select: { id: true },
+  });
   const cseSection = await adminApi.post<{
     status: string;
     data?: { id: string };
   }>(`${PATHS.suppOfferings}/${cseOffering.data?.id}/sections`, {
     name: `SUP-CSE-${suffix}`,
+    facultyId: facultyForSup.id,
   });
   expect(cseSection.status).toBe("success");
   const matSection = await adminApi.post<{
@@ -161,6 +166,7 @@ test("Supplementary registration places only registered students into per-course
     data?: { id: string };
   }>(`${PATHS.suppOfferings}/${matOffering.data?.id}/sections`, {
     name: `SUP-MAT-${suffix}`,
+    facultyId: facultyForSup.id,
   });
   expect(matSection.status).toBe("success");
   await expect(

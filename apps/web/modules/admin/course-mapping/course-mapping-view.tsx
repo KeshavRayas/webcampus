@@ -419,19 +419,49 @@ export const AdminCourseMappingView = () => {
 
   return (
     <div className="space-y-8">
-      {isCourseLocked && (
-        <div className="border-primary/20 bg-primary/10 text-primary flex items-start gap-3 rounded-lg border p-4">
-          <ShieldCheck className="mt-0.5 h-5 w-5" />
-          <div className="flex flex-col gap-1">
-            <h5 className="font-medium leading-none tracking-tight">
-              Admin Override Enabled
-            </h5>
-            <div className="text-sm">
-              This course is {selectedCourse?.approvalStatus?.toLowerCase()}.
-              You have override privileges to modify faculty assignments.
+      {isSupplementaryTerm ? (
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 h-5 w-5 text-amber-700" />
+            <div className="flex flex-col gap-1">
+              <h5 className="font-medium leading-none tracking-tight">
+                Supplementary term — read-only
+              </h5>
+              <div className="text-sm">
+                This is a supplementary term — faculty assignments are managed
+                in Courses → Supplementary Sections, not here. This mapping is
+                read-only.
+              </div>
             </div>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+            onClick={() =>
+              router.push(
+                `/admin/courses?academicTermId=${appliedFilters.termId}&semesterId=${appliedFilters.semesterId}`
+              )
+            }
+          >
+            Go to Courses
+          </Button>
         </div>
+      ) : (
+        isCourseLocked && (
+          <div className="border-primary/20 bg-primary/10 text-primary flex items-start gap-3 rounded-lg border p-4">
+            <ShieldCheck className="mt-0.5 h-5 w-5" />
+            <div className="flex flex-col gap-1">
+              <h5 className="font-medium leading-none tracking-tight">
+                Admin Override Enabled
+              </h5>
+              <div className="text-sm">
+                This course is {selectedCourse?.approvalStatus?.toLowerCase()}.
+                You have override privileges to modify faculty assignments.
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       <FilterPanel>
@@ -492,16 +522,6 @@ export const AdminCourseMappingView = () => {
               </div>
             </CourseDetailsCard>
 
-            {isSupplementaryTerm && (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <span className="font-semibold">Supplementary term</span> — this
-                grid maps the supplementary host sections. Faculty was
-                auto-inherited from the original ODD/Even term when the SUP
-                section was created; you can reassign here. Both Admin and
-                Department Admin can edit (scoped to department).
-              </div>
-            )}
-
             <div className="bg-card text-card-foreground w-full overflow-hidden rounded-xl border shadow-sm">
               <div className="p-6">
                 {/* --- Excel Action Buttons --- */}
@@ -544,6 +564,7 @@ export const AdminCourseMappingView = () => {
                   cycle={appliedFilters.cycle}
                   isBasicSciences={isBasicSciences}
                   isLocked={isCourseLocked}
+                  isSupplementaryTerm={isSupplementaryTerm}
                   excelExtractedData={extractedExcelData}
                   onExcelDataConsumed={() => setExtractedExcelData(null)}
                 />

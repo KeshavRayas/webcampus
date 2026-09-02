@@ -22,6 +22,7 @@ export const SupplementaryOfferingParamsSchema = z.object({
 
 export const CreateSupplementarySectionSchema = z.object({
   name: z.string().trim().min(1, "Section name is required").max(50),
+  facultyId: z.uuid("Invalid faculty ID"),
 });
 
 export const SupplementarySectionParamsSchema = z.object({
