@@ -2,7 +2,6 @@ import { db } from "@webcampus/db";
 
 interface GenerateProctorGroupsParams {
   departmentId: string;
-  departmentName: string;
   semesterId: string;
   studentsPerGroup: number;
   action: "generate" | "regenerate";
@@ -10,13 +9,7 @@ interface GenerateProctorGroupsParams {
 
 export class ProctorService {
   static async generateProctorGroups(params: GenerateProctorGroupsParams) {
-    const {
-      departmentId,
-      departmentName,
-      semesterId,
-      studentsPerGroup,
-      action,
-    } = params;
+    const { departmentId, semesterId, studentsPerGroup, action } = params;
 
     return await db.$transaction(async (tx) => {
       // 1. Verify semester
@@ -32,7 +25,7 @@ export class ProctorService {
         // Clear students' proctor groups in this semester
         await tx.student.updateMany({
           where: {
-            departmentName,
+            departmentId,
             semesterId,
           },
           data: { proctorGroupId: null },
@@ -50,7 +43,7 @@ export class ProctorService {
       // 3. Fetch unassigned students
       const unassignedStudents = await tx.student.findMany({
         where: {
-          departmentName,
+          departmentId,
           semesterId,
           proctorGroupId: null,
         },

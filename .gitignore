@@ -73,6 +73,9 @@ packages/db/data/minio/*
 AGENTS.md
 .cursor
 
+# Stress tests (generated reports & temp data)
+stress-tests/
+
 # Local deployment plan
 plan.md
 deploy.md

@@ -6,6 +6,7 @@ import { z } from "zod";
  */
 export const BaseHODSchema = z.object({
   userId: z.string("User ID is required"),
+  departmentId: z.string("Department ID is required"),
   departmentName: z.string("Department name is required"),
 });
 
@@ -29,6 +30,7 @@ export const RemoveHODSchema = CreateHODSchema;
  */
 export const HODResponseSchema = BaseHODSchema.extend({
   id: z.string("HOD ID is required"),
+  departmentId: z.string().optional(),
 });
 
 export type BaseHODDTO = z.infer<typeof BaseHODSchema>;

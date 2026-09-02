@@ -27,6 +27,7 @@ export type StudentEligibility = {
   name: string;
   email: string | null;
   photo: string | null;
+  departmentId: string;
   departmentName: string;
   currentSemester: number;
   programType: string | null;
@@ -332,6 +333,7 @@ export const academicEligibility = {
       name: student.user.name,
       email: student.user.email ?? null,
       photo,
+      departmentId: student.departmentId,
       departmentName: student.departmentName,
       currentSemester: student.currentSemester,
       programType: student.programType,
@@ -569,6 +571,7 @@ export const academicEligibility = {
         name: student.user.name,
         email: student.user.email ?? null,
         photo,
+        departmentId: student.departmentId,
         departmentName: student.departmentName,
         currentSemester: student.currentSemester,
         programType: student.programType,

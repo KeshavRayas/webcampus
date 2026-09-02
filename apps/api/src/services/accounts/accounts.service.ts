@@ -138,11 +138,52 @@ export class AccountsService {
       take: 20,
     });
 
-    const details = await Promise.all(
-      students.map(async (student) =>
-        toStudentDetails(student, await loadAccounts(student.id))
-      )
-    );
+    // Batch-load accounts to avoid N+1 queries
+    const studentIds = students.map((s) => s.id);
+    const accountsRecords =
+      studentIds.length > 0
+        ? await db.$queryRaw<AccountsRecord[]>`
+            SELECT * FROM "Accounts"
+            WHERE "studentId" = ANY(${studentIds})
+            AND "id" IN (
+              SELECT DISTINCT ON ("studentId") "id"
+              FROM "Accounts"
+              WHERE "studentId" = ANY(${studentIds})
+              ORDER BY "studentId", "updatedAt" DESC
+            )
+          `
+        : [];
+
+    const accountsIds = accountsRecords.map((a) => a.id);
+    const allPayments =
+      accountsIds.length > 0
+        ? await db.$queryRaw<AccountsPayment[]>`
+            SELECT * FROM "AccountsPayment"
+            WHERE "accountsId" = ANY(${accountsIds})
+            ORDER BY "paidAt" DESC
+          `
+        : [];
+
+    // Build lookup maps
+    const accountsMap = new Map(accountsRecords.map((a) => [a.studentId, a]));
+    const paymentsByAccountsId = new Map<string, AccountsPayment[]>();
+    for (const payment of allPayments) {
+      const list = paymentsByAccountsId.get(payment.accountsId) ?? [];
+      list.push(payment);
+      paymentsByAccountsId.set(payment.accountsId, list);
+    }
+
+    const details = students.map((student) => {
+      const accounts = accountsMap.get(student.id) ?? null;
+      const accountsWithPayments = accounts
+        ? {
+            ...accounts,
+            payments: paymentsByAccountsId.get(accounts.id) ?? [],
+          }
+        : null;
+      return toStudentDetails(student, accountsWithPayments);
+    });
+
     return {
       status: "success" as const,
       message: "Students fetched successfully",

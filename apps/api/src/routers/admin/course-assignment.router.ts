@@ -1,4 +1,5 @@
 import { AdminCourseAssignmentController } from "@webcampus/api/src/controllers/admin/course-assignment.controller";
+import { upload } from "@webcampus/api/src/utils/upload";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   AdminCourseMappingByCourseQuerySchema,
@@ -10,10 +11,8 @@ import {
   AdminUpsertCourseMappingSchema,
 } from "@webcampus/schemas/admin";
 import { Router } from "express";
-import multer from "multer";
 
 const router: Router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
 router.get(
   "/status",

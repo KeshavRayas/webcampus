@@ -1,4 +1,5 @@
 import { AdminFacultyController } from "@webcampus/api/src/controllers/admin/faculty.controller";
+import { upload } from "@webcampus/api/src/utils/upload";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import { createUserSchema } from "@webcampus/schemas/admin";
 import {
@@ -6,10 +7,8 @@ import {
   UpdateFacultySchema,
 } from "@webcampus/schemas/faculty";
 import { Router } from "express";
-import multer from "multer";
 
 const router: Router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
 router.get(
   "/",

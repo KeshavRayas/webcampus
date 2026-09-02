@@ -43,7 +43,13 @@ export class HODDepartmentController {
       const result = await HODDepartmentService.getDepartmentInfo(
         session.user.id
       );
-      res.status(200).json(result);
+      sendResponse({
+        res,
+        status: "success",
+        statusCode: 200,
+        message: "Department fetched successfully",
+        data: result,
+      });
     } catch (error) {
       logger.error("Error fetching HOD department", error);
       sendResponse({

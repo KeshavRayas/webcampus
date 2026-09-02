@@ -18,6 +18,14 @@ export class CourseAssignmentController {
           data: response.data,
           statusCode: 201,
         });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: 400,
+          error: response.error,
+        });
       }
     } catch (error) {
       logger.error({ error });
@@ -41,6 +49,14 @@ export class CourseAssignmentController {
           message: response.message,
           data: response.data,
           statusCode: 200,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: 400,
+          error: response.error,
         });
       }
     } catch (error) {
@@ -68,6 +84,14 @@ export class CourseAssignmentController {
           message: response.message,
           data: response.data,
           statusCode: response.data ? 200 : 404,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: 400,
+          error: response.error,
         });
       }
     } catch (error) {
@@ -98,6 +122,14 @@ export class CourseAssignmentController {
           data: response.data,
           statusCode: 200,
         });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: 400,
+          error: response.error,
+        });
       }
     } catch (error) {
       logger.error("Error retrieving faculty's course assignments:", { error });
@@ -124,6 +156,14 @@ export class CourseAssignmentController {
           message: response.message,
           data: response.data,
           statusCode: 200,
+        });
+      } else {
+        sendResponse({
+          res,
+          status: "error",
+          message: response.message,
+          statusCode: 400,
+          error: response.error,
         });
       }
     } catch (error) {

@@ -30,7 +30,6 @@ const TERM_LABEL = "ODD 2026";
 const TERM_TYPE = "odd" as const;
 const UG_SEMESTERS = [1, 3, 5, 7];
 const PG_SEMESTERS = [1, 3];
-
 const MANIFEST_PATH =
   process.env.STRESS_MANIFEST_PATH ??
   path.resolve(process.cwd(), "stress-tests/.tmp/seed-manifest.json");

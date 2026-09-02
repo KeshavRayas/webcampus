@@ -64,7 +64,8 @@
   "exports": {
     "./globals.css": "./src/styles/globals.css",
     "./postcss.config": "./postcss.config.mjs",
-    "./lib/*": "./src/lib/*.ts",
+    "./lib/utils": "./src/lib/utils.ts",
+    "./lib/hall-ticket-template": "./src/lib/hall-ticket-template.ts",
     "./lib/hall-ticket": "./src/lib/hall-ticket/index.ts",
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",

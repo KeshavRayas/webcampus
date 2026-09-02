@@ -34,28 +34,46 @@ const s3Client = new S3Client({
 
 // Bucket auto-creation
 let bucketReady = false;
+let bucketReadyPromise: Promise<void> | null = null;
 
 async function ensureBucket(): Promise<void> {
   if (bucketReady) return;
+  if (bucketReadyPromise) return bucketReadyPromise;
 
-  try {
-    await s3Client.send(new HeadBucketCommand({ Bucket: BUCKET }));
-    bucketReady = true;
-  } catch (error: unknown) {
-    const code =
-      error && typeof error === "object" && "$metadata" in error
-        ? (error as { $metadata: { httpStatusCode?: number } }).$metadata
-            .httpStatusCode
-        : undefined;
-
-    if (code === 404 || code === 403) {
-      await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET }));
-      logger.info(`[MinIO] Created bucket "${BUCKET}"`);
+  bucketReadyPromise = (async () => {
+    try {
+      await s3Client.send(new HeadBucketCommand({ Bucket: BUCKET }));
       bucketReady = true;
-    } else {
-      throw error;
+    } catch (error: unknown) {
+      const code =
+        error && typeof error === "object" && "$metadata" in error
+          ? (error as { $metadata: { httpStatusCode?: number } }).$metadata
+              .httpStatusCode
+          : undefined;
+
+      if (code === 404 || code === 403) {
+        try {
+          await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET }));
+        } catch (createErr: unknown) {
+          const createCode =
+            createErr &&
+            typeof createErr === "object" &&
+            "$metadata" in createErr
+              ? (createErr as { $metadata: { httpStatusCode?: number } })
+                  .$metadata.httpStatusCode
+              : undefined;
+          // 409 = BucketAlreadyOwnedByYou / BucketAlreadyExists — safe to ignore
+          if (createCode !== 409) throw createErr;
+        }
+        logger.info(`[MinIO] Created bucket "${BUCKET}"`);
+        bucketReady = true;
+      } else {
+        throw error;
+      }
     }
-  }
+  })();
+
+  await bucketReadyPromise;
 }
 
 // Helpers

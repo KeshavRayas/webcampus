@@ -1,5 +1,4 @@
 import { redis } from "@webcampus/common/redis";
-import { secondaryStorage } from "./secondary-storage";
 
 const PREFIX = "ba:";
 
@@ -34,7 +33,4 @@ export async function invalidateUserSessions(userId: string): Promise<void> {
     }
   }
   await redis.del(listKey);
-  // Force secondaryStorage to stay consistent if it has a local cache of
-  // the same keys (no-op here, kept for future-proofing).
-  await secondaryStorage.delete(`active-sessions-${userId}`);
 }
