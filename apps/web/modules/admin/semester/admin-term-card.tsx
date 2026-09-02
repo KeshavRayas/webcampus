@@ -30,9 +30,6 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
   const lifecycleStatus =
     term.status ?? (term.isCurrent ? "ACTIVE" : "INACTIVE");
 
-  // Issue 5: Check if the term is archived
-  const isArchived = lifecycleStatus === "ARCHIVED";
-
   const handleDelete = () => {
     deleteTerm(term.id);
     setIsDeleteDialogOpen(false);
@@ -133,10 +130,6 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
               variant="outline"
               size="sm"
               onClick={() => setIsExpanded(!isExpanded)}
-              disabled={isArchived} // Issue 5: Disable config if archived
-              title={
-                isArchived ? "Archived terms cannot be configured" : undefined
-              }
             >
               {isExpanded ? (
                 <>
