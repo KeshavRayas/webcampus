@@ -27,13 +27,7 @@ import {
   useSupplementaryCandidateCourses,
   useSupplementaryOfferings,
 } from "../supplementary/use-supplementary-admin";
-
-interface TermBundle {
-  id: string;
-  type: string;
-  parity: string | null;
-  year: string;
-}
+import type { TermBundle } from "./term-bundle";
 
 interface AdminSupplementaryOfferingBlockProps {
   semesterId: string;
