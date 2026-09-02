@@ -15,19 +15,32 @@ test.describe("Sign in page", () => {
     await expect(page.getByPlaceholder("Enter your password")).toBeVisible();
   });
 
-  test("should render applicant sign in with application ID field", async ({
-    page,
-  }) => {
+  test("should render applicant sign in with email field", async ({ page }) => {
     await page.goto("/applicant/sign-in");
 
     await expect(
       page.getByRole("heading", { name: /Applicant sign in/i })
     ).toBeVisible();
-    await expect(page.getByLabel("Application ID")).toBeVisible();
+    await expect(page.getByLabel("Primary Email/College Email")).toBeVisible();
     await expect(
-      page.getByPlaceholder("Enter your Application ID")
+      page.getByPlaceholder("Enter your primary email")
     ).toBeVisible();
     await expect(page.getByPlaceholder("Enter your password")).toBeVisible();
+  });
+
+  test("should render admin sign in with all elements", async ({ page }) => {
+    await page.goto("/admin/sign-in");
+
+    await expect(
+      page.getByRole("heading", { name: /Admin sign in/i })
+    ).toBeVisible();
+    await expect(
+      page.locator('input[placeholder="Enter your email"]')
+    ).toBeVisible();
+    await expect(
+      page.locator('input[placeholder="Enter your password"]')
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
   });
 
   test("should sign in as admin successfully", async ({

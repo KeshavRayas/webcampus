@@ -429,7 +429,7 @@ describe("CourseAssignmentService upsertMapping (batch-managed)", () => {
     expect(electiveBatchFacultyDeleteCount).toBe(0);
   });
 
-  it("rejects cross-department faculty for PW when the department differs", async () => {
+  it("allows cross-department faculty for PW batch mappings", async () => {
     facultyRecords = [
       { id: "f-1", departmentId: "dep-session" },
       { id: "f-2", departmentId: "dep-other" },
@@ -447,12 +447,13 @@ describe("CourseAssignmentService upsertMapping (batch-managed)", () => {
           academicYear: "2025-26",
           electiveBatchMappings: [
             { electiveBatchId: "eb-1", facultyId: "f-2" },
+            { electiveBatchId: "eb-2", facultyId: "f-1" },
           ],
         },
         "user-1",
         { requesterRole: "department" }
       )
-    ).rejects.toThrow("Faculty f-2 does not belong to your department");
+    ).resolves.toBeDefined();
   });
 
   it("blocks faculty reassignment for PW once attendance/marks exist (C3)", async () => {
@@ -662,5 +663,55 @@ describe("CourseAssignmentService upsertMapping (batch-managed)", () => {
     expect(res.status).toBe("success");
     expect(electiveBatchFacultyCreateCount).toBe(1);
     expect(electiveBatchFacultyDeleteCount).toBe(1);
+  });
+});
+
+describe("CourseAssignmentService upsertMapping (section-mapped)", () => {
+  beforeEach(() => {
+    sessionDepartment = {
+      id: "dep-session",
+      name: "Session Department",
+      type: "ENGINEERING",
+      abbreviation: "SD",
+    };
+    courseRecord = {
+      id: "course-1",
+      courseType: "PC",
+      approvalStatus: "DRAFT",
+    };
+    electiveBatchRecords = [];
+    facultyRecords = [
+      { id: "f-1", departmentId: "dep-session" },
+      { id: "f-2", departmentId: "dep-other" },
+    ];
+    hasAttendanceOrMarks = false;
+    courseAssignmentCreateCount = 0;
+    electiveBatchFacultyCreateCount = 0;
+    electiveBatchFacultyDeleteCount = 0;
+  });
+
+  it("still rejects cross-department faculty for section mappings", async () => {
+    const { CourseAssignmentService } = await import(
+      "./course-assignment.service"
+    );
+
+    await expect(
+      CourseAssignmentService.upsertMapping(
+        {
+          courseId: "course-1",
+          semesterId: "sem-1",
+          academicYear: "2025-26",
+          sectionMappings: [
+            {
+              sectionId: "sec-1",
+              theoryFacultyId: "f-2",
+              labFacultyByBatch: [],
+            },
+          ],
+        },
+        "user-1",
+        { requesterRole: "department" }
+      )
+    ).rejects.toThrow("Faculty f-2 does not belong to your department");
   });
 });

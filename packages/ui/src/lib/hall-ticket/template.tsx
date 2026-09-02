@@ -14,6 +14,7 @@ export interface CourseEligibility {
   markEligible: boolean;
   attendanceEligible: boolean;
   eligible: boolean;
+  isBacklog?: boolean;
   status: "ELIGIBLE" | "NOT_ELIGIBLE";
 }
 

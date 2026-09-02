@@ -5,6 +5,7 @@ import {
   type CourseAssignmentWithFreeze,
 } from "./course-assignment.service";
 import { isBatchManagedCourse } from "./course-kind";
+import { REGULAR_ATTEMPT_REGISTRATION_TYPES } from "./course-registration-resolver";
 
 export type CourseEligibilityItem = {
   courseAssignmentId: string;
@@ -19,6 +20,7 @@ export type CourseEligibilityItem = {
   attendanceEligible: boolean;
   eligible: boolean;
   reason: string | null;
+  isBacklog?: boolean;
 };
 
 export type StudentEligibility = {
@@ -172,7 +174,12 @@ export const academicEligibility = {
     if (!student) return null;
 
     const registrations = await db.courseRegistration.findMany({
-      where: { studentId, academicTermId },
+      where: {
+        studentId,
+        academicTermId,
+        status: "ACTIVE",
+        registrationType: { in: [...REGULAR_ATTEMPT_REGISTRATION_TYPES] },
+      },
       include: { course: true },
     });
 
@@ -375,6 +382,8 @@ export const academicEligibility = {
     const registrations = await db.courseRegistration.findMany({
       where: {
         ...whereRegistrations,
+        status: "ACTIVE",
+        registrationType: { in: [...REGULAR_ATTEMPT_REGISTRATION_TYPES] },
         student:
           Object.keys(studentWhere).length > 0 ? studentWhere : undefined,
       } as Record<string, unknown>,

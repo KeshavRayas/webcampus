@@ -105,4 +105,12 @@ export class AdminCourseService {
   static getMappedFacultyForCourse(courseId: string) {
     return CourseService.getMappedFacultyForCourse(courseId);
   }
+
+  static listApprovedSupplementaryCandidates(params: {
+    departmentId: string;
+    parity?: "odd" | "even";
+    programType?: "UG" | "PG";
+  }) {
+    return CourseService.listApprovedSupplementaryCandidates(params);
+  }
 }

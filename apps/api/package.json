@@ -13,12 +13,13 @@
     "mock:admission-constants": "bun --env-file=../../.env run tsx scripts/seed-admission-constants.ts",
     "submit:mock-applicant": "bun --env-file=../../.env run tsx scripts/submit-mock-applicant.ts",
     "cleanup:mock-applicants": "bun --env-file=../../.env run tsx scripts/cleanup-mock-applicants.ts",
-    "rewrite:admission-usn": "bun --env-file=../../.env run tsx scripts/rewrite-admission-usn.ts",
-    "backfill:current-student-emails": "bun --env-file=../../.env run tsx scripts/backfill-current-student-emails.ts",
+    "backfill:qp-setup": "bun --env-file=../../.env run tsx scripts/qp-setup-backfill.ts",
     "check-types": "tsc --noEmit --pretty",
     "format:write": "prettier --write \"**/*.{ts,tsx,mdx}\" --cache",
     "format:check": "prettier --check \"**/*.{ts,tsx,mdx}\" --cache",
-    "bootstrap": "bun --env-file=../../.env tsx scripts/admin.ts"
+    "bootstrap": "bun --env-file=../../.env tsx scripts/admin.ts",
+    "courses:seed": "bun --env-file=../../.env run tsx scripts/create-courses.ts",
+    "courses:map-faculties": "bun --env-file=../../.env run tsx scripts/map-faculties.ts"
   },
   "devDependencies": {
     "@eslint/css": "^0.9.0",

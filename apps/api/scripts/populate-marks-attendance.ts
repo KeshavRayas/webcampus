@@ -16,6 +16,9 @@ import {
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const VERIFY_ONLY = process.argv.includes("--verify");
+const SESSIONS_PER_COURSE = 12;
+const PRESENT_RATE = 0.8;
+const WIPE_SESSIONS = true;
 const SEED = (() => {
   const flag = process.argv.find((arg) => arg.startsWith("--seed="));
   return flag ? Number(flag.split("=")[1]) : 42;
@@ -519,6 +522,224 @@ async function syncAttendanceBatch(
   stats.attendanceUpdated += updates.length;
 }
 
+async function syncSessionsBatch(
+  course: TargetCourse,
+  owner: OwnerRef,
+  studentIds: string[],
+  presentRate: number,
+  sessionCount: number
+) {
+  const courseRow = await db.course.findUnique({
+    where: { id: course.id },
+    select: { semesterId: true },
+  });
+  const semester = courseRow
+    ? await db.semester.findUnique({
+        where: { id: courseRow.semesterId },
+        select: { startDate: true, endDate: true },
+      })
+    : null;
+  const start = semester?.startDate
+    ? new Date(semester.startDate)
+    : new Date(Date.now() - 1000 * 60 * 60 * 24 * 30 * 4);
+  const end = semester?.endDate ? new Date(semester.endDate) : new Date();
+  const faculty = await db.faculty.findUnique({
+    where: { userId: owner.userId },
+    select: { id: true },
+  });
+  if (!faculty) return;
+  const assignments = await db.courseAssignment.findMany({
+    where: { courseId: course.id, facultyId: faculty.id },
+    select: { sectionId: true, batchId: true },
+  });
+  // Handle batch-managed PE/PW via electiveBatch
+  if (owner.electiveBatchId) {
+    const eb = await db.electiveBatch.findUnique({
+      where: { id: owner.electiveBatchId },
+      select: { id: true, sectionId: true },
+    });
+    if (eb) {
+      if (WIPE_SESSIONS) {
+        const toDel = await db.classSession.findMany({
+          where: {
+            courseId: course.id,
+            electiveBatchId: eb.id,
+            facultyId: faculty.id,
+            sessionDate: { gte: start, lte: end },
+          },
+          select: { id: true },
+        });
+        if (toDel.length > 0) {
+          await db.attendanceRecord.deleteMany({
+            where: { sessionId: { in: toDel.map((x) => x.id) } },
+          });
+          await db.classSession.deleteMany({
+            where: { id: { in: toDel.map((x) => x.id) } },
+          });
+        }
+      }
+      const dates: Date[] = [];
+      const totalMs = end.getTime() - start.getTime();
+      const step = totalMs / Math.max(1, sessionCount);
+      for (let i = 0; i < sessionCount; i++) {
+        const d = new Date(start.getTime() + i * step + step * 0.2);
+        d.setHours(9, 0, 0, 0);
+        dates.push(d);
+      }
+      let enrolled = studentIds;
+      const batchStudents = await db.electiveStudentAssignment.findMany({
+        where: { electiveBatchId: eb.id },
+        select: { studentId: true },
+      });
+      if (batchStudents.length > 0)
+        enrolled = batchStudents
+          .map((x) => x.studentId)
+          .filter((id) => studentIds.includes(id));
+      if (enrolled.length === 0) enrolled = studentIds;
+      for (let i = 0; i < dates.length; i++) {
+        const dVal = dates[i]!;
+        let sess = await db.classSession.findFirst({
+          where: {
+            courseId: course.id,
+            electiveBatchId: eb.id,
+            facultyId: faculty.id,
+            sessionDate: dVal,
+            timingCode: "T" + (i + 1),
+          },
+        });
+        if (!sess) {
+          sess = await db.classSession.create({
+            data: {
+              id: crypto.randomUUID(),
+              courseId: course.id,
+              sectionId: eb.sectionId || null,
+              facultyId: faculty.id,
+              electiveBatchId: eb.id,
+              sessionDate: dVal,
+              timingCode: "T" + (i + 1),
+              timingLabel: "09:00 - 10:00",
+              timingStartTime: "09:00",
+              timingEndTime: "10:00",
+            },
+          });
+        }
+        for (const sid of enrolled) {
+          const present = Math.random() < presentRate;
+          await db.attendanceRecord.upsert({
+            where: {
+              sessionId_studentId: { sessionId: sess.id, studentId: sid },
+            },
+            create: {
+              id: crypto.randomUUID(),
+              sessionId: sess.id,
+              studentId: sid,
+              status: present ? "PRESENT" : "ABSENT",
+            },
+            update: { status: present ? "PRESENT" : "ABSENT" },
+          });
+        }
+      }
+      return;
+    }
+  }
+  const targets = assignments.filter((a) => a.sectionId);
+  if (targets.length === 0) return;
+  for (const a of targets) {
+    if (WIPE_SESSIONS) {
+      const toDel = await db.classSession.findMany({
+        where: {
+          courseId: course.id,
+          sectionId: a.sectionId!,
+          facultyId: faculty.id,
+          sessionDate: { gte: start, lte: end },
+        },
+        select: { id: true },
+      });
+      if (toDel.length > 0) {
+        await db.attendanceRecord.deleteMany({
+          where: { sessionId: { in: toDel.map((x) => x.id) } },
+        });
+        await db.classSession.deleteMany({
+          where: { id: { in: toDel.map((x) => x.id) } },
+        });
+      }
+    }
+    const dates: Date[] = [];
+    const totalMs = end.getTime() - start.getTime();
+    const step = totalMs / Math.max(1, sessionCount);
+    for (let i = 0; i < sessionCount; i++) {
+      const d = new Date(start.getTime() + i * step + step * 0.2);
+      d.setHours(9, 0, 0, 0);
+      dates.push(d);
+    }
+    let enrolled = studentIds;
+    if (a.batchId) {
+      const b = await db.batch.findUnique({
+        where: { id: a.batchId },
+        select: { students: { select: { id: true } } },
+      });
+      if (b)
+        enrolled = b.students
+          .map((x) => x.id)
+          .filter((id) => studentIds.includes(id));
+      if (enrolled.length === 0) enrolled = studentIds;
+    } else {
+      const sec = await db.studentSection.findMany({
+        where: { sectionId: a.sectionId! },
+        select: { studentId: true },
+      });
+      if (sec.length > 0)
+        enrolled = sec
+          .map((x) => x.studentId)
+          .filter((id) => studentIds.includes(id));
+      if (enrolled.length === 0) enrolled = studentIds;
+    }
+    for (let i = 0; i < dates.length; i++) {
+      const dVal = dates[i]!;
+      let sess = await db.classSession.findFirst({
+        where: {
+          courseId: course.id,
+          sectionId: a.sectionId!,
+          facultyId: faculty.id,
+          sessionDate: dVal,
+          timingCode: "T" + (i + 1),
+        },
+      });
+      if (!sess) {
+        sess = await db.classSession.create({
+          data: {
+            id: crypto.randomUUID(),
+            courseId: course.id,
+            sectionId: a.sectionId!,
+            facultyId: faculty.id,
+            batchId: a.batchId || null,
+            sessionDate: dVal,
+            timingCode: "T" + (i + 1),
+            timingLabel: "09:00 - 10:00",
+            timingStartTime: "09:00",
+            timingEndTime: "10:00",
+          },
+        });
+      }
+      for (const sid of enrolled) {
+        const present = Math.random() < presentRate;
+        await db.attendanceRecord.upsert({
+          where: {
+            sessionId_studentId: { sessionId: sess.id, studentId: sid },
+          },
+          create: {
+            id: crypto.randomUUID(),
+            sessionId: sess.id,
+            studentId: sid,
+            status: present ? "PRESENT" : "ABSENT",
+          },
+          update: { status: present ? "PRESENT" : "ABSENT" },
+        });
+      }
+    }
+  }
+}
+
 interface RunStats {
   coursesScanned: number;
   coursesProcessed: number;
@@ -635,6 +856,14 @@ async function processOwnerCourse(
         rng,
         registrationByStudent,
         stats
+      );
+      const studentIds = [...tiers].map(([sid]) => sid);
+      await syncSessionsBatch(
+        course,
+        owner,
+        studentIds,
+        PRESENT_RATE,
+        SESSIONS_PER_COURSE
       );
     } catch (error) {
       stats.errors++;

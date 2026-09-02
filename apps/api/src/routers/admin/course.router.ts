@@ -5,6 +5,7 @@ import {
   AdminCourseByIdQuerySchema,
   AdminCreateCourseSchema,
   AdminDeleteCourseSchema,
+  AdminSupplementaryCandidatesQuerySchema,
   AdminUpdateCourseSchema,
 } from "@webcampus/schemas/admin";
 import { Router } from "express";
@@ -69,6 +70,18 @@ router.get(
     },
   }),
   AdminCourseController.getPeCapacitySummary
+);
+
+router.get(
+  "/supplementary-candidates",
+  validateRequest(AdminSupplementaryCandidatesQuerySchema, "query"),
+  protect({
+    role: "admin",
+    permissions: {
+      courses: ["read"],
+    },
+  }),
+  AdminCourseController.listSupplementaryCandidates
 );
 
 router.get(

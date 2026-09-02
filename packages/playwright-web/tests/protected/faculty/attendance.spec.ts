@@ -31,7 +31,7 @@ const getTakeAttendanceModal = (page: Page) =>
 
 const getEditAttendanceModal = (page: Page) =>
   page.getByRole("dialog").filter({
-    has: page.getByRole("heading", { name: "Edit Attendance Sessions" }),
+    has: page.getByRole("heading", { name: "Edit Attendance" }),
   });
 
 test.describe("Faculty attendance", () => {
@@ -43,7 +43,7 @@ test.describe("Faculty attendance", () => {
     await mockFacultyAttendanceApis(page, state);
     await authenticatedAsFaculty();
 
-    await page.goto("/faculty/attendance");
+    await page.goto("/faculty/attendance/take");
     await selectAttendanceSlot(page);
 
     const takeAttendanceModal = getTakeAttendanceModal(page);
@@ -62,7 +62,7 @@ test.describe("Faculty attendance", () => {
     ).toBeEnabled();
   });
 
-  test("loads existing session from edit attendance modal", async ({
+  test("loads existing session from the edit attendance page", async ({
     page,
     authenticatedAsFaculty,
   }) => {
@@ -79,33 +79,22 @@ test.describe("Faculty attendance", () => {
     await mockFacultyAttendanceApis(page, state);
     await authenticatedAsFaculty();
 
-    await page.goto("/faculty/attendance");
-    await selectAttendanceSlot(page);
-
-    await page.getByRole("button", { name: "Edit Attendance" }).click();
+    await page.goto("/faculty/attendance/edit");
 
     const editAttendanceModal = getEditAttendanceModal(page);
+    await expect(editAttendanceModal).toHaveCount(0);
+    await expect(page.getByText("CS301 - Algorithms").first()).toBeVisible();
+
+    await page.getByRole("button", { name: "Edit Attendance" }).first().click();
+
     await expect(editAttendanceModal).toBeVisible();
     await expect(
-      editAttendanceModal.getByRole("heading", {
-        name: "Edit Attendance Sessions",
-      })
+      editAttendanceModal.getByRole("heading", { name: "Edit Attendance" })
     ).toBeVisible();
-    await expect(
-      editAttendanceModal.getByRole("button", { name: "Edit Session" })
-    ).toBeVisible();
-
-    await editAttendanceModal
-      .getByRole("button", { name: "Edit Session" })
-      .click();
-
-    const takeAttendanceModal = getTakeAttendanceModal(page);
-    await expect(editAttendanceModal).toHaveCount(0);
-    await expect(takeAttendanceModal).toBeVisible();
-    await expect(takeAttendanceModal.getByText("Alice Johnson")).toBeVisible();
-    await expect(takeAttendanceModal.getByText("Bob Rao")).toBeVisible();
-    await expect(takeAttendanceModal.getByText("Present: 1")).toBeVisible();
-    await expect(takeAttendanceModal.getByText("Absent: 1")).toBeVisible();
+    await expect(editAttendanceModal.getByText("Alice Johnson")).toBeVisible();
+    await expect(editAttendanceModal.getByText("Bob Rao")).toBeVisible();
+    await expect(editAttendanceModal.getByText("Present: 1")).toBeVisible();
+    await expect(editAttendanceModal.getByText("Absent: 1")).toBeVisible();
   });
 
   test("saves attendance only when Save Attendance is clicked", async ({
@@ -116,7 +105,7 @@ test.describe("Faculty attendance", () => {
     await mockFacultyAttendanceApis(page, state);
     await authenticatedAsFaculty();
 
-    await page.goto("/faculty/attendance");
+    await page.goto("/faculty/attendance/take");
     await selectAttendanceSlot(page);
     await page.getByRole("button", { name: "Take Attendance" }).click();
 
@@ -154,7 +143,7 @@ test.describe("Faculty attendance", () => {
     await mockFacultyAttendanceApis(page, state);
     await authenticatedAsFaculty();
 
-    await page.goto("/faculty/attendance");
+    await page.goto("/faculty/attendance/take");
     await selectAttendanceSlot(page);
 
     // Open Take Attendance modal

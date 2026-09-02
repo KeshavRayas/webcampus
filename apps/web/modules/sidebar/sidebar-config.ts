@@ -160,6 +160,18 @@ export const sidebarConfig: Record<Role, SidebarData> = {
               url: "/admin/verification/settings",
             },
             {
+              name: "Promotion",
+              url: "/admin/promotion",
+            },
+            {
+              name: "Supplementary",
+              url: "/admin/supplementary",
+            },
+            {
+              name: "Exam Registrations",
+              url: "/admin/exam-registrations",
+            },
+            {
               name: "Feedback",
               url: "/admin/academics/feedback",
               children: [
@@ -263,7 +275,13 @@ export const sidebarConfig: Record<Role, SidebarData> = {
           name: "Courses",
           url: "/student/courses",
           icon: BookCopy,
-          children: [{ name: "Course Registration", url: "/student/courses" }],
+          children: [
+            { name: "Course Registration", url: "/student/courses" },
+            {
+              name: "Repeat & Exam Registrations",
+              url: "/student/registrations",
+            },
+          ],
         },
         {
           name: "Academics",

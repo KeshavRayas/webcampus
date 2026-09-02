@@ -7,7 +7,11 @@ import axios from "axios";
 const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
 export type HODAttendanceFilterOptions = {
-  academicTerms: { id: string; year: string; type: "odd" | "even" }[];
+  academicTerms: {
+    id: string;
+    year: string;
+    type: "odd" | "even" | "supplementary";
+  }[];
   semesters: {
     id: string;
     academicTermId: string;

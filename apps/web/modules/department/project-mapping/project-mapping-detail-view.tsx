@@ -232,9 +232,10 @@ export function ProjectMappingDetailView({
   });
 
   const facultyQuery = useQuery({
-    queryKey: ["course-assignment-faculty", basePath],
+    queryKey: ["course-assignment-faculty", basePath, "batch"],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<FacultyOption[]>>(facultyApi, {
+        params: { scope: "batch" },
         withCredentials: true,
       });
       return res.data.status === "success" ? res.data.data : [];
@@ -758,7 +759,9 @@ export function ProjectMappingDetailView({
               <SelectContent>
                 {facultyOptions.map((f) => (
                   <SelectItem key={f.id} value={f.id}>
-                    {f.name}
+                    {f.departmentAbbreviation
+                      ? `${f.name} (${f.departmentAbbreviation})`
+                      : f.name}
                   </SelectItem>
                 ))}
               </SelectContent>

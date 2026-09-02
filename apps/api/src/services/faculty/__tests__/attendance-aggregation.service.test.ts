@@ -77,6 +77,9 @@ const dbMock = {
       return rows;
     },
   },
+  courseRegistration: {
+    findFirst: async () => null,
+  },
   attendance: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findMany: async ({ where, distinct }: any) => {

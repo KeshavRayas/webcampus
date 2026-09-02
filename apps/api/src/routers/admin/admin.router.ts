@@ -10,11 +10,15 @@ import AdminCourseAssignmentRouter from "@webcampus/api/src/routers/admin/course
 import AdminCourseRouter from "@webcampus/api/src/routers/admin/course.router";
 import DepartmentRouter from "@webcampus/api/src/routers/admin/department.router";
 import ElectiveMappingRouter from "@webcampus/api/src/routers/admin/elective-mapping.router";
+import ExamRegistrationAdminRouter from "@webcampus/api/src/routers/admin/exam-registration.router";
+import PromotionRouter from "@webcampus/api/src/routers/admin/promotion.router";
+import ReRegistrationOfferingRouter from "@webcampus/api/src/routers/admin/re-registration-offering.router";
 import RegistrationTrackingRouter from "@webcampus/api/src/routers/admin/registration-tracking.router";
 import RegistrationWindowRouter from "@webcampus/api/src/routers/admin/registration-window.router";
 import SemesterRouter from "@webcampus/api/src/routers/admin/semester.router";
 import StudentProfileRouter from "@webcampus/api/src/routers/admin/student-profile.router";
 import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
+import SupplementaryRouter from "@webcampus/api/src/routers/admin/supplementary.router";
 import UserRouter from "@webcampus/api/src/routers/admin/user.router";
 import WhatsAppRouter from "@webcampus/api/src/routers/admin/whatsapp.router";
 import { Router } from "express";
@@ -53,6 +57,14 @@ router.use("/project-mapping", ProjectMappingRouter);
 router.use("/audit", AuditRouter);
 
 router.use("/registration-windows", RegistrationWindowRouter);
+
+router.use("/promotion", PromotionRouter);
+
+router.use("/re-registration-offering", ReRegistrationOfferingRouter);
+
+router.use("/supplementary", SupplementaryRouter);
+
+router.use("/exam-registration", ExamRegistrationAdminRouter);
 
 router.use("/registration-tracking", RegistrationTrackingRouter);
 

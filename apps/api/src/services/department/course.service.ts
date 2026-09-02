@@ -1082,6 +1082,57 @@ export class CourseService {
     };
   }
 
+  static async listApprovedSupplementaryCandidates(params: {
+    departmentId: string;
+    parity?: "odd" | "even";
+    programType?: "UG" | "PG";
+  }) {
+    const where: Record<string, unknown> = {
+      departmentId: params.departmentId,
+      approvalStatus: CourseApprovalStatus.APPROVED,
+    };
+
+    const semesterFilter: Record<string, unknown> = {};
+    if (params.parity === "odd") {
+      semesterFilter.semesterNumber = { in: [1, 3, 5, 7] };
+    } else if (params.parity === "even") {
+      semesterFilter.semesterNumber = { in: [2, 4, 6, 8] };
+    }
+    if (params.programType) {
+      semesterFilter.programType = params.programType;
+    }
+    if (Object.keys(semesterFilter).length > 0) {
+      where.semester = semesterFilter;
+    }
+
+    const courses = await prisma.course.findMany({
+      where: where as never,
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        courseType: true,
+        approvalStatus: true,
+        semester: { select: { semesterNumber: true, programType: true } },
+      },
+      orderBy: { code: "asc" },
+    });
+
+    return {
+      status: "success" as const,
+      message: "Supplementary candidates fetched successfully",
+      data: courses.map((c) => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        courseType: c.courseType,
+        approvalStatus: c.approvalStatus,
+        semesterNumber: c.semester.semesterNumber,
+        programType: c.semester.programType,
+      })),
+    };
+  }
+
   static async deleteCourse(id: string) {
     const existingCourse = await prisma.course.findUnique({
       where: { id },

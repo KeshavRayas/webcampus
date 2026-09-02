@@ -41,6 +41,15 @@ export const AdminCourseByIdQuerySchema = z
   })
   .superRefine(requireDepartmentIdOrName);
 
+export const AdminSupplementaryCandidatesQuerySchema = z.object({
+  departmentId: z.string().uuid("Invalid department ID"),
+  parity: z.enum(["odd", "even"]).optional(),
+  programType: z.enum(["UG", "PG"]).optional(),
+});
+export type AdminSupplementaryCandidatesQueryType = z.infer<
+  typeof AdminSupplementaryCandidatesQuerySchema
+>;
+
 export const AdminCreateCourseSchema = CreateCourseSchema;
 
 export const AdminUpdateCourseSchema = UpdateCourseSchema;

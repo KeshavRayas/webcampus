@@ -147,13 +147,15 @@ export class CourseAssignmentController {
   ): Promise<void> {
     try {
       const departmentContext = await getDepartmentRequestContext(req);
+      const { scope } = req.query as { scope?: string };
 
       const response = await CourseAssignmentService.getFacultyForMapping(
         departmentContext.userId,
         {
           requesterRole: "department",
           requestContext: departmentContext,
-        }
+        },
+        scope
       );
 
       if (response.status === "success") {

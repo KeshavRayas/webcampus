@@ -3,6 +3,7 @@ import {
   assertCanMutateAttendance,
   resolveFreezeState,
 } from "@webcampus/api/src/services/faculty/freeze.service";
+import { resolveActiveRegistration } from "@webcampus/api/src/services/shared/course-registration-resolver";
 import { buildRegistrationWhere } from "@webcampus/api/src/services/shared/registration-helper.service";
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
@@ -65,6 +66,12 @@ export class Attendance {
         data: {
           ...data,
           batchId: data.batchId ?? null,
+          courseRegistrationId: (
+            await resolveActiveRegistration({
+              studentId: data.studentId,
+              courseId: data.courseId,
+            })
+          )?.id,
         } as any,
       });
 
@@ -357,7 +364,6 @@ export class Attendance {
           where: buildRegistrationWhere({
             courseId,
             semesterId: course.semesterId,
-            academicTermId: course.semester.academicTermId,
             sectionId: sectionId ?? "",
             batchId: batchId ?? undefined,
           }),

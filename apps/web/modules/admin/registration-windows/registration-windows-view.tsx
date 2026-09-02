@@ -22,6 +22,7 @@ import { useMemo, useState } from "react";
 import {
   RegistrationWindowFilters,
   RegistrationWindowRow,
+  RegistrationWindowTypeValue,
   useCreateRegistrationWindow,
   useRegistrationWindows,
   useToggleRegistrationWindow,
@@ -36,6 +37,9 @@ type RegistrationWindowFilterState = {
   semesterId: string;
   departmentId: string;
   cycle: string;
+  registrationType: string;
+  startsAt: string;
+  endsAt: string;
 };
 
 const EMPTY_FILTERS: RegistrationWindowFilterState = {
@@ -43,6 +47,30 @@ const EMPTY_FILTERS: RegistrationWindowFilterState = {
   semesterId: "",
   departmentId: "",
   cycle: "",
+  registrationType: "",
+  startsAt: "",
+  endsAt: "",
+};
+
+const REGISTRATION_TYPE_OPTIONS = [
+  "REGULAR",
+  "RE_REGISTRATION",
+  "SUPPLEMENTARY",
+] as const;
+
+const REGISTRATION_TYPE_LABELS: Record<string, string> = {
+  REGULAR: "Regular",
+  RE_REGISTRATION: "Re-registration",
+  SUPPLEMENTARY: "Supplementary",
+};
+
+const formatWindowSchedule = (
+  startsAt: string | null,
+  endsAt: string | null
+) => {
+  const start = startsAt ? new Date(startsAt).toLocaleString() : "—";
+  const end = endsAt ? new Date(endsAt).toLocaleString() : "—";
+  return `${start} → ${end}`;
 };
 
 export const RegistrationWindowsView = () => {
@@ -95,6 +123,12 @@ export const RegistrationWindowsView = () => {
     ...(!isAppliedFirstYearUG && appliedFilters.departmentId
       ? { departmentId: appliedFilters.departmentId }
       : {}),
+    ...(appliedFilters.registrationType
+      ? {
+          registrationType:
+            appliedFilters.registrationType as RegistrationWindowTypeValue,
+        }
+      : {}),
   };
 
   const { data: windows = [], isLoading } = useRegistrationWindows(
@@ -133,6 +167,26 @@ export const RegistrationWindowsView = () => {
           label: `${semester.programType} - Semester ${semester.semesterNumber}`,
           value: semester.id,
         })),
+      },
+      {
+        key: "registrationType",
+        label: "Registration Type",
+        type: "select",
+        allOptionLabel: "All types",
+        options: REGISTRATION_TYPE_OPTIONS.map((type) => ({
+          label: REGISTRATION_TYPE_LABELS[type],
+          value: type,
+        })),
+      },
+      {
+        key: "startsAt",
+        label: "New Window Starts At",
+        type: "date",
+      },
+      {
+        key: "endsAt",
+        label: "New Window Ends At",
+        type: "date",
       },
     ];
 
@@ -187,6 +241,8 @@ export const RegistrationWindowsView = () => {
       ...draftFilters,
       departmentId: isFirstYearUG ? "" : draftFilters.departmentId,
       cycle: isFirstYearUG ? draftFilters.cycle : "",
+      startsAt: "",
+      endsAt: "",
     });
   };
 
@@ -203,6 +259,14 @@ export const RegistrationWindowsView = () => {
     createWindow({
       academicTermId: draftFilters.academicTermId,
       semesterId: draftFilters.semesterId,
+      registrationType: (draftFilters.registrationType ||
+        "REGULAR") as RegistrationWindowTypeValue,
+      ...(draftFilters.startsAt
+        ? { startsAt: new Date(draftFilters.startsAt).toISOString() }
+        : {}),
+      ...(draftFilters.endsAt
+        ? { endsAt: new Date(draftFilters.endsAt).toISOString() }
+        : {}),
       ...(isFirstYearUG && draftFilters.cycle
         ? { cycle: draftFilters.cycle as "PHYSICS" | "CHEMISTRY" }
         : {}),
@@ -248,6 +312,27 @@ export const RegistrationWindowsView = () => {
                 };
               }
 
+              if (key === "startsAt" || key === "endsAt") {
+                const next = { ...current, [key]: value };
+                if (!value) {
+                  return next;
+                }
+                const otherKey = key === "startsAt" ? "endsAt" : "startsAt";
+                const picked = new Date(value).getTime();
+                const other = current[otherKey];
+                const invalid =
+                  (key === "startsAt" &&
+                    !!other &&
+                    new Date(other).getTime() < picked) ||
+                  (key === "endsAt" &&
+                    !!other &&
+                    new Date(other).getTime() > picked);
+                if (invalid) {
+                  next[otherKey] = "";
+                }
+                return next;
+              }
+
               return { ...current, [key]: value };
             });
           }}
@@ -287,6 +372,8 @@ export const RegistrationWindowsView = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Instance Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Schedule</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -296,6 +383,15 @@ export const RegistrationWindowsView = () => {
                 <TableRow key={window.id}>
                   <TableCell className="font-medium">
                     {window.instanceName}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm">
+                      {REGISTRATION_TYPE_LABELS[window.registrationType] ??
+                        window.registrationType}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {formatWindowSchedule(window.startsAt, window.endsAt)}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">

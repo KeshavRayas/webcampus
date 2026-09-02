@@ -107,6 +107,26 @@ export const AdminCourseMappingView = () => {
     }
 
     const termType = selectedDraftTerm?.type;
+    const parity = (selectedDraftTerm as { parity?: string | null })?.parity;
+    if (termType === "supplementary") {
+      if (parity === "odd") {
+        return allSemestersForSelectedDraftTerm.filter(
+          (s) =>
+            !FIRST_YEAR_UG_SEMESTERS.has(s.semesterNumber) &&
+            s.semesterNumber % 2 === 1
+        );
+      }
+      if (parity === "even") {
+        return allSemestersForSelectedDraftTerm.filter(
+          (s) =>
+            !FIRST_YEAR_UG_SEMESTERS.has(s.semesterNumber) &&
+            s.semesterNumber % 2 === 0
+        );
+      }
+      return allSemestersForSelectedDraftTerm.filter(
+        (s) => !FIRST_YEAR_UG_SEMESTERS.has(s.semesterNumber)
+      );
+    }
     if (termType === "odd") {
       return allSemestersForSelectedDraftTerm.filter(
         (s) => s.semesterNumber >= 3 && s.semesterNumber % 2 === 1
@@ -125,6 +145,7 @@ export const AdminCourseMappingView = () => {
     allSemestersForSelectedDraftTerm,
     isFirstYearDepartment,
     selectedDraftTerm?.type,
+    (selectedDraftTerm as { parity?: string | null })?.parity,
   ]);
 
   const selectedDraftSemester = semesterOptions.find(
@@ -146,6 +167,7 @@ export const AdminCourseMappingView = () => {
     (term) => term.id === appliedFilters.termId
   );
   const academicYear = selectedAppliedTerm?.year ?? "";
+  const isSupplementaryTerm = selectedAppliedTerm?.type === "supplementary";
 
   const selectedAppliedDepartment = departments.find(
     (d) => d.id === appliedFilters.departmentId
@@ -469,6 +491,16 @@ export const AdminCourseMappingView = () => {
                 )}
               </div>
             </CourseDetailsCard>
+
+            {isSupplementaryTerm && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <span className="font-semibold">Supplementary term</span> — this
+                grid maps the supplementary host sections. Faculty was
+                auto-inherited from the original ODD/Even term when the SUP
+                section was created; you can reassign here. Both Admin and
+                Department Admin can edit (scoped to department).
+              </div>
+            )}
 
             <div className="bg-card text-card-foreground w-full overflow-hidden rounded-xl border shadow-sm">
               <div className="p-6">

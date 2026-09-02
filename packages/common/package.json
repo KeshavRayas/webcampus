@@ -7,7 +7,8 @@
     "./logger": "./src/logger.ts",
     "./dayjs": "./src/dayjs.ts",
     "./redis": "./src/redis.ts",
-    "./cache": "./src/cache.ts"
+    "./cache": "./src/cache.ts",
+    "./term-label": "./src/term-label.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit --pretty"

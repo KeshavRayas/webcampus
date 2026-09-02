@@ -545,7 +545,6 @@ export class FacultyAttendanceSessionService {
           where: buildRegistrationWhere({
             courseId: query.courseId,
             semesterId: assignmentContext.semesterId,
-            academicTermId: assignmentContext.academicTermId,
             sectionId: query.sectionId as string,
             batchId:
               assignmentContext.assignmentType === "LAB"
@@ -819,7 +818,6 @@ export class FacultyAttendanceSessionService {
         where: buildRegistrationWhere({
           courseId,
           semesterId: assignmentContext!.semesterId,
-          academicTermId: assignmentContext!.academicTermId,
           sectionId,
           batchId: batchId ?? undefined,
         }),

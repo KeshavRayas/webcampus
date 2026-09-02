@@ -1,4 +1,5 @@
 import { CourseApprovalStatus, db, Prisma } from "@webcampus/db";
+import { PINNED_REGISTRATION_TYPES } from "./course-registration-resolver";
 
 export type PeCapacityScope = {
   departmentId: string | null;
@@ -177,6 +178,8 @@ export class PeCapacityService {
     return tx.courseRegistration.count({
       where: {
         semesterId: scope.semesterId,
+        status: "ACTIVE",
+        registrationType: { in: [...PINNED_REGISTRATION_TYPES] },
         course: {
           courseType: "PE",
           ...(scope.departmentId ? { departmentId: scope.departmentId } : {}),
@@ -191,7 +194,11 @@ export class PeCapacityService {
     tx: TxClient = db
   ): Promise<number> {
     return tx.courseRegistration.count({
-      where: { courseId },
+      where: {
+        courseId,
+        status: "ACTIVE",
+        registrationType: { in: [...PINNED_REGISTRATION_TYPES] },
+      },
     });
   }
 
@@ -421,16 +428,23 @@ export class PeCapacityService {
     tx: TxClient = db
   ): Promise<boolean> {
     const registrations = await tx.courseRegistration.findMany({
-      where: { courseId },
+      where: {
+        courseId,
+        status: "ACTIVE",
+        registrationType: { in: [...PINNED_REGISTRATION_TYPES] },
+      },
       select: { studentId: true },
     });
     if (registrations.length === 0) {
       return true;
     }
+    const registeredStudents = new Set(
+      registrations.map((registration) => registration.studentId)
+    );
     const assigned = await tx.electiveStudentAssignment.count({
       where: { courseId },
     });
-    return assigned >= registrations.length;
+    return assigned >= registeredStudents.size;
   }
 
   static async assertPeDownstreamReady(

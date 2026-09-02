@@ -15,8 +15,6 @@ interface SemesterCourseBlockProps {
   semesterId: string;
   semesterNumber: number;
   courses: CourseResponseDTO[];
-  departmentType: string;
-  programType: string;
   selectedCycle: CourseCycle;
   isBasicSciences: boolean;
   isSemesterLocked: boolean;

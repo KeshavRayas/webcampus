@@ -1,8 +1,10 @@
 import { logger } from "@webcampus/common/logger";
 import { db } from "@webcampus/db";
 import { BaseResponse } from "@webcampus/types/api";
+import { preferAttemptScopedAssessments } from "../../shared/assessment-aggregation.loader";
 import { assertBatchBelongsToCourse } from "../../shared/batch-managed";
 import { isBatchManagedCourse } from "../../shared/course-kind";
+import { PINNED_REGISTRATION_TYPES } from "../../shared/course-registration-resolver";
 
 export class AdminMarksReportService {
   static async getMarksReport(
@@ -34,6 +36,8 @@ export class AdminMarksReportService {
         where: {
           courseId,
           semesterId: course.semesterId,
+          status: "ACTIVE",
+          registrationType: { in: [...PINNED_REGISTRATION_TYPES] },
           ...(sectionId && !isBatchManagedCourse(course.courseType)
             ? {
                 student: {
@@ -101,6 +105,12 @@ export class AdminMarksReportService {
         },
       });
 
+      markRecords.sort(
+        (a, b) =>
+          Number(a.courseRegistrationId !== null) -
+          Number(b.courseRegistrationId !== null)
+      );
+
       for (const mark of markRecords) {
         marksMap.set(mark.studentId, {
           cieTotal: mark.cieTotal,
@@ -109,7 +119,7 @@ export class AdminMarksReportService {
       }
 
       const assessmentMap = new Map(
-        studentAssessments.map((sa) => [
+        preferAttemptScopedAssessments(studentAssessments).map((sa) => [
           `${sa.studentId}_${sa.assessmentId}`,
           sa,
         ])

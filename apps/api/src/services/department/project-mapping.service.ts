@@ -56,6 +56,29 @@ function projectGroupName(sequence: number): string {
   return `G-${String(sequence).padStart(3, "0")}`;
 }
 
+/**
+ * Resolve the student's section relevant to a course. Students can hold
+ * multiple StudentSection rows across semesters, so prefer the row whose
+ * section belongs to the student's current semester; fall back to the first
+ * row only when no semester-scoped match exists.
+ */
+function resolveStudentSection<
+  S extends { id: string; semesterId?: string | null },
+>(student: {
+  semesterId?: string | null;
+  studentSections: Array<{ section: S }>;
+}): S | null {
+  const sections = student.studentSections ?? [];
+  if (sections.length === 0) return null;
+  if (student.semesterId) {
+    const scoped = sections.find(
+      (item) => item.section.semesterId === student.semesterId
+    );
+    if (scoped) return scoped.section;
+  }
+  return sections[0]?.section ?? null;
+}
+
 type SyncProjectGroupsParams = {
   tx: TxClient;
   courseId: string;
@@ -490,7 +513,15 @@ export class ProjectMappingService {
             select: { id: true, facultyAssignment: { select: { id: true } } },
           },
           _count: {
-            select: { registrations: true, electiveStudentAssignments: true },
+            select: {
+              registrations: {
+                where: {
+                  status: "ACTIVE",
+                  registrationType: { in: ["REGULAR", "RE_REGISTRATION"] },
+                },
+              },
+              electiveStudentAssignments: true,
+            },
           },
         },
         orderBy: { code: "asc" },
@@ -636,7 +667,10 @@ export class ProjectMappingService {
       studentId: string;
       student: {
         usn: string;
-        studentSections: Array<{ section: { id: string } }>;
+        semesterId: string | null;
+        studentSections: Array<{
+          section: { id: string; semesterId: string | null };
+        }>;
       };
     }>,
     registeredIds: Set<string>,
@@ -647,8 +681,12 @@ export class ProjectMappingService {
         "Every registered student must be assigned to a group before saving"
       );
     }
+    const registrationsByStudent = new Map(
+      registrations.map((reg) => [reg.studentId, reg])
+    );
     const assignedStudents = new Set<string>();
     const capacityCounts = new Map<string, number>();
+    const wrongSectionUsns: string[] = [];
     for (const row of assignments) {
       if (!registeredIds.has(row.studentId)) {
         throw new Error(
@@ -663,15 +701,13 @@ export class ProjectMappingService {
       }
       assignedStudents.add(row.studentId);
 
-      const reg = registrations.find((r) => r.studentId === row.studentId)!;
-      const section = reg.student.studentSections[0]?.section ?? null;
+      const reg = registrationsByStudent.get(row.studentId)!;
+      const section = resolveStudentSection(reg.student);
       const batch = batchMap.get(row.electiveBatchId)!;
 
       if (course.projectGroupingScope === "WITHIN_SECTION") {
         if (!section || !batch.sectionId || section.id !== batch.sectionId) {
-          throw new Error(
-            `Student ${reg.student.usn} cannot be placed in a group outside their section`
-          );
+          wrongSectionUsns.push(reg.student.usn);
         }
       }
 
@@ -682,6 +718,19 @@ export class ProjectMappingService {
           `Group ${batchMap.get(row.electiveBatchId)?.id ?? ""} exceeds the students-per-group limit of ${course.studentsPerBatch}`
         );
       }
+    }
+
+    // Report every violating row at once so users fixing an inverted draft do
+    // not have to rediscover the next offender on each save attempt.
+    if (wrongSectionUsns.length > 0) {
+      const preview = wrongSectionUsns.slice(0, 10).join(", ");
+      const more =
+        wrongSectionUsns.length > 10
+          ? ` (+${wrongSectionUsns.length - 10} more)`
+          : "";
+      throw new Error(
+        `${wrongSectionUsns.length} student(s) cannot be placed in a group outside their section: ${preview}${more}`
+      );
     }
   }
 
@@ -714,7 +763,6 @@ export class ProjectMappingService {
 
   private static async validateFacultyAssignments(
     courseId: string,
-    department: { id: string; type?: string | null },
     rows: ProjectFacultyAssignmentInput[],
     tx: TxClient = db
   ): Promise<Map<string, string>> {
@@ -737,6 +785,8 @@ export class ProjectMappingService {
     );
     const facultyById = new Map<string, string>();
     if (facultyIds.length > 0) {
+      // Project groups may be guided by faculty from any department, so only
+      // existence is validated here (no department ownership check).
       const facultyRecords = await tx.faculty.findMany({
         where: { id: { in: facultyIds } },
         select: { id: true, departmentId: true },
@@ -746,15 +796,6 @@ export class ProjectMappingService {
       }
       for (const record of facultyRecords) {
         facultyById.set(record.id, record.departmentId);
-      }
-      if (department.type !== "BASIC_SCIENCES") {
-        for (const facultyId of facultyIds) {
-          if (facultyById.get(facultyId) !== department.id) {
-            throw new Error(
-              `Faculty ${facultyId} does not belong to your department`
-            );
-          }
-        }
       }
     }
 
@@ -816,8 +857,13 @@ export class ProjectMappingService {
               id: true,
               usn: true,
               user: { select: { name: true } },
+              semesterId: true,
               studentSections: {
-                select: { section: { select: { id: true, name: true } } },
+                select: {
+                  section: {
+                    select: { id: true, name: true, semesterId: true },
+                  },
+                },
               },
             },
           },
@@ -836,7 +882,7 @@ export class ProjectMappingService {
         await PeCapacityService.hasAttendanceOrMarksForCourse(courseId);
 
       const students = registrations.map((reg) => {
-        const section = reg.student.studentSections[0]?.section ?? null;
+        const section = resolveStudentSection(reg.student);
         const batchId = assignmentByStudent.get(reg.student.id) ?? null;
         return {
           studentId: reg.student.id,
@@ -1094,8 +1140,13 @@ export class ProjectMappingService {
               id: true,
               usn: true,
               user: { select: { name: true } },
+              semesterId: true,
               studentSections: {
-                select: { section: { select: { id: true, name: true } } },
+                select: {
+                  section: {
+                    select: { id: true, name: true, semesterId: true },
+                  },
+                },
               },
             },
           },
@@ -1118,7 +1169,7 @@ export class ProjectMappingService {
             null,
         },
         members: members.map((m) => {
-          const section = m.student.studentSections[0]?.section ?? null;
+          const section = resolveStudentSection(m.student);
           return {
             studentId: m.student.id,
             usn: m.student.usn,
@@ -1245,7 +1296,6 @@ export class ProjectMappingService {
 
       await ProjectMappingService.validateFacultyAssignments(
         course.id,
-        department,
         payload.assignments
       );
 
@@ -1327,11 +1377,7 @@ export class ProjectMappingService {
         electiveBatchId: id,
         facultyId: payload.facultyId,
       }));
-      await ProjectMappingService.validateFacultyAssignments(
-        course.id,
-        department,
-        rows
-      );
+      await ProjectMappingService.validateFacultyAssignments(course.id, rows);
 
       const semester = course.semesterNumber;
       const academicYear = course.semester.academicTerm.year;
@@ -1415,7 +1461,6 @@ export class ProjectMappingService {
       );
       await ProjectMappingService.validateFacultyAssignments(
         course.id,
-        department,
         faculty
       );
 
@@ -1696,12 +1741,6 @@ export class ProjectMappingService {
         throw new Error("PW course not found");
       }
 
-      const dept = await db.department.findUnique({
-        where: { id: department.id },
-        select: { type: true },
-      });
-      const isBasicSciences = dept?.type === "BASIC_SCIENCES";
-
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(fileBuffer as unknown as ArrayBuffer);
       const worksheet = workbook.getWorksheet(1);
@@ -1747,8 +1786,10 @@ export class ProjectMappingService {
         registrations.map((r) => [r.student.usn.toUpperCase(), r])
       );
 
+      // Project guides may come from any department, so resolve names
+      // across the whole college.
       const facultyRecords = await db.faculty.findMany({
-        where: isBasicSciences ? {} : { departmentId: department.id },
+        where: {},
         select: {
           id: true,
           shortName: true,
@@ -1848,18 +1889,6 @@ export class ProjectMappingService {
                   message: `Row ${rowNumber}: Faculty "${facultyName}" matches multiple faculty records`,
                   value: facultyName,
                 });
-              } else if (
-                !isBasicSciences &&
-                (deduped[0] as { departmentId: string }).departmentId !==
-                  department.id
-              ) {
-                errors.push({
-                  row: rowNumber,
-                  column: "Faculty",
-                  code: "CROSS_DEPT_FACULTY",
-                  message: `Row ${rowNumber}: Faculty "${facultyName}" does not belong to your department`,
-                  value: facultyName,
-                });
               } else {
                 resolvedFacultyId = (deduped[0] as { id: string }).id;
               }
@@ -1902,7 +1931,7 @@ export class ProjectMappingService {
           }
 
           if (course.projectGroupingScope === "WITHIN_SECTION") {
-            const section = reg.student.studentSections[0]?.section ?? null;
+            const section = resolveStudentSection(reg.student);
             if (
               !section ||
               !batch.sectionId ||

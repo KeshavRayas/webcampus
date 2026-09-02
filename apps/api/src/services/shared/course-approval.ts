@@ -1,11 +1,8 @@
-import { CourseApprovalStatus } from "@webcampus/db";
+﻿import type { CourseApprovalStatus } from "@webcampus/db";
 
-export const ADMIN_VISIBLE_COURSE_STATUSES = [
-  CourseApprovalStatus.PENDING,
-  CourseApprovalStatus.APPROVED,
-] as const;
+export const ADMIN_VISIBLE_COURSE_STATUSES = ["PENDING", "APPROVED"] as const;
 
-export const FACULTY_COURSE_STATUS = CourseApprovalStatus.APPROVED;
+export const FACULTY_COURSE_STATUS = "APPROVED";
 
 export const COURSE_NOT_SUBMITTED_MESSAGE =
   "Course has not been submitted for approval.";

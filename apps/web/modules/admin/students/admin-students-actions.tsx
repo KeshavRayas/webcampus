@@ -44,7 +44,7 @@ type AdminStudentDetailResponse = {
   semesterId?: string | null;
   programType?: "UG" | "PG" | null;
   academicTermId?: string | null;
-  academicTermType?: "even" | "odd" | null;
+  academicTermType?: "even" | "odd" | "supplementary" | null;
   academicTermYear?: string | null;
   academicTermLabel?: string | null;
   user: {

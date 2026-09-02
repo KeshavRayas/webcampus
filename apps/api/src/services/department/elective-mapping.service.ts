@@ -17,6 +17,7 @@ import type {
   ValidateElectiveMappingCsvType,
 } from "@webcampus/schemas/department";
 import type { BaseResponse } from "@webcampus/types/api";
+import { PINNED_REGISTRATION_TYPES } from "../shared/course-registration-resolver";
 
 type MappingContext = {
   departmentId?: string;
@@ -92,7 +93,12 @@ export class ElectiveMappingService {
           },
           _count: {
             select: {
-              registrations: true,
+              registrations: {
+                where: {
+                  status: "ACTIVE",
+                  registrationType: { in: ["REGULAR", "RE_REGISTRATION"] },
+                },
+              },
               electiveStudentAssignments: true,
             },
           },
@@ -193,7 +199,11 @@ export class ElectiveMappingService {
       if (!course) throw new Error("PE course not found");
 
       const registrations = await db.courseRegistration.findMany({
-        where: { courseId },
+        where: {
+          courseId,
+          status: "ACTIVE",
+          registrationType: { in: [...PINNED_REGISTRATION_TYPES] },
+        },
         select: {
           studentId: true,
           student: {
@@ -530,12 +540,11 @@ export class ElectiveMappingService {
         );
       }
 
-      const existing = await db.courseRegistration.findUnique({
+      const existing = await db.courseRegistration.findFirst({
         where: {
-          studentId_courseId: {
-            studentId: payload.studentId,
-            courseId: fromCourse.id,
-          },
+          studentId: payload.studentId,
+          courseId: fromCourse.id,
+          status: "ACTIVE",
         },
       });
       if (!existing) {

@@ -183,9 +183,10 @@ export class AdminCourseAssignmentController {
     try {
       const requestingUserId =
         await AdminCourseAssignmentController.getRequestingUserId(req);
-      const { departmentId, departmentName } = req.query as {
+      const { departmentId, departmentName, scope } = req.query as {
         departmentId?: string;
         departmentName?: string;
+        scope?: string;
       };
 
       const response = await AdminCourseAssignmentService.getFacultyForMapping(
@@ -193,7 +194,8 @@ export class AdminCourseAssignmentController {
         {
           departmentId,
           departmentName: departmentId ? undefined : departmentName,
-        }
+        },
+        scope
       );
 
       if (response.status !== "success") {

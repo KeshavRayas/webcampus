@@ -775,7 +775,7 @@ describe("ProjectMappingService.saveFullMapping", () => {
     expect(deleteManyCalls).toHaveLength(0);
   });
 
-  test("rejects faculty from another department", async () => {
+  test("allows faculty from another department", async () => {
     const originalFindMany = dbMock.faculty.findMany;
     dbMock.faculty.findMany = async () => [
       { id: "f1", departmentId: "dept-cse" },
@@ -786,11 +786,11 @@ describe("ProjectMappingService.saveFullMapping", () => {
         ProjectMappingService.saveFullMapping(fullPayload, "user-dept", {
           requesterRole: "department",
         })
-      ).rejects.toThrow("Faculty f2 does not belong to your department");
+      ).resolves.toBeDefined();
     } finally {
       dbMock.faculty.findMany = originalFindMany;
     }
-    expect(deleteManyCalls).toHaveLength(0);
+    expect(deleteManyCalls).toHaveLength(2);
   });
 
   test("no-op skip is order-insensitive and produces no version bump or audit", async () => {

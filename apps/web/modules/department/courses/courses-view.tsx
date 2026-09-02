@@ -379,8 +379,6 @@ export const CoursesView: React.FC = () => {
               semesterId={selectedAppliedSemester.id}
               semesterNumber={selectedAppliedSemester.semesterNumber}
               courses={filteredCourses}
-              departmentType={departmentType}
-              programType={selectedAppliedSemester.programType}
               selectedCycle={appliedCycle}
               isBasicSciences={isBasicSciences}
               isSemesterLocked={isSemesterLocked}

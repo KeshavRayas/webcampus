@@ -1,5 +1,6 @@
 "use client";
 
+import { getTermLabel } from "@webcampus/common/term-label";
 import { AcademicTermResponseType } from "@webcampus/schemas/admin";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -89,7 +90,7 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
           <div>
             <div className="flex items-center gap-3">
               <CardTitle className="text-xl">
-                {term.type.toUpperCase()} {term.year}
+                {getTermLabel(term.type, term.year, term.parity).toUpperCase()}
               </CardTitle>
               <span
                 className={`rounded-full px-2 py-0.5 text-xs font-medium tracking-wide ${
@@ -154,7 +155,12 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
 
         {isExpanded && (
           <CardContent>
-            <AdminSemesterConfigForm termId={term.id} termType={term.type} />
+            <AdminSemesterConfigForm
+              termId={term.id}
+              termType={term.type}
+              parity={term.parity}
+              year={term.year}
+            />
           </CardContent>
         )}
       </Card>
@@ -164,9 +170,10 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
           <DialogHeader>
             <DialogTitle>Delete Academic Term</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {term.type.toUpperCase()}{" "}
-              {term.year}? This will safely drop all underlying semester
-              configurations. This action cannot be undone.
+              Are you sure you want to delete{" "}
+              {getTermLabel(term.type, term.year, term.parity)}? This will
+              safely drop all underlying semester configurations. This action
+              cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

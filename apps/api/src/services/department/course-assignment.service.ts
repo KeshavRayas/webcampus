@@ -200,51 +200,126 @@ export class CourseAssignmentService {
 
       const semester = await db.semester.findUnique({
         where: { id: semesterId },
+        include: { academicTerm: true },
       });
       const semesterNumber = semester?.semesterNumber;
+      const isSupplementaryTerm =
+        semester?.academicTerm.type === "supplementary";
 
-      const courses = await db.course.findMany({
-        where: {
-          semesterId,
-          department: {
-            is: {
-              id: department.id,
+      let courses: Array<{
+        id: string;
+        code: string;
+        name: string;
+        courseMode: string;
+        courseType: string;
+        cycle: string;
+        lectureCredits: number;
+        tutorialCredits: number;
+        practicalCredits: number;
+        assignments: { id: string }[];
+        electiveBatches: {
+          id: string;
+          facultyAssignment: {
+            id: string;
+            semester: number;
+            academicYear: string;
+          } | null;
+        }[];
+      }>;
+
+      if (isSupplementaryTerm && semester) {
+        // Supplementary term has no Course rows with this semesterId; list offerings' original courses.
+        // Assignments counted are those on SUP sections (section.semesterId = this sup host semester).
+        const offerings = await db.supplementaryCourseOffering.findMany({
+          where: {
+            academicTermId: semester.academicTermId,
+            course: {
+              departmentId: department.id,
+              ...(cycle && cycle !== "NONE"
+                ? { cycle: cycle as import("@webcampus/db").Cycle }
+                : {}),
             },
           },
-          ...(cycle && cycle !== "NONE"
-            ? { cycle: cycle as import("@webcampus/db").Cycle }
-            : {}),
-        },
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          courseMode: true,
-          courseType: true,
-          cycle: true,
-          lectureCredits: true,
-          tutorialCredits: true,
-          practicalCredits: true,
-          assignments: {
-            where: {
-              semester: {
-                in: semesterNumber != null ? [semesterNumber] : [],
+          select: {
+            course: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                courseMode: true,
+                courseType: true,
+                cycle: true,
+                lectureCredits: true,
+                tutorialCredits: true,
+                practicalCredits: true,
+                assignments: {
+                  where: {
+                    semester: {
+                      in: semesterNumber != null ? [semesterNumber] : [],
+                    },
+                    academicYear,
+                    section: { semesterId },
+                  },
+                  select: { id: true },
+                },
+                electiveBatches: {
+                  select: {
+                    id: true,
+                    facultyAssignment: {
+                      select: { id: true, semester: true, academicYear: true },
+                    },
+                  },
+                },
               },
-              academicYear,
             },
-            select: { id: true },
           },
-          electiveBatches: {
-            select: {
-              id: true,
-              facultyAssignment: {
-                select: { id: true, semester: true, academicYear: true },
+          orderBy: { course: { code: "asc" } },
+        });
+        courses = offerings.map((o) => o.course as (typeof courses)[number]);
+      } else {
+        courses = (await db.course.findMany({
+          where: {
+            semesterId,
+            department: {
+              is: {
+                id: department.id,
+              },
+            },
+            ...(cycle && cycle !== "NONE"
+              ? { cycle: cycle as import("@webcampus/db").Cycle }
+              : {}),
+          },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            courseMode: true,
+            courseType: true,
+            cycle: true,
+            lectureCredits: true,
+            tutorialCredits: true,
+            practicalCredits: true,
+            assignments: {
+              where: {
+                semester: {
+                  in: semesterNumber != null ? [semesterNumber] : [],
+                },
+                academicYear,
+              },
+              select: { id: true },
+            },
+            electiveBatches: {
+              select: {
+                id: true,
+                facultyAssignment: {
+                  select: { id: true, semester: true, academicYear: true },
+                },
               },
             },
           },
-        },
-        orderBy: { code: "asc" },
-      });
+          orderBy: { code: "asc" },
+        })) as typeof courses;
+      }
 
       const data = courses.map((course) => {
         if (isBatchManagedCourse(course.courseType)) {
@@ -632,18 +707,8 @@ export class CourseAssignmentService {
             throw new Error("One or more faculty records are invalid");
           }
 
-          // Q10: faculty must belong to the requesting department (same rule
-          // as the section branch). BASIC_SCIENCES departments may map faculty
-          // from all departments.
-          if (department.type !== "BASIC_SCIENCES") {
-            for (const record of facultyRecords) {
-              if (record.departmentId !== department.id) {
-                throw new Error(
-                  `Faculty ${record.id} does not belong to your department`
-                );
-              }
-            }
-          }
+          // Batch-managed courses (PE/OE/PW) may map faculty from any
+          // department, so no department ownership check here.
         }
 
         // PW only: the save must be rejected unless every active project group
@@ -1002,10 +1067,13 @@ export class CourseAssignmentService {
 
   /**
    * Get faculty list for the mapping comboboxes scoped to the resolved department.
+   * Batch-managed courses (PE/OE/PW) pass scope="batch" to allow mapping
+   * faculty from any department.
    */
   static async getFacultyForMapping(
     requestingUserId: string,
-    context?: MappingContext
+    context?: MappingContext,
+    scope?: string
   ): Promise<
     BaseResponse<{ id: string; name: string; departmentAbbreviation: string }[]>
   > {
@@ -1015,11 +1083,13 @@ export class CourseAssignmentService {
         context
       );
 
-      // BASIC_SCIENCES can view and map faculty from all departments
-      const whereClause: Prisma.FacultyWhereInput =
-        department.type === "BASIC_SCIENCES"
-          ? {}
-          : { departmentId: department.id };
+      // BASIC_SCIENCES can view and map faculty from all departments;
+      // batch-managed mappings (PE/OE/PW) are open to all departments too.
+      const includeAllDepartments =
+        department.type === "BASIC_SCIENCES" || scope === "batch";
+      const whereClause: Prisma.FacultyWhereInput = includeAllDepartments
+        ? {}
+        : { departmentId: department.id };
 
       const faculty = await db.faculty.findMany({
         where: whereClause,

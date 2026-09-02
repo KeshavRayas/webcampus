@@ -1,6 +1,7 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
+import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
@@ -43,6 +44,10 @@ export const CourseMappingView = () => {
   const isCourseLocked =
     selectedCourse?.approvalStatus === "PENDING" ||
     selectedCourse?.approvalStatus === "APPROVED";
+
+  const { data: termsData } = useAcademicTerms();
+  const appliedTerm = termsData?.find((t) => t.id === appliedFilters?.termId);
+  const isSupplementaryTerm = appliedTerm?.type === "supplementary";
 
   return (
     <div className="space-y-8">
@@ -88,6 +93,15 @@ export const CourseMappingView = () => {
         appliedFilters?.academicYear && (
           <div className="flex w-full flex-col gap-6">
             <CourseDetailsCard course={selectedCourse} />
+
+            {isSupplementaryTerm && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <span className="font-semibold">Supplementary term</span> — this
+                grid maps the supplementary host sections. Faculty was
+                auto-inherited from the original term when the SUP section was
+                created; you can reassign here.
+              </div>
+            )}
 
             <div className="bg-card text-card-foreground w-full overflow-hidden rounded-xl border shadow-sm">
               <div className="p-6">

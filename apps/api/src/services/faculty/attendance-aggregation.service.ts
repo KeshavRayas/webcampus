@@ -1,6 +1,7 @@
 import { logger } from "@webcampus/common/logger";
 import { db, type Prisma } from "@webcampus/db";
 import { BaseResponse } from "@webcampus/types/api";
+import { resolveActiveRegistration } from "../shared/course-registration-resolver";
 
 type DbLike = Prisma.TransactionClient | typeof db;
 
@@ -79,6 +80,29 @@ export class AttendanceAggregationService {
         condonationStatus: "NOT_REQUESTED",
       };
 
+      // K1: pin the aggregate to the student's active attempt (recency
+      // fallback when no term anchor exists, e.g. section-less PE sessions).
+      const registration = await resolveActiveRegistration(
+        { studentId, courseId },
+        tx
+      );
+      // Attempt-scoped aggregation: only sessions belonging to offerings of
+      // the same registration type feed the current attempt's totals, and the
+      // aggregate row is keyed to this attempt's pin so superseded attempts
+      // keep their historical aggregates untouched.
+      const attemptPin = registration?.id ?? null;
+      const attemptSectionScope: Prisma.ClassSessionWhereInput = {
+        OR: [
+          { Section: null },
+          {
+            Section: {
+              registrationType: (registration?.registrationType ??
+                "REGULAR") as "REGULAR" | "RE_REGISTRATION" | "SUPPLEMENTARY",
+            },
+          },
+        ],
+      };
+
       // 2. Aggregate each (batchId, electiveBatchId) pair independently
       for (const { batchId, electiveBatchId } of pairsToProcess.values()) {
         const [total, present] = await Promise.all([
@@ -87,7 +111,7 @@ export class AttendanceAggregationService {
               studentId,
               batchId,
               electiveBatchId,
-              ClassSession: { courseId },
+              ClassSession: { courseId, ...attemptSectionScope },
             },
           }),
           tx.attendanceRecord.count({
@@ -96,7 +120,7 @@ export class AttendanceAggregationService {
               batchId,
               electiveBatchId,
               status: "PRESENT",
-              ClassSession: { courseId },
+              ClassSession: { courseId, ...attemptSectionScope },
             },
           }),
         ]);
@@ -112,6 +136,9 @@ export class AttendanceAggregationService {
               courseId,
               batchId,
               electiveBatchId,
+              ...(attemptPin
+                ? { courseRegistrationId: attemptPin }
+                : { courseRegistrationId: null }),
             },
           });
           continue;
@@ -124,10 +151,14 @@ export class AttendanceAggregationService {
             courseId,
             batchId,
             electiveBatchId,
+            ...(attemptPin
+              ? { courseRegistrationId: attemptPin }
+              : { courseRegistrationId: null }),
           },
           select: {
             id: true,
             condonationStatus: true,
+            courseRegistrationId: true,
           },
         });
 
@@ -137,7 +168,17 @@ export class AttendanceAggregationService {
         if (existingAttendance) {
           await tx.attendance.update({
             where: { id: existingAttendance.id },
-            data: { total, present, absent, percentage },
+            data: {
+              total,
+              present,
+              absent,
+              percentage,
+              // Fill-if-null: never clobber an existing attempt pin.
+              courseRegistrationId:
+                existingAttendance.courseRegistrationId ??
+                registration?.id ??
+                undefined,
+            },
           });
         } else {
           await tx.attendance.create({
@@ -152,6 +193,7 @@ export class AttendanceAggregationService {
               absent,
               percentage,
               condonationStatus,
+              courseRegistrationId: registration?.id,
             },
           });
         }

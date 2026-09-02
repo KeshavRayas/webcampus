@@ -107,13 +107,17 @@ export const CourseMappingGrid = ({
 
   const sections = useMemo(() => rawSections ?? [], [rawSections]);
 
-  // Fetch faculty
+  // Fetch faculty. Batch-managed courses (PE/OE/PW) allow mapping faculty
+  // from any department.
   const { data: rawFaculty, isLoading: loadingFaculty } = useQuery({
-    queryKey: ["faculty-mappable"],
+    queryKey: ["faculty-mappable", isBatchManaged ? "batch" : "department"],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<FacultyData[]>>(
         `${assignmentBase}/faculty`,
-        { withCredentials: true }
+        {
+          params: isBatchManaged ? { scope: "batch" } : {},
+          withCredentials: true,
+        }
       );
       return res.data.status === "success" && res.data.data
         ? res.data.data

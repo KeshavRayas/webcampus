@@ -6,6 +6,7 @@ import {
   AcademicTermQueryType,
   CreateAcademicTermType,
   CreateSemesterConfigType,
+  UpdateAcademicTermType,
 } from "@webcampus/schemas/admin";
 import { Request, Response } from "express";
 
@@ -39,7 +40,7 @@ export class SemesterController {
   static async updateAcademicTerm(req: Request, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
-      const request: CreateAcademicTermType = req.body;
+      const request: UpdateAcademicTermType = req.body;
       const response = await SemesterService.updateAcademicTerm(id, request);
       if (response.status === "success") {
         sendResponse({
@@ -119,8 +120,20 @@ export class SemesterController {
     try {
       const academicTermId = req.params.id as string;
       const request: CreateSemesterConfigType[] = req.body;
+      const userId = req.requestContext?.userId;
+      if (!userId) {
+        return sendResponse({
+          res,
+          statusCode: 401,
+          status: "error",
+          message: ERRORS.UNAUTHORIZED,
+          error: ERRORS.UNAUTHORIZED,
+        });
+      }
+
       const response = await SemesterService.bulkUpsertSemesters(
         academicTermId,
+        userId,
         request
       );
       if (response.status === "success") {
@@ -136,7 +149,11 @@ export class SemesterController {
       logger.error({ error });
       return sendResponse({
         res,
-        statusCode: 400,
+        statusCode:
+          error instanceof Error &&
+          error.message === "Authenticated user not found"
+            ? 401
+            : 400,
         status: "error",
         message:
           error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,

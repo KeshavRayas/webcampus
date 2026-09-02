@@ -19,9 +19,7 @@ export const GetAdminStudentsQuerySchema = z.object({
   semesterId: optionalQueryString(z.string().uuid()),
   academicYear: optionalQueryString(z.string()),
   programType: optionalQueryString(z.enum(["UG", "PG"])),
-  currentSemester: optionalQueryString(
-    z.coerce.number().int().min(1).max(8)
-  ),
+  currentSemester: optionalQueryString(z.coerce.number().int().min(1).max(8)),
 });
 
 export const AdminStudentResponseSchema = z.object({
@@ -37,7 +35,10 @@ export const AdminStudentResponseSchema = z.object({
   semesterId: z.string().nullable().optional(),
   programType: z.enum(["UG", "PG"]).nullable().optional(),
   academicTermId: z.string().nullable().optional(),
-  academicTermType: z.enum(["even", "odd"]).nullable().optional(),
+  academicTermType: z
+    .enum(["even", "odd", "supplementary"])
+    .nullable()
+    .optional(),
   academicTermYear: z.string().nullable().optional(),
   academicTermLabel: z.string().nullable().optional(),
 });

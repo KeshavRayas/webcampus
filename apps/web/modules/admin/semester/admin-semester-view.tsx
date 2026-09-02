@@ -5,9 +5,11 @@ import {
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { getTermLabel } from "@webcampus/common/term-label";
 import {
   SemesterLifecycleStatusSchema,
   SemesterTypeSchema,
+  TermParitySchema,
 } from "@webcampus/schemas/admin";
 import { Button } from "@webcampus/ui/components/button"; // Add this import
 
@@ -33,11 +35,17 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
+import { ArrowRight, Check } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AdminTermCard } from "./admin-term-card";
+import {
+  ParityBadge,
+  ParityCardClasses,
+  ParitySemesterChips,
+} from "./parity-semesters";
 import { useAcademicTerms, useCreateAcademicTerm } from "./use-academic-term";
 
 type SemesterFilters = {
@@ -58,10 +66,21 @@ const normalizeFilters = (filters: SemesterFilters): SemesterFilters => ({
   year: filters.year || "",
 });
 
-const createSchema = z.object({
-  type: SemesterTypeSchema,
-  year: z.string().min(4, "Year is required"),
-});
+const createSchema = z
+  .object({
+    type: SemesterTypeSchema,
+    parity: TermParitySchema.optional(),
+    year: z.string().min(4, "Year is required"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "supplementary" && !data.parity) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["parity"],
+        message: "Select Odd or Even for a supplementary term",
+      });
+    }
+  });
 
 export const AdminSemesterView = () => {
   const router = useRouter();
@@ -204,7 +223,12 @@ export const AdminSemesterView = () => {
                   <FormItem>
                     <FormLabel>Type</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        if (value !== "supplementary") {
+                          form.setValue("parity", undefined);
+                        }
+                      }}
                       defaultValue={field.value}
                     >
                       <FormControl>
@@ -224,6 +248,76 @@ export const AdminSemesterView = () => {
                   </FormItem>
                 )}
               />
+
+              {form.watch("type") === "supplementary" && (
+                <FormField
+                  control={form.control}
+                  name="parity"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Supplementary Of</FormLabel>
+                      <div
+                        role="radiogroup"
+                        aria-label="Supplementary parity"
+                        className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                      >
+                        {TermParitySchema.options.map((option) => {
+                          const selected = field.value === option;
+                          return (
+                            <button
+                              key={option}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              className={ParityCardClasses({ selected })}
+                              onClick={() => field.onChange(option)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-base font-bold uppercase tracking-wide">
+                                  {option}
+                                </span>
+                                <ParityBadge />
+                                {selected && (
+                                  <span className="bg-primary text-primary-foreground ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full">
+                                    <Check className="h-3 w-3" />
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-2.5">
+                                <ParitySemesterChips parity={option} />
+                              </div>
+                              <p className="text-muted-foreground mt-2.5 text-xs">
+                                Covers exams for {option}-numbered semesters of
+                                the selected year.
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="bg-muted/30 flex flex-wrap items-center gap-2 rounded-md border border-dashed px-3 py-2.5 text-sm">
+                        <span className="text-muted-foreground">
+                          Will create
+                        </span>
+                        <ArrowRight className="text-muted-foreground h-3.5 w-3.5" />
+                        {field.value ? (
+                          <span className="font-semibold tracking-wide">
+                            {getTermLabel(
+                              "supplementary",
+                              form.watch("year"),
+                              field.value
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground italic">
+                            Pick a parity card to see the term label
+                          </span>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

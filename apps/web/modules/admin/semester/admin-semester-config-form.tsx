@@ -1,10 +1,10 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
 import { dayjs } from "@webcampus/common/dayjs";
 import {
   CreateSemesterConfigType,
   SemesterConfigResponseType,
+  TermParitySchema,
 } from "@webcampus/schemas/admin";
 import { Button } from "@webcampus/ui/components/button";
 import { Calendar } from "@webcampus/ui/components/calendar";
@@ -16,6 +16,8 @@ import {
 import { cn } from "@webcampus/ui/lib/utils";
 import { CalendarIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { PARITY_SEMESTERS, ParitySemesterChips } from "./parity-semesters";
+import { useUpdateAcademicTerm } from "./use-academic-term";
 import {
   useBulkUpsertSemesters,
   useSemestersByTerm,
@@ -24,16 +26,32 @@ import {
 export const AdminSemesterConfigForm = ({
   termId,
   termType,
+  parity,
+  year,
 }: {
   termId: string;
-  termType: "odd" | "even";
+  termType: "odd" | "even" | "supplementary";
+  parity?: "odd" | "even" | null;
+  year: string;
 }) => {
-  const { data: session } = authClient.useSession();
   const { data: existingSemesters, isLoading } = useSemestersByTerm(termId);
   const { mutate: bulkUpsert, isPending } = useBulkUpsertSemesters(termId);
+  const { mutate: updateTerm } = useUpdateAcademicTerm();
 
-  const ugNumbers = termType === "odd" ? [1, 3, 5, 7] : [2, 4, 6, 8];
-  const pgNumbers = termType === "odd" ? [1, 3] : [2, 4];
+  const oddNumbers = PARITY_SEMESTERS.odd;
+  const evenNumbers = PARITY_SEMESTERS.even;
+  const resolvedParity =
+    termType === "supplementary"
+      ? (parity ?? null)
+      : (termType as "odd" | "even");
+  const numbers =
+    resolvedParity === "odd"
+      ? oddNumbers
+      : resolvedParity === "even"
+        ? evenNumbers
+        : null;
+  const ugNumbers = numbers?.ug ?? [];
+  const pgNumbers = numbers?.pg ?? [];
 
   const currentYear = new Date().getFullYear();
 
@@ -83,8 +101,6 @@ export const AdminSemesterConfigForm = ({
   };
 
   const handleSave = () => {
-    if (!session?.user?.id) return;
-
     const payload: CreateSemesterConfigType[] = [];
     const newErrors: Record<string, string> = {};
     let hasErrors = false;
@@ -115,7 +131,6 @@ export const AdminSemesterConfigForm = ({
                 termType,
                 startDate,
                 endDate,
-                userId: session.user.id,
               });
             }
           }
@@ -194,8 +209,54 @@ export const AdminSemesterConfigForm = ({
       </div>
     );
 
+  if (termType === "supplementary" && !resolvedParity) {
+    return (
+      <div className="mt-4 space-y-3 rounded-md border border-dashed p-4">
+        <p className="text-muted-foreground text-sm">
+          This supplementary term was created before parity tracking and has no
+          Odd/Even scope set. Choose one to configure its semesters.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {TermParitySchema.options.map((option) => (
+            <Button
+              key={option}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-auto py-2"
+              disabled={isPending}
+              onClick={() =>
+                updateTerm({
+                  id: termId,
+                  data: { type: "supplementary", parity: option, year },
+                })
+              }
+            >
+              <span className="flex flex-col items-start gap-1.5">
+                <span className="font-semibold uppercase tracking-wide">
+                  {option} Supplementary
+                </span>
+                <ParitySemesterChips parity={option} />
+              </span>
+            </Button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-4 space-y-6 border-t pt-4">
+      {termType === "supplementary" &&
+        (resolvedParity === "odd" || resolvedParity === "even") && (
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-medium">
+            <span className="text-foreground font-semibold uppercase tracking-wide">
+              {resolvedParity} Supplementary
+            </span>
+            <span>hosts:</span>
+            <ParitySemesterChips parity={resolvedParity} />
+          </div>
+        )}
       <div>
         <h4 className="mb-3 font-semibold">Undergraduate (UG) Semesters</h4>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

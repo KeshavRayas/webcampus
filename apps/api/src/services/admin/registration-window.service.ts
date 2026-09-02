@@ -15,7 +15,10 @@ type RegistrationWindowWithRelations = {
   semesterId: string;
   departmentId: string | null;
   cycle: "PHYSICS" | "CHEMISTRY" | "NONE" | null;
+  registrationType: "REGULAR" | "RE_REGISTRATION" | "SUPPLEMENTARY";
   isOpen: boolean;
+  startsAt: Date | null;
+  endsAt: Date | null;
   academicTerm: Pick<AcademicTerm, "type" | "year">;
   semester: Pick<Semester, "semesterNumber" | "programType">;
   department: Pick<Department, "id" | "code" | "name"> | null;
@@ -31,7 +34,10 @@ export interface RegistrationWindowListItem {
   departmentId: string | null;
   departmentName: string | null;
   cycle: "PHYSICS" | "CHEMISTRY" | null;
+  registrationType: "REGULAR" | "RE_REGISTRATION" | "SUPPLEMENTARY";
   isOpen: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
   instanceName: string;
 }
 
@@ -80,7 +86,10 @@ export class RegistrationWindowService {
         window.cycle === "PHYSICS" || window.cycle === "CHEMISTRY"
           ? window.cycle
           : null,
+      registrationType: window.registrationType,
       isOpen: window.isOpen,
+      startsAt: window.startsAt?.toISOString() ?? null,
+      endsAt: window.endsAt?.toISOString() ?? null,
       instanceName: `${academicTermLabel} - Sem ${window.semester.semesterNumber} - ${RegistrationWindowService.getWindowScopeLabel(window)}`,
     };
   }
@@ -144,6 +153,9 @@ export class RegistrationWindowService {
           semesterId: query.semesterId,
           ...(query.departmentId ? { departmentId: query.departmentId } : {}),
           ...(query.cycle ? { cycle: query.cycle } : {}),
+          ...(query.registrationType
+            ? { registrationType: query.registrationType }
+            : {}),
         },
         include: {
           academicTerm: {
@@ -196,6 +208,7 @@ export class RegistrationWindowService {
           semesterId: input.semesterId,
           departmentId: input.departmentId ?? null,
           cycle: input.cycle ?? null,
+          registrationType: input.registrationType,
         },
         include: {
           academicTerm: { select: { type: true, year: true } },
@@ -218,6 +231,9 @@ export class RegistrationWindowService {
           semesterId: input.semesterId,
           departmentId: input.departmentId ?? null,
           cycle: input.cycle ?? null,
+          registrationType: input.registrationType,
+          startsAt: input.startsAt ? new Date(input.startsAt) : null,
+          endsAt: input.endsAt ? new Date(input.endsAt) : null,
         },
         include: {
           academicTerm: { select: { type: true, year: true } },

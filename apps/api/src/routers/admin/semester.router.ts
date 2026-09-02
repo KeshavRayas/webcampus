@@ -3,7 +3,8 @@ import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   AcademicTermQuerySchema,
   CreateAcademicTermSchema,
-  CreateSemesterConfigSchema,
+  CreateSemesterConfigListSchema,
+  UpdateAcademicTermSchema,
 } from "@webcampus/schemas/admin";
 import { Router } from "express";
 
@@ -23,7 +24,7 @@ router.post(
 
 router.put(
   "/:id",
-  validateRequest(CreateAcademicTermSchema),
+  validateRequest(UpdateAcademicTermSchema),
   protect({
     role: "admin",
     permissions: {
@@ -53,7 +54,7 @@ router.get(
 
 router.put(
   "/:id/semesters",
-  validateRequest(CreateSemesterConfigSchema.array()),
+  validateRequest(CreateSemesterConfigListSchema),
   protect({
     role: "admin",
     permissions: { semester: ["update"] },

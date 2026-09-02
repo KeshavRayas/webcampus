@@ -5,6 +5,7 @@ import { useAdmissionDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
+import { getTermLabel } from "@webcampus/common/term-label";
 import {
   admissionTypes,
   counsellingRounds,
@@ -696,7 +697,11 @@ export const ApplicantAdmissionView = ({
     .flatMap((term) =>
       (term.Semester ?? []).map((semester) => ({
         ...semester,
-        termLabel: `${term.type} ${term.year}`.toUpperCase(),
+        termLabel: getTermLabel(
+          term.type,
+          term.year,
+          term.parity
+        ).toUpperCase(),
       }))
     )
     .filter(
@@ -1376,8 +1381,6 @@ export const ApplicantAdmissionView = ({
       cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   };
-
-  
 
   const saveAndNext = (step: StepKey) => {
     const currentIndex = STEP_ORDER.indexOf(step);

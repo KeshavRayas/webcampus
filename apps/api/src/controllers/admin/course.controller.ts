@@ -8,6 +8,7 @@ import { db } from "@webcampus/db";
 import type {
   AdminCourseBranchQueryType,
   AdminCourseByIdQueryType,
+  AdminSupplementaryCandidatesQueryType,
 } from "@webcampus/schemas/admin";
 import type { UUIDType } from "@webcampus/schemas/common";
 import type {
@@ -398,6 +399,39 @@ export class AdminCourseController {
       });
     } catch (error) {
       logger.error("Error fetching admin mapped faculty", error);
+      sendResponse({
+        res,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+        statusCode: error instanceof Error ? 400 : 500,
+        error,
+      });
+    }
+  }
+
+  static async listSupplementaryCandidates(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { departmentId, parity, programType } =
+        req.query as AdminSupplementaryCandidatesQueryType;
+      const response =
+        await AdminCourseService.listApprovedSupplementaryCandidates({
+          departmentId,
+          parity,
+          programType,
+        });
+      sendResponse({
+        res,
+        status: "success",
+        statusCode: 200,
+        message: response.message,
+        data: response.data,
+      });
+    } catch (error) {
+      logger.error("Error fetching supplementary candidates", error);
       sendResponse({
         res,
         status: "error",

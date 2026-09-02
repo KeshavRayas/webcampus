@@ -2,11 +2,16 @@ import { readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { logger } from "@webcampus/common/logger";
+import { getTermLabel } from "@webcampus/common/term-label";
 import { db } from "@webcampus/db";
 import { hallTicketHtml } from "@webcampus/ui/lib/hall-ticket";
 import type { HallTicketTemplateData } from "@webcampus/ui/lib/hall-ticket-template";
 import { academicEligibility } from "./academic-eligibility.service";
-import type { StudentEligibility } from "./academic-eligibility.service";
+import type {
+  CourseEligibilityItem,
+  StudentEligibility,
+} from "./academic-eligibility.service";
+import { REGULAR_ATTEMPT_REGISTRATION_TYPES } from "./course-registration-resolver";
 import {
   buildQrPayload,
   hallTicketVerificationService,
@@ -84,6 +89,47 @@ type HallTicketWithAcademics = StudentEligibility & {
   blockReason?: string | null;
 };
 
+export type BacklogPaperRow = {
+  id: string;
+  courseId: string;
+  course: {
+    code: string;
+    name: string;
+    courseType: string;
+    totalCredits: number;
+  };
+};
+
+export type ReappearExamRegistrationRow = BacklogPaperRow & {
+  attemptNumber: number;
+};
+
+export function buildReappearPapers(
+  rows: readonly BacklogPaperRow[],
+  existingCourseIds: ReadonlySet<string>
+): CourseEligibilityItem[] {
+  const papers: CourseEligibilityItem[] = [];
+  for (const row of rows) {
+    if (existingCourseIds.has(row.courseId)) continue;
+    papers.push({
+      courseAssignmentId: row.id,
+      courseCode: row.course.code,
+      courseName: row.course.name,
+      courseType: row.course.courseType,
+      credits: row.course.totalCredits,
+      cieTotal: null,
+      attendancePercentage: null,
+      isFrozen: true,
+      markEligible: true,
+      attendanceEligible: true,
+      eligible: true,
+      reason: null,
+      isBacklog: true,
+    });
+  }
+  return papers;
+}
+
 export const hallTicketService = {
   async getStudentPeCourseIds(
     studentId: string,
@@ -93,6 +139,8 @@ export const hallTicketService = {
       where: {
         studentId,
         academicTermId,
+        status: "ACTIVE",
+        registrationType: { in: [...REGULAR_ATTEMPT_REGISTRATION_TYPES] },
         course: { courseType: { in: ["PE", "PW"] } },
       },
       select: { courseId: true },
@@ -128,6 +176,104 @@ export const hallTicketService = {
     }
   },
 
+  async getActiveRegistrationCourseIds(
+    studentIds: string[],
+    academicTermId: string
+  ): Promise<Map<string, Set<string>>> {
+    const regs = await db.courseRegistration.findMany({
+      where: {
+        studentId: { in: studentIds },
+        academicTermId,
+        status: "ACTIVE",
+        registrationType: { in: [...REGULAR_ATTEMPT_REGISTRATION_TYPES] },
+      },
+      select: { studentId: true, courseId: true },
+    });
+    const map = new Map<string, Set<string>>();
+    for (const reg of regs) {
+      const set = map.get(reg.studentId) ?? new Set<string>();
+      set.add(reg.courseId);
+      map.set(reg.studentId, set);
+    }
+    return map;
+  },
+
+  async getReappearExamRegistrations(
+    studentIds: string[],
+    academicTermId: string
+  ): Promise<Map<string, ReappearExamRegistrationRow[]>> {
+    const rows = await db.examRegistration.findMany({
+      where: {
+        studentId: { in: studentIds },
+        academicTermId,
+        examType: "REAPPEAR",
+        status: { not: "CANCELLED" },
+      },
+      orderBy: { attemptNumber: "asc" },
+      select: {
+        id: true,
+        studentId: true,
+        courseId: true,
+        attemptNumber: true,
+        course: {
+          select: {
+            code: true,
+            name: true,
+            courseType: true,
+            totalCredits: true,
+          },
+        },
+      },
+    });
+    const map = new Map<string, ReappearExamRegistrationRow[]>();
+    for (const row of rows) {
+      const list = map.get(row.studentId) ?? [];
+      list.push({
+        id: row.id,
+        courseId: row.courseId,
+        attemptNumber: row.attemptNumber,
+        course: row.course,
+      });
+      map.set(row.studentId, list);
+    }
+    return map;
+  },
+
+  async getActiveSupplementaryRegistrations(
+    studentIds: string[],
+    academicTermId: string
+  ): Promise<Map<string, BacklogPaperRow[]>> {
+    const rows = await db.courseRegistration.findMany({
+      where: {
+        studentId: { in: studentIds },
+        academicTermId,
+        status: "ACTIVE",
+        registrationType: "SUPPLEMENTARY",
+      },
+      orderBy: { registrationDate: "asc" },
+      select: {
+        id: true,
+        studentId: true,
+        courseId: true,
+        course: {
+          select: {
+            code: true,
+            name: true,
+            courseType: true,
+            totalCredits: true,
+          },
+        },
+      },
+    });
+    const map = new Map<string, BacklogPaperRow[]>();
+    for (const row of rows) {
+      const list = map.get(row.studentId) ?? [];
+      list.push({ id: row.id, courseId: row.courseId, course: row.course });
+      map.set(row.studentId, list);
+    }
+    return map;
+  },
+
   async list(
     filters: {
       departmentId?: string;
@@ -153,10 +299,10 @@ export const hallTicketService = {
 
     const term = await db.academicTerm.findUnique({
       where: { id: academicTermId },
-      select: { year: true, type: true },
+      select: { year: true, type: true, parity: true },
     });
     const academicTermLabel = term
-      ? `${term.type.toUpperCase()} ${term.year}`
+      ? getTermLabel(term.type, term.year, term.parity)
       : "N/A";
 
     const studentIds = eligibleStudents.map((s) => s.studentId);
@@ -189,7 +335,32 @@ export const hallTicketService = {
       }
     }
 
+    const activeCourseIds = await this.getActiveRegistrationCourseIds(
+      studentIds,
+      academicTermId
+    );
+    const reappearByStudent = await this.getReappearExamRegistrations(
+      studentIds,
+      academicTermId
+    );
+    const supplementaryByStudent =
+      await this.getActiveSupplementaryRegistrations(
+        studentIds,
+        academicTermId
+      );
+
     return eligibleStudents.map((student) => {
+      const backlogRows = [
+        ...(reappearByStudent.get(student.studentId) ?? []),
+        ...(supplementaryByStudent.get(student.studentId) ?? []),
+      ];
+      const exclude =
+        activeCourseIds.get(student.studentId) ??
+        new Set(student.courses.map((c) => c.courseAssignmentId));
+      const mergedCourses = [
+        ...student.courses,
+        ...buildReappearPapers(backlogRows, exclude),
+      ];
       const peReady = peReadyMap.get(student.studentId) ?? false;
       let blockReason: string | null = null;
       if (!student.allCoursesFrozen) {
@@ -205,6 +376,7 @@ export const hallTicketService = {
       }
       return {
         ...student,
+        courses: mergedCourses,
         academicTermLabel,
         isSent: sendMap.get(student.studentId)?.isSent ?? false,
         sentAt: sendMap.get(student.studentId)?.sentAt?.toISOString() ?? null,
@@ -367,7 +539,7 @@ export const hallTicketService = {
             sentAt: true,
             sentBy: true,
             verificationToken: true,
-            academicTerm: { select: { year: true, type: true } },
+            academicTerm: { select: { year: true, type: true, parity: true } },
           },
         })
       : await db.hallTicket.findFirst({
@@ -377,7 +549,7 @@ export const hallTicketService = {
             sentAt: true,
             sentBy: true,
             verificationToken: true,
-            academicTerm: { select: { year: true, type: true } },
+            academicTerm: { select: { year: true, type: true, parity: true } },
           },
         });
 
@@ -385,8 +557,33 @@ export const hallTicketService = {
       ? `${sendRecord.academicTerm.type.toUpperCase()} ${sendRecord.academicTerm.year}`
       : "N/A";
 
+    const activeCourseIds = await this.getActiveRegistrationCourseIds(
+      [studentId],
+      academicTermId
+    );
+    const reappearByStudent = await this.getReappearExamRegistrations(
+      [studentId],
+      academicTermId
+    );
+    const supplementaryByStudent =
+      await this.getActiveSupplementaryRegistrations(
+        [studentId],
+        academicTermId
+      );
+    const backlogRows = [
+      ...(reappearByStudent.get(studentId) ?? []),
+      ...(supplementaryByStudent.get(studentId) ?? []),
+    ];
+    const exclude =
+      activeCourseIds.get(studentId) ??
+      new Set(eligibility.courses.map((c) => c.courseAssignmentId));
+
     return {
       ...eligibility,
+      courses: [
+        ...eligibility.courses,
+        ...buildReappearPapers(backlogRows, exclude),
+      ],
       academicTermLabel: termLabel,
       isSent: sendRecord?.isSent ?? false,
       sentAt: sendRecord?.sentAt?.toISOString() ?? null,
@@ -426,6 +623,8 @@ export const hallTicketService = {
       where: {
         studentId,
         academicTermId,
+        status: "ACTIVE",
+        registrationType: { in: [...REGULAR_ATTEMPT_REGISTRATION_TYPES] },
         course: { courseType: { in: ["PE", "PW"] } },
       },
       select: { courseId: true },
@@ -506,6 +705,7 @@ export const hallTicketService = {
         markEligible: c.markEligible,
         attendanceEligible: c.attendanceEligible,
         eligible: c.eligible,
+        isBacklog: c.isBacklog,
         status: c.eligible ? ("ELIGIBLE" as const) : ("NOT_ELIGIBLE" as const),
       })),
       qrPayload,

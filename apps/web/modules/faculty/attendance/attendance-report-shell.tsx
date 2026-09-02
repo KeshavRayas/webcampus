@@ -22,7 +22,7 @@ import type { DetailedReportData } from "./attendance-report-types";
 type AcademicTermOption = {
   id: string;
   year: string;
-  type: "odd" | "even";
+  type: "odd" | "even" | "supplementary";
 };
 
 type SemesterOption = {

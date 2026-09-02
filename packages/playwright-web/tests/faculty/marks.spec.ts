@@ -44,6 +44,8 @@ test.describe("Faculty marks entry", () => {
     });
 
     const template = await createAssessmentTemplate(api, assessmentInput);
+    expect(template.id).toBeDefined();
+    expect(template.title).toBe(assessmentInput.title);
 
     const dbQuestions = await testDb.assessmentQuestion.findMany({
       where: { assessmentId: template.id },

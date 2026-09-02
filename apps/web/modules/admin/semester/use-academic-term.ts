@@ -6,6 +6,7 @@ import {
   AcademicTermResponseType,
   CreateAcademicTermType,
   SemesterLifecycleStatusType,
+  UpdateAcademicTermType,
 } from "@webcampus/schemas/admin";
 import {
   BaseResponse,
@@ -18,7 +19,7 @@ import { toast } from "react-toastify";
 export const useAcademicTerms = (
   filters?: {
     status?: SemesterLifecycleStatusType;
-    type?: "even" | "odd";
+    type?: "even" | "odd" | "supplementary";
     year?: string;
     isCurrent?: boolean;
   },
@@ -87,7 +88,7 @@ export const useUpdateAcademicTerm = () => {
       data,
     }: {
       id: string;
-      data: CreateAcademicTermType;
+      data: UpdateAcademicTermType;
     }) => {
       return await axios.put<SuccessResponse<AcademicTermResponseType>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/semester/${id}`,

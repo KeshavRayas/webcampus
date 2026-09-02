@@ -45,18 +45,29 @@ export class StudentMarksService {
         );
         const result = aggregationResults.get(student.id);
 
-        const mark = await db.mark.findUnique({
-          where: {
-            studentId_courseId: {
+        const mark =
+          (await db.mark.findFirst({
+            where: {
               studentId: student.id,
               courseId,
+              courseRegistrationId: registration.id,
             },
-          },
-          select: {
-            cieTotal: true,
-            status: true,
-          },
-        });
+            select: {
+              cieTotal: true,
+              status: true,
+            },
+          })) ??
+          (await db.mark.findFirst({
+            where: {
+              studentId: student.id,
+              courseId,
+              courseRegistrationId: null,
+            },
+            select: {
+              cieTotal: true,
+              status: true,
+            },
+          }));
 
         const assessments = await db.assessmentTemplate.findMany({
           where: {

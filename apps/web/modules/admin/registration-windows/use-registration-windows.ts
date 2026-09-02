@@ -6,6 +6,11 @@ import { BaseResponse, ErrorResponse } from "@webcampus/types/api";
 import axios, { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
+export type RegistrationWindowTypeValue =
+  | "REGULAR"
+  | "RE_REGISTRATION"
+  | "SUPPLEMENTARY";
+
 export interface RegistrationWindowRow {
   id: string;
   academicTermId: string;
@@ -16,7 +21,10 @@ export interface RegistrationWindowRow {
   departmentId: string | null;
   departmentName: string | null;
   cycle: "PHYSICS" | "CHEMISTRY" | null;
+  registrationType: RegistrationWindowTypeValue;
   isOpen: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
   instanceName: string;
 }
 
@@ -34,6 +42,17 @@ export interface RegistrationWindowFilters {
   semesterId: string;
   departmentId?: string;
   cycle?: "PHYSICS" | "CHEMISTRY";
+  registrationType?: RegistrationWindowTypeValue;
+}
+
+export interface CreateRegistrationWindowPayload {
+  academicTermId: string;
+  semesterId: string;
+  departmentId?: string;
+  cycle?: "PHYSICS" | "CHEMISTRY";
+  registrationType: RegistrationWindowTypeValue;
+  startsAt?: string;
+  endsAt?: string;
 }
 
 export const useRegistrationWindows = (
@@ -55,6 +74,9 @@ export const useRegistrationWindows = (
               ? { departmentId: filters.departmentId }
               : {}),
             ...(filters.cycle ? { cycle: filters.cycle } : {}),
+            ...(filters.registrationType
+              ? { registrationType: filters.registrationType }
+              : {}),
           },
           withCredentials: true,
         }
@@ -75,7 +97,7 @@ export const useCreateRegistrationWindow = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: RegistrationWindowFilters) => {
+    mutationFn: async (payload: CreateRegistrationWindowPayload) => {
       return axios.post<BaseResponse<RegistrationWindowRow>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/registration-windows`,
         payload,

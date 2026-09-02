@@ -399,12 +399,25 @@ export class SectionService {
         requestContext,
       });
 
+      const semester = await db.semester.findUnique({
+        where: { id: data.semesterId },
+        select: {
+          academicTermId: true,
+          academicTerm: { select: { type: true } },
+        },
+      });
+      const isSupplementaryTerm =
+        semester?.academicTerm.type === "supplementary";
+
       const section = await db.$transaction(async (tx) => {
         const created = await tx.section.create({
           data: {
             ...data,
             departmentId: resolvedDepartment.departmentId,
             departmentName: resolvedDepartment.departmentName,
+            ...(isSupplementaryTerm
+              ? { registrationType: "SUPPLEMENTARY" as const }
+              : {}),
           },
         });
         await ProjectMappingService.reconcileProjectGroupsForScope({
@@ -1519,13 +1532,15 @@ export class SectionService {
   static async promoteFirstYearSections(
     fromSemesterId: string,
     toSemesterId: string,
-    academicYear: string
+    academicYear: string,
+    tx?: Prisma.TransactionClient
   ): Promise<BaseResponse<Section[]>> {
     try {
-      const fromSemester = await db.semester.findUnique({
+      const client = tx ?? db;
+      const fromSemester = await client.semester.findUnique({
         where: { id: fromSemesterId },
       });
-      const toSemester = await db.semester.findUnique({
+      const toSemester = await client.semester.findUnique({
         where: { id: toSemesterId },
       });
       if (!fromSemester || !toSemester)
@@ -1539,8 +1554,8 @@ export class SectionService {
         );
       }
 
-      const sem1Sections = await db.section.findMany({
-        where: { semesterId: fromSemesterId },
+      const sem1Sections = await client.section.findMany({
+        where: { semesterId: fromSemesterId, registrationType: "REGULAR" },
         include: {
           studentSections: { select: { studentId: true } },
         },
@@ -1572,7 +1587,7 @@ export class SectionService {
           a.semesterId.localeCompare(b.semesterId)
       );
 
-      const createdSections = await db.$transaction(async (tx) => {
+      const runPromotion = async (trx: Prisma.TransactionClient) => {
         const newSections: Section[] = [];
 
         for (const oldSection of sem1Sections) {
@@ -1591,7 +1606,7 @@ export class SectionService {
               ? `P${oldSection.name.slice(1)}`
               : oldSection.name;
 
-          const newSection = await tx.section.create({
+          const newSection = await trx.section.create({
             data: {
               name: newName,
               departmentId: oldSection.departmentId,
@@ -1603,7 +1618,7 @@ export class SectionService {
 
           // Migrate students
           if (oldSection.studentSections.length > 0) {
-            await tx.studentSection.createMany({
+            await trx.studentSection.createMany({
               data: oldSection.studentSections.map((ss) => ({
                 studentId: ss.studentId,
                 sectionId: newSection.id,
@@ -1620,16 +1635,20 @@ export class SectionService {
         // groups are recalculated both where sections left and where they arrived.
         for (const scope of orderedScopes) {
           await ProjectMappingService.reconcileProjectGroupsForScope({
-            tx,
+            tx: trx,
             departmentId: scope.departmentId,
             semesterId: scope.semesterId,
           });
         }
 
         return newSections;
-      });
+      };
 
-      await invalidatePrefix("cache:section:");
+      const createdSections = await runPromotion(client);
+
+      if (!tx) {
+        await invalidatePrefix("cache:section:");
+      }
 
       return {
         status: "success",

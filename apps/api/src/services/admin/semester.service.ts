@@ -9,10 +9,21 @@ import {
   CreateSemesterConfigType,
   SemesterConfigResponseType,
   SemesterLifecycleStatusType,
+  UpdateAcademicTermType,
 } from "@webcampus/schemas/admin";
 import { UUIDType } from "@webcampus/schemas/common";
 import { BaseResponse } from "@webcampus/types/api";
 import { ArchiveService } from "./archive.service";
+
+function getTermDisplayName(
+  type: "even" | "odd" | "supplementary",
+  parity?: "odd" | "even" | null
+): string {
+  if (type === "supplementary" && parity) {
+    return parity === "odd" ? "Odd Supplementary" : "Even Supplementary";
+  }
+  return type;
+}
 
 export class SemesterService {
   private static getSemesterStatus(
@@ -68,7 +79,7 @@ export class SemesterService {
         error.code === "P2002"
       ) {
         throw new Error(
-          `Academic Term ${data.type} ${data.year} already exists`
+          `Academic Term ${getTermDisplayName(data.type, data.parity)} ${data.year} already exists`
         );
       }
       logger.error({ error });
@@ -78,7 +89,7 @@ export class SemesterService {
 
   static async updateAcademicTerm(
     id: string,
-    data: CreateAcademicTermType
+    data: UpdateAcademicTermType
   ): Promise<BaseResponse<AcademicTermResponseType>> {
     try {
       if (data.isCurrent === false) {
@@ -130,7 +141,7 @@ export class SemesterService {
         error.code === "P2002"
       ) {
         throw new Error(
-          `Academic Term ${data.type} ${data.year} already exists`
+          `Academic Term ${getTermDisplayName(data.type, data.parity)} ${data.year} already exists`
         );
       }
       if (
@@ -250,9 +261,41 @@ export class SemesterService {
 
   static async bulkUpsertSemesters(
     academicTermId: string,
+    userId: string,
     semesters: CreateSemesterConfigType[]
   ): Promise<BaseResponse<SemesterConfigResponseType[]>> {
     try {
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+      if (!user) {
+        throw new Error("Authenticated user not found");
+      }
+
+      const term = await db.academicTerm.findUnique({
+        where: { id: academicTermId },
+        select: { type: true, parity: true, year: true },
+      });
+
+      if (!term) {
+        throw new Error("Academic Term not found");
+      }
+
+      if (term.type === "supplementary" && term.parity) {
+        const mismatched = semesters.filter(
+          (semester) =>
+            semester.semesterNumber % 2 !== (term.parity === "odd" ? 1 : 0)
+        );
+        if (mismatched.length > 0) {
+          throw new Error(
+            `${term.parity === "odd" ? "Odd" : "Even"} Supplementary ${term.year} hosts ${
+              term.parity === "odd" ? "odd" : "even"
+            }-numbered semesters only`
+          );
+        }
+      }
+
       const upsertedSemesters = await db.$transaction(
         semesters.map((semester) => {
           return db.semester.upsert({
@@ -266,7 +309,7 @@ export class SemesterService {
             update: {
               startDate: semester.startDate,
               endDate: semester.endDate,
-              userId: semester.userId,
+              userId,
             },
             create: {
               academicTermId: semester.academicTermId,
@@ -274,7 +317,7 @@ export class SemesterService {
               semesterNumber: semester.semesterNumber,
               startDate: semester.startDate,
               endDate: semester.endDate,
-              userId: semester.userId,
+              userId,
             },
           });
         })
@@ -288,6 +331,10 @@ export class SemesterService {
       logger.info(response);
       return response;
     } catch (error) {
+      if (error instanceof Error) {
+        logger.error({ error: error.message });
+        throw error;
+      }
       logger.error({ error });
       throw new Error("Failed to bulk upsert semesters");
     }

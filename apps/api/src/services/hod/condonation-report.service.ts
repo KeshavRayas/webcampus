@@ -1,6 +1,7 @@
 import { logger } from "@webcampus/common/logger";
 import { Cycle, db } from "@webcampus/db";
 import { BaseResponse } from "@webcampus/types/api";
+import { PINNED_REGISTRATION_TYPES } from "../shared/course-registration-resolver";
 import { resolveHODDepartment } from "./resolve-hod-department";
 
 export class HODCondonationReportService {
@@ -52,7 +53,22 @@ export class HODCondonationReportService {
           student: {
             include: {
               user: true,
-              attendances: { where: { courseId: course.id } },
+              attendances: {
+                where: {
+                  courseId: course.id,
+                  OR: [
+                    { courseRegistrationId: null },
+                    {
+                      courseRegistration: {
+                        status: "ACTIVE",
+                        registrationType: {
+                          in: [...PINNED_REGISTRATION_TYPES],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
             },
           },
         },

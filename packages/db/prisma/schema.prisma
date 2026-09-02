@@ -23,6 +23,7 @@ model User {
   banReason             String?
   banExpires            DateTime?
   role                  String?
+  promotionsExecuted    StudentPromotion[]
   admin                 Admin?
   coe                   Coe?
   Department            Department[]
@@ -52,11 +53,17 @@ model User {
 model AcademicTerm {
   id                      String                   @id @default(uuid())
   type                    SemesterType
+  parity                  TermParity?
   year                    String
   isCurrent               Boolean                  @default(false)
+  startDate               DateTime?
+  endDate                 DateTime?
   Semester                Semester[]
   registrationWindows     RegistrationWindow[]
   courseRegistrations     CourseRegistration[]
+  examRegistrations       ExamRegistration[]
+  supplementaryCourseOfferings SupplementaryCourseOffering[]
+  promotions              StudentPromotion[]
   hallTickets             HallTicket[]
   feedbackQuestionSets    FeedbackQuestionSet[]
   feedbackRounds          FeedbackRound[]
@@ -65,7 +72,16 @@ model AcademicTerm {
   hallTicketVerificationSettings HallTicketVerificationSetting[]
   hallTicketVerificationLogs     HallTicketVerificationLog[]
 
-  @@unique([type, year])
+  // Uniqueness is DB-enforced by partial unique indexes (see migration
+  // supplementary_term_parity): (type, year) for regular odd/even terms and
+  // (year, parity) for supplementary terms with parity set. Prisma cannot
+  // express partial indexes, so they exist only in SQL.
+  @@index([type, year])
+}
+
+enum TermParity {
+  odd
+  even
 }
 
 model Semester {
@@ -81,6 +97,8 @@ model Semester {
   Admission              Admission[]
   Course                 Course[]
   courseRegistrations    CourseRegistration[]
+  promotionsFrom         StudentPromotion[]   @relation("PromotionFromSemester")
+  promotionsTo           StudentPromotion[]   @relation("PromotionToSemester")
   hallTickets            HallTicket[]
   feedbackQuestionSet    FeedbackQuestionSet?
   feedbackRounds         FeedbackRound[]
@@ -169,18 +187,21 @@ model Department {
 }
 
 model RegistrationWindow {
-  id             String  @id @default(uuid())
-  academicTermId String
-  semesterId     String
-  departmentId   String?
-  cycle          Cycle?
-  isOpen         Boolean @default(false)
+  id               String           @id @default(uuid())
+  academicTermId   String
+  semesterId       String
+  departmentId     String?
+  cycle            Cycle?
+  registrationType RegistrationType @default(REGULAR)
+  isOpen           Boolean          @default(false)
+  startsAt         DateTime?
+  endsAt           DateTime?
 
   academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
   semester     Semester     @relation(fields: [semesterId], references: [id], onDelete: Cascade)
   department   Department?  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
-  @@unique([academicTermId, semesterId, departmentId, cycle])
+  @@unique([academicTermId, semesterId, departmentId, cycle, registrationType])
   @@index([academicTermId, semesterId])
 }
 
@@ -233,6 +254,7 @@ model Section {
   departmentName  String?
   semesterId      String
   cycle           Cycle              @default(NONE)
+  registrationType RegistrationType @default(REGULAR)
   departmentId    String
   batches         Batch[]
   electiveBatches ElectiveBatch[]
@@ -242,11 +264,16 @@ model Section {
   semester        Semester           @relation(fields: [semesterId], references: [id])
   studentSections StudentSection[]
   timetableEntries TimetableEntry[]
+  supplementaryOffering SupplementaryCourseOffering? @relation(fields: [supplementaryOfferingId], references: [id], onDelete: SetNull)
+
+  supplementaryOfferingId String?
 
   @@unique([id, departmentId])
   @@unique([name, departmentId, semesterId])
   @@index([departmentId, semesterId])
   @@index([departmentId, semesterId, cycle])
+  @@index([registrationType])
+  @@index([supplementaryOfferingId])
 }
 
 /// *
@@ -299,6 +326,8 @@ model Student {
   attendances                Attendance[]
   AttendanceRecord           AttendanceRecord[]
   registrations              CourseRegistration[]
+  examRegistrations          ExamRegistration[]
+  promotions                 StudentPromotion[]
   assessments                StudentAssessment[]
   accounts                   Accounts[]
   hallTickets                HallTicket[]
@@ -513,6 +542,8 @@ model Course {
   coordinators            CourseCoordinator[]
   mappingAuditLogs        CourseMappingAuditLog[]
   registrations           CourseRegistration[]
+  examRegistrations       ExamRegistration[]
+  supplementaryOfferings  SupplementaryCourseOffering[]
   marks                   Mark[]
   studentAssessments      StudentAssessment[]
   electiveBatches            ElectiveBatch[]
@@ -673,23 +704,141 @@ enum ClassType {
   OTHER
 }
 
-model CourseRegistration {
-  id               String       @id @default(uuid())
-  studentId        String
-  courseId         String
-  semesterId       String
-  academicTermId   String
-  registrationDate DateTime     @default(now())
-  academicTerm     AcademicTerm @relation(fields: [academicTermId], references: [id])
-  course           Course       @relation(fields: [courseId], references: [id])
-  semester         Semester     @relation(fields: [semesterId], references: [id])
-  student          Student      @relation(fields: [studentId], references: [id])
+enum RegistrationType {
+  REGULAR
+  RE_REGISTRATION
+  SUPPLEMENTARY
+}
 
-  @@unique([studentId, courseId])
+enum RegistrationStatus {
+  ACTIVE
+  CANCELLED
+  SUPERSEDED
+}
+
+model CourseRegistration {
+  id                   String             @id @default(uuid())
+  studentId            String
+  courseId             String
+  semesterId           String
+  academicTermId       String
+  registrationType     RegistrationType   @default(REGULAR)
+  status               RegistrationStatus @default(ACTIVE)
+  sourceRegistrationId String?
+  registrationDate     DateTime           @default(now())
+  academicTerm         AcademicTerm       @relation(fields: [academicTermId], references: [id])
+  course               Course             @relation(fields: [courseId], references: [id])
+  semester             Semester           @relation(fields: [semesterId], references: [id])
+  student              Student            @relation(fields: [studentId], references: [id])
+  sourceRegistration   CourseRegistration?  @relation("RegistrationChain", fields: [sourceRegistrationId], references: [id], onDelete: SetNull)
+  derivedRegistrations CourseRegistration[] @relation("RegistrationChain")
+  examRegistrations    ExamRegistration[]
+  attendanceRecords    Attendance[]         @relation("AttendanceAttempt")
+  marks                Mark[]               @relation("MarkAttempt")
+  studentAssessments   StudentAssessment[]  @relation("StudentAssessmentAttempt")
+
+  @@unique([studentId, courseId, academicTermId, registrationType])
   @@index([studentId])
   @@index([courseId])
   @@index([semesterId])
   @@index([academicTermId])
+  @@index([sourceRegistrationId])
+}
+
+enum ExamType {
+  REGULAR
+  REAPPEAR
+  SUPPLEMENTARY
+  MAKE_UP
+}
+
+enum ExamRegistrationStatus {
+  REGISTERED
+  SEATED
+  RESULT_DECLARED
+  CANCELLED
+}
+
+enum CourseOutcome {
+  PENDING
+  P
+  F
+  NE
+  W
+  I
+  X
+}
+
+model ExamRegistration {
+  id                         String                 @id @default(uuid())
+  studentId                  String
+  courseId                   String
+  academicTermId             String
+  sourceCourseRegistrationId String?
+  examType                   ExamType
+  attemptNumber              Int                    @default(1)
+  status                     ExamRegistrationStatus @default(REGISTERED)
+  eligibleAtRegistration     Boolean
+  eligibilitySnapshot        Json?
+  seeMarks                   Float?
+  maxSeeMarks                Float?
+  outcome                    CourseOutcome          @default(PENDING)
+  registeredAt               DateTime               @default(now())
+
+  student                  Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course                   Course              @relation(fields: [courseId], references: [id])
+  academicTerm             AcademicTerm        @relation(fields: [academicTermId], references: [id])
+  sourceCourseRegistration CourseRegistration? @relation(fields: [sourceCourseRegistrationId], references: [id], onDelete: SetNull)
+
+  @@unique([studentId, courseId, academicTermId, examType])
+  @@index([studentId, academicTermId])
+  @@index([courseId])
+}
+
+model StudentPromotion {
+  id                 String   @id @default(uuid())
+  studentId          String
+  fromSemesterNumber Int
+  toSemesterNumber   Int
+  fromSemesterId     String?
+  toSemesterId       String?
+  academicTermId     String
+  promotedById       String
+  promotedAt         DateTime @default(now())
+  notes              String?
+
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id])
+  promotedBy   User         @relation(fields: [promotedById], references: [id])
+  fromSemester Semester?    @relation("PromotionFromSemester", fields: [fromSemesterId], references: [id])
+  toSemester   Semester?    @relation("PromotionToSemester", fields: [toSemesterId], references: [id])
+
+  @@unique([studentId, academicTermId, fromSemesterNumber])
+  @@index([academicTermId])
+}
+
+model SupplementaryCourseOffering {
+  id             String @id @default(uuid())
+  academicTermId String
+  courseId       String
+
+  academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+  course       Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sections     Section[]
+
+  @@unique([academicTermId, courseId])
+}
+
+model AcademicPolicyConfig {
+  id                         String      @id @default(uuid())
+  programType                ProgramType?
+  admissionYear              String?
+  maxTotalCredits            Int         @default(30)
+  maxSupplementaryCredits    Int         @default(16)
+  maxAttemptsBeforeAlternate Int         @default(4)
+  maxAttemptsTotal           Int         @default(5)
+
+  @@unique([programType, admissionYear])
 }
 
 model FeedbackQuestionSet {
@@ -820,46 +969,52 @@ model FeedbackAnswer {
 }
 
 model Attendance {
-  id                String            @id @default(uuid())
-  studentId         String
-  courseId          String
-  batchId           String? // lab batch (section-scoped)
-  electiveBatchId   String? // PE elective batch
-  total             Int
-  present           Int
-  absent            Int
-  condonationStatus CondonationStatus @default(NOT_REQUESTED)
-  percentage        Float
-  batch             Batch?            @relation(fields: [batchId], references: [id])
-  course            Course            @relation(fields: [courseId], references: [id])
-  student           Student           @relation(fields: [studentId], references: [id])
-  electiveBatch     ElectiveBatch?    @relation(fields: [electiveBatchId], references: [id])
+  id                  String            @id @default(uuid())
+  studentId           String
+  courseId            String
+  batchId             String? // lab batch (section-scoped)
+  electiveBatchId     String? // PE elective batch
+  total               Int
+  present             Int
+  absent              Int
+  condonationStatus   CondonationStatus @default(NOT_REQUESTED)
+  percentage          Float
+  courseRegistrationId String?
+  batch               Batch?            @relation(fields: [batchId], references: [id])
+  course              Course            @relation(fields: [courseId], references: [id])
+  student             Student           @relation(fields: [studentId], references: [id])
+  electiveBatch       ElectiveBatch?    @relation(fields: [electiveBatchId], references: [id])
+  courseRegistration  CourseRegistration? @relation("AttendanceAttempt", fields: [courseRegistrationId], references: [id], onDelete: SetNull)
 
-  @@unique([studentId, courseId, batchId, electiveBatchId])
+  @@index([studentId, courseId, batchId, electiveBatchId])
   @@index([courseId])
   @@index([batchId])
   @@index([electiveBatchId])
+  @@index([courseRegistrationId])
 }
 
 model Mark {
-  id        String            @id @default(uuid())
-  studentId String
-  courseId  String
-  cie1      Float?
-  cie2      Float?
-  cie3      Float?
-  aat1      Float?
-  aat2      Float?
-  lab1      Float?
-  lab2      Float?
-  labTotal  Float?
-  cieTotal  Float?
-  status    EligibilityStatus
-  course    Course            @relation(fields: [courseId], references: [id])
-  student   Student           @relation(fields: [studentId], references: [id])
+  id                   String            @id @default(uuid())
+  studentId            String
+  courseId             String
+  cie1                 Float?
+  cie2                 Float?
+  cie3                 Float?
+  aat1                 Float?
+  aat2                 Float?
+  lab1                 Float?
+  lab2                 Float?
+  labTotal             Float?
+  cieTotal             Float?
+  status               EligibilityStatus
+  courseRegistrationId String?
+  course               Course              @relation(fields: [courseId], references: [id])
+  student              Student             @relation(fields: [studentId], references: [id])
+  courseRegistration   CourseRegistration? @relation("MarkAttempt", fields: [courseRegistrationId], references: [id], onDelete: SetNull)
 
-  @@unique([studentId, courseId])
+  @@index([studentId, courseId])
   @@index([courseId])
+  @@index([courseRegistrationId])
 }
 
 model Coe {
@@ -1301,18 +1456,21 @@ model AssessmentQuestion {
 }
 
 model StudentAssessment {
-  id            String                @id @default(uuid())
-  studentId     String
-  assessmentId  String
-  courseId      String
-  totalMarks    Float
-  status        String                @default("PRESENT")
-  assessment    AssessmentTemplate    @relation(fields: [assessmentId], references: [id])
-  course        Course                @relation(fields: [courseId], references: [id])
-  student       Student               @relation(fields: [studentId], references: [id])
-  questionMarks StudentQuestionMark[]
+  id                   String   @id @default(uuid())
+  studentId            String
+  assessmentId         String
+  courseId             String
+  totalMarks           Float
+  status               String   @default("PRESENT")
+  courseRegistrationId String?
+  assessment           AssessmentTemplate    @relation(fields: [assessmentId], references: [id])
+  course               Course                @relation(fields: [courseId], references: [id])
+  student              Student               @relation(fields: [studentId], references: [id])
+  courseRegistration   CourseRegistration?   @relation("StudentAssessmentAttempt", fields: [courseRegistrationId], references: [id], onDelete: SetNull)
+  questionMarks        StudentQuestionMark[]
 
-  @@unique([studentId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@index([courseRegistrationId])
 }
 
 model StudentQuestionMark {
@@ -1452,6 +1610,7 @@ enum DepartmentScopedRole {
 enum SemesterType {
   even
   odd
+  supplementary
 }
 
 enum ProgramType {
@@ -1635,6 +1794,7 @@ enum AuditEntityType {
   BATCH
   ASSESSMENT
   STUDENT_PROFILE
+  PROMOTION
 }
 
 enum AuditAction {
@@ -1643,6 +1803,7 @@ enum AuditAction {
   DELETE_MAPPING
   UPDATE_COORDINATOR
   UPDATE_STUDENT_PROFILE
+  PROMOTE_STUDENT
 }
 
 // ─── ARCHIVE TABLES ───

@@ -9,11 +9,22 @@ const optionalQueryString = <T extends z.ZodTypeAny>(schema: T) =>
 
 export const RegistrationWindowCycleSchema = z.enum(["PHYSICS", "CHEMISTRY"]);
 
+export const RegistrationWindowTypeSchema = z.enum([
+  "REGULAR",
+  "RE_REGISTRATION",
+  "SUPPLEMENTARY",
+]);
+
+const optionalIsoDateTime = z
+  .string("Invalid date")
+  .refine((value) => !Number.isNaN(Date.parse(value)), "Invalid date");
+
 export const GetRegistrationWindowsQuerySchema = z.object({
   academicTermId: z.uuid("Invalid academic term ID"),
   semesterId: z.uuid("Invalid semester ID"),
   departmentId: optionalQueryString(z.uuid("Invalid department ID")),
   cycle: optionalQueryString(RegistrationWindowCycleSchema),
+  registrationType: optionalQueryString(RegistrationWindowTypeSchema),
 });
 
 export const CreateRegistrationWindowSchema = z
@@ -22,6 +33,9 @@ export const CreateRegistrationWindowSchema = z
     semesterId: z.uuid("Invalid semester ID"),
     departmentId: z.uuid("Invalid department ID").optional(),
     cycle: RegistrationWindowCycleSchema.optional(),
+    registrationType: RegistrationWindowTypeSchema.default("REGULAR"),
+    startsAt: optionalIsoDateTime.optional(),
+    endsAt: optionalIsoDateTime.optional(),
   })
   .superRefine((value, ctx) => {
     if (value.departmentId && value.cycle) {
@@ -29,6 +43,13 @@ export const CreateRegistrationWindowSchema = z
         code: z.ZodIssueCode.custom,
         path: ["departmentId"],
         message: "Select either a department or a cycle for a window scope",
+      });
+    }
+    if (value.startsAt && value.endsAt && value.endsAt < value.startsAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endsAt"],
+        message: "Window end date must be after the start date",
       });
     }
   });
@@ -47,6 +68,9 @@ export const RegistrationWindowCoursesParamsSchema = z.object({
 
 export type RegistrationWindowCycleType = z.infer<
   typeof RegistrationWindowCycleSchema
+>;
+export type RegistrationWindowTypeType = z.infer<
+  typeof RegistrationWindowTypeSchema
 >;
 export type GetRegistrationWindowsQueryType = z.infer<
   typeof GetRegistrationWindowsQuerySchema

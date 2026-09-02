@@ -6,6 +6,7 @@ import type {
   MessageScope,
   SendConfigType,
 } from "@webcampus/schemas/admin";
+import { PINNED_REGISTRATION_TYPES } from "../../shared/course-registration-resolver";
 import {
   formatNumber,
   renderMessageBody,
@@ -256,6 +257,8 @@ export async function resolveTargets(
     const registrations = await db.courseRegistration.findMany({
       where: {
         studentId: { in: activeStudentIds },
+        status: "ACTIVE",
+        registrationType: { in: [...PINNED_REGISTRATION_TYPES] },
         ...(semesterId ? { semesterId } : {}),
         ...(config.subjectIds && config.subjectIds.length > 0
           ? { courseId: { in: config.subjectIds } }

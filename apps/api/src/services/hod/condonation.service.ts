@@ -7,6 +7,7 @@ import type {
 } from "@webcampus/schemas/hod";
 import { MAX_CONDONATION, MIN_CONDONATION } from "@webcampus/schemas/hod";
 import type { BaseResponse } from "@webcampus/types/api";
+import { PINNED_REGISTRATION_TYPES } from "../shared/course-registration-resolver";
 
 export class HODCondonationService {
   private static async resolveHODDepartmentName(
@@ -33,6 +34,8 @@ export class HODCondonationService {
         where: {
           academicTermId: filters.academicTermId,
           semesterId: filters.semesterId,
+          status: "ACTIVE",
+          registrationType: { in: [...PINNED_REGISTRATION_TYPES] },
           ...(filters.courseId ? { courseId: filters.courseId } : {}),
           course: {
             department: { name: departmentName },

@@ -1,10 +1,10 @@
 import { expect, type Page, type Route } from "@playwright/test";
+import { test } from "../../fixtures/auth";
 import {
   facultyHandlingAssignmentsMock,
   facultyHandlingLabAssignmentsMock,
   facultyHandlingStudentsMock,
 } from "../../mocks/faculty-handling";
-import { test } from "../../fixtures/auth";
 
 const mockHandlingApis = async ({ page }: { page: Page }) => {
   await page.route("**/admin/semester**", async (route: Route) => {
@@ -80,23 +80,22 @@ test.describe("Faculty handling", () => {
     await page.getByRole("link", { name: "Lab" }).click();
     await page.waitForURL("**/faculty/handling/lab");
 
-    await expect(page.getByRole("heading", { name: "Handling Lab" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Handling Lab" })
+    ).toBeVisible();
   });
 
   test("persists filters in query params", async ({ page }) => {
     await page.goto("/faculty/handling/courses");
 
-    await page.locator('#courses-handling-search').fill('algo');
-    await page.locator('#courses-handling-section').fill('A');
+    await page.locator("#courses-handling-search").fill("algo");
     await page.getByRole("button", { name: "Apply" }).click();
 
     await expect(page).toHaveURL(/search=algo/);
-    await expect(page).toHaveURL(/section=A/);
 
     await page.reload();
 
-    await expect(page.locator('#courses-handling-search')).toHaveValue('algo');
-    await expect(page.locator('#courses-handling-section')).toHaveValue('A');
+    await expect(page.locator("#courses-handling-search")).toHaveValue("algo");
   });
 
   test("opens students drill-down from assignment row", async ({ page }) => {
@@ -105,7 +104,9 @@ test.describe("Faculty handling", () => {
     await page.getByRole("cell", { name: "CS301" }).click();
 
     await expect(page.getByRole("dialog")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Assigned Students" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Assigned Students" })
+    ).toBeVisible();
     await expect(page.getByRole("cell", { name: "1BM22CS001" })).toBeVisible();
   });
 });

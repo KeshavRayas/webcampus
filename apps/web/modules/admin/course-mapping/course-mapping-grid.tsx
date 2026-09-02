@@ -111,12 +111,20 @@ export const AdminCourseMappingGrid = ({
   const sections = useMemo(() => rawSections ?? [], [rawSections]);
 
   const { data: rawFaculty, isLoading: loadingFaculty } = useQuery({
-    queryKey: ["admin-mapping-faculty", departmentId],
+    queryKey: [
+      "admin-mapping-faculty",
+      departmentId,
+      isBatchManaged ? "batch" : "department",
+    ],
     queryFn: async () => {
       const res = await axios.get<BaseResponse<FacultyData[]>>(
         `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment/faculty`,
         {
-          params: { departmentId, departmentName },
+          params: {
+            departmentId,
+            departmentName,
+            ...(isBatchManaged ? { scope: "batch" } : {}),
+          },
           withCredentials: true,
         }
       );

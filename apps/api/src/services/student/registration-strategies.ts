@@ -112,7 +112,11 @@ export const peRegistrationStrategy: RegistrationStrategy = {
         peCourse.studentsPerBatch
       );
       const registeredCount = await tx.courseRegistration.count({
-        where: { courseId: course.id },
+        where: {
+          courseId: course.id,
+          status: "ACTIVE",
+          registrationType: { in: ["REGULAR", "RE_REGISTRATION"] },
+        },
       });
       if (isPeFull(capacity, registeredCount)) {
         throw new Error(

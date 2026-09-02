@@ -12,6 +12,20 @@ test.describe("Seed data verification", () => {
     expect(cs!.name).toBe("Computer Science and Engineering");
   });
 
+  test("GET /admin/department returns seeded departments (not stale cache)", async ({
+    page,
+  }) => {
+    const res = await page.request.get(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080"}/admin/department`
+    );
+    expect(res.ok()).toBeTruthy();
+    const body = await res.json();
+    const departments = body?.data ?? [];
+    const codes = departments.map((d: { code?: string }) => d.code) as string[];
+    expect(codes).toContain("CS");
+    expect(codes).toContain("FY");
+  });
+
   test("mock_start seeded faculty", async () => {
     const faculties = await testDb.faculty.findMany({
       where: { employeeId: { in: ["CS001", "FY001", "CE001"] } },
@@ -35,15 +49,15 @@ test.describe("Seed data verification", () => {
   });
 
   test("mock_start seeded admission users", async () => {
-    const admissionAdmin = await testDb.user.findFirst({
-      where: { email: "admission.admin@webcampus.com" },
+    const admissionUser = await testDb.user.findFirst({
+      where: { email: "admission@webcampus.com" },
     });
-    const admissionReviewer = await testDb.user.findFirst({
-      where: { email: "admission.reviewer@webcampus.com" },
+    const admissionInstructor = await testDb.user.findFirst({
+      where: { email: "admission-instructor@webcampus.com" },
     });
-    expect(admissionAdmin).toBeDefined();
-    expect(admissionReviewer).toBeDefined();
-    expect(admissionAdmin!.role).toBe("admission_admin");
-    expect(admissionReviewer!.role).toBe("admission_reviewer");
+    expect(admissionUser).toBeDefined();
+    expect(admissionInstructor).toBeDefined();
+    expect(admissionUser!.role).toBe("admission");
+    expect(admissionInstructor!.role).toBe("admission-instructor");
   });
 });

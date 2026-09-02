@@ -75,7 +75,7 @@ export type FacultyHandlingFilterOptionsDTO = {
   academicTerms: {
     id: string;
     year: string;
-    type: "odd" | "even";
+    type: "odd" | "even" | "supplementary";
   }[];
   semesters: {
     id: string;

@@ -69,12 +69,20 @@ export class AdminCourseAssignmentService {
     });
   }
 
-  static getFacultyForMapping(requestingUserId: string, context: AdminContext) {
-    return CourseAssignmentService.getFacultyForMapping(requestingUserId, {
-      departmentId: context.departmentId,
-      departmentName: context.departmentName,
-      requesterRole: "admin",
-    });
+  static getFacultyForMapping(
+    requestingUserId: string,
+    context: AdminContext,
+    scope?: string
+  ) {
+    return CourseAssignmentService.getFacultyForMapping(
+      requestingUserId,
+      {
+        departmentId: context.departmentId,
+        departmentName: context.departmentName,
+        requesterRole: "admin",
+      },
+      scope
+    );
   }
 
   static getSectionsForMapping(

@@ -10,9 +10,24 @@ const eligMock = {
   getCourseEligibility: mock<() => Promise<unknown>>(async () => null),
 };
 
+const PE_REGISTRATION_ROW = {
+  courseId: "course-pe",
+  id: "reg-1",
+  studentId: "s1",
+  course: {
+    code: "CS101",
+    name: "Course PE",
+    courseType: "PE",
+    totalCredits: 3,
+  },
+};
+
 const dbMock = {
   courseRegistration: {
-    findMany: async () => [{ courseId: "course-pe" }],
+    findMany: async () => [PE_REGISTRATION_ROW],
+  },
+  examRegistration: {
+    findMany: async () => [],
   },
   academicTerm: {
     findUnique: async () => ({ year: 2026, type: "ODD" }),
@@ -144,30 +159,30 @@ describe("hall-ticket PE completeness gate", () => {
   });
 });
 
+const PW_REGISTRATION_ROW = {
+  ...PE_REGISTRATION_ROW,
+  courseId: "course-pw",
+  id: "reg-2",
+};
+
 describe("hall-ticket PW PDF gate", () => {
   beforeEach(() => {
     gateMock.mockImplementation(async () => {});
     eligMock.getCourseEligibility.mockImplementation(
       async () => FROZEN_STUDENT
     );
-    dbMock.courseRegistration.findMany = async () => [
-      { courseId: "course-pe" },
-    ];
+    dbMock.courseRegistration.findMany = async () => [PE_REGISTRATION_ROW];
   });
 
   it("generatePdfHtml succeeds for a fully ready PW course", async () => {
-    dbMock.courseRegistration.findMany = async () => [
-      { courseId: "course-pw" },
-    ];
+    dbMock.courseRegistration.findMany = async () => [PW_REGISTRATION_ROW];
 
     const html = await hallTicketService.generatePdfHtml("s1", "term-1");
     expect(html).toContain("<html>");
   });
 
   it("generatePdfHtml is blocked when a PW course is not downstream ready", async () => {
-    dbMock.courseRegistration.findMany = async () => [
-      { courseId: "course-pw" },
-    ];
+    dbMock.courseRegistration.findMany = async () => [PW_REGISTRATION_ROW];
     gateMock.mockImplementation(async () => {
       throw new Error(GATE_MESSAGE);
     });

@@ -61,6 +61,7 @@ scripts/dev.sh
 # Generated MCP / debug artifacts
 .playwright-mcp/
 .serena/
+.lavish/
 screenshots/
 
 packages/db/data/*
@@ -70,6 +71,7 @@ packages/db/data/minio/*
 
 AGENTS.md
 .cursor
+FEATURE_DEPENDENCIES.md
 
 # Local deployment plan
 plan.md

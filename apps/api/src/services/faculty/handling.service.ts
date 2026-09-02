@@ -62,7 +62,7 @@ type FacultyHandlingFilterOptionsDTO = {
   academicTerms: {
     id: string;
     year: string;
-    type: "odd" | "even";
+    type: "odd" | "even" | "supplementary";
   }[];
   semesters: {
     id: string;
@@ -1081,9 +1081,13 @@ export class FacultyHandlingService {
                 return yearComparison;
               }
 
-              const termPriority: Record<"odd" | "even", number> = {
+              const termPriority: Record<
+                "odd" | "even" | "supplementary",
+                number
+              > = {
                 odd: 0,
                 even: 1,
+                supplementary: 2,
               };
 
               return termPriority[a.type] - termPriority[b.type];
@@ -1316,7 +1320,11 @@ export class FacultyHandlingService {
 
       studentConditions.push({
         registrations: {
-          some: { courseId: assignment.course.id },
+          some: {
+            courseId: assignment.course.id,
+            status: "ACTIVE",
+            registrationType: { in: ["REGULAR", "RE_REGISTRATION"] },
+          },
         },
       });
 

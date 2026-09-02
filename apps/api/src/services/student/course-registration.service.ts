@@ -10,6 +10,7 @@ import {
   StudentRegistrationContext,
 } from "@webcampus/api/src/services/student/registration-strategies";
 import { logger } from "@webcampus/common/logger";
+import { getTermLabel } from "@webcampus/common/term-label";
 import { db, Prisma } from "@webcampus/db";
 import {
   AvailableCurriculumType,
@@ -80,10 +81,6 @@ export class CourseRegistration {
     };
   }
 
-  private static getTermLabel(type: "even" | "odd", year: string): string {
-    return `${type.charAt(0).toUpperCase() + type.slice(1)} ${year}`;
-  }
-
   private static getSemesterLabel(
     programType: "UG" | "PG",
     semesterNumber: number
@@ -142,6 +139,7 @@ export class CourseRegistration {
         semesterId: student.semesterId,
         departmentId: scope.departmentId,
         cycle: scope.cycle,
+        registrationType: "REGULAR",
       },
       select: { isOpen: true },
     });
@@ -156,6 +154,7 @@ export class CourseRegistration {
         semesterId: student.semesterId,
         departmentId: null,
         cycle: null,
+        registrationType: "REGULAR",
       },
       select: { isOpen: true },
     });
@@ -215,7 +214,14 @@ export class CourseRegistration {
           },
         },
         _count: {
-          select: { registrations: true },
+          select: {
+            registrations: {
+              where: {
+                status: "ACTIVE",
+                registrationType: { in: ["REGULAR", "RE_REGISTRATION"] },
+              },
+            },
+          },
         },
       },
       orderBy: { code: "asc" },
@@ -291,7 +297,7 @@ export class CourseRegistration {
           }),
           db.academicTerm.findUnique({
             where: { id: student.academicTermId },
-            select: { type: true, year: true },
+            select: { type: true, parity: true, year: true },
           }),
           this.getRegistrationWindowState(student),
           db.courseRegistration.findMany({
@@ -306,6 +312,7 @@ export class CourseRegistration {
               academicTerm: {
                 select: {
                   type: true,
+                  parity: true,
                   year: true,
                 },
               },
@@ -340,9 +347,10 @@ export class CourseRegistration {
               registration.semester.programType,
               registration.semester.semesterNumber
             ),
-            academicTermLabel: this.getTermLabel(
+            academicTermLabel: getTermLabel(
               registration.academicTerm.type,
-              registration.academicTerm.year
+              registration.academicTerm.year,
+              registration.academicTerm.parity
             ),
             courseCount: 0,
             registrationDate: registration.registrationDate.toISOString(),
@@ -358,7 +366,8 @@ export class CourseRegistration {
       const hasRegistered = registrations.some(
         (registration) =>
           registration.semesterId === student.semesterId &&
-          registration.academicTermId === student.academicTermId
+          registration.academicTermId === student.academicTermId &&
+          registration.registrationType === "REGULAR"
       );
 
       return {
@@ -372,9 +381,10 @@ export class CourseRegistration {
               currentSemester.programType,
               currentSemester.semesterNumber
             ),
-            academicTermLabel: this.getTermLabel(
+            academicTermLabel: getTermLabel(
               currentTerm.type,
-              currentTerm.year
+              currentTerm.year,
+              currentTerm.parity
             ),
             isWindowOpen,
             hasRegistered,
@@ -435,6 +445,7 @@ export class CourseRegistration {
               studentId: student.id,
               semesterId: student.semesterId,
               academicTermId: student.academicTermId,
+              registrationType: "REGULAR",
             },
           }),
           this.getApprovedInstanceCourses(student),
@@ -586,6 +597,7 @@ export class CourseRegistration {
           academicTerm: {
             select: {
               type: true,
+              parity: true,
               year: true,
             },
           },
@@ -627,9 +639,10 @@ export class CourseRegistration {
               reg.semester.programType,
               reg.semester.semesterNumber
             ),
-            academicTermLabel: this.getTermLabel(
+            academicTermLabel: getTermLabel(
               reg.academicTerm.type,
-              reg.academicTerm.year
+              reg.academicTerm.year,
+              reg.academicTerm.parity
             ),
             courses: [],
             totalCredits: 0,

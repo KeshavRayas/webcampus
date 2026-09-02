@@ -1,9 +1,11 @@
 import { logger } from "@webcampus/common/logger";
 import { Cycle, db } from "@webcampus/db";
 import { BaseResponse } from "@webcampus/types/api";
+import { preferAttemptScopedAssessments } from "../shared/assessment-aggregation.loader";
 import { assertBatchBelongsToCourse } from "../shared/batch-managed";
 import { FACULTY_COURSE_STATUS } from "../shared/course-approval";
 import { isBatchManagedCourse } from "../shared/course-kind";
+import { PINNED_REGISTRATION_TYPES } from "../shared/course-registration-resolver";
 import { resolveHODDepartment } from "./resolve-hod-department";
 
 export class HODMarksReportService {
@@ -242,6 +244,8 @@ export class HODMarksReportService {
         where: {
           courseId,
           semesterId: course.semesterId,
+          status: "ACTIVE",
+          registrationType: { in: [...PINNED_REGISTRATION_TYPES] },
           ...(sectionId && !isBatchManagedCourse(course.courseType)
             ? {
                 student: {
@@ -311,6 +315,12 @@ export class HODMarksReportService {
         },
       });
 
+      markRecords.sort(
+        (a, b) =>
+          Number(a.courseRegistrationId !== null) -
+          Number(b.courseRegistrationId !== null)
+      );
+
       for (const mark of markRecords) {
         marksMap.set(mark.studentId, {
           cieTotal: mark.cieTotal,
@@ -319,10 +329,12 @@ export class HODMarksReportService {
       }
 
       const assessmentMap = new Map(
-        studentAssessments.map((studentAssessment) => [
-          `${studentAssessment.studentId}_${studentAssessment.assessmentId}`,
-          studentAssessment,
-        ])
+        preferAttemptScopedAssessments(studentAssessments).map(
+          (studentAssessment) => [
+            `${studentAssessment.studentId}_${studentAssessment.assessmentId}`,
+            studentAssessment,
+          ]
+        )
       );
 
       const students = roster.map((student) => {

@@ -5,6 +5,7 @@ import { AdminFacultyService } from "@webcampus/api/src/services/admin/faculty.s
 import { SemesterService } from "@webcampus/api/src/services/admin/semester.service";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { auth } from "@webcampus/auth";
+import { invalidatePrefix } from "@webcampus/common/cache";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
 import { redis } from "@webcampus/common/redis";
@@ -770,6 +771,7 @@ class MockStarter {
 
     await SemesterService.bulkUpsertSemesters(
       term.id,
+      this.adminUserId as string,
       ODD_2026_SEMESTERS.map((semester) => ({
         academicTermId: term.id,
         programType: semester.programType,
@@ -777,7 +779,6 @@ class MockStarter {
         termType: "odd",
         startDate: semester.startDate,
         endDate: semester.endDate,
-        userId: this.adminUserId as string,
       }))
     );
 
@@ -998,6 +999,14 @@ async function main() {
     );
     process.exitCode = 1;
   } finally {
+    // The seed writes to Prisma directly, bypassing DepartmentService's
+    // invalidatePrefix("cache:department:") on every write. Clear the
+    // look-aside cache so the Admin->Departments UI reflects seeded data
+    // immediately instead of serving a stale entry for up to 3600s. Runs
+    // in `finally` (even on partial failure) and before redis.quit().
+    await invalidatePrefix("cache:department:").catch((err) =>
+      logger.warn("mock_start: failed to invalidate department cache", { err })
+    );
     await Promise.allSettled([redis.quit(), db.$disconnect()]);
   }
 }

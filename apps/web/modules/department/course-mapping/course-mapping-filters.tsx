@@ -82,6 +82,31 @@ export const CourseMappingFilters = ({
     semesters: nestedSemesters,
   });
 
+  const semesterOptions = (() => {
+    const termType = selectedDraftTerm?.type;
+    const parity = (selectedDraftTerm as { parity?: string | null })?.parity;
+    if (termType === "supplementary") {
+      if (parity === "odd") {
+        return nestedSemesters.filter(
+          (s) =>
+            !FIRST_YEAR_UG_SEMESTERS.has(s.semesterNumber) &&
+            s.semesterNumber % 2 === 1
+        );
+      }
+      if (parity === "even") {
+        return nestedSemesters.filter(
+          (s) =>
+            !FIRST_YEAR_UG_SEMESTERS.has(s.semesterNumber) &&
+            s.semesterNumber % 2 === 0
+        );
+      }
+      return nestedSemesters.filter(
+        (s) => !FIRST_YEAR_UG_SEMESTERS.has(s.semesterNumber)
+      );
+    }
+    return nestedSemesters;
+  })();
+
   const selectedSemester = nestedSemesters.find(
     (s) => s.id === draftFilters.semesterId
   );
@@ -89,6 +114,8 @@ export const CourseMappingFilters = ({
   const isFirstYearUg =
     selectedSemester?.programType === "UG" &&
     FIRST_YEAR_UG_SEMESTERS.has(selectedSemester?.semesterNumber);
+
+  const isSupplementaryTerm = selectedDraftTerm?.type === "supplementary";
 
   // Auto-select logic for initial load
   useEffect(() => {
@@ -220,7 +247,7 @@ export const CourseMappingFilters = ({
       label: "Semester",
       type: "select",
       hideAllOption: true,
-      options: nestedSemesters.map((s) => ({
+      options: semesterOptions.map((s) => ({
         label: `${s.programType} - Semester ${s.semesterNumber}`,
         value: s.id,
       })),
@@ -287,6 +314,13 @@ export const CourseMappingFilters = ({
           });
         }}
       />
+      {isSupplementaryTerm && (
+        <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          Supplementary term — courses listed are supplementary offerings;
+          sections are SUP host sections. Auto-inherited faculty from the
+          original term can be edited here.
+        </div>
+      )}
       <div className="mt-4 flex justify-end">
         <FilterActions
           onApply={applyFilters}

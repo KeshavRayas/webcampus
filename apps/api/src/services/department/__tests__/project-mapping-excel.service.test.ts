@@ -238,9 +238,7 @@ function registrationsFor(
   }));
 }
 
-async function extractError(
-  result: Promise<unknown>
-): Promise<{
+async function extractError(result: Promise<unknown>): Promise<{
   errors: Array<{ code: string; value?: string; message?: string }>;
 }> {
   const error = await result.then(
@@ -471,7 +469,7 @@ describe("ProjectMappingService.validateUpload", () => {
     expect(codes).toContain("AMBIGUOUS_FACULTY");
   });
 
-  it("rejects a faculty from another department with CROSS_DEPT_FACULTY", async () => {
+  it("resolves a faculty from another department", async () => {
     const crossDept = [
       {
         id: "f1",
@@ -490,18 +488,25 @@ describe("ProjectMappingService.validateUpload", () => {
       crossDept) as unknown as typeof dbMock.faculty.findMany;
     const buffer = await buildWorkbook([
       ["G-001", "Dr. Ambuja", "1BM22CS001:Keshav"],
+      ["G-002", "Dr. Ravi Kumar", "1BM22CS014:Rahul"],
+      ["G-003", "Dr. Ambuja", ""],
     ]);
-    const error = await ProjectMappingService.validateUpload(
+    const result = await ProjectMappingService.validateUpload(
       "c1",
       buffer,
       "user-1"
-    ).then(
-      () => null,
-      (e: unknown) => e
     );
-    expect((error as { errors: Array<{ code: string }> }).errors[0]!.code).toBe(
-      "CROSS_DEPT_FACULTY"
-    );
+    expect(result.status).toBe("success");
+    const data = (result as { data: unknown }).data as {
+      facultyAssignments: {
+        electiveBatchId: string;
+        facultyId: string | null;
+      }[];
+    };
+    expect(data.facultyAssignments[0]).toEqual({
+      electiveBatchId: "g1",
+      facultyId: "f1",
+    });
   });
 
   it("rejects a student placed outside their section with WRONG_SECTION", async () => {

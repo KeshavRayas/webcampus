@@ -20,7 +20,8 @@ export type AuditLogEntry = {
     | "COORDINATOR"
     | "BATCH"
     | "ASSESSMENT"
-    | "STUDENT_PROFILE";
+    | "STUDENT_PROFILE"
+    | "PROMOTION";
   entityId: string;
   courseId?: string;
   action:
@@ -28,7 +29,8 @@ export type AuditLogEntry = {
     | "UPSERT_MAPPING"
     | "DELETE_MAPPING"
     | "UPDATE_COORDINATOR"
-    | "UPDATE_STUDENT_PROFILE";
+    | "UPDATE_STUDENT_PROFILE"
+    | "PROMOTE_STUDENT";
 };
 
 export type FieldChange = {

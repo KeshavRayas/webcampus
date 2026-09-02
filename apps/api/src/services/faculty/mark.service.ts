@@ -16,6 +16,10 @@ import {
   assertFacultyCourseApproved,
   FACULTY_COURSE_STATUS,
 } from "../shared/course-approval";
+import {
+  resolveActiveRegistration,
+  resolveActiveRegistrationsForCourse,
+} from "../shared/course-registration-resolver";
 import { recomputeStudentMark } from "../shared/mark-sync.service";
 
 export interface ExcelImportError {
@@ -148,6 +152,8 @@ export class Mark {
       where: {
         courseId,
         semesterId,
+        status: "ACTIVE",
+        registrationType: { in: ["REGULAR", "RE_REGISTRATION"] },
         ...(sectionId
           ? { student: { studentSections: { some: { sectionId } } } }
           : {}),
@@ -205,12 +211,16 @@ export class Mark {
         throw new Error("Faculty profile not found");
       }
 
-      const existingMark = await db.mark.findUnique({
+      const registration = await resolveActiveRegistration({
+        studentId: data.studentId,
+        courseId: data.courseId,
+      });
+
+      const existingMark = await db.mark.findFirst({
         where: {
-          studentId_courseId: {
-            studentId: data.studentId,
-            courseId: data.courseId,
-          },
+          studentId: data.studentId,
+          courseId: data.courseId,
+          courseRegistrationId: registration?.id ?? null,
         },
       });
 
@@ -225,7 +235,10 @@ export class Mark {
       await this.assertFacultyCanManageMark(faculty.id, data.courseId);
 
       const mark = await db.mark.create({
-        data,
+        data: {
+          ...data,
+          courseRegistrationId: registration?.id,
+        },
       });
 
       logger.info("Mark created successfully", { mark });
@@ -287,14 +300,25 @@ export class Mark {
     courseId: string
   ): Promise<BaseResponse<MarkResponseType>> {
     try {
-      const mark = await db.mark.findUnique({
-        where: {
-          studentId_courseId: {
-            studentId,
-            courseId,
-          },
-        },
+      const registration = await resolveActiveRegistration({
+        studentId,
+        courseId,
       });
+      const mark = registration
+        ? ((await db.mark.findFirst({
+            where: {
+              studentId,
+              courseId,
+              courseRegistrationId: registration.id,
+            },
+          })) ??
+          (await db.mark.findFirst({
+            where: { studentId, courseId, courseRegistrationId: null },
+          })))
+        : await db.mark.findFirst({
+            where: { studentId, courseId },
+            orderBy: { id: "desc" },
+          });
 
       if (!mark) {
         return {
@@ -855,6 +879,23 @@ export class Mark {
       );
 
       // Process each student's totals
+      const studentIds = [...totalsByStudent.keys()];
+
+      // K3: pin every CIE write to the student's active attempt in the
+      // course's home semester (REGULAR / RE_REGISTRATION only). Anchored by
+      // semesterId — cross-term re-registrations carry their original
+      // semester, so backlog attempts resolve here. Resolved in one batched
+      // query for the whole upload.
+      const registrationByStudent = await resolveActiveRegistrationsForCourse(
+        {
+          courseId: assessment.courseId,
+          studentIds,
+          semesterId: assessment.semesterId,
+        },
+        tx
+      );
+
+      const registrationPinByStudent = new Map<string, string>();
       for (const [studentId, totalEntry] of totalsByStudent.entries()) {
         // PE/OE faculty may only mark students within their elective batches
         if (isBatchManaged) {
@@ -863,44 +904,53 @@ export class Mark {
               `Student ${studentId} is not in any of your elective batches for this course`
             );
           }
-        } else {
-          // Verify student is registered for this course
-          const registration = await prisma.courseRegistration.findFirst({
-            where: {
-              studentId,
-              courseId: assessment.courseId,
-              semesterId: assessment.semesterId,
-            },
-          });
-
-          if (!registration) {
-            logger.warn(`Student ${studentId} not registered for course`, {
-              courseId: assessment.courseId,
-            });
-            continue;
-          }
         }
 
-        // Create or update StudentAssessment record
-        const studentAssess = await prisma.studentAssessment.upsert({
+        const registration = registrationByStudent.get(studentId) ?? null;
+
+        if (!registration) {
+          logger.warn(
+            `Student ${studentId} has no active registration for course`,
+            {
+              courseId: assessment.courseId,
+              semesterId: assessment.semesterId,
+            }
+          );
+          continue;
+        }
+
+        registrationPinByStudent.set(studentId, registration.id);
+
+        // Attempt-scoped StudentAssessment row: one per (student, assessment,
+        // registration). Never touches a legacy null-pinned row or another
+        // attempt's row.
+        const attemptAssessment = await prisma.studentAssessment.findFirst({
           where: {
-            studentId_assessmentId: {
-              studentId,
-              assessmentId: data.assessmentId,
-            },
-          },
-          create: {
             studentId,
             assessmentId: data.assessmentId,
-            courseId: data.courseId,
-            totalMarks: totalEntry.totalMarks,
-            status: totalEntry.status,
+            courseRegistrationId: registration.id,
           },
-          update: {
-            totalMarks: totalEntry.totalMarks,
-            status: totalEntry.status,
-          },
+          select: { id: true },
         });
+
+        const studentAssess = attemptAssessment
+          ? await prisma.studentAssessment.update({
+              where: { id: attemptAssessment.id },
+              data: {
+                totalMarks: totalEntry.totalMarks,
+                status: totalEntry.status,
+              },
+            })
+          : await prisma.studentAssessment.create({
+              data: {
+                studentId,
+                assessmentId: data.assessmentId,
+                courseId: data.courseId,
+                totalMarks: totalEntry.totalMarks,
+                status: totalEntry.status,
+                courseRegistrationId: registration.id,
+              },
+            });
 
         // Upsert question marks only when QP exists
         if (hasQuestions) {
@@ -926,8 +976,14 @@ export class Mark {
         }
       }
 
-      for (const studentId of totalsByStudent.keys()) {
-        await recomputeStudentMark(studentId, data.courseId, tx);
+      for (const [
+        studentId,
+        courseRegistrationId,
+      ] of registrationPinByStudent) {
+        await recomputeStudentMark(studentId, data.courseId, tx, {
+          semesterId: assessment.semesterId,
+          courseRegistrationId,
+        });
       }
 
       logger.info("Assessment marks saved successfully", {
