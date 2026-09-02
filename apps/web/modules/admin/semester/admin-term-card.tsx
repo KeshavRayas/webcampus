@@ -35,28 +35,21 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
     setIsDeleteDialogOpen(false);
   };
 
-  // Issue 4: Compute both Configured and Active formats
-  const configuredSemesters: Record<string, number[]> = {};
-  const activeSemesters: Record<string, number[]> = {};
+  const groupByProgramType = (
+    semesters: NonNullable<AcademicTermResponseType["Semester"]>,
+    filter?: (sem: NonNullable<AcademicTermResponseType["Semester"]>[number]) => boolean
+  ): Record<string, number[]> => {
+    const grouped: Record<string, number[]> = {};
+    for (const sem of semesters) {
+      if (filter && !filter(sem)) continue;
+      const list = grouped[sem.programType] ?? [];
+      list.push(sem.semesterNumber);
+      grouped[sem.programType] = list;
+    }
+    return grouped;
+  };
 
-  if (term.Semester) {
-    term.Semester.forEach((sem) => {
-      // Group all for 'Configured'
-      const configList = configuredSemesters[sem.programType] ?? [];
-      configList.push(sem.semesterNumber);
-      configuredSemesters[sem.programType] = configList;
-
-      // Group only active for 'Active' (Assuming your schema uses sem.status)
-      if (sem.status === "ACTIVE") {
-        const activeList = activeSemesters[sem.programType] ?? [];
-        activeList.push(sem.semesterNumber);
-        activeSemesters[sem.programType] = activeList;
-      }
-    });
-  }
-
-  // Helper function to format the semester strings
-  const formatSummary = (record: Record<string, number[]>) => {
+  const formatSemesterSummary = (record: Record<string, number[]>) => {
     const summaries: string[] = [];
     if (record["UG"] && record["UG"].length > 0) {
       summaries.push(`UG: ${record["UG"].sort((a, b) => a - b).join(", ")}`);
@@ -67,8 +60,15 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
     return summaries.join(" | ");
   };
 
-  const configuredSummaryString = formatSummary(configuredSemesters) || "None";
-  const activeSummaryString = formatSummary(activeSemesters) || "None";
+  const configuredSemesters = term.Semester
+    ? groupByProgramType(term.Semester)
+    : {};
+  const activeSemesters = term.Semester
+    ? groupByProgramType(term.Semester, (sem) => sem.status === "ACTIVE")
+    : {};
+
+  const configuredSummaryString = formatSemesterSummary(configuredSemesters) || "None";
+  const activeSummaryString = formatSemesterSummary(activeSemesters) || "None";
 
   return (
     <>
@@ -101,13 +101,10 @@ export const AdminTermCard = ({ term }: { term: AcademicTermResponseType }) => {
                 {lifecycleStatus}
               </span>
             </div>
-            {/* Issue 4: Show both configured and active statuses below each other */}
             <CardDescription className="mt-2 flex flex-col gap-1">
               <span className="text-muted-foreground">
                 Configured: {configuredSummaryString}
               </span>
-
-              {/* Highlight the active semester in Black Bold */}
               <span className="font-bold text-black dark:text-white">
                 Active: {activeSummaryString}
               </span>

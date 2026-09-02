@@ -1,21 +1,13 @@
 "use client";
 
 import { Button } from "@webcampus/ui/components/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@webcampus/ui/components/dialog";
+import { Dialog, DialogClose, DialogTrigger } from "@webcampus/ui/components/dialog";
 import { Form } from "@webcampus/ui/components/form";
 import { useIsMobile } from "@webcampus/ui/hooks/use-mobile";
-import { cn } from "@webcampus/ui/lib/utils";
 import { Plus } from "lucide-react";
 import React from "react";
 import { FieldValues, UseFormReturn } from "react-hook-form";
+import { ScrollableDialogContent } from "./scrollable-dialog";
 
 interface DialogFormProps<T extends FieldValues> {
   trigger: string | React.ReactNode;
@@ -60,40 +52,36 @@ export const DialogForm = <T extends FieldValues>({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{renderTrigger()}</DialogTrigger>
-      <DialogContent
-        className={cn(
-          "flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-md",
-          contentClassName
-        )}
+      <ScrollableDialogContent
+        title={title}
+        className={contentClassName}
+        footer={
+          <>
+            <DialogClose asChild>
+              <Button
+                type="reset"
+                onClick={() => form.reset()}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button disabled={form.formState.isSubmitting} type="submit" form="dialog-form">
+              Continue
+            </Button>
+          </>
+        }
       >
         <Form {...form}>
           <form
+            id="dialog-form"
             onSubmit={form.handleSubmit(handleSubmit)}
-            className="flex min-h-0 flex-1 flex-col"
+            className="space-y-4"
           >
-            <DialogHeader className="shrink-0 px-6 pb-4 pt-6">
-              <DialogTitle>{title}</DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <div className="space-y-4">{children}</div>
-            </div>
-            <DialogFooter className="bg-background shrink-0 border-t px-6 py-4">
-              <DialogClose asChild>
-                <Button
-                  type="reset"
-                  onClick={() => form.reset()}
-                  variant="outline"
-                >
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button disabled={form.formState.isSubmitting} type="submit">
-                Continue
-              </Button>
-            </DialogFooter>
+            {children}
           </form>
         </Form>
-      </DialogContent>
+      </ScrollableDialogContent>
     </Dialog>
   );
 };

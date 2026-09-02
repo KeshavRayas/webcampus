@@ -18,6 +18,7 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import axios from "axios";
+import { getTermLabel } from "@webcampus/common/term-label";
 import { Lock } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -147,7 +148,7 @@ export const AdminCoursesView = () => {
       label: "Academic Term",
       type: "select",
       options: terms.map((term) => ({
-        label: `${term.type.toUpperCase()} ${term.year}`,
+        label: getTermLabel(term.type, term.year, term.parity),
         value: term.id,
       })),
       hideAllOption: true,
@@ -327,7 +328,7 @@ export const AdminCoursesView = () => {
             <div>Loading courses...</div>
           ) : (
             <AdminSemesterCourseBlock
-              key={`${selectedAppliedSemester.id}_${appliedFilters.departmentName}`}
+              key={`${selectedAppliedSemester.id}_${appliedFilters.departmentName}_${selectedAppliedTerm?.type}`}
               semesterId={selectedAppliedSemester.id}
               semesterNumber={selectedAppliedSemester.semesterNumber}
               courses={filteredCourses}
@@ -336,6 +337,16 @@ export const AdminCoursesView = () => {
               selectedDepartmentName={appliedFilters.departmentName}
               isBasicSciences={appliedIsSemesterOneOrTwo}
               isSemesterLocked={isSemesterLocked}
+              term={
+                selectedAppliedTerm
+                  ? {
+                      id: selectedAppliedTerm.id,
+                      type: selectedAppliedTerm.type as "odd" | "even" | "supplementary",
+                      parity: (selectedAppliedTerm.parity as "odd" | "even" | null) ?? null,
+                      year: selectedAppliedTerm.year,
+                    }
+                  : undefined
+              }
             />
           )}
         </div>

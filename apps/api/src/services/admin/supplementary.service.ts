@@ -10,6 +10,7 @@ import { BaseResponse } from "@webcampus/types/api";
 import { isRegistrationWindowOpen } from "../shared/academic-rules/academic-rules.service";
 import type { WindowEvaluation } from "../shared/academic-rules/registration-rules";
 import { isBatchManagedCourse } from "../shared/course-kind";
+import { AdminSectionService } from "./section.service";
 
 export interface SupplementaryOfferingItem {
   id: string;
@@ -646,16 +647,18 @@ export class SupplementaryService {
         throw new Error("A section with this name already exists in this term");
       }
 
-      const section = await db.section.create({
-        data: {
+      const sectionRes = await AdminSectionService.create(
+        {
           name,
-          departmentId: offering.course.departmentId,
           semesterId: hostSemester.id,
-          registrationType: "SUPPLEMENTARY",
+          departmentId: offering.course.departmentId,
+          cycle: offering.course.cycle as any,
           supplementaryOfferingId: offering.id,
-          cycle: offering.course.cycle,
-        },
-      });
+          registrationType: "SUPPLEMENTARY",
+        } as any,
+        undefined
+      );
+      const section = (sectionRes as unknown as { data: { id: string } }).data;
 
       // Hybrid (Card C): auto-inherit faculty mapping from original term's CourseAssignments.
       // Copies distinct THEORY assignments for the same course into the new SUP section,
