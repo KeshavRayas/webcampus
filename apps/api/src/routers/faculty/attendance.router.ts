@@ -15,16 +15,16 @@ import { Router } from "express";
 
 const router: Router = Router();
 
-router.get("/session/test-hang", (req, res) => {
-  res.json({ ok: true, message: "test route works" });
-});
-
 router.use(
   protect({
     role: "faculty",
     permissions: {},
   })
 );
+
+router.get("/session/test-hang", (req, res) => {
+  res.json({ ok: true, message: "test route works" });
+});
 
 router.get(
   "/session/filter-options",

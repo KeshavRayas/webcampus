@@ -1,0 +1,74 @@
+# Monitoring stack for the college server: Prometheus + Grafana + exporters.
+# Reads GRAFANA_ADMIN_* from the repo-root .env (compose auto-loads it).
+#
+# Merge it with the prod stack so every container shares one Docker network
+# and can resolve each other by service name (api, db, redis):
+#
+#   docker compose -f compose.prod.yaml -f compose.monitoring.yaml up -d
+#
+# Every port below binds to 127.0.0.1 ONLY — nothing is exposed to the LAN.
+# View dashboards through an SSH tunnel (see deploy.md → Monitoring).
+
+services:
+  # Scrapes /metrics endpoints every 15s and stores them as time series.
+  prometheus:
+    image: prom/prometheus:v3.4.0
+    container_name: webcampus-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # lets Prometheus scrape a host-run dev API
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/targets:/etc/prometheus/targets:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090" # UI + PromQL console (tunnel only)
+
+  # Dashboards. Datasource + dashboards are auto-provisioned from
+  # monitoring/grafana/provisioning at startup — zero manual setup.
+  grafana:
+    image: grafana/grafana:11.6.0
+    container_name: webcampus-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3001
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000" # UI (tunnel only)
+    depends_on:
+      - prometheus
+
+  # Bridges Postgres statistics into /metrics for Prometheus.
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.17.0
+    container_name: webcampus-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-webcampus}?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Bridges Redis INFO stats into /metrics for Prometheus.
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: webcampus-redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  prometheus_data:
+  grafana_data:

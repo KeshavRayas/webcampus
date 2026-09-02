@@ -15,12 +15,7 @@ import {
   peCourseCapacity,
   syncBatchManagedCourseBatches,
 } from "@webcampus/api/src/services/shared/pe-capacity.service";
-import {
-  CourseApprovalStatus,
-  CourseType,
-  Cycle,
-  PrismaClient,
-} from "@webcampus/db";
+import { CourseApprovalStatus, CourseType, Cycle, db } from "@webcampus/db";
 import {
   CreateCourseDTO,
   UpdateCourseDTO,
@@ -75,8 +70,6 @@ const TRACKABLE_COURSE_FIELDS = [
   "nextProjectGroupSequence",
 ] as const;
 
-const prisma = new PrismaClient();
-
 interface GroupShape {
   id: string;
   departmentId: string;
@@ -106,7 +99,7 @@ export class CourseService {
     let targetDepartmentId = data.departmentId;
 
     if (!targetDepartmentId && data.departmentName) {
-      const dept = await prisma.department.findFirst({
+      const dept = await db.department.findFirst({
         where: { name: data.departmentName },
       });
       if (!dept) {
@@ -119,7 +112,7 @@ export class CourseService {
       throw new Error("Valid Department ID or Name is required");
     }
 
-    const semester = await prisma.semester.findUnique({
+    const semester = await db.semester.findUnique({
       where: { id: data.semesterId },
     });
     if (!semester) {
@@ -179,7 +172,7 @@ export class CourseService {
       }
     }
 
-    const course = await prisma.$transaction(async (tx) => {
+    const course = await db.$transaction(async (tx) => {
       const created = await tx.course
         .create({
           data: {
@@ -313,8 +306,8 @@ export class CourseService {
     const isAdmin = adminContext?.isAdmin === true;
 
     const existingCourse = isAdmin
-      ? await prisma.course.findUnique({ where: { id } })
-      : await prisma.course.findFirst({
+      ? await db.course.findUnique({ where: { id } })
+      : await db.course.findFirst({
           where: { id, departmentId: requestContext?.departmentId },
         });
 
@@ -329,7 +322,7 @@ export class CourseService {
 
     let targetDepartmentId = data.departmentId ?? existingCourse.departmentId;
     if (data.departmentName && !data.departmentId) {
-      const dept = await prisma.department.findFirst({
+      const dept = await db.department.findFirst({
         where: { name: data.departmentName },
       });
       if (!dept) {
@@ -357,7 +350,7 @@ export class CourseService {
     const nextStudentsPerBatch =
       data.studentsPerBatch ?? existingCourse.studentsPerBatch;
 
-    const registrationCount = await prisma.courseRegistration.count({
+    const registrationCount = await db.courseRegistration.count({
       where: { courseId: id },
     });
 
@@ -389,7 +382,7 @@ export class CourseService {
       isBatchManagedCourse(data.courseType) &&
       !isBatchManagedCourse(existingCourse.courseType)
     ) {
-      const sectionAssignments = await prisma.courseAssignment.count({
+      const sectionAssignments = await db.courseAssignment.count({
         where: { courseId: id },
       });
       if (sectionAssignments > 0) {
@@ -457,7 +450,7 @@ export class CourseService {
           ? ((data.cycle ?? existingCourse.cycle) as "PHYSICS" | "CHEMISTRY")
           : null;
 
-      const windowOpen = await prisma.registrationWindow.findFirst({
+      const windowOpen = await db.registrationWindow.findFirst({
         where: {
           semesterId: data.semesterId ?? existingCourse.semesterId,
           isOpen: true,
@@ -498,7 +491,7 @@ export class CourseService {
         if (registrationCount > 0) {
           let scopeAcademicYear: string | undefined;
           if (data.semesterId) {
-            const targetSemester = await prisma.semester.findUnique({
+            const targetSemester = await db.semester.findUnique({
               where: { id: data.semesterId },
               include: { academicTerm: true },
             });
@@ -506,7 +499,7 @@ export class CourseService {
           }
           const effectiveGroupCount =
             await ProjectMappingService.computeEffectiveGroupCount({
-              tx: prisma,
+              tx: db,
               courseId: id,
               studentsPerGroup: nextStudentsPerBatch as number,
               groupingScope: nextGroupingScope,
@@ -549,7 +542,7 @@ export class CourseService {
       }
     }
 
-    const course = await prisma.$transaction(async (tx) => {
+    const course = await db.$transaction(async (tx) => {
       // Leaving a batch-managed course: wipe elective batch data
       if (
         isBatchManagedCourse(existingCourse.courseType) &&
@@ -736,7 +729,7 @@ export class CourseService {
           adminContext.adminUserId ?? null
         );
       }
-      const latest = await prisma.course.findUnique({
+      const latest = await db.course.findUnique({
         where: { id: course.id },
         select: { version: true },
       });
@@ -757,7 +750,7 @@ export class CourseService {
     departmentId: string,
     cycle?: string
   ): Promise<Record<string, { sections: number; batches: number }>> {
-    const sections = await prisma.section.findMany({
+    const sections = await db.section.findMany({
       where: {
         semesterId,
         departmentId,
@@ -813,7 +806,7 @@ export class CourseService {
   ): Promise<string> {
     if (departmentId) return departmentId;
     if (departmentName) {
-      const dept = await prisma.department.findFirst({
+      const dept = await db.department.findFirst({
         where: { name: departmentName },
       });
       if (dept) return dept.id;
@@ -853,7 +846,7 @@ export class CourseService {
       where.departmentId = departmentId;
     }
 
-    const course = await prisma.course.findFirst({
+    const course = await db.course.findFirst({
       where: where as never,
       include: {
         department: true,
@@ -991,7 +984,7 @@ export class CourseService {
       cycle
     );
 
-    const courses = await prisma.course.findMany({
+    const courses = await db.course.findMany({
       where: whereClause,
       include: {
         department: true,
@@ -1083,7 +1076,7 @@ export class CourseService {
   }
 
   static async deleteCourse(id: string) {
-    const existingCourse = await prisma.course.findUnique({
+    const existingCourse = await db.course.findUnique({
       where: { id },
       include: {
         _count: {
@@ -1112,7 +1105,7 @@ export class CourseService {
       );
     }
 
-    await prisma.course.delete({
+    await db.course.delete({
       where: { id },
     });
 
@@ -1151,7 +1144,7 @@ export class CourseService {
       whereClause.cycle = cycle;
     }
 
-    const courses = await prisma.course.findMany({
+    const courses = await db.course.findMany({
       where: whereClause,
       select: {
         id: true,
@@ -1193,7 +1186,7 @@ export class CourseService {
       }
     }
 
-    const updateResult = await prisma.$transaction(async (tx) => {
+    const updateResult = await db.$transaction(async (tx) => {
       for (const course of courses) {
         if (isBatchManagedCourse(course.courseType)) {
           const batchCount = await tx.electiveBatch.count({
@@ -1260,7 +1253,7 @@ export class CourseService {
       whereClause.cycle = cycle;
     }
 
-    const updateResult = await prisma.$transaction((tx) =>
+    const updateResult = await db.$transaction((tx) =>
       tx.course.updateMany({
         where: whereClause,
         data: {
@@ -1423,7 +1416,7 @@ export class CourseService {
       cycle
     );
 
-    const courses = await prisma.course.findMany({
+    const courses = await db.course.findMany({
       where: whereClause,
       include: {
         _count: {
@@ -1513,7 +1506,7 @@ export class CourseService {
       }
     }
 
-    const updateResult = await prisma.$transaction(async (tx) => {
+    const updateResult = await db.$transaction(async (tx) => {
       for (const course of courses) {
         if (isBatchManagedCourse(course.courseType)) {
           const batchCount = await tx.electiveBatch.count({
@@ -1560,7 +1553,7 @@ export class CourseService {
   }
 
   static async getGroupedCourseSubmissions(role: "admin" | "coe") {
-    const pendingCourses = await prisma.course.findMany({
+    const pendingCourses = await db.course.findMany({
       where: {
         approvalStatus: CourseApprovalStatus.PENDING,
       },
@@ -1650,14 +1643,14 @@ export class CourseService {
   ) {
     if (!isAdmin) {
       const departmentId = requestContext?.departmentId;
-      const course = await prisma.course.findFirst({
+      const course = await db.course.findFirst({
         where: { id: courseId, departmentId },
         select: { id: true },
       });
       if (!course) throw new Error("Course not found");
     }
 
-    const coordinators = await prisma.courseCoordinator.findMany({
+    const coordinators = await db.courseCoordinator.findMany({
       where: { courseId },
       include: {
         faculty: {
@@ -1686,7 +1679,7 @@ export class CourseService {
   ) {
     const isAdmin = adminContext?.isAdmin === true;
 
-    const course = await prisma.course.findFirst({
+    const course = await db.course.findFirst({
       where: isAdmin
         ? { id: courseId }
         : { id: courseId, departmentId: requestContext?.departmentId },
@@ -1698,13 +1691,13 @@ export class CourseService {
 
     let oldCoordinators: Array<{ facultyId: string }> | null = null;
     if (isAdmin) {
-      oldCoordinators = await prisma.courseCoordinator.findMany({
+      oldCoordinators = await db.courseCoordinator.findMany({
         where: { courseId },
         select: { facultyId: true },
       });
     }
 
-    await prisma.$transaction(async (tx) => {
+    await db.$transaction(async (tx) => {
       await tx.courseCoordinator.deleteMany({ where: { courseId } });
       if (facultyIds.length > 0) {
         await tx.courseCoordinator.createMany({
@@ -1761,7 +1754,7 @@ export class CourseService {
     }[] = [];
 
     if (isBatchManagedCourse(courseType)) {
-      const batches = await prisma.electiveBatch.findMany({
+      const batches = await db.electiveBatch.findMany({
         where: { courseId },
         select: {
           facultyAssignment: {
@@ -1789,7 +1782,7 @@ export class CourseService {
         }
       }
     } else {
-      const assignments = await prisma.courseAssignment.findMany({
+      const assignments = await db.courseAssignment.findMany({
         where: { courseId },
         select: {
           facultyId: true,
@@ -1828,7 +1821,7 @@ export class CourseService {
     courseId: string,
     departmentContext?: { departmentId: string }
   ) {
-    const course = await prisma.course.findUnique({
+    const course = await db.course.findUnique({
       where: { id: courseId },
     });
 

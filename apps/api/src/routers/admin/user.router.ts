@@ -7,13 +7,13 @@ const router: Router = Router();
 
 router.post(
   "/",
-  validateRequest(createUserSchema),
   protect({
     role: "admin",
     permissions: {
       user: ["set-role"],
     },
   }),
+  validateRequest(createUserSchema),
   UserController.createUser
 );
 
@@ -30,6 +30,12 @@ router.delete(
 
 router.get(
   "/",
+  protect({
+    role: "admin",
+    permissions: {
+      user: ["get"],
+    },
+  }),
   validateRequest(UsersQuerySchema, "query"),
   UserController.getUsers
 );

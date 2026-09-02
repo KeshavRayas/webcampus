@@ -1,3 +1,4 @@
+import { logger } from "@webcampus/common/logger";
 import Redis from "ioredis";
 
 const globalForRedis = global as unknown as { redis: Redis };
@@ -19,9 +20,12 @@ export const redis =
 if (process.env.NODE_ENV !== "production") globalForRedis.redis = redis;
 
 redis.on("connect", () => {
-  console.log("Redis client connected successfully");
+  logger.info("Redis client connected successfully");
 });
 
 redis.on("error", (err) => {
-  console.error("Redis client error:", err);
+  logger.error(
+    "Redis client error:",
+    err as unknown as Record<string, unknown>
+  );
 });

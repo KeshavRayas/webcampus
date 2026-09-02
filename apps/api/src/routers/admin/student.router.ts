@@ -7,13 +7,13 @@ const router: Router = Router();
 
 router.get(
   "/",
-  validateRequest(GetAdminStudentsQuerySchema, "query"),
   protect({
     role: "admin",
     permissions: {
       student: ["read"],
     },
   }),
+  validateRequest(GetAdminStudentsQuerySchema, "query"),
   AdminStudentController.getAll
 );
 

@@ -1,10 +1,12 @@
 import assessmentRouter from "@webcampus/api/src/routers/faculty/assessment.router";
 import attendanceRouter from "@webcampus/api/src/routers/faculty/attendance.router";
+import courseOutcomeRouter from "@webcampus/api/src/routers/faculty/course-outcome.router";
 import attendanceWindowRouter from "@webcampus/api/src/routers/faculty/faculty-attendance-window.router";
 import profileRouter from "@webcampus/api/src/routers/faculty/faculty.router";
 import handlingRouter from "@webcampus/api/src/routers/faculty/handling.router";
 import markRouter from "@webcampus/api/src/routers/faculty/mark.router";
 import proctorRouter from "@webcampus/api/src/routers/faculty/proctor.router";
+import programmeOutcomeRouter from "@webcampus/api/src/routers/faculty/programme-outcome.router";
 import { Router } from "express";
 
 const router: Router = Router();
@@ -16,5 +18,8 @@ router.use("/attendance-windows", attendanceWindowRouter);
 router.use("/assessment", assessmentRouter);
 router.use("/marks", markRouter);
 router.use("/proctor", proctorRouter);
+
+router.use("/programme-outcomes", programmeOutcomeRouter);
+router.use("/course-outcomes", courseOutcomeRouter);
 
 export default router;

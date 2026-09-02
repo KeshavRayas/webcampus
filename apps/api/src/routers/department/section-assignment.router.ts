@@ -105,12 +105,44 @@ router.post(
   guardSectionWriteAccessFromBody,
   SectionAssignmentController.create
 );
-router.get("/", SectionAssignmentController.getAll);
-router.get("/:id", SectionAssignmentController.getById);
-router.get("/section/:sectionId", SectionAssignmentController.getBySectionId);
+router.get(
+  "/",
+  protect({
+    role: "department",
+    permissions: {
+      section: ["read"],
+    },
+  }),
+  SectionAssignmentController.getAll
+);
+router.get(
+  "/:id",
+  protect({
+    role: "department",
+    permissions: {
+      section: ["read"],
+    },
+  }),
+  SectionAssignmentController.getById
+);
+router.get(
+  "/section/:sectionId",
+  protect({
+    role: "department",
+    permissions: {
+      section: ["read"],
+    },
+  }),
+  SectionAssignmentController.getBySectionId
+);
 router.put(
   "/:id",
+  protect({
+    role: "department",
+    permissions: {},
+  }),
   validateRequest(UpdateSectionAssignmentSchema),
+  guardSectionWriteAccessFromAssignmentId,
   SectionAssignmentController.update
 );
 router.delete(

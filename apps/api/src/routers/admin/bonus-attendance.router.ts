@@ -1,4 +1,4 @@
-import { validateRequest } from "@webcampus/backend-utils/middlewares";
+import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   CreateBonusAttendanceWindowSchema,
   GetBonusAttendanceWindowsQuerySchema,
@@ -14,18 +14,21 @@ const router: Router = Router();
 
 router.get(
   "/",
+  protect({ role: "admin", permissions: {} }),
   validateRequest(GetBonusAttendanceWindowsQuerySchema, "query"),
   BonusAttendanceWindowController.getWindows
 );
 
 router.post(
   "/",
+  protect({ role: "admin", permissions: {} }),
   validateRequest(CreateBonusAttendanceWindowSchema),
   BonusAttendanceWindowController.createWindow
 );
 
 router.patch(
   "/:id/toggle",
+  protect({ role: "admin", permissions: {} }),
   validateRequest(ToggleBonusAttendanceWindowParamsSchema, "params"),
   validateRequest(ToggleBonusAttendanceWindowBodySchema),
   BonusAttendanceWindowController.toggleWindow
@@ -33,6 +36,7 @@ router.patch(
 
 router.patch(
   "/:id",
+  protect({ role: "admin", permissions: {} }),
   validateRequest(UpdateBonusAttendanceWindowParamsSchema, "params"),
   validateRequest(UpdateBonusAttendanceWindowBodySchema),
   BonusAttendanceWindowController.updateWindow
