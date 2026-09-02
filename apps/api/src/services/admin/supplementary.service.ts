@@ -929,30 +929,37 @@ export class SupplementaryService {
         );
       }
 
+      const hostSemesterRef = section.supplementaryOffering.course.semester;
+      if (!hostSemesterRef) {
+        throw new Error("Host semester not found for supplementary offering");
+      }
+
       const gateHostSemester = await db.semester.findFirst({
         where: {
           academicTermId: section.semester.academicTermId,
-          programType:
-            section.supplementaryOffering.course.semester.programType,
-          semesterNumber:
-            section.supplementaryOffering.course.semester.semesterNumber,
+          programType: hostSemesterRef.programType,
+          semesterNumber: hostSemesterRef.semesterNumber,
         },
         select: { id: true },
       });
 
-      if (gateHostSemester) {
-        const evaluation = await isRegistrationWindowOpen({
-          registrationType: "SUPPLEMENTARY",
-          academicTermId: section.semester.academicTermId,
-          semesterId: gateHostSemester.id,
-          departmentId: section.supplementaryOffering.course.departmentId,
-          cycle: section.supplementaryOffering.course.cycle,
-        });
+      if (!gateHostSemester) {
+        throw new Error(
+          `Host semester ${hostSemesterRef.semesterNumber} (${hostSemesterRef.programType}) was not found in the selected term`
+        );
+      }
 
-        const gateMessage = supplementaryWindowSettledMessage(evaluation);
-        if (gateMessage) {
-          throw new Error(gateMessage);
-        }
+      const evaluation = await isRegistrationWindowOpen({
+        registrationType: "SUPPLEMENTARY",
+        academicTermId: section.semester.academicTermId,
+        semesterId: gateHostSemester.id,
+        departmentId: section.supplementaryOffering.course.departmentId,
+        cycle: section.supplementaryOffering.course.cycle,
+      });
+
+      const gateMessage = supplementaryWindowSettledMessage(evaluation);
+      if (gateMessage) {
+        throw new Error(gateMessage);
       }
 
       const uniqueStudentIds = Array.from(new Set(input.studentIds));
