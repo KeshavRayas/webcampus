@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { AdminAdmissionUserService } from "@webcampus/api/src/services/admin/admission-user.service";
 import { CoeService } from "@webcampus/api/src/services/admin/coe.service";
 import { AdminFacultyService } from "@webcampus/api/src/services/admin/faculty.service";
@@ -7,7 +9,6 @@ import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
-import { redis } from "@webcampus/common/redis";
 import { db } from "@webcampus/db";
 
 type MockUserInput = {
@@ -972,13 +973,13 @@ async function main() {
     "@webcampus/api/src/utils/s3"
   );
 
-  // Create a tiny 1x1 transparent PNG buffer
-  const dummyBuffer = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-    "base64"
+  // Read the shared mock avatar image (committed to the repo) so it works on
+  // every developer machine, and upload it to the local MinIO instance.
+  const dummyBuffer = readFileSync(
+    fileURLToPath(new URL("./assets/mock-avatar.jpg", import.meta.url))
   );
-  const fileName = generateFileName("mock.png", "users/mock/");
-  const uploadResult = await uploadToS3(dummyBuffer, fileName, "image/png");
+  const fileName = generateFileName("mock.jpg", "users/mock/");
+  const uploadResult = await uploadToS3(dummyBuffer, fileName, "image/jpeg");
 
   if (uploadResult.success && uploadResult.url) {
     IMAGE_URL = uploadResult.url;
@@ -996,10 +997,8 @@ async function main() {
     logger.error(
       `Fatal error in mock_start script: ${(error as Error).message}`
     );
-    process.exitCode = 1;
-  } finally {
-    await Promise.allSettled([redis.quit(), db.$disconnect()]);
+    process.exit(1);
   }
 }
 
-void main();
+main();

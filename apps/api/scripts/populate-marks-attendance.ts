@@ -286,8 +286,6 @@ async function resolveRoster(
     where: {
       courseId: course.id,
       semesterId: course.semesterId,
-      status: "ACTIVE",
-      registrationType: { in: ["REGULAR", "RE_REGISTRATION"] },
     },
     select: { studentId: true },
   });
@@ -343,18 +341,15 @@ async function saveAssessmentBatch(
   );
   stats.studentsAssessed += registered.length;
 
-  // Existing attempt-scoped rows for this assessment — one query.
-  const registrationIds = registered.map(
-    (t) => registrationByStudent.get(t.studentId)!.id
-  );
+  // Existing rows for this assessment — one query (dev schema has no courseRegistrationId).
   const existing =
-    registrationIds.length > 0
+    registered.length > 0
       ? await db.studentAssessment.findMany({
           where: {
             assessmentId: assessment.id,
-            courseRegistrationId: { in: registrationIds },
+            studentId: { in: registered.map((t) => t.studentId) },
           },
-          select: { id: true, courseRegistrationId: true },
+          select: { id: true, studentId: true },
         })
       : [];
   const recordIdByStudent = new Map<string, string>();
@@ -365,9 +360,8 @@ async function saveAssessmentBatch(
     status: string;
   }> = [];
   for (const entry of registered) {
-    const registrationId = registrationByStudent.get(entry.studentId)!.id;
     const existingRow = existing.find(
-      (row) => row.courseRegistrationId === registrationId
+      (row) => row.studentId === entry.studentId
     );
     if (existingRow) {
       toUpdate.push({
@@ -387,7 +381,6 @@ async function saveAssessmentBatch(
         courseId: course.id,
         totalMarks: entry.totalMarks,
         status: entry.status,
-        courseRegistrationId: registrationId,
       });
       recordIdByStudent.set(entry.studentId, id);
     }
@@ -492,7 +485,6 @@ async function syncAttendanceBatch(
         absent,
         percentage,
         condonationStatus: "NOT_REQUESTED",
-        courseRegistrationId: registrationByStudent.get(studentId)?.id ?? null,
       });
     }
   }
