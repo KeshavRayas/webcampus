@@ -12,6 +12,7 @@ import {
 } from "@webcampus/ui/components/dialog";
 import { Form } from "@webcampus/ui/components/form";
 import { useIsMobile } from "@webcampus/ui/hooks/use-mobile";
+import { cn } from "@webcampus/ui/lib/utils";
 import { Plus } from "lucide-react";
 import React from "react";
 import { FieldValues, UseFormReturn } from "react-hook-form";
@@ -59,17 +60,24 @@ export const DialogForm = <T extends FieldValues>({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{renderTrigger()}</DialogTrigger>
-      <DialogContent className={contentClassName}>
+      <DialogContent
+        className={cn(
+          "flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-md",
+          contentClassName
+        )}
+      >
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit)}
-            className="space-y-4"
+            className="flex min-h-0 flex-1 flex-col"
           >
-            <DialogHeader>
+            <DialogHeader className="shrink-0 px-6 pb-4 pt-6">
               <DialogTitle>{title}</DialogTitle>
             </DialogHeader>
-            {children}
-            <DialogFooter>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-4">{children}</div>
+            </div>
+            <DialogFooter className="bg-background shrink-0 border-t px-6 py-4">
               <DialogClose asChild>
                 <Button
                   type="reset"

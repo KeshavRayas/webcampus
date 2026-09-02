@@ -54,7 +54,7 @@ export const SemesterCourseBlock = ({
           title={`Create Course (Semester ${semesterNumber})`}
           form={form}
           onSubmit={onSubmit}
-          contentClassName="sm:max-w-4xl max-h-[90vh] overflow-y-auto"
+          contentClassName="sm:max-w-4xl"
         >
           <CourseFormFields form={form} />
         </DialogForm>
