@@ -35,7 +35,7 @@ import {
 } from "@webcampus/ui/components/table";
 import { ScrollableDialog } from "@webcampus/ui/molecules/scrollable-dialog";
 import axios from "axios";
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { TermBundle } from "./term-bundle";
 import {
   useAddSupplementaryOffering,
@@ -367,8 +367,8 @@ export const AdminSupplementaryOfferingBlock = ({
                 const demand = demandByOfferingId.get(offering.id);
                 const isExpanded = expandedOfferingId === offering.id;
                 return (
-                  <>
-                    <TableRow key={offering.id}>
+                  <React.Fragment key={offering.id}>
+                    <TableRow>
                       <TableCell className="font-medium">
                         {offering.code}
                       </TableCell>
@@ -526,7 +526,7 @@ export const AdminSupplementaryOfferingBlock = ({
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </TableBody>
