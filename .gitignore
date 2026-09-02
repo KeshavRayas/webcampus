@@ -89,3 +89,5 @@ stress-tests/*
 security-assessment.md
 stress-tests.zip
 ISSUES.md
+FEATURE_DEPENDENCIES.md
+.lavish

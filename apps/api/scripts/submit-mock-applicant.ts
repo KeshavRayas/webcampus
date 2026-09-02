@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { faker } from "@faker-js/faker";
 import { UserService } from "@webcampus/api/src/services/admin/user.service";
 import { AdmissionCreateService } from "@webcampus/api/src/services/admission/admission-create.service";
@@ -6,19 +8,16 @@ import { AdmissionViewService } from "@webcampus/api/src/services/admission/admi
 import { auth } from "@webcampus/auth";
 import { backendEnv } from "@webcampus/common/env";
 import { logger } from "@webcampus/common/logger";
-import { redis } from "@webcampus/common/redis";
 import { db } from "@webcampus/db";
 
 let IMAGE_URL = "";
 let PDF_URL = "";
 
-const imgBuffer = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-  "base64"
+const imgBuffer = readFileSync(
+  fileURLToPath(new URL("./assets/mock-avatar.jpg", import.meta.url))
 );
-const pdfBuffer = Buffer.from(
-  "JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDMgMCBSL0ZpbHRlci9GbGF0ZURlY29kZT4+CnN0cmVhbQp4nDPQM1Qo5ypUMFAwALJMLU31jBQsTAz1LBSK0osSQTz9xJLMYqXExOJUvdTEvNSC1JxUveQUKwOulPziVA2E1Pwi/dwUVw2E4HIFwygFo8KMAgYA+8ccKAplbmRzdHJlYW0KZW5kb2JqCgozIDAgb2JqCjc3CmVuZG9iagoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDIwMCAyMDBdL1BhcmVudCA0IDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNSAwIFI+Pj4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCgo0IDAgb2JqCjw8L1R5cGUvUGFnZXMvQ291bnQgMS9LaWRzWzEgMCBSXT4+CmVuZG9iagoKNSAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9UaW1lcy1Sb21hbj4+CmVuZG9iagoKNiAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgNCAwIFI+PgplbmRvYmoKCjcgMCBvYmoKPDwvUHJvZHVjZXIoR2hvc3RzY3JpcHQgMTAuMDQuMCkKMTw8L0NyZWF0aW9uRGF0ZShEOjIwMjQxMDIyMDQzMDIxKzA1JzMwJyk+PgplbmRvYmoKCnhyZWYKMCA4CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDE2NCAwMDAwMCBuIAowMDAwMDAwMDE1IDAwMDAwIG4gCjAwMDAwMDAxNDMgMDAwMDAgbiAKMDAwMDAwMDI2MiAwMDAwMCBuIAowMDAwMDAwMzE5IDAwMDAwIG4gCjAwMDAwMDA0MDcgMDAwMDAgbiAKMDAwMDAwMDQ1NiAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgOC9Sb290IDYgMCBSL0luZm8gNyAwIFI+PgpzdGFydHhyZWYKNTcyCiUlRU9GCg==",
-  "base64"
+const pdfBuffer = readFileSync(
+  fileURLToPath(new URL("./assets/mock-document.pdf", import.meta.url))
 );
 
 interface ParsedArgs {
@@ -560,5 +559,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await Promise.allSettled([redis.quit(), db.$disconnect()]);
+    await db.$disconnect();
   });
