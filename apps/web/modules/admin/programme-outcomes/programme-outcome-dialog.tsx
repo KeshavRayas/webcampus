@@ -138,7 +138,12 @@ export const ProgrammeOutcomeDialog = ({
   });
 
   const onSubmit = (values: CreateProgrammeOutcomeType) => {
-    mutation.mutate(values);
+    // "None" option uses "" in the form — convert to null so the API
+    // stores it as a common (department-less) outcome.
+    mutation.mutate({
+      ...values,
+      departmentId: values.departmentId || null,
+    });
   };
 
   const departments = departmentsQuery.data?.data?.data || [];

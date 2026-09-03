@@ -41,7 +41,14 @@ export const createProgrammeOutcome = async (
   next: NextFunction
 ) => {
   try {
-    const parsed = CreateProgrammeOutcomeSchema.parse(req.body);
+    // Normalize legacy/empty-string payloads ("None" option sends "") to null
+    // before validation so common (department-less) outcomes can be created.
+    const normalizedBody = {
+      ...req.body,
+      departmentId:
+        req.body?.departmentId === "" ? null : req.body?.departmentId,
+    };
+    const parsed = CreateProgrammeOutcomeSchema.parse(normalizedBody);
 
     // I will use findFirst to be safe with null departmentId.
     const duplicate = await db.programmeOutcome.findFirst({

@@ -2,7 +2,14 @@ import { z } from "zod";
 
 export const CreateProgrammeOutcomeSchema = z.object({
   programType: z.enum(["UG", "PG"]),
-  departmentId: z.string().uuid("Invalid department ID").optional().nullable(),
+  // "" is the form's "None (Common)" sentinel — accepted here then
+  // normalized to null in the dialog/controller before DB write.
+  departmentId: z
+    .string()
+    .uuid("Invalid department ID")
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
   type: z.enum(["PEO", "PSO", "PO"]),
   code: z.string().min(1, "Code is required"),
   description: z.string().min(1, "Description is required"),

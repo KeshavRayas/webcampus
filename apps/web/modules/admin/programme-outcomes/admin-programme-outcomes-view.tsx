@@ -67,10 +67,15 @@ export const AdminProgrammeOutcomesView = () => {
   const filteredOutcomes = allOutcomes.filter((outcome) => {
     if (outcome.programType !== programType) return false;
     if (outcome.type !== outcomeType) return false;
-    if (departmentId === "all") {
+    if (departmentId === "all") return true;
+    if (departmentId === "common") {
       return outcome.departmentId === null;
     }
-    return outcome.departmentId === departmentId;
+    // Specific department: include both common (null) outcomes — they apply
+    // to all departments (same semantics as faculty view) — plus this dept.
+    return (
+      outcome.departmentId === null || outcome.departmentId === departmentId
+    );
   });
 
   return (
@@ -108,7 +113,10 @@ export const AdminProgrammeOutcomesView = () => {
                 <SelectValue placeholder="Select Department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Common (All Departments)</SelectItem>
+                <SelectItem value="all">
+                  All (Common + All Departments)
+                </SelectItem>
+                <SelectItem value="common">Common (No Department)</SelectItem>
                 {departments.map((dept) => (
                   <SelectItem key={dept.id} value={dept.id}>
                     {dept.name}
@@ -146,7 +154,11 @@ export const AdminProgrammeOutcomesView = () => {
         isOpen={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         defaultProgramType={programType}
-        defaultDepartmentId={departmentId === "all" ? "" : departmentId}
+        defaultDepartmentId={
+          departmentId === "all" || departmentId === "common"
+            ? ""
+            : departmentId
+        }
         defaultType={outcomeType}
       />
     </Page>
