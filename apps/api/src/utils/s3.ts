@@ -8,47 +8,72 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { backendEnv } from "@webcampus/common/env";
+import { logger } from "@webcampus/common/logger";
 import { v4 as uuidv4 } from "uuid";
 
-// MinIO / S3-compatible configuration
-const ENDPOINT = process.env.MINIO_ENDPOINT;
-const BUCKET = process.env.MINIO_BUCKET_NAME;
-const REGION = process.env.MINIO_REGION;
+// MinIO / S3-compatible configuration — validated via Zod at startup
+
+const {
+  MINIO_ENDPOINT: ENDPOINT,
+  MINIO_BUCKET_NAME: BUCKET,
+  MINIO_REGION: REGION,
+  MINIO_ACCESS_KEY_ID,
+  MINIO_SECRET_ACCESS_KEY,
+} = backendEnv();
 
 const s3Client = new S3Client({
   region: REGION,
   endpoint: ENDPOINT,
   forcePathStyle: true, // Required for MinIO
   credentials: {
-    accessKeyId: process.env.MINIO_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.MINIO_SECRET_ACCESS_KEY!,
+    accessKeyId: MINIO_ACCESS_KEY_ID,
+    secretAccessKey: MINIO_SECRET_ACCESS_KEY,
   },
 });
 
 // Bucket auto-creation
 let bucketReady = false;
+let bucketReadyPromise: Promise<void> | null = null;
 
 async function ensureBucket(): Promise<void> {
   if (bucketReady) return;
+  if (bucketReadyPromise) return bucketReadyPromise;
 
-  try {
-    await s3Client.send(new HeadBucketCommand({ Bucket: BUCKET }));
-    bucketReady = true;
-  } catch (error: unknown) {
-    const code =
-      error && typeof error === "object" && "$metadata" in error
-        ? (error as { $metadata: { httpStatusCode?: number } }).$metadata
-            .httpStatusCode
-        : undefined;
-
-    if (code === 404 || code === 403) {
-      await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET }));
-      console.log(`[MinIO] Created bucket "${BUCKET}"`);
+  bucketReadyPromise = (async () => {
+    try {
+      await s3Client.send(new HeadBucketCommand({ Bucket: BUCKET }));
       bucketReady = true;
-    } else {
-      throw error;
+    } catch (error: unknown) {
+      const code =
+        error && typeof error === "object" && "$metadata" in error
+          ? (error as { $metadata: { httpStatusCode?: number } }).$metadata
+              .httpStatusCode
+          : undefined;
+
+      if (code === 404 || code === 403) {
+        try {
+          await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET }));
+        } catch (createErr: unknown) {
+          const createCode =
+            createErr &&
+            typeof createErr === "object" &&
+            "$metadata" in createErr
+              ? (createErr as { $metadata: { httpStatusCode?: number } })
+                  .$metadata.httpStatusCode
+              : undefined;
+          // 409 = BucketAlreadyOwnedByYou / BucketAlreadyExists — safe to ignore
+          if (createCode !== 409) throw createErr;
+        }
+        logger.info(`[MinIO] Created bucket "${BUCKET}"`);
+        bucketReady = true;
+      } else {
+        throw error;
+      }
     }
-  }
+  })();
+
+  await bucketReadyPromise;
 }
 
 // Helpers
@@ -139,7 +164,7 @@ export const uploadToS3 = async (
     await s3Client.send(command);
 
     // Return the proxy route URL instead of the direct MinIO URL
-    const backendUrl = process.env.BETTER_AUTH_URL || "http://localhost:8080";
+    const backendUrl = backendEnv().BETTER_AUTH_URL;
     const url = `${backendUrl}/files/${fileName}`;
 
     // Old MinIO path-style URL (commented out for reference):
@@ -147,7 +172,7 @@ export const uploadToS3 = async (
 
     return { success: true, url };
   } catch (error) {
-    console.error("S3 Upload Error:", error);
+    logger.error("S3 Upload Error:", error as Record<string, unknown>);
     return { success: false, url: null };
   }
 };
@@ -170,7 +195,7 @@ export const uploadBufferToS3 = async (
     await s3Client.send(command);
     return { success: true, key: fileName };
   } catch (error) {
-    console.error("S3 Upload Error:", error);
+    logger.error("S3 Upload Error:", error as Record<string, unknown>);
     return { success: false, key: null };
   }
 };
@@ -222,7 +247,7 @@ export const deleteFromS3 = async (
     await s3Client.send(command);
     return { success: true };
   } catch (error) {
-    console.error("S3 Delete Error:", error);
+    logger.error("S3 Delete Error:", error as Record<string, unknown>);
     return { success: false };
   }
 };

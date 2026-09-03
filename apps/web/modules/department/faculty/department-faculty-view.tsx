@@ -1,12 +1,12 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import {
   createFilterQueryString,
   getFiltersFromSearchParams,
 } from "@/lib/filter-search-params";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { DepartmentFacultyResponseType } from "@webcampus/schemas/department";
 import { DesignationEnum } from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
@@ -19,7 +19,6 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import { Skeleton } from "@webcampus/ui/components/skeleton";
-import axios from "axios";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import { departmentFacultyColumns } from "./department-faculty-columns";
@@ -50,18 +49,13 @@ export const DepartmentFacultyView = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data: session } = authClient.useSession();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   // Fetch department type for conditional filter rendering
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
-        {
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get<
+        BaseResponse<{ type: string; name: string }>
+      >(`/department/section/department-info`);
       if (res.data.status === "success") return res.data.data;
       return { type: "DEGREE_GRANTING", name: "" };
     },
@@ -117,11 +111,10 @@ export const DepartmentFacultyView = () => {
           : {}),
       };
 
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<DepartmentFacultyResponseType[]>
-      >(`${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/department/faculty`, {
+      >(`/department/faculty`, {
         params: apiFilters,
-        withCredentials: true,
       });
 
       if (res.data.status === "success" && Array.isArray(res.data.data)) {

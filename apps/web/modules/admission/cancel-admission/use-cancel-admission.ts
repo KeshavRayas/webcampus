@@ -26,8 +26,7 @@ export const useCancelAdmission = () => {
     }) => {
       const response = await apiClient.patch<BaseResponse<unknown>>(
         `/admission/${id}/cancel`,
-        { reason, otherReason, description },
-        { withCredentials: true }
+        { reason, otherReason, description }
       );
 
       if (response.data.status === "error") {

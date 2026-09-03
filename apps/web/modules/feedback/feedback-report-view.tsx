@@ -69,7 +69,7 @@ export function FeedbackReportView({
   role,
   title,
 }: {
-  role: "faculty" | "hod" | "department" | "coe" | "admin";
+  role: "faculty" | "hod" | "department" | "coe" | "admin" | "coordinator";
   title: string;
 }) {
   const [draftFilters, setDraftFilters] = useState<Filters>(EMPTY_FILTERS);

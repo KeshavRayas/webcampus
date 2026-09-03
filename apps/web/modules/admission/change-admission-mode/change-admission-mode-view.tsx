@@ -13,12 +13,8 @@ export function ChangeAdmissionModeView() {
     queryKey: ["change-admission-mode"],
 
     queryFn: async () => {
-      const res = await apiClient.get<BaseResponse<AdmissionResponse[]>>(
-        "/admission",
-        {
-          withCredentials: true,
-        }
-      );
+      const res =
+        await apiClient.get<BaseResponse<AdmissionResponse[]>>("/admission");
 
       if (res.data.status === "error") {
         throw new Error(res.data.message);

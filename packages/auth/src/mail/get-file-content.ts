@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
+import { logger } from "@webcampus/common/logger";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,12 +27,22 @@ export const getFileContent = async ({
     const absolutePath = path.resolve(__dirname, "../", ...fileName.split("/"));
     let content = await fs.readFile(absolutePath, "utf-8");
     for (const [key, value] of Object.entries(variables)) {
-      const regex = new RegExp(`{${key}}`, "g");
-      content = content.replace(regex, value);
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`{${escapedKey}}`, "g");
+      const escapedValue = value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#x27;");
+      content = content.replace(regex, escapedValue);
     }
     return content;
   } catch (err) {
-    console.error(`Error reading or processing file "${fileName}":`, err);
+    logger.error(
+      `Error reading or processing file "${fileName}":`,
+      err as Record<string, unknown>
+    );
     throw new Error("Could not load email template.");
   }
 };

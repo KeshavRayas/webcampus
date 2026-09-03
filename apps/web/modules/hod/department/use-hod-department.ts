@@ -1,8 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
-import axios from "axios";
 
 export interface HODDepartmentInfo {
   departmentId: string;
@@ -11,15 +10,10 @@ export interface HODDepartmentInfo {
 }
 
 export const useHODDepartment = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["hod-department"],
     queryFn: async (): Promise<HODDepartmentInfo> => {
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/department`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get(`/hod/department`);
       return res.data.data;
     },
   });

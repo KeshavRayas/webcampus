@@ -34,6 +34,7 @@ export const DepartmentStudentResponseSchema = z.object({
   usn: z.string(),
   name: z.string().nullable(),
   email: z.string().nullable(),
+  departmentId: z.string(),
   departmentName: z.string(),
   currentSemester: z.number().int(),
   academicYear: z.string(),

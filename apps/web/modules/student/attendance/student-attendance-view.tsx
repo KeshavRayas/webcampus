@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
@@ -17,7 +17,6 @@ import {
   FilterFieldConfig,
   FilterPanel,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { ArrowLeft, Calendar, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useStudentTerms } from "./use-student-terms";
@@ -45,7 +44,6 @@ type AttendanceFilters = {
 };
 
 export const StudentAttendanceView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: terms, isLoading: termsLoading } = useStudentTerms();
 
   const [draftFilters, setDraftFilters] = useState<AttendanceFilters>({
@@ -112,11 +110,10 @@ export const StudentAttendanceView = () => {
   const { data: summaries, isLoading: summaryLoading } = useQuery({
     queryKey: ["student-attendance-summary", appliedFilters.semesterId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<CourseAttendanceSummary[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/student/attendance/summary`,
+      const res = await apiClient.get<BaseResponse<CourseAttendanceSummary[]>>(
+        `/student/attendance/summary`,
         {
           params: { semesterId: appliedFilters.semesterId },
-          withCredentials: true,
         }
       );
       return res.data.status === "success" ? res.data.data : [];
@@ -128,15 +125,12 @@ export const StudentAttendanceView = () => {
   const { data: details, isLoading: detailsLoading } = useQuery({
     queryKey: ["student-course-attendance-details", selectedCourse?.id],
     queryFn: async () => {
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{
           course: { code: string; name: string };
           sessions: SessionDetail[];
         }>
-      >(
-        `${NEXT_PUBLIC_API_BASE_URL}/student/attendance/course/${selectedCourse?.id}`,
-        { withCredentials: true }
-      );
+      >(`/student/attendance/course/${selectedCourse?.id}`);
       return res.data.status === "success" ? res.data.data : null;
     },
     enabled: !!selectedCourse?.id,

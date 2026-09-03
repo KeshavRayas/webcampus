@@ -7,18 +7,23 @@ type SendEmailParams = {
   html: string;
 };
 
+let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
+
+function getTransporter() {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: backendEnv().SENDER_EMAIL,
+        pass: backendEnv().GMAIL_APP_PASSWORD,
+      },
+    });
+  }
+  return transporter;
+}
+
 export const sendEmail = async ({ to, subject, html }: SendEmailParams) => {
-  /**
-   * TODO: Replace with a production grade SMTP service.
-   */
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: backendEnv().SENDER_EMAIL,
-      pass: backendEnv().GMAIL_APP_PASSWORD,
-    },
-  });
-  const response = await transporter.sendMail({
+  const response = await getTransporter().sendMail({
     from: backendEnv().SENDER_EMAIL,
     to,
     subject,

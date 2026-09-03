@@ -1,14 +1,15 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CreateAssessmentSchema,
   CreateAssessmentType,
 } from "@webcampus/schemas/faculty";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
+import { ConfirmDialog } from "@webcampus/ui/components/confirm-dialog";
 import {
   Form,
   FormControl,
@@ -24,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { Copy, Loader2, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -50,13 +51,45 @@ const inferNumberOfParts = (
 };
 
 export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [isCopying, setIsCopying] = useState(false);
   const [computedTotal, setComputedTotal] = useState(0);
 
   const { course, assessmentTitle, maxMarks, componentType, sequence } =
     setupContext;
+
+  const outcomesQuery = useQuery({
+    queryKey: ["programme-outcomes", course.id],
+    queryFn: async () => {
+      return await apiClient.get(
+        `/faculty/programme-outcomes?courseId=${course.id}`
+      );
+    },
+  });
+
+  const coQuery = useQuery({
+    queryKey: ["course-outcomes", course.id],
+    queryFn: async () => {
+      return await apiClient.get(
+        `/faculty/course-outcomes?courseId=${course.id}`
+      );
+    },
+  });
+
+  const groupedOutcomes = useMemo(() => {
+    const data = outcomesQuery.data?.data?.data || [];
+    const groups: Record<string, typeof data> = {
+      PEO: [],
+      PSO: [],
+      PO: [],
+    };
+    data.forEach((outcome: { id: string; type: string; code: string }) => {
+      if (groups[outcome.type]) {
+        groups[outcome.type].push(outcome);
+      }
+    });
+    return groups;
+  }, [outcomesQuery.data]);
 
   const baseType = assessmentTitle.split(" ")[0] || "";
 
@@ -122,6 +155,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
             marks: 1,
             co: "",
             po: "",
+            peo: "",
+            pso: "",
             bl: "",
             orGroupId: undefined,
           });
@@ -133,6 +168,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
           marks: 1,
           co: "",
           po: "",
+          peo: "",
+          pso: "",
           bl: "",
           orGroupId: undefined,
         });
@@ -371,21 +408,20 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
     });
   };
 
-  const handleCopyFrom = async (assessmentId: string) => {
-    if (
-      !window.confirm(
-        "This will overwrite your current questions. Are you sure?"
-      )
-    ) {
-      return;
-    }
+  const [pendingCopyId, setPendingCopyId] = useState<string | null>(null);
 
+  const handleCopyFrom = async (assessmentId: string) => {
+    setPendingCopyId(assessmentId);
+    return;
+  };
+
+  const confirmCopyFrom = async () => {
+    const assessmentId = pendingCopyId;
+    if (!assessmentId) return;
+    setPendingCopyId(null);
     setIsCopying(true);
     try {
-      const res = await axios.get(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment/${assessmentId}`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get(`/faculty/assessment/${assessmentId}`);
 
       const data = res.data.data;
       if (data && data.questions) {
@@ -396,6 +432,8 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
             marks: q.marks,
             co: q.co || undefined,
             po: q.po || undefined,
+            peo: q.peo || undefined,
+            pso: q.pso || undefined,
             bl: q.bl || undefined,
             orGroupId: q.orGroupId || undefined,
           })
@@ -425,11 +463,7 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
 
   const mutation = useMutation({
     mutationFn: async (values: CreateAssessmentType) => {
-      return await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment`,
-        values,
-        { withCredentials: true }
-      );
+      return await apiClient.post(`/faculty/assessment`, values);
     },
     onSuccess: () => {
       toast.success(`${assessmentTitle} configured successfully`);
@@ -573,11 +607,13 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
                       <thead className="bg-muted text-muted-foreground text-xs uppercase">
                         <tr>
                           <th className="w-20 px-4 py-3">Q#</th>
-                          <th className="w-32 px-4 py-3">Marks</th>
-                          <th className="w-32 px-4 py-3">CO</th>
-                          <th className="w-32 px-4 py-3">PO</th>
-                          <th className="w-32 px-4 py-3">BL</th>
-                          <th className="w-40 px-4 py-3">OR</th>
+                          <th className="w-24 px-4 py-3">Marks</th>
+                          <th className="w-28 px-4 py-3">CO</th>
+                          <th className="w-28 px-4 py-3">PO</th>
+                          <th className="w-28 px-4 py-3">PEO</th>
+                          <th className="w-28 px-4 py-3">PSO</th>
+                          <th className="w-28 px-4 py-3">BL</th>
+                          <th className="w-32 px-4 py-3">OR</th>
                           <th className="w-16 px-4 py-3 text-right"></th>
                         </tr>
                       </thead>
@@ -642,11 +678,29 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormControl>
-                                        <Input
-                                          className="h-8 uppercase placeholder:normal-case"
-                                          placeholder="CO1"
-                                          {...field}
-                                        />
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          value={field.value || undefined}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="CO" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {coQuery.data?.data?.data?.map(
+                                              (co: {
+                                                id: string;
+                                                code: string;
+                                              }) => (
+                                                <SelectItem
+                                                  key={co.id}
+                                                  value={co.code}
+                                                >
+                                                  {co.code}
+                                                </SelectItem>
+                                              )
+                                            )}
+                                          </SelectContent>
+                                        </Select>
                                       </FormControl>
                                     </FormItem>
                                   )}
@@ -659,11 +713,99 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormControl>
-                                        <Input
-                                          className="h-8 uppercase placeholder:normal-case"
-                                          placeholder="PO1"
-                                          {...field}
-                                        />
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          value={field.value || undefined}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="PO" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {groupedOutcomes["PO"]?.map(
+                                              (po: {
+                                                id: string;
+                                                code: string;
+                                              }) => (
+                                                <SelectItem
+                                                  key={po.id}
+                                                  value={po.code}
+                                                >
+                                                  {po.code}
+                                                </SelectItem>
+                                              )
+                                            )}
+                                          </SelectContent>
+                                        </Select>
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`questions.${index}.peo`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          value={field.value || undefined}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="PEO" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {groupedOutcomes["PEO"]?.map(
+                                              (peo: {
+                                                id: string;
+                                                code: string;
+                                              }) => (
+                                                <SelectItem
+                                                  key={peo.id}
+                                                  value={peo.code}
+                                                >
+                                                  {peo.code}
+                                                </SelectItem>
+                                              )
+                                            )}
+                                          </SelectContent>
+                                        </Select>
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`questions.${index}.pso`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          value={field.value || undefined}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="PSO" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {groupedOutcomes["PSO"]?.map(
+                                              (pso: {
+                                                id: string;
+                                                code: string;
+                                              }) => (
+                                                <SelectItem
+                                                  key={pso.id}
+                                                  value={pso.code}
+                                                >
+                                                  {pso.code}
+                                                </SelectItem>
+                                              )
+                                            )}
+                                          </SelectContent>
+                                        </Select>
                                       </FormControl>
                                     </FormItem>
                                   )}
@@ -778,6 +920,18 @@ export const QPSetupForm = ({ setupContext, onSuccess }: QPSetupFormProps) => {
           </div>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={!!pendingCopyId}
+        onOpenChange={(open) => {
+          if (!open) setPendingCopyId(null);
+        }}
+        title="Overwrite current questions?"
+        description="This will overwrite your current questions. This action cannot be undone."
+        confirmLabel="Overwrite"
+        variant="destructive"
+        onConfirm={() => void confirmCopyFrom()}
+      />
     </Form>
   );
 };

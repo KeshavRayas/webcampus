@@ -1,10 +1,9 @@
 "use client";
 
-import { stripDepartmentOwnershipFields } from "@/lib/api-client";
+import { apiClient, stripDepartmentOwnershipFields } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
-import { frontendEnv } from "@webcampus/common/env";
 import { courseTypeLabel } from "@webcampus/schemas/constants";
 import {
   CourseResponseDTO,
@@ -29,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@webcampus/ui/components/dropdown-menu";
 import { Form } from "@webcampus/ui/components/form";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
@@ -47,8 +46,6 @@ const COURSE_MODE_LABELS: Record<string, string> = {
 /** Row actions component with Edit and Delete dialogs */
 const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -95,11 +92,10 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
 
   const updateMutation = useMutation({
     mutationFn: async (values: CreateCourseDTO) => {
-      return await axios.put(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course`,
-        { id: course.id, ...stripDepartmentOwnershipFields(values) },
-        { withCredentials: true }
-      );
+      return await apiClient.put(`/department/course`, {
+        id: course.id,
+        ...stripDepartmentOwnershipFields(values),
+      });
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);
@@ -114,13 +110,9 @@ const CourseRowActions = ({ course }: { course: CourseResponseDTO }) => {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      return await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course`,
-        {
-          data: { id: course.id },
-          withCredentials: true,
-        }
-      );
+      return await apiClient.delete(`/department/course`, {
+        data: { id: course.id },
+      });
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {
       toast.success(data.data.message);

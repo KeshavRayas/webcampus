@@ -1,4 +1,6 @@
 import { auth } from "@webcampus/auth";
+import { ERRORS } from "@webcampus/backend-utils/errors";
+import { sendResponse } from "@webcampus/backend-utils/helpers";
 import { logger } from "@webcampus/common/logger";
 import { db, Designation } from "@webcampus/db";
 import { fromNodeHeaders } from "better-auth/node";
@@ -28,20 +30,40 @@ const toDurationLabel = (startDate: Date, endDate?: Date | null) => {
   return `${years} year${years === 1 ? "" : "s"} ${months} month${months === 1 ? "" : "s"}`;
 };
 
+const getStatusCode = (error: unknown): number => {
+  if (!(error instanceof Error)) return 500;
+  if (error.message === "Unauthorized") return 401;
+  if (error.message.includes("Unauthorized")) return 403;
+  if (error.message.includes("not found")) return 404;
+  return 500;
+};
+
 export const getDepartmentFaculty = async (req: Request, res: Response) => {
   try {
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),
     });
     if (!session?.user?.id) {
-      return res.status(401).json({ error: "Unauthorized" });
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 401,
+        message: ERRORS.UNAUTHORIZED,
+        error: ERRORS.UNAUTHORIZED,
+      });
+      return;
     }
 
     const hodDepartment = await resolveHODDepartment(session.user.id);
     if (!hodDepartment) {
-      return res
-        .status(403)
-        .json({ error: "Unauthorized: No department attached to HOD" });
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 403,
+        message: "Unauthorized: No department attached to HOD",
+        error: "Unauthorized: No department attached to HOD",
+      });
+      return;
     }
 
     const { departmentId } = hodDepartment;
@@ -92,14 +114,23 @@ export const getDepartmentFaculty = async (req: Request, res: Response) => {
       designation: f.designation,
     }));
 
-    res.json({
+    sendResponse({
+      res,
       status: "success",
+      statusCode: 200,
       message: "Department faculty fetched successfully",
       data: mapped,
     });
   } catch (error: unknown) {
     logger.error("Failed to get department faculty", { error });
-    res.status(500).json({ error: (error as Error).message });
+    sendResponse({
+      res,
+      status: "error",
+      statusCode: getStatusCode(error),
+      message:
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
   }
 };
 
@@ -109,14 +140,26 @@ export const getFacultyProfile = async (req: Request, res: Response) => {
       headers: fromNodeHeaders(req.headers),
     });
     if (!session?.user?.id) {
-      return res.status(401).json({ error: "Unauthorized" });
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 401,
+        message: ERRORS.UNAUTHORIZED,
+        error: ERRORS.UNAUTHORIZED,
+      });
+      return;
     }
 
     const hodDepartment = await resolveHODDepartment(session.user.id);
     if (!hodDepartment) {
-      return res
-        .status(403)
-        .json({ error: "Unauthorized: No department attached to HOD" });
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 403,
+        message: "Unauthorized: No department attached to HOD",
+        error: "Unauthorized: No department attached to HOD",
+      });
+      return;
     }
 
     const { departmentId } = hodDepartment;
@@ -162,9 +205,14 @@ export const getFacultyProfile = async (req: Request, res: Response) => {
     });
 
     if (!faculty || faculty.departmentId !== departmentId) {
-      return res
-        .status(404)
-        .json({ error: "Faculty profile not found or access denied" });
+      sendResponse({
+        res,
+        status: "error",
+        statusCode: 404,
+        message: "Faculty profile not found or access denied",
+        error: "Faculty profile not found or access denied",
+      });
+      return;
     }
 
     const data = {
@@ -180,13 +228,22 @@ export const getFacultyProfile = async (req: Request, res: Response) => {
       ),
     };
 
-    res.json({
+    sendResponse({
+      res,
       status: "success",
+      statusCode: 200,
       message: "Faculty profile fetched successfully",
       data,
     });
   } catch (error: unknown) {
     logger.error("Error retrieving faculty profile by HOD", { error });
-    res.status(500).json({ error: (error as Error).message });
+    sendResponse({
+      res,
+      status: "error",
+      statusCode: getStatusCode(error),
+      message:
+        error instanceof Error ? error.message : ERRORS.INTERNAL_SERVER_ERROR,
+      error: error instanceof Error ? error : new Error(String(error)),
+    });
   }
 };

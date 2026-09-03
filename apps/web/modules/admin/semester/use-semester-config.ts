@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CreateSemesterConfigType,
   SemesterConfigResponseType,
@@ -11,19 +11,16 @@ import {
   ErrorResponse,
   SuccessResponse,
 } from "@webcampus/types/api";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
 export const useSemestersByTerm = (termId: string) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["semesters", termId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<SemesterConfigResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester/${termId}/semesters`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get<
+        BaseResponse<SemesterConfigResponseType[]>
+      >(`/admin/semester/${termId}/semesters`);
       if (res.data.status === "success") {
         return res.data.data;
       }
@@ -36,15 +33,13 @@ export const useSemestersByTerm = (termId: string) => {
 };
 
 export const useBulkUpsertSemesters = (termId: string) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: CreateSemesterConfigType[]) => {
-      return await axios.put<SuccessResponse<SemesterConfigResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester/${termId}/semesters`,
-        data,
-        { withCredentials: true }
+      return await apiClient.put<SuccessResponse<SemesterConfigResponseType[]>>(
+        `/admin/semester/${termId}/semesters`,
+        data
       );
     },
     onSuccess: (res) => {

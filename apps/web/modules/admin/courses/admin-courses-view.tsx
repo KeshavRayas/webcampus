@@ -1,5 +1,6 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import {
   createFilterQueryString,
   getFiltersFromSearchParams,
@@ -8,7 +9,6 @@ import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useDepartments } from "@/lib/use-departments";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import {
@@ -17,7 +17,6 @@ import {
   FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { Lock } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -45,7 +44,6 @@ const EMPTY_FILTERS: AdminCoursesFilters = {
 };
 
 export const AdminCoursesView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -208,8 +206,8 @@ export const AdminCoursesView = () => {
       appliedFilters.cycle,
     ],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<CourseResponseDTO[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/course/branch`,
+      const res = await apiClient.get<BaseResponse<CourseResponseDTO[]>>(
+        `/admin/course/branch`,
         {
           params: {
             departmentId: appliedFilters.departmentId,
@@ -219,7 +217,6 @@ export const AdminCoursesView = () => {
               ? { cycle: appliedFilters.cycle }
               : {}),
           },
-          withCredentials: true,
         }
       );
 

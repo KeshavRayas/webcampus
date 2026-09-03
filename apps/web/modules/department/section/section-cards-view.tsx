@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import {
   AlertDialog,
@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@webcampus/ui/components/table";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { Plus, Trash2, Users, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { toast } from "react-toastify";
@@ -84,7 +84,6 @@ export const SectionCardsView = ({
 }: SectionCardsViewProps) => {
   const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const departmentName = session?.user?.name ?? "";
 
   // Assign dialog state
@@ -107,13 +106,11 @@ export const SectionCardsView = ({
   const { data: sections, isLoading } = useQuery({
     queryKey: ["sections-with-students", semesterId, departmentName],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<SectionsWithStudentsResponse>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/with-students`,
-        {
-          params: { semesterId, departmentName },
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get<
+        BaseResponse<SectionsWithStudentsResponse>
+      >(`/department/section/with-students`, {
+        params: { semesterId, departmentName },
+      });
       if (
         res.data.status === "success" &&
         Array.isArray(res.data.data?.sections)
@@ -127,10 +124,7 @@ export const SectionCardsView = ({
 
   const deleteSectionMutation = useMutation({
     mutationFn: async (sectionId: string) => {
-      return axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/${sectionId}`,
-        { withCredentials: true }
-      );
+      return apiClient.delete(`/department/section/${sectionId}`);
     },
     onSuccess: (res) => {
       toast.success(res.data.message || "Section deleted successfully");
@@ -150,10 +144,7 @@ export const SectionCardsView = ({
 
   const removeStudentMutation = useMutation({
     mutationFn: async (assignmentId: string) => {
-      return axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section-assignment/${assignmentId}`,
-        { withCredentials: true }
-      );
+      return apiClient.delete(`/department/section-assignment/${assignmentId}`);
     },
     onSuccess: (res) => {
       toast.success(res.data.message || "Student removed from section");

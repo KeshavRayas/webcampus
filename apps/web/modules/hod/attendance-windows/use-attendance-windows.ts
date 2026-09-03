@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import type { BaseResponse, ErrorResponse } from "@webcampus/types/api";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
 export type HODAttendanceWindowDisplayState =
@@ -59,16 +59,13 @@ export const useHODSections = (
   semesterId: string | undefined,
   enabled: boolean
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["hod-sections", semesterId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<HODSection[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/attendance-windows/sections`,
+      const res = await apiClient.get<BaseResponse<HODSection[]>>(
+        `/hod/attendance-windows/sections`,
         {
           params: semesterId ? { semesterId } : {},
-          withCredentials: true,
         }
       );
       if (res.data.status === "success") return res.data.data || [];
@@ -82,20 +79,17 @@ export const useHODAttendanceWindows = (
   filters: HODAttendanceWindowFilters,
   enabled: boolean
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["hod-attendance-windows", filters],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<HODAttendanceWindowRow[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/attendance-windows`,
+      const res = await apiClient.get<BaseResponse<HODAttendanceWindowRow[]>>(
+        `/hod/attendance-windows`,
         {
           params: {
             academicTermId: filters.academicTermId,
             semesterId: filters.semesterId,
             ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
           },
-          withCredentials: true,
         }
       );
 
@@ -110,15 +104,13 @@ export const useHODAttendanceWindows = (
 };
 
 export const useHODBulkFreezeAttendanceWindows = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload: HODAttendanceWindowFilters) => {
-      return axios.post<BaseResponse<HODBulkResult>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/attendance-windows/freeze`,
-        payload,
-        { withCredentials: true }
+      return apiClient.post<BaseResponse<HODBulkResult>>(
+        `/hod/attendance-windows/freeze`,
+        payload
       );
     },
     onSuccess: (res) => {
@@ -136,15 +128,13 @@ export const useHODBulkFreezeAttendanceWindows = () => {
 };
 
 export const useHODBulkUnfreezeAttendanceWindows = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload: HODAttendanceWindowFilters) => {
-      return axios.post<BaseResponse<HODBulkResult>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/attendance-windows/unfreeze`,
-        payload,
-        { withCredentials: true }
+      return apiClient.post<BaseResponse<HODBulkResult>>(
+        `/hod/attendance-windows/unfreeze`,
+        payload
       );
     },
     onSuccess: (res) => {
@@ -162,15 +152,13 @@ export const useHODBulkUnfreezeAttendanceWindows = () => {
 };
 
 export const useHODFreezeAssignment = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (courseAssignmentId: string) => {
-      return axios.post<BaseResponse<HODAttendanceWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/attendance-windows/${courseAssignmentId}/freeze`,
-        {},
-        { withCredentials: true }
+      return apiClient.post<BaseResponse<HODAttendanceWindowRow>>(
+        `/hod/attendance-windows/${courseAssignmentId}/freeze`,
+        {}
       );
     },
     onSuccess: (res) => {
@@ -188,15 +176,13 @@ export const useHODFreezeAssignment = () => {
 };
 
 export const useHODUnfreezeAssignment = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (courseAssignmentId: string) => {
-      return axios.post<BaseResponse<HODAttendanceWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/attendance-windows/${courseAssignmentId}/unfreeze`,
-        {},
-        { withCredentials: true }
+      return apiClient.post<BaseResponse<HODAttendanceWindowRow>>(
+        `/hod/attendance-windows/${courseAssignmentId}/unfreeze`,
+        {}
       );
     },
     onSuccess: (res) => {

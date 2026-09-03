@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Dialog,
@@ -22,7 +22,7 @@ import {
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
 import { PasswordInput } from "@webcampus/ui/components/password-input";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
@@ -43,7 +43,6 @@ export const CoeForm = () => {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -115,16 +114,11 @@ export const CoeForm = () => {
       formData.append("password", values.password);
       formData.append("photo", photoFile);
 
-      const res = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/coe`,
-        formData,
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const res = await apiClient.post(`/admin/coe`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
       if (res.data.status === "success") {
         toast.success("COE user created successfully");

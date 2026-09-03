@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { frontendEnv } from "@webcampus/common/env";
 import type { ProjectMappingExcelError } from "@webcampus/schemas/department";
 import type { BaseResponse } from "@webcampus/types/api";
 import { Badge } from "@webcampus/ui/components/badge";
@@ -37,7 +37,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@webcampus/ui/components/tabs";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -185,9 +185,8 @@ export function ProjectMappingDetailView({
   basePath,
   departmentId,
 }: Props) {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const apiBase = `${NEXT_PUBLIC_API_BASE_URL}${basePath}/project-mapping`;
-  const facultyApi = `${NEXT_PUBLIC_API_BASE_URL}${basePath}/course-assignment/faculty`;
+  const apiBase = `${basePath}/project-mapping`;
+  const facultyApi = `${basePath}/course-assignment/faculty`;
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("students");
@@ -222,9 +221,9 @@ export function ProjectMappingDetailView({
   const detailQuery = useQuery({
     queryKey: ["project-mapping-detail", courseId, departmentId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<DetailData>>(
+      const res = await apiClient.get<BaseResponse<DetailData>>(
         `${apiBase}/${courseId}`,
-        { params: { departmentId }, withCredentials: true }
+        { params: { departmentId } }
       );
       return res.data.status === "success" ? res.data.data : null;
     },
@@ -234,9 +233,8 @@ export function ProjectMappingDetailView({
   const facultyQuery = useQuery({
     queryKey: ["course-assignment-faculty", basePath],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<FacultyOption[]>>(facultyApi, {
-        withCredentials: true,
-      });
+      const res =
+        await apiClient.get<BaseResponse<FacultyOption[]>>(facultyApi);
       return res.data.status === "success" ? res.data.data : [];
     },
     enabled: Boolean(courseId),
@@ -251,7 +249,7 @@ export function ProjectMappingDetailView({
       departmentId,
     ],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<GroupsData>>(
+      const res = await apiClient.get<BaseResponse<GroupsData>>(
         `${apiBase}/${courseId}/groups`,
         {
           params: {
@@ -266,7 +264,6 @@ export function ProjectMappingDetailView({
             sectionId: appliedGroupFilters.sectionId || undefined,
             departmentId,
           },
-          withCredentials: true,
         }
       );
       return res.data.status === "success" ? res.data.data : null;
@@ -277,9 +274,9 @@ export function ProjectMappingDetailView({
   const groupDetailQuery = useQuery({
     queryKey: ["project-mapping-group", courseId, openGroupId, departmentId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<GroupDetail>>(
+      const res = await apiClient.get<BaseResponse<GroupDetail>>(
         `${apiBase}/${courseId}/groups/${openGroupId}`,
-        { params: { departmentId }, withCredentials: true }
+        { params: { departmentId } }
       );
       return res.data.status === "success" ? res.data.data : null;
     },
@@ -308,9 +305,9 @@ export function ProjectMappingDetailView({
         localFaculty,
         departmentId,
       });
-      const res = await axios.put<
+      const res = await apiClient.put<
         BaseResponse<{ electiveMappingVersion: number }>
-      >(`${apiBase}/save-full`, payload, { withCredentials: true });
+      >(`${apiBase}/save-full`, payload);
       return res.data;
     },
     onSuccess: () => {
@@ -347,7 +344,7 @@ export function ProjectMappingDetailView({
       formData.append("file", file);
       formData.append("courseId", courseId);
       if (departmentId) formData.append("departmentId", departmentId);
-      const res = await axios.post<
+      const res = await apiClient.post<
         BaseResponse<{
           assignments: { studentId: string; electiveBatchId: string }[];
           facultyAssignments: {
@@ -356,7 +353,6 @@ export function ProjectMappingDetailView({
           }[];
         }>
       >(`${apiBase}/${courseId}/excel/validate`, formData, {
-        withCredentials: true,
         headers: { "Content-Type": "multipart/form-data" },
       });
       return res.data;
@@ -393,10 +389,9 @@ export function ProjectMappingDetailView({
 
   const handleDownloadTemplate = async () => {
     try {
-      const res = await axios.get(`${apiBase}/${courseId}/excel/template`, {
+      const res = await apiClient.get(`${apiBase}/${courseId}/excel/template`, {
         params: { departmentId },
         responseType: "blob",
-        withCredentials: true,
       });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");

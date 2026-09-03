@@ -9,6 +9,15 @@ const PREFIX = "ba:";
 
 const keyFor = (key: string): string => `${PREFIX}${key}`;
 
+// Atomic GET + DEL via Lua script (single round-trip)
+const LUA_GET_AND_DELETE = `
+local val = redis.call('GET', KEYS[1])
+if val then
+  redis.call('DEL', KEYS[1])
+end
+return val
+`;
+
 /**
  * Redis-backed secondary storage for better-auth.
  * Caches sessions and stores rate-limit counters atomically.
@@ -18,10 +27,10 @@ export const secondaryStorage: SecondaryStorage = {
     return redis.get(keyFor(key));
   },
   async getAndDelete(key) {
-    const fullKey = keyFor(key);
-    const value = await redis.get(fullKey);
-    if (value != null) await redis.del(fullKey);
-    return value;
+    const result = (await redis.eval(LUA_GET_AND_DELETE, 1, keyFor(key))) as
+      | string
+      | null;
+    return result;
   },
   async increment(key, ttl) {
     const fullKey = keyFor(key);

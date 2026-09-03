@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { DepartmentResponseDTO } from "@webcampus/schemas/department";
 import { DesignationEnum, StaffTypeEnum } from "@webcampus/schemas/faculty";
 import { BaseResponse } from "@webcampus/types/api";
@@ -29,7 +29,6 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { DialogForm } from "@webcampus/ui/molecules/dialog-form";
-import axios from "axios";
 // import { X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { UserPhotoUpload } from "../shared/user-photo-upload";
@@ -42,7 +41,6 @@ import { useCreateAdminFacultyForm } from "./use-create-admin-faculty-form";
 // import { ALL } from "dns";
 
 export const AdminFacultyView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const ALL_DEPARTMENTS_VALUE = "__all__";
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>(
     ALL_DEPARTMENTS_VALUE
@@ -52,10 +50,10 @@ export const AdminFacultyView = () => {
   const { data: departments = [] } = useQuery({
     queryKey: ["admin-departments"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<DepartmentResponseDTO[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/department`,
-        { withCredentials: true }
-      );
+      const res =
+        await apiClient.get<BaseResponse<DepartmentResponseDTO[]>>(
+          `/admin/department`
+        );
       if (res.data.status === "success" && Array.isArray(res.data.data)) {
         return res.data.data;
       }
@@ -77,11 +75,10 @@ export const AdminFacultyView = () => {
   const { data: faculty = [], isLoading: facultyLoading } = useQuery({
     queryKey: ["admin-faculty", selectedDepartmentId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<AdminFacultyResponse[]>>(
+      const res = await apiClient.get<BaseResponse<AdminFacultyResponse[]>>(
         selectedDepartmentId === ALL_DEPARTMENTS_VALUE
-          ? `${NEXT_PUBLIC_API_BASE_URL}/admin/faculty`
-          : `${NEXT_PUBLIC_API_BASE_URL}/admin/faculty/department/${selectedDepartmentId}`,
-        { withCredentials: true }
+          ? `/admin/faculty`
+          : `/admin/faculty/department/${selectedDepartmentId}`
       );
       if (res.data.status === "success" && Array.isArray(res.data.data))
         return res.data.data;

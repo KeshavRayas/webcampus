@@ -272,17 +272,10 @@ const createdAtColumn: ColumnDef<AdmissionResponse> = {
     const createdAt = row.original.createdAt;
     if (!createdAt) return <div>-</div>;
     const date = new Date(createdAt);
-    return (
-      <div suppressHydrationWarning>
-        {Number.isNaN(date.getTime())
-          ? "-"
-          : date.toLocaleDateString("en-IN", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })}
-      </div>
-    );
+    if (Number.isNaN(date.getTime())) return <div>-</div>;
+    // Format consistently to avoid hydration mismatch (client-only locale formatting via ISO fallback would also work)
+    const iso = date.toISOString().slice(0, 10);
+    return <div title={iso}>{iso}</div>;
   },
 };
 

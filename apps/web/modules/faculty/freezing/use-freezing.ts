@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import type { BaseResponse, ErrorResponse } from "@webcampus/types/api";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
 export type FreezingDisplayState =
@@ -51,8 +51,6 @@ export const useFreezingWindows = (
   filters: FreezingFilters,
   enabled: boolean
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["faculty-freezing", filters],
     queryFn: async () => {
@@ -60,11 +58,10 @@ export const useFreezingWindows = (
         academicTermId: filters.academicTermId,
         semesterId: filters.semesterId,
       };
-      const res = await axios.get<BaseResponse<FreezingRow[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/attendance-windows`,
+      const res = await apiClient.get<BaseResponse<FreezingRow[]>>(
+        `/faculty/attendance-windows`,
         {
           params,
-          withCredentials: true,
         }
       );
 
@@ -89,14 +86,12 @@ export const useFacultySections = (
   semesterId: string | undefined,
   enabled: boolean
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["faculty-sections", semesterId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<FacultySection[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/attendance-windows/sections`,
-        { params: { semesterId }, withCredentials: true }
+      const res = await apiClient.get<BaseResponse<FacultySection[]>>(
+        `/faculty/attendance-windows/sections`,
+        { params: { semesterId } }
       );
       if (res.data.status === "success") {
         return res.data.data || [];
@@ -108,15 +103,13 @@ export const useFacultySections = (
 };
 
 export const useBulkFreezeWindows = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload: FreezingFilters) => {
-      return axios.post<BaseResponse<{ processed: number }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/attendance-windows/freeze-filtered`,
-        payload,
-        { withCredentials: true }
+      return apiClient.post<BaseResponse<{ processed: number }>>(
+        `/faculty/attendance-windows/freeze-filtered`,
+        payload
       );
     },
     onSuccess: (res) => {
@@ -137,7 +130,6 @@ export type FreezeTarget = {
 };
 
 export const useFreezeAssignment = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -145,10 +137,9 @@ export const useFreezeAssignment = () => {
       const path = target.courseAssignmentId
         ? `/faculty/attendance-windows/course-assignment/${target.courseAssignmentId}/freeze`
         : `/faculty/attendance-windows/elective-batch/${target.electiveBatchFacultyId ?? ""}/freeze`;
-      const res = await axios.post<BaseResponse<FreezingRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}${path}`,
-        {},
-        { withCredentials: true }
+      const res = await apiClient.post<BaseResponse<FreezingRow>>(
+        `${path}`,
+        {}
       );
       return res;
     },

@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { toast } from "react-toastify";
 
 type PortStudentsPayload = {
@@ -23,15 +23,13 @@ type PortStudentsResult = {
 };
 
 export const usePortStudents = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async (payload: PortStudentsPayload) => {
-      return await axios.post<SuccessResponse<PortStudentsResult>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admission/port`,
-        payload,
-        { withCredentials: true }
+      return await apiClient.post<SuccessResponse<PortStudentsResult>>(
+        `/admission/port`,
+        payload
       );
     },
     onSuccess: (

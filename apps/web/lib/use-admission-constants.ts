@@ -1,12 +1,11 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   AdmissionConstantsOptionsDTO,
   BaseResponse,
 } from "@webcampus/types/api";
-import axios from "axios";
 
 const EMPTY_OPTIONS: AdmissionConstantsOptionsDTO = {
   modes: [],
@@ -20,19 +19,16 @@ const EMPTY_OPTIONS: AdmissionConstantsOptionsDTO = {
  * from the backend. These drive the admission dropdowns throughout the app.
  */
 export const useAdmissionConstants = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["admission-constants"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<AdmissionConstantsOptionsDTO>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admission/constants/options`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get<
+        BaseResponse<AdmissionConstantsOptionsDTO>
+      >(`/admission/constants/options`);
       if (res.data.status === "success") {
         return res.data.data ?? EMPTY_OPTIONS;
       }
-      return EMPTY_OPTIONS;
+      throw new Error(res.data.message || "Failed to load admission constants");
     },
     staleTime: 5 * 60 * 1000,
   });

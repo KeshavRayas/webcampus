@@ -1,10 +1,11 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { AcademicTermResponseType } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
+import { ConfirmDialog } from "@webcampus/ui/components/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -22,15 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@webcampus/ui/components/select";
-import axios from "axios";
 import { Wand2 } from "lucide-react";
 import React, { useState } from "react";
 import { toast } from "react-toastify";
 
 export const GenerateProctorGroupsDialog = () => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const [open, setOpen] = useState(false);
   const [termId, setTermId] = useState<string>("");
   const [semesterId, setSemesterId] = useState<string>("");
@@ -39,10 +37,10 @@ export const GenerateProctorGroupsDialog = () => {
   const { data: terms, isLoading: isLoadingTerms } = useQuery({
     queryKey: ["academic-terms"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<AcademicTermResponseType[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/semester`,
-        { withCredentials: true }
-      );
+      const res =
+        await apiClient.get<BaseResponse<AcademicTermResponseType[]>>(
+          `/admin/semester`
+        );
       if (res.data.status === "success") return res.data.data;
       return [] as AcademicTermResponseType[];
     },
@@ -53,11 +51,11 @@ export const GenerateProctorGroupsDialog = () => {
 
   const generateMutation = useMutation({
     mutationFn: async ({ action }: { action: "generate" | "regenerate" }) => {
-      const res = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/proctor/generate`,
-        { semesterId, studentsPerGroup, action },
-        { withCredentials: true }
-      );
+      const res = await apiClient.post(`/department/proctor/generate`, {
+        semesterId,
+        studentsPerGroup,
+        action,
+      });
       return res.data;
     },
     onSuccess: (data) => {
@@ -71,6 +69,8 @@ export const GenerateProctorGroupsDialog = () => {
     },
   });
 
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+
   const handleAction = (action: "generate" | "regenerate") => {
     if (!semesterId) {
       toast.error("Please select a semester");
@@ -82,13 +82,8 @@ export const GenerateProctorGroupsDialog = () => {
     }
 
     if (action === "regenerate") {
-      if (
-        !window.confirm(
-          "Regenerating the proctor groups will replace the current automatic student distribution. Manual student movements may be lost. Are you sure?"
-        )
-      ) {
-        return;
-      }
+      setShowRegenerateConfirm(true);
+      return;
     }
 
     generateMutation.mutate({ action });
@@ -185,6 +180,19 @@ export const GenerateProctorGroupsDialog = () => {
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <ConfirmDialog
+        open={showRegenerateConfirm}
+        onOpenChange={setShowRegenerateConfirm}
+        title="Regenerate proctor groups?"
+        description="This will replace the current automatic student distribution. Manual student movements may be lost."
+        confirmLabel="Regenerate"
+        variant="destructive"
+        onConfirm={() => {
+          setShowRegenerateConfirm(false);
+          generateMutation.mutate({ action: "regenerate" });
+        }}
+      />
     </Dialog>
   );
 };

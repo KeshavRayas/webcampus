@@ -1,8 +1,8 @@
 "use client";
 
 import { ReasonDialog } from "@/components/admin/reason-dialog";
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   CourseMappingByCourseItemType,
   CourseResponseDTO,
@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@webcampus/ui/components/select";
 import { Combobox } from "@webcampus/ui/molecules/combobox";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { CheckCircle2, Download, Loader2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
@@ -67,7 +67,6 @@ export const CourseMappingGrid = ({
   isLocked = false,
   isAdmin = false,
 }: CourseMappingGridProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isBatchManaged =
@@ -87,16 +86,16 @@ export const CourseMappingGrid = ({
   const hasLab = ["INTEGRATED", "FINAL_SUMMARY"].includes(course.courseMode);
 
   const assignmentBase = isAdmin
-    ? `${NEXT_PUBLIC_API_BASE_URL}/admin/course-assignment`
-    : `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment`;
+    ? `/admin/course-assignment`
+    : `/department/course-assignment`;
 
   // Fetch sections (PC only)
   const { data: rawSections, isLoading: loadingSections } = useQuery({
     queryKey: ["sections", semesterId, cycle],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<SectionData[]>>(
+      const res = await apiClient.get<BaseResponse<SectionData[]>>(
         `${assignmentBase}/sections`,
-        { params: { semesterId, cycle }, withCredentials: true }
+        { params: { semesterId, cycle } }
       );
       return res.data.status === "success" && res.data.data
         ? res.data.data
@@ -111,9 +110,8 @@ export const CourseMappingGrid = ({
   const { data: rawFaculty, isLoading: loadingFaculty } = useQuery({
     queryKey: ["faculty-mappable"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<FacultyData[]>>(
-        `${assignmentBase}/faculty`,
-        { withCredentials: true }
+      const res = await apiClient.get<BaseResponse<FacultyData[]>>(
+        `${assignmentBase}/faculty`
       );
       return res.data.status === "success" && res.data.data
         ? res.data.data
@@ -127,7 +125,7 @@ export const CourseMappingGrid = ({
   const { data: rawExistingMappings, isLoading: loadingExisting } = useQuery({
     queryKey: ["course-mapping", course.id, semesterId, academicYear],
     queryFn: async () => {
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<CourseMappingByCourseItemType[]>
       >(`${assignmentBase}/by-course`, {
         params: {
@@ -136,7 +134,6 @@ export const CourseMappingGrid = ({
           academicYear,
           ...(isAdmin ? { departmentId: course.departmentId } : {}),
         },
-        withCredentials: true,
       });
       return res.data.status === "success" && res.data.data
         ? res.data.data
@@ -259,10 +256,9 @@ export const CourseMappingGrid = ({
   // --- Excel Handlers ---
   const handleDownloadExcel = async () => {
     try {
-      const res = await axios.get(`${assignmentBase}/excel/download`, {
+      const res = await apiClient.get(`${assignmentBase}/excel/download`, {
         params: { courseId: course.id, semesterId, academicYear },
         responseType: "blob",
-        withCredentials: true,
       });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");
@@ -286,10 +282,13 @@ export const CourseMappingGrid = ({
     formData.append("file", file);
 
     try {
-      const res = await axios.post(`${assignmentBase}/excel/upload`, formData, {
-        withCredentials: true,
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await apiClient.post(
+        `${assignmentBase}/excel/upload`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
 
       const extractedData = res.data.data.extractedData as {
         section: string;
@@ -380,9 +379,7 @@ export const CourseMappingGrid = ({
         payload.reason = reason;
       }
 
-      return axios.post(`${assignmentBase}/upsert`, payload, {
-        withCredentials: true,
-      });
+      return apiClient.post(`${assignmentBase}/upsert`, payload);
     },
     onSuccess: (res) => {
       toast.success(res.data.message);

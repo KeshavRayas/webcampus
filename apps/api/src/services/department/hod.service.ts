@@ -74,6 +74,7 @@ export class HODService {
       const hod = await db.hod.create({
         data: {
           userId: data.userId,
+          departmentId: data.departmentId,
           departmentName: data.departmentName,
         },
       });

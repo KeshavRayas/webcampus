@@ -14,6 +14,10 @@ let semesterTarget: Record<string, unknown> | null;
 
 interface ConfigLifecycleDb {
   $transaction: <T>(fn: (tx: ConfigLifecycleDb) => Promise<T>) => Promise<T>;
+  $queryRaw: (
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ) => Promise<unknown[]>;
   department: { findFirst: () => Promise<{ id: string } | null> };
   course: {
     findUnique: (args: {
@@ -58,6 +62,7 @@ interface ConfigLifecycleDb {
 
 const dbMock: ConfigLifecycleDb = {
   $transaction: async (fn) => fn(dbMock),
+  $queryRaw: async () => [] as unknown[],
   department: {
     findFirst: async () => ({ id: "dep-1" }),
   },

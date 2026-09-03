@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { Role } from "@webcampus/types/rbac";
 import {
   Sidebar,
@@ -13,17 +13,14 @@ import {
   SidebarMenuItem,
 } from "@webcampus/ui/components/sidebar";
 import { capitalize } from "@webcampus/ui/lib/utils";
-import axios from "axios";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import * as React from "react";
 import { NavMain } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
 import { sidebarConfig } from "./sidebar-config";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
   const [isMounted, setIsMounted] = React.useState(false);
 
@@ -31,17 +28,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     setIsMounted(true);
   }, []);
 
-  React.useEffect(() => {
-    authClient.getSession();
-  }, [pathname]);
-
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
-      const res = await axios.get(
-        `${frontendEnv().NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get("/department/section/department-info");
       if (res.data.status === "success") return res.data.data;
       return null;
     },

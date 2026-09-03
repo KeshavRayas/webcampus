@@ -1,5 +1,6 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import {
   createFilterQueryString,
@@ -8,7 +9,6 @@ import {
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import {
@@ -17,7 +17,6 @@ import {
   FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { Lock } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
@@ -39,7 +38,6 @@ const EMPTY_FILTERS: CoursesFilters = {
 };
 
 export const CoursesView: React.FC = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: session } = authClient.useSession();
   const pathname = usePathname();
   const router = useRouter();
@@ -49,12 +47,9 @@ export const CoursesView: React.FC = () => {
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
-        {
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get<
+        BaseResponse<{ type: string; name: string }>
+      >(`/department/section/department-info`);
       if (res.data.status === "success") return res.data.data;
       return { type: "DEGREE_GRANTING", name: "" };
     },
@@ -303,14 +298,13 @@ export const CoursesView: React.FC = () => {
       appliedFilters.cycle || "NONE",
     ],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<CourseResponseDTO[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/branch`,
+      const res = await apiClient.get<BaseResponse<CourseResponseDTO[]>>(
+        `/department/course/branch`,
         {
           params: {
             semesterId: appliedFilters.semesterId,
             ...(appliedFilters.cycle ? { cycle: appliedFilters.cycle } : {}),
           },
-          withCredentials: true,
         }
       );
       if (res.data.status === "success") return res.data.data;

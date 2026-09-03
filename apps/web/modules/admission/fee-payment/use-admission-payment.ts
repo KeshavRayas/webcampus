@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { ErrorResponse, SuccessResponse } from "@webcampus/types/api";
-import axios, { AxiosError, AxiosResponse } from "axios";
+import type { AxiosError, AxiosResponse } from "axios";
 import { toast } from "react-toastify";
 
 export type PaymentPayload = {
@@ -13,15 +13,13 @@ export type PaymentPayload = {
 };
 
 export const useAdmissionPayment = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   const approveMutation = useMutation({
     mutationFn: async ({ id, feePaid, feeReceiptNumber }: PaymentPayload) => {
-      return await axios.patch<SuccessResponse<null>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admission/${id}/approve`,
-        { feePaid, feeReceiptNumber },
-        { withCredentials: true }
+      return await apiClient.patch<SuccessResponse<null>>(
+        `/admission/${id}/approve`,
+        { feePaid, feeReceiptNumber }
       );
     },
     onSuccess: (data: AxiosResponse<SuccessResponse<null>>) => {

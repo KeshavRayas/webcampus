@@ -66,9 +66,7 @@ export function ChangeAdmissionModeActions({
     },
   });
 
-  console.log(form.formState.errors);
   const onSubmit = (data: ChangeAdmissionModeType) => {
-    console.log("SUBMITTED", data);
     mutation.changeAdmissionMode({
       id: admission.id,
       data: {

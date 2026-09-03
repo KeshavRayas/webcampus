@@ -21,24 +21,6 @@ export class Attendance {
     data: CreateAttendanceType & { batchId?: string | null }
   ): Promise<BaseResponse<AttendanceResponseType>> {
     try {
-      // Swapped findUnique to findFirst to avoid outdated compound key TS errors
-      const existingAttendance = await db.attendance.findFirst({
-        where: {
-          studentId: data.studentId,
-          courseId: data.courseId,
-          batchId: data.batchId ?? null,
-        },
-      });
-
-      if (existingAttendance) {
-        return {
-          status: "error",
-          message:
-            "Attendance already exists for this student, course, and batch",
-          error: "Attendance already exists",
-        };
-      }
-
       const { PeCapacityService } = await import(
         "@webcampus/api/src/services/shared/pe-capacity.service"
       );
@@ -61,11 +43,28 @@ export class Attendance {
         );
       }
 
-      const attendance = await db.attendance.create({
-        data: {
-          ...data,
-          batchId: data.batchId ?? null,
-        } as any,
+      // Atomic check-and-create to prevent race condition duplicates
+      const attendance = await db.$transaction(async (tx) => {
+        const existingAttendance = await tx.attendance.findFirst({
+          where: {
+            studentId: data.studentId,
+            courseId: data.courseId,
+            batchId: data.batchId ?? null,
+          },
+        });
+
+        if (existingAttendance) {
+          throw new Error(
+            "Attendance already exists for this student, course, and batch"
+          );
+        }
+
+        return tx.attendance.create({
+          data: {
+            ...data,
+            batchId: data.batchId ?? null,
+          } as any,
+        });
       });
 
       return {
@@ -80,10 +79,73 @@ export class Attendance {
     }
   }
 
-  static async getAll(): Promise<BaseResponse<AttendanceResponseType[]>> {
+  static async getAll(params?: {
+    page?: number;
+    limit?: number;
+    userId?: string;
+    role?: string;
+  }): Promise<BaseResponse<AttendanceResponseType[]>> {
     try {
-      const attendances = await db.attendance.findMany();
-
+      const page = Math.max(1, params?.page ?? 1);
+      const limit = Math.min(100, Math.max(1, params?.limit ?? 20));
+      const skip = (page - 1) * limit;
+      // Admin sees all with pagination; faculty scoped to assigned courses
+      if (params?.role === "admin") {
+        const attendances = await db.attendance.findMany({
+          skip,
+          take: limit,
+          orderBy: { id: "asc" },
+        });
+        return {
+          status: "success",
+          message: "Attendances retrieved successfully",
+          data: attendances as any,
+        };
+      }
+      if (params?.userId) {
+        const faculty = await db.faculty.findUnique({
+          where: { userId: params.userId },
+          select: { id: true },
+        });
+        if (faculty) {
+          const assignments = await db.courseAssignment.findMany({
+            where: { facultyId: faculty.id },
+            select: { courseId: true },
+          });
+          const elective = await db.electiveBatchFaculty.findMany({
+            where: { facultyId: faculty.id },
+            select: { courseId: true },
+          });
+          const courseIds = [
+            ...new Set([
+              ...assignments.map((a) => a.courseId),
+              ...elective.map((e) => e.courseId),
+            ]),
+          ];
+          if (courseIds.length === 0)
+            return {
+              status: "success",
+              message: "Attendances retrieved successfully",
+              data: [] as any,
+            };
+          const attendances = await db.attendance.findMany({
+            where: { courseId: { in: courseIds } },
+            skip,
+            take: limit,
+            orderBy: { id: "asc" },
+          });
+          return {
+            status: "success",
+            message: "Attendances retrieved successfully",
+            data: attendances as any,
+          };
+        }
+      }
+      const attendances = await db.attendance.findMany({
+        skip,
+        take: limit,
+        orderBy: { id: "asc" },
+      });
       return {
         status: "success",
         message: "Attendances retrieved successfully",
@@ -125,9 +187,26 @@ export class Attendance {
   static async getByStudentAndCourse(
     studentId: string,
     courseId: string,
-    batchId?: string | null
+    batchId?: string | null,
+    userId?: string
   ): Promise<BaseResponse<AttendanceResponseType>> {
     try {
+      if (userId) {
+        const faculty = await db.faculty.findUnique({
+          where: { userId },
+          select: { id: true },
+        });
+        if (faculty) {
+          const assigned = await db.courseAssignment.findFirst({
+            where: { courseId, facultyId: faculty.id },
+          });
+          const batchAssigned = await db.electiveBatchFaculty.findFirst({
+            where: { courseId, facultyId: faculty.id },
+          });
+          if (!assigned && !batchAssigned)
+            throw new Error("Unauthorized to view attendance for this course");
+        }
+      }
       // Swapped findUnique to findFirst to handle new batchId requirement safely
       const attendance = await db.attendance.findFirst({
         where: {

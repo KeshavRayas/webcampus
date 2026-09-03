@@ -1,3 +1,4 @@
+import { protect } from "@webcampus/backend-utils/middlewares";
 import { Router } from "express";
 import {
   getDepartmentCourses,
@@ -6,7 +7,15 @@ import {
 
 const router: Router = Router();
 
-router.get("/", getDepartmentCourses);
-router.get("/sections", getDepartmentSections);
+router.get(
+  "/",
+  protect({ role: "hod", permissions: {} }),
+  getDepartmentCourses
+);
+router.get(
+  "/sections",
+  protect({ role: "hod", permissions: {} }),
+  getDepartmentSections
+);
 
 export default router;

@@ -15,13 +15,13 @@ export default function Page() {
         <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl">
           Access Denied
         </h1>
-        <p className="max-w-150 text-gray-500 md:text-xl/relaxed dark:text-gray-400">
+        <p className="text-muted-foreground max-w-150 md:text-xl/relaxed">
           You do not have permission to view this page
         </p>
       </div>
       <Link
         href="/"
-        className="inline-flex h-10 items-center justify-center rounded-md border border-gray-200 bg-white px-8 text-sm font-medium shadow-sm transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 disabled:pointer-events-none disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:hover:bg-gray-800 dark:hover:text-gray-50 dark:focus-visible:ring-gray-300"
+        className="border-border bg-card hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex h-10 items-center justify-center rounded-md border px-8 text-sm font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 disabled:pointer-events-none disabled:opacity-50"
         prefetch={false}
       >
         Go to Homepage

@@ -1,6 +1,6 @@
 "use client";
 
-import { frontendEnv } from "@webcampus/common/env";
+import { apiClient } from "@/lib/api-client";
 import { Button } from "@webcampus/ui/components/button";
 import {
   Card,
@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@webcampus/ui/components/card";
 import { Input } from "@webcampus/ui/components/input";
-import axios from "axios";
+import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -20,7 +20,6 @@ const blankQuestions = () =>
   }));
 
 export function FeedbackPresetsView() {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [questions, setQuestions] = useState(blankQuestions());
@@ -33,19 +32,17 @@ export function FeedbackPresetsView() {
     }>
   >([]);
   const load = () =>
-    void axios
-      .get(`${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/presets`, {
-        withCredentials: true,
-      })
+    void apiClient
+      .get(`/admin/feedback/presets`)
       .then((response) => setPresets(response.data.data ?? []));
-  useEffect(load, [NEXT_PUBLIC_API_BASE_URL]);
+  useEffect(load, []);
   const save = async () => {
     try {
-      await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/feedback/presets`,
-        { name, description, questions },
-        { withCredentials: true }
-      );
+      await apiClient.post(`/admin/feedback/presets`, {
+        name,
+        description,
+        questions,
+      });
       toast.success("Preset created");
       setName("");
       setDescription("");
@@ -53,7 +50,7 @@ export function FeedbackPresetsView() {
       load();
     } catch (error) {
       toast.error(
-        axios.isAxiosError(error)
+        isAxiosError(error)
           ? (error.response?.data?.message ?? "Could not create preset")
           : "Could not create preset"
       );

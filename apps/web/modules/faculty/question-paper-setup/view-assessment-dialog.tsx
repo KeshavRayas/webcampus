@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import type { BaseResponse, ErrorResponse } from "@webcampus/types/api";
 import {
   AlertDialog,
@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@webcampus/ui/components/dialog";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-toastify";
@@ -64,14 +64,11 @@ export const ViewAssessmentDialog = ({
   courseName,
   onDelete,
 }: ViewAssessmentDialogProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const { data: assessment, isLoading } = useQuery({
     queryKey: ["assessment", assessmentId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<AssessmentResponse>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment/${assessmentId}`,
-        { withCredentials: true }
+      const res = await apiClient.get<BaseResponse<AssessmentResponse>>(
+        `/faculty/assessment/${assessmentId}`
       );
       if (res.data.status === "success") {
         return res.data.data;
@@ -85,9 +82,8 @@ export const ViewAssessmentDialog = ({
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const res = await axios.delete<BaseResponse<null>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/faculty/assessment/${assessmentId}`,
-        { withCredentials: true }
+      const res = await apiClient.delete<BaseResponse<null>>(
+        `/faculty/assessment/${assessmentId}`
       );
       return res.data;
     },

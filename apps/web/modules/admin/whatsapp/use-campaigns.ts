@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { frontendEnv } from "@webcampus/common/env";
-import axios from "axios";
 import type { Campaign, Pagination, Receipt, ReceiptStatus } from "./types";
 
 const apiBase = () => frontendEnv().NEXT_PUBLIC_API_BASE_URL;
@@ -11,12 +11,11 @@ export const useCampaigns = (page: number, limit: number) => {
   return useQuery({
     queryKey: ["whatsapp-campaigns", page, limit],
     queryFn: async () => {
-      const res = await axios.get<{
+      const res = await apiClient.get<{
         status: string;
         data: { items: Campaign[]; pagination: Pagination };
       }>(`${apiBase()}/admin/whatsapp/campaigns`, {
         params: { page, limit },
-        withCredentials: true,
       });
       return res.data.data ?? { items: [], pagination: null };
     },
@@ -34,7 +33,7 @@ export const useCampaignDetail = (
     queryFn: async () => {
       const params: Record<string, string | number> = { page, limit };
       if (status) params.status = status;
-      const res = await axios.get<{
+      const res = await apiClient.get<{
         status: string;
         data: {
           campaign: Campaign;
@@ -43,7 +42,6 @@ export const useCampaignDetail = (
         };
       }>(`${apiBase()}/admin/whatsapp/campaigns/${id}`, {
         params,
-        withCredentials: true,
       });
       return res.data.data;
     },

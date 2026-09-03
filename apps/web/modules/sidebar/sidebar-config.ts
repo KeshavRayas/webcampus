@@ -171,6 +171,10 @@ export const sidebarConfig: Record<Role, SidebarData> = {
                 },
               ],
             },
+            {
+              name: "PO/PEO/PSO Configuration",
+              url: "/admin/academics/po-peo-pso",
+            },
           ],
         },
         {

@@ -266,12 +266,19 @@ export function AdmissionSetupView() {
     data: options,
     isLoading,
     isError,
+    error,
     refetch,
   } = useAdmissionConstants();
   const queryClient = useQueryClient();
   const [activeMode, setActiveMode] = useState<string | null>(null);
 
   const modes = options?.modes ?? [];
+
+  useEffect(() => {
+    if (!activeMode && modes.length > 0) {
+      setActiveMode(modes[0]!);
+    }
+  }, [modes, activeMode]);
 
   const initialDraft: ModeDraft = useMemo(() => {
     if (!options || !activeMode) return EMPTY_DRAFT;
@@ -305,7 +312,10 @@ export function AdmissionSetupView() {
     return (
       <Card className="flex items-center justify-between p-6">
         <p className="text-muted-foreground text-sm">
-          Failed to load admission setup. Please try again.
+          {getApiErrorMessage(
+            error,
+            "Failed to load admission setup. Please try again."
+          )}
         </p>
         <Button type="button" variant="outline" onClick={() => refetch()}>
           Retry

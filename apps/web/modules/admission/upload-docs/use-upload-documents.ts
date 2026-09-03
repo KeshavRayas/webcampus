@@ -27,7 +27,6 @@ export const useUploadDocuments = () => {
         `/admission/${id}/documents`,
         formData,
         {
-          withCredentials: true,
           headers: {
             "Content-Type": "multipart/form-data",
           },

@@ -1,10 +1,10 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { ElectiveMappingListView } from "@/modules/department/elective-mapping/elective-mapping-list-view";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import {
   FilterActions,
@@ -12,7 +12,6 @@ import {
   FilterFieldConfig,
   FilterPanel,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
 
 type ElectiveMappingFilters = {
@@ -26,7 +25,6 @@ const EMPTY_FILTERS: ElectiveMappingFilters = {
 };
 
 export const ElectiveMappingDepartmentPage = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: terms } = useAcademicTerms();
   const [draftFilters, setDraftFilters] =
     useState<ElectiveMappingFilters>(EMPTY_FILTERS);
@@ -48,13 +46,11 @@ export const ElectiveMappingDepartmentPage = () => {
   const { data: semesterOptions } = useQuery({
     queryKey: ["semesters-by-term", draftTermId],
     queryFn: async () => {
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<
           { id: string; semesterNumber: number; programType: string }[]
         >
-      >(`${NEXT_PUBLIC_API_BASE_URL}/admin/semester/${draftTermId}/semesters`, {
-        withCredentials: true,
-      });
+      >(`/admin/semester/${draftTermId}/semesters`);
       if (res.data.status !== "success") return [];
       return (res.data.data ?? []).map((s) => ({
         id: s.id,

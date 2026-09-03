@@ -29,10 +29,7 @@ export const useChangeAdmissionMode = () => {
     }) => {
       const res = await apiClient.patch<BaseResponse<unknown>>(
         `/admission/${id}/change-mode`,
-        data,
-        {
-          withCredentials: true,
-        }
+        data
       );
 
       if (res.data.status === "error") {

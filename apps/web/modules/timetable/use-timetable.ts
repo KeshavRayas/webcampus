@@ -146,6 +146,15 @@ export const useTimetableMutations = () => {
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["department-timetable"] });
     void queryClient.invalidateQueries({ queryKey: ["timetable-template"] });
+    void queryClient.invalidateQueries({ queryKey: ["timetable"] });
+    void queryClient.invalidateQueries({ queryKey: ["student-timetable"] });
+    void queryClient.invalidateQueries({
+      queryKey: ["student-timetable-today"],
+    });
+    void queryClient.invalidateQueries({ queryKey: ["faculty-timetable"] });
+    void queryClient.invalidateQueries({
+      queryKey: ["faculty-timetable-today"],
+    });
   };
   const create = useMutation({
     mutationFn: (input: TimetableMutationInput) =>

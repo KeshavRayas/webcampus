@@ -1,11 +1,10 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
-import axios from "axios";
 import { Lock } from "lucide-react";
 import { useState } from "react";
 import { CourseDetailsCard } from "../course-mapping/course-details-card";
@@ -16,7 +15,6 @@ import {
 import { ManageCoordinatorsCard } from "./manage-coordinators-card";
 
 export const CourseCoordinatorsView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: session } = authClient.useSession();
 
   const [appliedFilters, setAppliedFilters] =
@@ -27,10 +25,9 @@ export const CourseCoordinatorsView = () => {
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get<
+        BaseResponse<{ type: string; name: string }>
+      >(`/department/section/department-info`);
       if (res.data.status === "success") return res.data.data;
       return { type: "", name: "" };
     },

@@ -1,10 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
-import axios from "axios";
 import { useState } from "react";
 import {
   CourseApprovalsFilters,
@@ -13,7 +12,6 @@ import {
 import { CourseApprovalsTable } from "./course-approvals-table";
 
 export const CourseApprovalsView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const { data: session } = authClient.useSession();
   const [appliedFilters, setAppliedFilters] =
     useState<CourseApprovalsFiltersState | null>(null);
@@ -21,10 +19,9 @@ export const CourseApprovalsView = () => {
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<{ type: string; name: string }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get<
+        BaseResponse<{ type: string; name: string }>
+      >(`/department/section/department-info`);
       if (res.data.status === "success") return res.data.data;
       return null;
     },

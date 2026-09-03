@@ -1,5 +1,6 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import {
   createFilterQueryString,
   getFiltersFromSearchParams,
@@ -8,7 +9,6 @@ import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useHODDepartment } from "@/modules/hod/department/use-hod-department";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import { DataTable } from "@webcampus/ui/components/data-table";
 import {
@@ -18,7 +18,6 @@ import {
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
 import { Page, PageContent, PageHeader } from "@webcampus/ui/components/page";
-import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
@@ -51,7 +50,6 @@ type HodCourseItem = {
 };
 
 export const HodCoursesView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -132,18 +130,16 @@ export const HodCoursesView = () => {
     queryKey: ["hod-sections", draftFilters.semesterId, draftFilters.cycle],
     queryFn: async () => {
       if (!draftFilters.semesterId) return [];
-      const res = await axios.get<BaseResponse<{ id: string; name: string }[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/courses/sections`,
-        {
-          params: {
-            semesterId: draftFilters.semesterId,
-            ...(isSemesterOneOrTwo && draftFilters.cycle
-              ? { cycle: draftFilters.cycle }
-              : {}),
-          },
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get<
+        BaseResponse<{ id: string; name: string }[]>
+      >(`/hod/courses/sections`, {
+        params: {
+          semesterId: draftFilters.semesterId,
+          ...(isSemesterOneOrTwo && draftFilters.cycle
+            ? { cycle: draftFilters.cycle }
+            : {}),
+        },
+      });
       if (res.data.status === "success") return res.data.data ?? [];
       return [];
     },
@@ -174,8 +170,8 @@ export const HodCoursesView = () => {
   const { data: response, isLoading: loadingCourses } = useQuery({
     queryKey: ["hod-courses-list", appliedFilters],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<HodCourseItem[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/hod/courses`,
+      const res = await apiClient.get<BaseResponse<HodCourseItem[]>>(
+        `/hod/courses`,
         {
           params: {
             academicTermId: appliedFilters.termId,
@@ -185,7 +181,6 @@ export const HodCoursesView = () => {
               ? { cycle: appliedFilters.cycle }
               : {}),
           },
-          withCredentials: true,
         }
       );
       return res.data;

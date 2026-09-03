@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { CreateAdmissionUserSchema } from "@webcampus/schemas/admin";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
@@ -24,7 +24,6 @@ import {
   FormMessage,
 } from "@webcampus/ui/components/form";
 import { Input } from "@webcampus/ui/components/input";
-import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -228,15 +227,12 @@ const CreateAdmissionUserDialog = ({
 };
 
 export const AdminAdmissionUsersView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-admission-users", "admission"],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<AdminAdmissionUserResponse[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/admission-users?role=admission`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get<
+        BaseResponse<AdminAdmissionUserResponse[]>
+      >(`/admin/admission-users?role=admission`);
       if (res.data.status === "success" && Array.isArray(res.data.data)) {
         return res.data.data;
       }

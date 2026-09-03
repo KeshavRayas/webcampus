@@ -1,13 +1,12 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { frontendEnv } from "@webcampus/common/env";
 import type { BaseResponse } from "@webcampus/types/api";
 import { Badge } from "@webcampus/ui/components/badge";
 import { Button } from "@webcampus/ui/components/button";
 import { DataTable } from "@webcampus/ui/components/data-table";
-import axios from "axios";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 
@@ -99,16 +98,17 @@ export function ProjectMappingListView({
   departmentId?: string;
   semesterId: string;
 }) {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-  const apiBase = `${NEXT_PUBLIC_API_BASE_URL}${basePath}/project-mapping`;
+  const apiBase = `${basePath}/project-mapping`;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["project-mapping-list", basePath, semesterId, departmentId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<ProjectListItem[]>>(apiBase, {
-        params: { semesterId, departmentId },
-        withCredentials: true,
-      });
+      const res = await apiClient.get<BaseResponse<ProjectListItem[]>>(
+        apiBase,
+        {
+          params: { semesterId, departmentId },
+        }
+      );
       return res.data.status === "success" ? (res.data.data ?? []) : [];
     },
     enabled:

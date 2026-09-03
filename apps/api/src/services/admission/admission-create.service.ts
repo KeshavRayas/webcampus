@@ -206,6 +206,18 @@ export class AdmissionCreateService {
         throw new Error("The submitted semester does not match the admission.");
       }
 
+      if (data.departmentId) {
+        const deptExists = await db.department.findUnique({
+          where: { id: data.departmentId },
+          select: { id: true },
+        });
+        if (!deptExists) {
+          throw new Error(
+            `Department ${data.departmentId} not found — it may have been deleted or the ID is stale. Please refresh the department list and try again.`
+          );
+        }
+      }
+
       if (data.scholarship !== "true" && data.scholarship !== "false") {
         throw new Error("Scholarship selection is required.");
       }
@@ -454,6 +466,19 @@ export class AdmissionCreateService {
     } catch (error) {
       logger.error("Failed to submit application", error);
 
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        (error as { code?: string }).code === "P2003"
+      ) {
+        const meta = (error as { meta?: { field_name?: string } }).meta;
+        const field = meta?.field_name || "department or semester";
+        throw new Error(
+          `Foreign key violation on ${field} — the selected department or semester no longer exists. Please refresh and try again.`
+        );
+      }
+
       throw new Error(
         error instanceof Error ? error.message : "Failed to submit application"
       );
@@ -470,6 +495,28 @@ export class AdmissionCreateService {
   ): Promise<BaseResponse<unknown>> {
     if (!data.semesterId || !data.departmentId) {
       throw new Error("Semester and department are required");
+    }
+
+    const [deptExists, semExists] = await Promise.all([
+      db.department.findUnique({
+        where: { id: data.departmentId },
+        select: { id: true },
+      }),
+      db.semester.findUnique({
+        where: { id: data.semesterId },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!deptExists) {
+      throw new Error(
+        `Department ${data.departmentId} not found — it may have been deleted or the ID is stale. Please refresh the department list and try again.`
+      );
+    }
+    if (!semExists) {
+      throw new Error(
+        `Semester ${data.semesterId} not found — it may have been deleted or the ID is stale. Please refresh and try again.`
+      );
     }
 
     const existingAdmission = await db.admission.findFirst({
@@ -519,6 +566,20 @@ export class AdmissionCreateService {
       if (createdAdmission && createdAdmission.status === "PENDING") {
         await db.admission.delete({ where: { id: createdAdmission.id } });
       }
+
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        (error as { code?: string }).code === "P2003"
+      ) {
+        const meta = (error as { meta?: { field_name?: string } }).meta;
+        const field = meta?.field_name || "department or semester";
+        throw new Error(
+          `Foreign key violation on ${field} — the selected department or semester no longer exists. Please refresh and try again.`
+        );
+      }
+
       throw error;
     }
   }

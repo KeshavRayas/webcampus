@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { AdminStudentResponseType } from "@webcampus/schemas/admin";
 import {
   Avatar,
@@ -25,7 +25,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@webcampus/ui/components/dropdown-menu";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { Eye, MoreHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
@@ -198,19 +198,24 @@ const DataField = ({
   label: string;
   value?: string | number | boolean | Date | null;
 }) => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   let displayValue = "-";
 
   if (value !== undefined && value !== null && value !== "") {
     if (typeof value === "boolean") {
       displayValue = value ? "Yes" : "No";
     } else if (value instanceof Date) {
-      displayValue = value.toLocaleDateString();
+      displayValue = mounted ? value.toLocaleDateString() : "-";
     } else if (
       typeof value === "string" &&
       !isNaN(Date.parse(value)) &&
       value.includes("T")
     ) {
-      displayValue = new Date(value).toLocaleDateString();
+      displayValue = mounted
+        ? new Date(value).toLocaleDateString()
+        : String(value).slice(0, 10);
     } else {
       displayValue = String(value);
     }
@@ -219,9 +224,7 @@ const DataField = ({
   return (
     <div className="space-y-1">
       <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="break-words font-medium" suppressHydrationWarning>
-        {displayValue}
-      </p>
+      <p className="break-words font-medium">{displayValue}</p>
     </div>
   );
 };
@@ -234,7 +237,6 @@ export const AdminStudentActions = ({
   menuOnly?: boolean;
 }) => {
   const queryClient = useQueryClient();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -251,12 +253,10 @@ export const AdminStudentActions = ({
   } = useQuery({
     queryKey: ["admin-student-details", student.id],
     queryFn: async () => {
-      const response = await axios.get<{
+      const response = await apiClient.get<{
         status: "success" | "error";
         data: AdminStudentDetailResponse;
-      }>(`${NEXT_PUBLIC_API_BASE_URL}/admin/student/${student.id}`, {
-        withCredentials: true,
-      });
+      }>(`/admin/student/${student.id}`);
 
       return response.data.data;
     },
@@ -279,10 +279,7 @@ export const AdminStudentActions = ({
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      return await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/student/${student.id}`,
-        { withCredentials: true }
-      );
+      return await apiClient.delete(`/admin/student/${student.id}`);
     },
     onSuccess: () => {
       toast.success(`Student ${student.usn} deleted successfully`);

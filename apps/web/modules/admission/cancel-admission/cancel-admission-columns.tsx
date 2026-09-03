@@ -34,17 +34,13 @@ export const cancelAdmissionColumns: ColumnDef<AdmissionResponse>[] = [
   {
     id: "createdOn",
     header: "Created On",
-    cell: ({ row }) => (
-      <div suppressHydrationWarning>{formatDate(row.original.createdAt)}</div>
-    ),
+    cell: ({ row }) => <div>{formatDate(row.original.createdAt)}</div>,
   },
   {
     id: "cancelledOn",
     header: "Cancelled On",
     cell: ({ row }) => (
-      <div suppressHydrationWarning>
-        {formatDate(row.original.cancellation?.cancelledAt)}
-      </div>
+      <div>{formatDate(row.original.cancellation?.cancelledAt)}</div>
     ),
   },
   {

@@ -8,9 +8,31 @@
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
       "env": [
         "DATABASE_URL",
+        "DATABASE_UNPOOLED_URL",
         "BETTER_AUTH_SECRET",
         "BETTER_AUTH_URL",
-        "API_BASE_URL"
+        "API_BASE_URL",
+        "NEXT_PUBLIC_API_BASE_URL",
+        "NEXT_PUBLIC_FRONTEND_URL",
+        "FRONTEND_URL",
+        "PORT",
+        "REDIS_URL",
+        "MINIO_ENDPOINT",
+        "MINIO_BUCKET_NAME",
+        "MINIO_BUCKET",
+        "MINIO_ACCESS_KEY_ID",
+        "MINIO_SECRET_ACCESS_KEY",
+        "MINIO_REGION",
+        "GMAIL_APP_PASSWORD",
+        "SENDER_EMAIL",
+        "ADMIN_USER_NAME",
+        "ADMIN_USER_EMAIL",
+        "ADMIN_USER_PASSWORD",
+        "ADMISSION_USER_NAME",
+        "ADMISSION_USER_EMAIL",
+        "ADMISSION_USER_PASSWORD",
+        "PUPPETEER_EXECUTABLE_PATH",
+        "NODE_ENV"
       ]
     },
     "start": {

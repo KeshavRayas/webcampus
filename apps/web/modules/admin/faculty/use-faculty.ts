@@ -1,10 +1,8 @@
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { ErrorResponse } from "@webcampus/types/api";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { toast } from "react-toastify";
-
-const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
 
 export const useUpdateFaculty = (departmentId: string) => {
   void departmentId;
@@ -30,16 +28,11 @@ export const useUpdateFaculty = (departmentId: string) => {
         formData.append("image", imageFile);
       }
 
-      const res = await axios.put(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/faculty/${id}`,
-        formData,
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const res = await apiClient.put(`/admin/faculty/${id}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
       return res.data;
     },
     onSuccess: (res) => {
@@ -57,10 +50,7 @@ export const useDeleteFaculty = (departmentId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const res = await axios.delete(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/faculty/${id}`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.delete(`/admin/faculty/${id}`);
       return res.data;
     },
     onSuccess: (res) => {
@@ -83,11 +73,10 @@ export const useCreateHodAccount = (departmentId: string) => {
       id: string;
       data: Record<string, unknown>;
     }) => {
-      const res = await axios.post(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/faculty/${id}/hod`,
-        { ...data, departmentId },
-        { withCredentials: true }
-      );
+      const res = await apiClient.post(`/admin/faculty/${id}/hod`, {
+        ...data,
+        departmentId,
+      });
       return res.data;
     },
     onSuccess: (res) => {
@@ -105,11 +94,7 @@ export const useReassignHodAccount = (departmentId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, hodId }: { id: string; hodId: string }) => {
-      const res = await axios.put(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/faculty/${id}/hod`,
-        { hodId },
-        { withCredentials: true }
-      );
+      const res = await apiClient.put(`/admin/faculty/${id}/hod`, { hodId });
       return res.data;
     },
     onSuccess: (res) => {

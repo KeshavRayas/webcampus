@@ -17,10 +17,12 @@ import StudentProfileRouter from "@webcampus/api/src/routers/admin/student-profi
 import StudentRouter from "@webcampus/api/src/routers/admin/student.router";
 import UserRouter from "@webcampus/api/src/routers/admin/user.router";
 import WhatsAppRouter from "@webcampus/api/src/routers/admin/whatsapp.router";
+import { protect } from "@webcampus/backend-utils/middlewares";
 import { Router } from "express";
 import { getSections } from "../../controllers/admin/section.controller";
 import facultyRouter from "./faculty.router";
 import HallTicketRouter from "./hall-ticket.router";
+import ProgrammeOutcomeRouter from "./programme-outcome.router";
 import ProjectMappingRouter from "./project-mapping.router";
 
 const router: Router = Router();
@@ -64,6 +66,14 @@ router.use("/hall-ticket", HallTicketRouter);
 
 router.use("/whatsapp", WhatsAppRouter);
 
+router.use("/programme-outcomes", ProgrammeOutcomeRouter);
+
 router.get("/sections", getSections);
+
+router.get(
+  "/sections",
+  protect({ role: "admin", permissions: {} }),
+  getSections
+);
 
 export default router;

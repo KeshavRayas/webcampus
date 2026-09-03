@@ -1,7 +1,7 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import { Button } from "@webcampus/ui/components/button";
 import {
@@ -12,7 +12,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@webcampus/ui/components/dialog";
-import axios from "axios";
 import { format } from "date-fns";
 import { ArrowRight, History, Loader2 } from "lucide-react";
 import { useState } from "react";
@@ -49,16 +48,15 @@ interface AuditHistoryDialogProps {
 }
 
 export const AuditHistoryDialog = ({ courseId }: AuditHistoryDialogProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const [page, setPage] = useState(1);
   const pageSize = 20;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["audit-history", courseId, page],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<PaginatedAuditResponse>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/audit/course/${courseId}`,
-        { params: { page, pageSize }, withCredentials: true }
+      const res = await apiClient.get<BaseResponse<PaginatedAuditResponse>>(
+        `/admin/audit/course/${courseId}`,
+        { params: { page, pageSize } }
       );
       if (res.data.status === "success") return res.data.data;
       return null;

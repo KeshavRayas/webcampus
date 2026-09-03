@@ -1,23 +1,18 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
-import { frontendEnv } from "@webcampus/common/env";
 import { DataTable } from "@webcampus/ui/components/data-table";
-import axios from "axios";
 import { CoeActions } from "./coe-actions";
 import { CoeForm } from "./coe-form";
 import { CoeUser } from "./coe-types";
 
 export const CoeView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const { data: coes = [], isLoading } = useQuery<CoeUser[]>({
     queryKey: ["admin-coes"],
     queryFn: async () => {
-      const res = await axios.get(`${NEXT_PUBLIC_API_BASE_URL}/admin/coe`, {
-        withCredentials: true,
-      });
+      const res = await apiClient.get(`/admin/coe`);
       return res.data.data;
     },
   });

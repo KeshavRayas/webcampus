@@ -293,6 +293,7 @@ class PeTestSeed {
           data: {
             userId: user.id,
             usn: student.usn,
+            departmentId: csDept.id,
             departmentName: "Computer Science and Engineering",
             currentSemester: 1,
             academicYear: "2026",

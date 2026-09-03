@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
-import { frontendEnv } from "@webcampus/common/env";
 import { CourseResponseDTO } from "@webcampus/schemas/department";
 import { BaseResponse } from "@webcampus/types/api";
 import {
@@ -42,7 +42,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@webcampus/ui/components/tooltip";
-import axios, { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { Eye, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-toastify";
@@ -57,7 +57,6 @@ export const CourseApprovalsTable = ({
   deptInfo,
   appliedFilters,
 }: CourseApprovalsTableProps) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -75,15 +74,14 @@ export const CourseApprovalsTable = ({
     queryFn: async () => {
       if (!deptInfo?.name || !appliedFilters?.semesterId) return [];
 
-      const res = await axios.get<BaseResponse<CourseResponseDTO[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/branch`,
+      const res = await apiClient.get<BaseResponse<CourseResponseDTO[]>>(
+        `/department/course/branch`,
         {
           params: {
             name: deptInfo.name,
             semesterId: appliedFilters.semesterId,
             ...(appliedFilters.cycle ? { cycle: appliedFilters.cycle } : {}),
           },
-          withCredentials: true,
         }
       );
       if (res.data.status === "success" && res.data.data) return res.data.data;
@@ -97,14 +95,13 @@ export const CourseApprovalsTable = ({
 
     setIsSubmitting(true);
     try {
-      const res = await axios.post<BaseResponse<{ count: number }>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/bulk-submit`,
+      const res = await apiClient.post<BaseResponse<{ count: number }>>(
+        `/department/course/bulk-submit`,
         {
           semesterId: appliedFilters.semesterId,
           departmentName: deptInfo.name,
           ...(appliedFilters.cycle ? { cycle: appliedFilters.cycle } : {}),
-        },
-        { withCredentials: true }
+        }
       );
 
       if (res.data.status === "success") {
@@ -378,16 +375,13 @@ const CourseDetailContent = ({
   semesterId: string;
   academicYear: string;
 }) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const { data: mappings, isLoading: loadingMappings } = useQuery({
     queryKey: ["course-mapping-detail", courseId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<MappingInfo[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course-assignment/by-course`,
+      const res = await apiClient.get<BaseResponse<MappingInfo[]>>(
+        `/department/course-assignment/by-course`,
         {
           params: { courseId, semesterId, academicYear },
-          withCredentials: true,
         }
       );
       return res.data.status === "success" && res.data.data
@@ -400,9 +394,8 @@ const CourseDetailContent = ({
   const { data: coordinators, isLoading: loadingCoords } = useQuery({
     queryKey: ["course-coordinators-detail", courseId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<CoordinatorInfo[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/department/course/${courseId}/coordinators`,
-        { withCredentials: true }
+      const res = await apiClient.get<BaseResponse<CoordinatorInfo[]>>(
+        `/department/course/${courseId}/coordinators`
       );
       return res.data.status === "success" && res.data.data
         ? res.data.data

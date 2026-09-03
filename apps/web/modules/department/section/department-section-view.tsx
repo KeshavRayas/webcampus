@@ -1,5 +1,6 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import {
   createFilterQueryString,
@@ -8,7 +9,6 @@ import {
 import { useCascadingFilterSync } from "@/lib/use-cascading-filter-sync";
 import { useAcademicTerms } from "@/modules/admin/semester/use-academic-term";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse } from "@webcampus/types/api";
 import {
   FilterActions,
@@ -16,7 +16,6 @@ import {
   FilterPanel,
   type FilterFieldConfig,
 } from "@webcampus/ui/components/filter-builder";
-import axios from "axios";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useMemo } from "react";
 import { GenerateSectionsDialog } from "./generate-sections-dialog";
@@ -47,7 +46,6 @@ const isRestrictedFirstYearUgSemester = (semester: {
 
 export const DepartmentSectionView = () => {
   const { data: session } = authClient.useSession();
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,11 +74,9 @@ export const DepartmentSectionView = () => {
   const { data: deptInfo } = useQuery({
     queryKey: ["department-info"],
     queryFn: async () => {
-      const res = await axios.get<
+      const res = await apiClient.get<
         BaseResponse<{ type: string; name: string; id: string }>
-      >(`${NEXT_PUBLIC_API_BASE_URL}/department/section/department-info`, {
-        withCredentials: true,
-      });
+      >(`/department/section/department-info`);
       if (res.data.status === "success") return res.data.data;
       return { type: "DEGREE_GRANTING", name: "", id: "" };
     },

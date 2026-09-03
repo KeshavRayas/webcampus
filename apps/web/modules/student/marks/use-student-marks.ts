@@ -1,9 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import type { BaseResponse } from "@webcampus/types/api";
-import axios from "axios";
 
 export interface StudentComponentResult {
   active: boolean;
@@ -35,16 +34,13 @@ export interface StudentCourseMarks {
 }
 
 export const useStudentMarks = (semesterId: string) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["student-marks-summary", semesterId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<StudentCourseMarks[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/student/marks/summary`,
+      const res = await apiClient.get<BaseResponse<StudentCourseMarks[]>>(
+        `/student/marks/summary`,
         {
           params: { semesterId },
-          withCredentials: true,
         }
       );
 

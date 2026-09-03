@@ -1,4 +1,5 @@
 import { MarkController } from "@webcampus/api/src/controllers/faculty/mark.controller";
+import { upload } from "@webcampus/api/src/utils/upload";
 import { protect, validateRequest } from "@webcampus/backend-utils/middlewares";
 import {
   CreateMarkSchema,
@@ -6,10 +7,8 @@ import {
   UpdateMarkSchema,
 } from "@webcampus/schemas/faculty";
 import { Router } from "express";
-import multer from "multer";
 
 const router: Router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
 
 // All mark routes require faculty authentication
 router.use(

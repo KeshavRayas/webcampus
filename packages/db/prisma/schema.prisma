@@ -39,8 +39,8 @@ model User {
   feedbackRoundsCreated       FeedbackRound[]
   noticesCreated              Notice[]
   feedbackPresetsCreated      FeedbackQuestionPreset[]
-  cancelledAdmissions             CancelledAdmissions[]
-  filledAdmissions            Admission[] @relation("AdmissionFilledBy")
+  cancelledAdmissions         CancelledAdmissions[]
+  filledAdmissions            Admission[]              @relation("AdmissionFilledBy")
 
   courseMappingAuditLogs CourseMappingAuditLog[]
   supportTicketsCreated  SupportTicket[]         @relation("SupportTicketCreator")
@@ -50,18 +50,18 @@ model User {
 }
 
 model AcademicTerm {
-  id                      String                   @id @default(uuid())
-  type                    SemesterType
-  year                    String
-  isCurrent               Boolean                  @default(false)
-  Semester                Semester[]
-  registrationWindows     RegistrationWindow[]
-  courseRegistrations     CourseRegistration[]
-  hallTickets             HallTicket[]
-  feedbackQuestionSets    FeedbackQuestionSet[]
-  feedbackRounds          FeedbackRound[]
-  feedbackQuestionPresets FeedbackQuestionPreset[]
-  bonusAttendanceWindows BonusAttendanceWindow[]
+  id                             String                          @id @default(uuid())
+  type                           SemesterType
+  year                           String
+  isCurrent                      Boolean                         @default(false)
+  Semester                       Semester[]
+  registrationWindows            RegistrationWindow[]
+  courseRegistrations            CourseRegistration[]
+  hallTickets                    HallTicket[]
+  feedbackQuestionSets           FeedbackQuestionSet[]
+  feedbackRounds                 FeedbackRound[]
+  feedbackQuestionPresets        FeedbackQuestionPreset[]
+  bonusAttendanceWindows         BonusAttendanceWindow[]
   hallTicketVerificationSettings HallTicketVerificationSetting[]
   hallTicketVerificationLogs     HallTicketVerificationLog[]
 
@@ -88,13 +88,14 @@ model Semester {
   registrationWindows    RegistrationWindow[]
   sections               Section[]
   proctorGroups          ProctorGroup[]
-  timetableEntries    TimetableEntry[]
-  timetableTemplates  TimetableTemplate[]
-  academicTerm        AcademicTerm         @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
-  createdBy           User                 @relation(fields: [userId], references: [id])
+  timetableEntries       TimetableEntry[]
+  timetableTemplates     TimetableTemplate[]
+  academicTerm           AcademicTerm            @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+  createdBy              User                    @relation(fields: [userId], references: [id])
 
   @@unique([academicTermId, programType, semesterNumber])
 }
+
 model Session {
   id             String   @id
   expiresAt      DateTime
@@ -161,6 +162,7 @@ model Department {
   bonusAttendanceWindows BonusAttendanceWindow[]
   proctorGroups          ProctorGroup[]
   timetableEntries       TimetableEntry[]
+  programmeOutcomes      ProgrammeOutcome[]
   timetableTemplates     TimetableTemplate[]
   notices                Notice[]
   feeStructures          FeeStructure[]
@@ -185,20 +187,20 @@ model RegistrationWindow {
 }
 
 model BonusAttendanceWindow {
-  id             String    @id @default(uuid())
+  id             String       @id @default(uuid())
   academicTermId String
   semesterId     String
   departmentId   String?
   cycle          Cycle?
-  days           Int       @default(1)
-  isOpen         Boolean   @default(false)
+  days           Int          @default(1)
+  isOpen         Boolean      @default(false)
   openedAt       DateTime?
   expiresAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  academicTerm AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
-  semester     Semester     @relation(fields: [semesterId], references: [id], onDelete: Cascade)
-  department   Department?  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  academicTerm   AcademicTerm @relation(fields: [academicTermId], references: [id], onDelete: Cascade)
+  semester       Semester     @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  department     Department?  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
   @@unique([academicTermId, semesterId, departmentId, cycle])
   @@index([academicTermId, semesterId])
@@ -220,27 +222,28 @@ model DepartmentUser {
 model Hod {
   id             String      @id @default(uuid())
   userId         String      @unique
+  departmentId   String?
   departmentName String?
   facultyId      String?     @unique
-  department     Department? @relation(fields: [departmentName], references: [name])
+  department     Department? @relation(fields: [departmentId], references: [id])
   faculty        Faculty?    @relation(fields: [facultyId], references: [id])
   user           User        @relation(fields: [userId], references: [id])
 }
 
 model Section {
-  id              String             @id @default(uuid())
-  name            String
-  departmentName  String?
-  semesterId      String
-  cycle           Cycle              @default(NONE)
-  departmentId    String
-  batches         Batch[]
-  electiveBatches ElectiveBatch[]
-  ClassSession    ClassSession[]
-  courses         CourseAssignment[]
-  department      Department         @relation(fields: [departmentId], references: [id])
-  semester        Semester           @relation(fields: [semesterId], references: [id])
-  studentSections StudentSection[]
+  id               String             @id @default(uuid())
+  name             String
+  departmentName   String?
+  semesterId       String
+  cycle            Cycle              @default(NONE)
+  departmentId     String
+  batches          Batch[]
+  electiveBatches  ElectiveBatch[]
+  ClassSession     ClassSession[]
+  courses          CourseAssignment[]
+  department       Department         @relation(fields: [departmentId], references: [id])
+  semester         Semester           @relation(fields: [semesterId], references: [id])
+  studentSections  StudentSection[]
   timetableEntries TimetableEntry[]
 
   @@unique([id, departmentId])
@@ -285,6 +288,7 @@ model Student {
   id                         String                      @id @default(uuid())
   userId                     String                      @unique
   usn                        String                      @unique
+  departmentId               String
   departmentName             String
   currentSemester            Int
   academicYear               String
@@ -303,18 +307,18 @@ model Student {
   accounts                   Accounts[]
   hallTickets                HallTicket[]
   marks                      Mark[]
-  department                 Department                  @relation(fields: [departmentName], references: [name])
+  department                 Department                  @relation(fields: [departmentId], references: [id])
   user                       User                        @relation(fields: [userId], references: [id])
   feedbackResponses          FeedbackResponse[]
   studentSections            StudentSection[]
   batches                    Batch[]                     @relation("BatchStudents")
   hallTicketVerificationLogs HallTicketVerificationLog[]
   electiveStudentAssignments ElectiveStudentAssignment[]
-  proctorGroupId    String?
-  proctorGroup      ProctorGroup?       @relation(fields: [proctorGroupId], references: [id], onDelete: SetNull)
+  proctorGroupId             String?
+  proctorGroup               ProctorGroup?               @relation(fields: [proctorGroupId], references: [id], onDelete: SetNull)
 
-  @@index([departmentName])
-  @@index([departmentName, currentSemester])
+  @@index([departmentId])
+  @@index([departmentId, currentSemester])
   @@index([semesterId])
   @@index([semesterNumber])
   @@index([programType])
@@ -490,37 +494,38 @@ model Course {
   nextProjectGroupSequence Int                  @default(0)
 
   // ─── APPROVAL & TRACKING FIELDS ───
-  approvalStatus          CourseApprovalStatus @default(DRAFT)
-  approvedByRole          String?
-  approvedByUsername      String?
-  approvedByDisplay       String?
-  approvedAt              DateTime?
-  revisionRequestedByRole String?
-  revisionNotes           String?
-  revisionRequestedAt     DateTime?
-  version                 Int                  @default(1)
-  lastOverrideAt          DateTime?
-  lastOverrideById        String?
-  overrideCount           Int                  @default(0)
-  hasPostApprovalEdits    Boolean              @default(false)
+  approvalStatus             CourseApprovalStatus        @default(DRAFT)
+  approvedByRole             String?
+  approvedByUsername         String?
+  approvedByDisplay          String?
+  approvedAt                 DateTime?
+  revisionRequestedByRole    String?
+  revisionNotes              String?
+  revisionRequestedAt        DateTime?
+  version                    Int                         @default(1)
+  lastOverrideAt             DateTime?
+  lastOverrideById           String?
+  overrideCount              Int                         @default(0)
+  hasPostApprovalEdits       Boolean                     @default(false)
   // ─── RELATIONS ───
-  assessments             AssessmentTemplate[]
-  attendances             Attendance[]
-  ClassSession            ClassSession[]
-  department              Department              @relation(fields: [departmentId], references: [id])
-  semester                Semester                @relation(fields: [semesterId], references: [id])
-  assignments             CourseAssignment[]
-  coordinators            CourseCoordinator[]
-  mappingAuditLogs        CourseMappingAuditLog[]
-  registrations           CourseRegistration[]
-  marks                   Mark[]
-  studentAssessments      StudentAssessment[]
+  assessments                AssessmentTemplate[]
+  attendances                Attendance[]
+  ClassSession               ClassSession[]
+  department                 Department                  @relation(fields: [departmentId], references: [id])
+  semester                   Semester                    @relation(fields: [semesterId], references: [id])
+  assignments                CourseAssignment[]
+  coordinators               CourseCoordinator[]
+  mappingAuditLogs           CourseMappingAuditLog[]
+  registrations              CourseRegistration[]
+  marks                      Mark[]
+  studentAssessments         StudentAssessment[]
   electiveBatches            ElectiveBatch[]
   electiveBatchFaculties     ElectiveBatchFaculty[]
   electiveStudentAssignments ElectiveStudentAssignment[]
-  openElectiveDepartments  OpenElectiveDepartment[]
-  feedbackResponses  FeedbackResponse[]
-  timetableEntries         TimetableEntry[]
+  openElectiveDepartments    OpenElectiveDepartment[]
+  feedbackResponses          FeedbackResponse[]
+  courseOutcomes             CourseOutcome[]
+  timetableEntries           TimetableEntry[]
 
   // ─── INDEXES ───
   @@unique([id, departmentId])
@@ -558,28 +563,28 @@ model CourseAssignment {
 }
 
 model TimetableEntry {
-  id                String             @id @default(uuid())
-  academicYear      String
-  semesterId        String
-  departmentId      String?
-  courseId          String
-  facultyId         String
-  roomNumber        String
-  dayOfWeek         DayOfWeek
-  startTime         String
-  endTime           String
-  classType         ClassType
-  sectionId         String?
-  batchId           String?
-  status            TimetableStatus @default(DRAFT)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id           String          @id @default(uuid())
+  academicYear String
+  semesterId   String
+  departmentId String?
+  courseId     String
+  facultyId    String
+  roomNumber   String
+  dayOfWeek    DayOfWeek
+  startTime    String
+  endTime      String
+  classType    ClassType
+  sectionId    String?
+  batchId      String?
+  status       TimetableStatus @default(DRAFT)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
-  semester          Semester           @relation(fields: [semesterId], references: [id], onDelete: Cascade)
-  course            Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  faculty           Faculty            @relation(fields: [facultyId], references: [id], onDelete: Cascade)
-  department        Department?       @relation(fields: [departmentId], references: [id])
-  section           Section?          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  semester   Semester    @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  course     Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  faculty    Faculty     @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id])
+  section    Section?    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
   @@unique([departmentId, courseId, facultyId, sectionId, batchId, dayOfWeek, startTime, endTime])
   @@index([semesterId])
@@ -1121,14 +1126,14 @@ model AdmissionConstants {
 }
 
 model FeeStructure {
-  id             String   @id @default(uuid())
-  departmentId   String
-  modeOfAdmission String
+  id               String   @id @default(uuid())
+  departmentId     String
+  modeOfAdmission  String
   categoryAllotted String?
-  quota          String?
-  feeAmount      Float    @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  quota            String?
+  feeAmount        Float    @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
 
@@ -1294,6 +1299,8 @@ model AssessmentQuestion {
   marks        Int
   co           String?
   po           String?
+  peo          String?
+  pso          String?
   bl           String?
   orGroupId    String?
   assessment   AssessmentTemplate    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
@@ -1366,13 +1373,13 @@ model CourseMappingAuditLog {
 }
 
 model Accounts {
-  id           String           @id @default(uuid())
+  id           String            @id @default(uuid())
   studentId    String
   academicYear String
-  finalFee     Float            @default(0)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  finalFee     Float             @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  student      Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
   payments     AccountsPayment[]
 
   @@unique([studentId, academicYear])
@@ -1968,4 +1975,40 @@ model ProctorGroup {
   @@index([departmentId])
   @@index([facultyId])
   @@index([semesterId])
+}
+
+enum OutcomeType {
+  PEO
+  PSO
+  PO
+}
+
+model ProgrammeOutcome {
+  id           String      @id @default(uuid())
+  programType  ProgramType
+  departmentId String?
+  type         OutcomeType
+  code         String
+  description  String
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  @@unique([programType, departmentId, type, code])
+}
+
+model CourseOutcome {
+  id          String   @id @default(uuid())
+  courseId    String
+  code        String
+  description String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, code])
 }

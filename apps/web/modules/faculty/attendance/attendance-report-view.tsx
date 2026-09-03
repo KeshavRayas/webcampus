@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { downloadBlob } from "@/lib/download";
 import { useQueryClient } from "@tanstack/react-query";
 import { FacultyAttendanceSessionDetailDTO } from "@webcampus/types/api";
 import jsPDF from "jspdf";
@@ -86,14 +87,7 @@ const downloadCSV = (filename: string, rows: string[][]) => {
     .map((e) => e.map((cell) => `"${cell}"`).join(","))
     .join("\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  downloadBlob(blob, filename);
 };
 
 export const AttendanceReportView = () => {
@@ -308,8 +302,7 @@ export const AttendanceReportView = () => {
               sessionId: session.id,
             }),
           };
-        } catch (err) {
-          console.log(err);
+        } catch {
           return { id: session.id, detail: null };
         }
       })

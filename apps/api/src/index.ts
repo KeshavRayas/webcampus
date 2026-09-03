@@ -1,6 +1,9 @@
 import { backendEnv } from "@webcampus/common/env";
 import app from "./app.js";
-import { startBonusAttendanceWindowSweep } from "./jobs/bonus-attendance-window-sweep";
+import {
+  startBonusAttendanceWindowSweep,
+  stopBonusAttendanceWindowSweep,
+} from "./jobs/bonus-attendance-window-sweep";
 
 const server = app.listen(backendEnv().PORT, () => {
   console.log(`API Server is running on http://localhost:${backendEnv().PORT}`);
@@ -9,6 +12,7 @@ const server = app.listen(backendEnv().PORT, () => {
 
 function gracefulShutdown(signal: string) {
   console.log(`\n${signal} received. Shutting down gracefully...`);
+  stopBonusAttendanceWindowSweep();
   server.close(() => {
     console.log("HTTP server closed.");
     process.exit(0);

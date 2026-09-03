@@ -1,26 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useQuery } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@webcampus/ui/components/card";
-import axios from "axios";
 
 export const StudentProctorView = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   const { data: proctorGroup, isLoading } = useQuery({
     queryKey: ["student-proctor"],
     queryFn: async () => {
-      const res = await axios.get<any>(
-        `${NEXT_PUBLIC_API_BASE_URL}/student/proctor`,
-        { withCredentials: true }
-      );
+      const res = await apiClient.get<any>(`/student/proctor`);
       return res.data.data;
     },
   });

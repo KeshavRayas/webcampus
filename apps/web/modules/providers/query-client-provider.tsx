@@ -6,13 +6,23 @@ import {
 } from "@tanstack/react-query";
 import React from "react";
 
-const queryClient = new QueryClient();
-
 export const QueryClientProvider = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
+  const [queryClient] = React.useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 5 * 60 * 1000,
+            retry: 1,
+          },
+        },
+      })
+  );
+
   return (
     <TanstackQueryProvider client={queryClient}>
       {children}

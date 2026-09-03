@@ -14,6 +14,7 @@ type CourseReference = {
   name: string;
   hasLaboratoryComponent?: boolean;
   handlingFaculty?: FacultyReference[];
+  handlingFacultyElective?: FacultyReference[];
 };
 type ReferenceRow = { code: string; name: string; faculty: string };
 const days = [
@@ -35,10 +36,22 @@ const buildReferenceRows = (
       course.handlingFaculty?.filter(
         (faculty) => !sectionId || faculty.sectionId === sectionId
       ) ?? [];
-    const theoryFaculty = handling.filter(
+    const handlingElective =
+      course.handlingFacultyElective?.filter(
+        (faculty) =>
+          !sectionId || !faculty.sectionId || faculty.sectionId === sectionId
+      ) ?? [];
+    // Aggregate PE/OE across all batches per course-section, deduped by faculty id
+    const combined = [...handling, ...handlingElective];
+    const dedupedMap = new Map<string, FacultyReference>();
+    for (const f of combined) {
+      if (!dedupedMap.has(f.id)) dedupedMap.set(f.id, f);
+    }
+    const deduped = [...dedupedMap.values()];
+    const theoryFaculty = deduped.filter(
       (faculty) => faculty.assignmentType === "THEORY"
     );
-    const labFaculty = handling.filter(
+    const labFaculty = deduped.filter(
       (faculty) => faculty.assignmentType === "LAB"
     );
 

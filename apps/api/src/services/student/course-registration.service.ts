@@ -24,6 +24,7 @@ const FIRST_YEAR_UG_SEMESTERS = new Set([1, 2]);
 
 type StudentContext = {
   id: string;
+  departmentId: string;
   departmentName: string;
   semesterId: string;
   academicTermId: string;
@@ -40,6 +41,7 @@ export class CourseRegistration {
       where: { userId },
       select: {
         id: true,
+        departmentId: true,
         departmentName: true,
         semesterId: true,
         academicTermId: true,
@@ -71,6 +73,7 @@ export class CourseRegistration {
 
     return {
       id: student.id,
+      departmentId: student.departmentId,
       departmentName: student.departmentName,
       semesterId: student.semesterId,
       academicTermId: student.academicTermId,
@@ -116,17 +119,8 @@ export class CourseRegistration {
       };
     }
 
-    const department = await db.department.findUnique({
-      where: { name: student.departmentName },
-      select: { id: true },
-    });
-
-    if (!department) {
-      throw new Error("Student department not found");
-    }
-
     return {
-      departmentId: department.id,
+      departmentId: student.departmentId,
       cycle: null,
     };
   }
@@ -197,7 +191,7 @@ export class CourseRegistration {
         departmentName: true,
         openElectiveEligibility: true,
         openElectiveDepartments: {
-          select: { department: { select: { name: true } } },
+          select: { department: { select: { id: true, name: true } } },
         },
         electiveBatches: {
           orderBy: { sortOrder: "asc" },
@@ -225,6 +219,7 @@ export class CourseRegistration {
       (course) =>
         strategyFor(course.courseType).visibleCourses(
           [course],
+          student.departmentId,
           student.departmentName
         ).length === 1
     );
@@ -470,6 +465,7 @@ export class CourseRegistration {
 
       const registrationContext: StudentRegistrationContext = {
         studentId: student.id,
+        departmentId: student.departmentId,
         departmentName: student.departmentName,
         semesterId: student.semesterId,
         academicTermId: student.academicTermId,

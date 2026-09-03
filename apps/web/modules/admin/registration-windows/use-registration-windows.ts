@@ -1,9 +1,9 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { frontendEnv } from "@webcampus/common/env";
 import { BaseResponse, ErrorResponse } from "@webcampus/types/api";
-import axios, { AxiosError } from "axios";
+import type { AxiosError } from "axios";
 import { toast } from "react-toastify";
 
 export interface RegistrationWindowRow {
@@ -40,13 +40,11 @@ export const useRegistrationWindows = (
   filters: RegistrationWindowFilters,
   enabled: boolean
 ) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["admin-registration-windows", filters],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<RegistrationWindowRow[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/registration-windows`,
+      const res = await apiClient.get<BaseResponse<RegistrationWindowRow[]>>(
+        `/admin/registration-windows`,
         {
           params: {
             academicTermId: filters.academicTermId,
@@ -56,7 +54,6 @@ export const useRegistrationWindows = (
               : {}),
             ...(filters.cycle ? { cycle: filters.cycle } : {}),
           },
-          withCredentials: true,
         }
       );
 
@@ -71,15 +68,13 @@ export const useRegistrationWindows = (
 };
 
 export const useCreateRegistrationWindow = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (payload: RegistrationWindowFilters) => {
-      return axios.post<BaseResponse<RegistrationWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/registration-windows`,
-        payload,
-        { withCredentials: true }
+      return apiClient.post<BaseResponse<RegistrationWindowRow>>(
+        `/admin/registration-windows`,
+        payload
       );
     },
     onSuccess: (res) => {
@@ -97,15 +92,13 @@ export const useCreateRegistrationWindow = () => {
 };
 
 export const useToggleRegistrationWindow = () => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, isOpen }: { id: string; isOpen: boolean }) => {
-      return axios.patch<BaseResponse<RegistrationWindowRow>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/registration-windows/${id}/toggle`,
-        { isOpen },
-        { withCredentials: true }
+      return apiClient.patch<BaseResponse<RegistrationWindowRow>>(
+        `/admin/registration-windows/${id}/toggle`,
+        { isOpen }
       );
     },
     onSuccess: (res) => {
@@ -123,17 +116,12 @@ export const useToggleRegistrationWindow = () => {
 };
 
 export const useRegistrationWindowCourses = (windowId?: string) => {
-  const { NEXT_PUBLIC_API_BASE_URL } = frontendEnv();
-
   return useQuery({
     queryKey: ["admin-registration-window-courses", windowId],
     queryFn: async () => {
-      const res = await axios.get<BaseResponse<RegistrationWindowCourseRow[]>>(
-        `${NEXT_PUBLIC_API_BASE_URL}/admin/registration-windows/${windowId}/courses`,
-        {
-          withCredentials: true,
-        }
-      );
+      const res = await apiClient.get<
+        BaseResponse<RegistrationWindowCourseRow[]>
+      >(`/admin/registration-windows/${windowId}/courses`);
 
       if (res.data.status === "success") {
         return res.data.data || [];

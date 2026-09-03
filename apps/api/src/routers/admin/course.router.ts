@@ -13,73 +13,73 @@ const router: Router = Router();
 
 router.post(
   "/",
-  validateRequest(AdminCreateCourseSchema),
   protect({
     role: "admin",
     permissions: {
       courses: ["create"],
     },
   }),
+  validateRequest(AdminCreateCourseSchema),
   AdminCourseController.create
 );
 
 router.put(
   "/",
-  validateRequest(AdminUpdateCourseSchema),
   protect({
     role: "admin",
     permissions: {
       courses: ["update"],
     },
   }),
+  validateRequest(AdminUpdateCourseSchema),
   AdminCourseController.update
 );
 
 router.delete(
   "/",
-  validateRequest(AdminDeleteCourseSchema),
   protect({
     role: "admin",
     permissions: {
       courses: ["delete"],
     },
   }),
+  validateRequest(AdminDeleteCourseSchema),
   AdminCourseController.delete
 );
 
 router.get(
   "/branch",
-  validateRequest(AdminCourseBranchQuerySchema, "query"),
   protect({
     role: "admin",
     permissions: {
       courses: ["read"],
     },
   }),
+  validateRequest(AdminCourseBranchQuerySchema, "query"),
   AdminCourseController.getByDepartment
 );
 
 router.get(
   "/pe-capacity-summary",
-  validateRequest(AdminCourseBranchQuerySchema, "query"),
   protect({
     role: "admin",
     permissions: {
       courses: ["read"],
     },
   }),
+  validateRequest(AdminCourseBranchQuerySchema, "query"),
   AdminCourseController.getPeCapacitySummary
 );
 
 router.get(
   "/:id",
-  validateRequest(AdminCourseByIdQuerySchema, "query"),
   protect({
     role: "admin",
     permissions: {
       courses: ["read"],
     },
   }),
+  validateRequest(AdminCourseByIdQuerySchema, "query"),
   AdminCourseController.getById
 );
 

@@ -1,8 +1,8 @@
 "use client";
 
+import { apiClient } from "@/lib/api-client";
 import { frontendEnv } from "@webcampus/common/env";
 import type { FeedbackReportQuery } from "@webcampus/schemas/feedback";
-import axios from "axios";
 
 const baseUrl = () => frontendEnv().NEXT_PUBLIC_API_BASE_URL;
 
@@ -10,9 +10,8 @@ export async function getFeedbackReport(
   query: FeedbackReportQuery,
   role: string
 ) {
-  const response = await axios.get(`${baseUrl()}/${role}/feedback/report`, {
+  const response = await apiClient.get(`${baseUrl()}/${role}/feedback/report`, {
     params: query,
-    withCredentials: true,
   });
   return response.data.data;
 }
@@ -21,9 +20,9 @@ export async function getFeedbackFilterOptions(
   role: string,
   scope?: { academicTermId?: string; semesterId?: string; courseId?: string }
 ) {
-  const response = await axios.get(
+  const response = await apiClient.get(
     `${baseUrl()}/${role}/feedback/filter-options`,
-    { params: scope, withCredentials: true }
+    { params: scope }
   );
   return response.data.data as {
     faculty: Array<{ id: string; shortName: string; user: { name: string } }>;
@@ -43,11 +42,10 @@ export async function getRoundFaculties(
   roundId: string,
   departmentId?: string
 ) {
-  const response = await axios.get(
+  const response = await apiClient.get(
     `${baseUrl()}/admin/feedback/rounds/${roundId}/faculties`,
     {
       params: departmentId ? { departmentId } : undefined,
-      withCredentials: true,
     }
   );
   return response.data.data;
@@ -91,11 +89,10 @@ export async function getCourseDistribution(
   courseId: string,
   sectionId?: string
 ) {
-  const response = await axios.get(
+  const response = await apiClient.get(
     `${baseUrl()}/admin/feedback/rounds/${roundId}/course-distribution`,
     {
       params: { facultyId, courseId, ...(sectionId ? { sectionId } : {}) },
-      withCredentials: true,
     }
   );
   return response.data.data as CourseDistributionResult;
@@ -105,9 +102,8 @@ export async function getRoundFacultyCourses(
   roundId: string,
   facultyId: string
 ) {
-  const response = await axios.get(
-    `${baseUrl()}/admin/feedback/rounds/${roundId}/faculties/${facultyId}/courses`,
-    { withCredentials: true }
+  const response = await apiClient.get(
+    `${baseUrl()}/admin/feedback/rounds/${roundId}/faculties/${facultyId}/courses`
   );
   return response.data.data;
 }
@@ -117,9 +113,8 @@ export async function getRoundCourseSections(
   facultyId: string,
   courseId: string
 ) {
-  const response = await axios.get(
-    `${baseUrl()}/admin/feedback/rounds/${roundId}/faculties/${facultyId}/courses/${courseId}/sections`,
-    { withCredentials: true }
+  const response = await apiClient.get(
+    `${baseUrl()}/admin/feedback/rounds/${roundId}/faculties/${facultyId}/courses/${courseId}/sections`
   );
   return response.data.data;
 }
@@ -130,9 +125,8 @@ export async function getRoundSectionStudents(
   courseId: string,
   sectionId: string
 ) {
-  const response = await axios.get(
-    `${baseUrl()}/admin/feedback/rounds/${roundId}/faculties/${facultyId}/courses/${courseId}/sections/${sectionId}/students`,
-    { withCredentials: true }
+  const response = await apiClient.get(
+    `${baseUrl()}/admin/feedback/rounds/${roundId}/faculties/${facultyId}/courses/${courseId}/sections/${sectionId}/students`
   );
   return response.data.data;
 }
